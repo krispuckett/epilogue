@@ -26,7 +26,8 @@ struct GoogleBookItem: Codable, Identifiable {
             coverImageURL: imageURL,
             isbn: volumeInfo.industryIdentifiers?.first { $0.type.contains("ISBN") }?.identifier,
             description: volumeInfo.description,
-            pageCount: volumeInfo.pageCount
+            pageCount: volumeInfo.pageCount,
+            localId: UUID()
         )
     }
 }
@@ -62,7 +63,8 @@ struct IndustryIdentifier: Codable {
 
 // MARK: - Book Model
 struct Book: Identifiable, Codable {
-    let id: String
+    let id: String  // Google Books ID
+    let localId: UUID  // Local UUID for linking
     let title: String
     let author: String
     let publishedYear: String?
@@ -77,6 +79,45 @@ struct Book: Identifiable, Codable {
     var userRating: Int?
     var userNotes: String?
     var dateAdded: Date = Date()
+    
+    init(id: String, title: String, author: String, publishedYear: String? = nil, coverImageURL: String? = nil, isbn: String? = nil, description: String? = nil, pageCount: Int? = nil, localId: UUID = UUID()) {
+        self.id = id
+        self.localId = localId
+        self.title = title
+        self.author = author
+        self.publishedYear = publishedYear
+        self.coverImageURL = coverImageURL
+        self.isbn = isbn
+        self.description = description
+        self.pageCount = pageCount
+    }
+    
+    // Custom decoding to handle migration from old model without localId
+    enum CodingKeys: String, CodingKey {
+        case id, localId, title, author, publishedYear, coverImageURL, isbn, description, pageCount
+        case isInLibrary, readingStatus, userRating, userNotes, dateAdded
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        // If localId doesn't exist in saved data, generate a new one
+        localId = try container.decodeIfPresent(UUID.self, forKey: .localId) ?? UUID()
+        title = try container.decode(String.self, forKey: .title)
+        author = try container.decode(String.self, forKey: .author)
+        publishedYear = try container.decodeIfPresent(String.self, forKey: .publishedYear)
+        coverImageURL = try container.decodeIfPresent(String.self, forKey: .coverImageURL)
+        isbn = try container.decodeIfPresent(String.self, forKey: .isbn)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount)
+        
+        isInLibrary = try container.decodeIfPresent(Bool.self, forKey: .isInLibrary) ?? false
+        readingStatus = try container.decodeIfPresent(ReadingStatus.self, forKey: .readingStatus) ?? .wantToRead
+        userRating = try container.decodeIfPresent(Int.self, forKey: .userRating)
+        userNotes = try container.decodeIfPresent(String.self, forKey: .userNotes)
+        dateAdded = try container.decodeIfPresent(Date.self, forKey: .dateAdded) ?? Date()
+    }
 }
 
 enum ReadingStatus: String, CaseIterable, Codable {

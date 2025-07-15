@@ -94,7 +94,9 @@ struct NoteComposerView: View {
                     .padding(.bottom, 12)
                     
                     // Save button near keyboard
-                    Button(action: saveNote) {
+                    Button(action: {
+                        saveNote()
+                    }) {
                         HStack {
                             Text("Save \(noteType.displayName)")
                                 .font(.system(size: 17, weight: .semibold))
@@ -179,11 +181,21 @@ struct NoteComposerView: View {
     private func saveNote() {
         let trimmedContent = noteContent.trimmingCharacters(in: .whitespacesAndNewlines)
         
+        // Parse attribution for notes
+        var finalContent = trimmedContent
+        var finalAuthor: String? = selectedBook?.author
+        var finalBookTitle: String? = selectedBook?.title
+        var bookId: UUID? = selectedBook?.localId
+        
+        // For notes, use content as-is for now
+        // Attribution parsing is handled in the command bar
+        
         let newNote = Note(
             type: noteType,
-            content: trimmedContent,
-            bookTitle: selectedBook?.title,
-            author: selectedBook?.author,
+            content: finalContent,
+            bookId: bookId,
+            bookTitle: finalBookTitle,
+            author: finalAuthor,
             pageNumber: nil,
             dateCreated: Date()
         )
@@ -422,14 +434,25 @@ struct UniversalCommandBar: View {
     @State private var showSuggestions = false
     @State private var showNoteComposer = false
     @State private var noteComposerText = ""
+    @State private var showQuoteComposer = false
+    @State private var quoteComposerText = ""
+    @State private var composerMode: ComposerMode = .none
     @FocusState private var isFocused: Bool
     @Namespace private var animation
     @Namespace private var tabSelection
+    @Namespace private var glassTransition
+    
+    enum ComposerMode {
+        case none
+        case note
+        case quote
+    }
+    
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Suggestions overlay - positioned above the command bar
-            if isExpanded && showSuggestions {
+            // Suggestions overlay - positioned above the command bar (but below composer)
+            if isExpanded && showSuggestions && composerMode == .none {
                 VStack {
                     Spacer()
                     CommandSuggestionsView(suggestions: suggestions) { suggestion in
@@ -448,16 +471,36 @@ struct UniversalCommandBar: View {
             
             // Main content that switches between tab bar and command bar
             if isExpanded {
-                // Expanded command bar
-                HStack(spacing: 12) {
-                    // Collapse button
-                    Button(action: collapse) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white.opacity(0.7))
-                            .frame(width: 44, height: 44)
-                    }
-                    .glassEffect(in: Circle())
+                // Check if we're in composer mode
+                if composerMode != .none {
+                    // Composer view with glass effect transition - this will be on top
+                    InlineComposerView(
+                        mode: $composerMode,
+                        text: $commandText,
+                        onSave: saveComposition,
+                        onCancel: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                composerMode = .none
+                                commandText = ""
+                                collapse()
+                            }
+                        }
+                    )
+                    .glassEffect(in: RoundedRectangle(cornerRadius: 24))
+                    .glassEffectID("composer", in: glassTransition)
+                    .padding(.horizontal, 16)
+                    .zIndex(1) // Ensure composer is above suggestions
+                } else {
+                    // Regular expanded command bar
+                    HStack(spacing: 12) {
+                        // Collapse button
+                        Button(action: collapse) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white.opacity(0.7))
+                                .frame(width: 44, height: 44)
+                        }
+                        .glassEffect(in: Circle())
                     
                     // Command input field
                     HStack(spacing: 12) {
@@ -471,27 +514,38 @@ struct UniversalCommandBar: View {
                             .font(.bodyLarge)
                             .foregroundStyle(.white)
                             .focused($isFocused)
-                            .onChange(of: commandText) { _, new in
-                                detectedIntent = CommandParser.parse(new)
-                                suggestions = CommandSuggestion.suggestions(for: new)
-                                showSuggestions = !new.isEmpty
+                            .onChange(of: commandText) {
+                                // Auto-convert em-dash to long em-dash
+                                var updatedText = commandText
+                                if updatedText.contains("–") {
+                                    updatedText = updatedText.replacingOccurrences(of: "–", with: "—")
+                                    commandText = updatedText
+                                }
                                 
-                                // Check if user is typing "note" to trigger composer
-                                if new.lowercased().starts(with: "note") && new.count > 4 && !showNoteComposer {
-                                    // Extract any text after "note:" or "note "
-                                    if new.lowercased().starts(with: "note:") {
-                                        noteComposerText = String(new.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                                    } else if new.lowercased().starts(with: "note ") {
-                                        noteComposerText = String(new.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                                    } else {
-                                        noteComposerText = ""
-                                    }
-                                    
-                                    // Trigger composer after a short delay
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        if commandText.lowercased().starts(with: "note") && commandText.count > 4 && !showNoteComposer {
-                                            showNoteComposer = true
-                                            isFocused = false
+                                detectedIntent = CommandParser.parse(updatedText)
+                                suggestions = CommandSuggestion.suggestions(for: updatedText)
+                                showSuggestions = !updatedText.isEmpty
+                                
+                                // Check if user is typing a command that needs composer
+                                if composerMode == .none {
+                                    if updatedText.lowercased().starts(with: "note") && updatedText.count > 4 {
+                                        // Extract any text after "note:" or "note "
+                                        var composerText = ""
+                                        if updatedText.lowercased().starts(with: "note:") {
+                                            composerText = String(updatedText.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                                        } else if updatedText.lowercased().starts(with: "note ") {
+                                            composerText = String(updatedText.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                                        }
+                                        
+                                        // Smoothly transition to note composer
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                            composerMode = .note
+                                            commandText = composerText
+                                        }
+                                    } else if case .createQuote = detectedIntent {
+                                        // Smoothly transition to quote composer
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                            composerMode = .quote
                                         }
                                     }
                                 }
@@ -520,10 +574,12 @@ struct UniversalCommandBar: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .glassEffect(in: RoundedRectangle(cornerRadius: 24))
+                    .glassEffectID("commandbar", in: glassTransition)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
                 
             } else {
                 // Normal state - tab bar with floating orb
@@ -590,7 +646,7 @@ struct UniversalCommandBar: View {
                 }
             )
         }
-        .onChange(of: isExpanded) { _, expanded in
+        .onChange(of: isExpanded) { expanded in
             if expanded {
                 // Ensure focus happens after animation
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -598,14 +654,19 @@ struct UniversalCommandBar: View {
                 }
             }
         }
-        .overlay {
-            // Note composer overlay
-            if showNoteComposer {
-                NoteComposerView(
-                    isPresented: $showNoteComposer,
-                    initialText: $noteComposerText,
-                    noteType: .note
-                ) { note in
+        // Using inline composer instead of sheet presentation
+        /*
+        .sheet(isPresented: $showNoteComposer) {
+            EditNoteSheet(
+                note: Note(
+                    type: .note,
+                    content: noteComposerText,
+                    bookTitle: nil,
+                    author: nil,
+                    pageNumber: nil,
+                    dateCreated: Date()
+                ),
+                onSave: { note in
                     // Save the note
                     notesViewModel.addNote(note)
                     
@@ -620,12 +681,34 @@ struct UniversalCommandBar: View {
                     // Reset any filters in NotesView
                     NotificationCenter.default.post(name: Notification.Name("ResetNotesFilter"), object: nil)
                 }
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 1.0, anchor: .bottom)),
-                    removal: .opacity
-                ))
-                .zIndex(100)
-            }
+            )
+            .presentationBackground(.regularMaterial)
+        }
+        */
+        .sheet(isPresented: $showQuoteComposer) {
+            EditNoteSheet(
+                note: Note(
+                    type: .quote,
+                    content: quoteComposerText,
+                    bookTitle: nil,
+                    author: nil,
+                    pageNumber: nil,
+                    dateCreated: Date()
+                ),
+                onSave: { note in
+                    // Save the quote
+                    notesViewModel.addNote(note)
+                    
+                    // Navigate to Notes tab
+                    selectedTab = 1
+                    
+                    // Reset
+                    quoteComposerText = ""
+                    
+                    HapticManager.shared.success()
+                }
+            )
+            .presentationBackground(.regularMaterial)
         }
     }
     
@@ -665,36 +748,61 @@ struct UniversalCommandBar: View {
     }
     
     private func saveQuote(_ text: String) {
-        // For now, let's just save quotes directly without the composer
-        // This could be enhanced to use the composer for quotes as well
-        var cleanedText = text
-        if cleanedText.lowercased().starts(with: "quote:") {
-            cleanedText = String(cleanedText.dropFirst(6))
-        }
-        cleanedText = cleanedText.trimmingCharacters(in: .whitespaces)
+        // Parse the quote to extract content and author
+        let parsed = CommandParser.parseQuote(text)
         
-        // Remove surrounding quotes if present
-        if cleanedText.hasPrefix("\"") && cleanedText.hasSuffix("\"") {
-            cleanedText = String(cleanedText.dropFirst().dropLast())
+        // Remove quotation marks from content since they're implied in the design
+        var cleanContent = parsed.content
+        if (cleanContent.hasPrefix("\"") && cleanContent.hasSuffix("\"")) ||
+           (cleanContent.hasPrefix("\u{201C}") && cleanContent.hasSuffix("\u{201D}")) {
+            cleanContent = String(cleanContent.dropFirst().dropLast())
         }
         
-        // Create and save the quote
-        let newNote = Note(
-            type: .quote,
-            content: cleanedText,
-            bookTitle: nil,
-            author: nil,
-            pageNumber: nil,
-            dateCreated: Date()
-        )
+        // Set the text and show composer
+        quoteComposerText = cleanContent
         
-        // Add to notes view model
-        notesViewModel.addNote(newNote)
+        // Check if author contains the special separator for book info
+        var authorText: String? = nil
+        var bookText: String? = nil
+        var pageText: String? = nil
         
-        // Navigate to Notes tab
-        selectedTab = 1
+        if let author = parsed.author {
+            if author.contains("|||BOOK|||") {
+                // Split into author, book, and possibly page
+                let parts = author.split(separator: "|||")
+                
+                // First part is author
+                if parts.count > 0 {
+                    authorText = String(parts[0])
+                }
+                
+                // Look for BOOK marker
+                for i in 0..<parts.count-1 {
+                    if parts[i] == "BOOK" && i+1 < parts.count {
+                        bookText = String(parts[i+1])
+                    }
+                    if parts[i] == "PAGE" && i+1 < parts.count {
+                        pageText = String(parts[i+1])
+                    }
+                }
+            } else {
+                authorText = author
+            }
+        }
         
-        HapticManager.shared.success()
+        // Create the quote text in the format EditNoteSheet expects
+        // Include author, book, and page as separate lines
+        if let author = authorText {
+            quoteComposerText = "\(cleanContent)\n\n— \(author)"
+            if let book = bookText {
+                quoteComposerText += "\n\(book)"
+            }
+            if let page = pageText {
+                quoteComposerText += "\n\(page)"
+            }
+        }
+        
+        showQuoteComposer = true
         collapse()
     }
     
@@ -721,6 +829,313 @@ struct UniversalCommandBar: View {
         
         // TODO: Implement search in LibraryView
         collapse()
+    }
+    
+    private func parseNoteAttribution(_ text: String) -> (content: String, author: String?, bookTitle: String?) {
+        // Check for pattern: "content - Author, Book Title"
+        let attributionPattern = "^(.+?)\\s*-\\s*([^,]+)(?:,\\s*(.+))?$"
+        
+        if let regex = try? NSRegularExpression(pattern: attributionPattern, options: [.dotMatchesLineSeparators]) {
+            let range = NSRange(location: 0, length: text.utf16.count)
+            if let match = regex.firstMatch(in: text, options: [], range: range) {
+                // Check if this looks like attribution (not just a dash in the middle of content)
+                if let contentRange = Range(match.range(at: 1), in: text),
+                   let authorRange = Range(match.range(at: 2), in: text) {
+                    
+                    let possibleContent = String(text[contentRange]).trimmingCharacters(in: .whitespaces)
+                    let possibleAuthor = String(text[authorRange]).trimmingCharacters(in: .whitespaces)
+                    
+                    // Only parse as attribution if author part looks like a name (not too long, no periods)
+                    if possibleAuthor.split(separator: " ").count <= 4 && !possibleAuthor.contains(".") {
+                        var bookTitle: String? = nil
+                        
+                        if match.range(at: 3).location != NSNotFound,
+                           let bookRange = Range(match.range(at: 3), in: text) {
+                            bookTitle = String(text[bookRange]).trimmingCharacters(in: .whitespaces)
+                        }
+                        
+                        return (content: possibleContent, author: possibleAuthor, bookTitle: bookTitle)
+                    }
+                }
+            }
+        }
+        
+        return (content: text, author: nil, bookTitle: nil)
+    }
+    
+    private func parseFullTextForQuote(_ text: String) -> (content: String, author: String?, bookTitle: String?, pageNumber: Int?) {
+        var workingText = text
+        var author: String? = nil
+        var bookTitle: String? = nil
+        var pageNumber: Int? = nil
+        
+        // Check if this is a quote format: "content" author, book, page
+        print("🔍 Attempting to parse quote from: \(text)")
+        
+        // Debug: Check what quote characters we have
+        if let firstChar = text.first {
+            print("📊 First character: '\(firstChar)' (Unicode: U+\(String(format: "%04X", firstChar.unicodeScalars.first!.value)))")
+        }
+        
+        // Try multiple quote patterns - ORDER MATTERS!
+        let quotePatterns = [
+            "^\"(.+?)\"\\s*(.+)$",                          // Regular double quotes (ASCII 34)
+            "^[\u{201C}](.+?)[\u{201D}]\\s*(.+)$",         // Smart quotes left and right
+            "^'(.+?)'\\s*(.+)$",                            // Single quotes
+            "^[\u{2018}](.+?)[\u{2019}]\\s*(.+)$"          // Smart single quotes
+        ]
+        
+        for (index, pattern) in quotePatterns.enumerated() {
+            print("🧪 Trying pattern \(index + 1): \(pattern)")
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
+                let range = NSRange(location: 0, length: text.utf16.count)
+                if let match = regex.firstMatch(in: text, options: [], range: range) {
+                    if let contentRange = Range(match.range(at: 1), in: text),
+                       let attributionRange = Range(match.range(at: 2), in: text) {
+                        // Extract the quote content (without quotes)
+                        let quoteContent = String(text[contentRange]).trimmingCharacters(in: .whitespaces)
+                        let attribution = String(text[attributionRange]).trimmingCharacters(in: .whitespaces)
+                        
+                        print("✅ Matched! Content: '\(quoteContent)', Attribution: '\(attribution)'")
+                        
+                        // Parse the attribution
+                        // First check if it uses comma separation
+                        if attribution.contains(",") {
+                            // Parse comma-separated format: "Seneca, On the Shortness of Life, pg 30"
+                            let parts = attribution.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                            
+                            if parts.count >= 1 {
+                                author = parts[0]
+                            }
+                            if parts.count >= 2 {
+                                var bookTitleText = parts[1]
+                                
+                                // Check if the book title contains page info (e.g., "Lord of the Rings pg 400")
+                                let pageInBookPattern = #"^(.+?)\s+(pg|p\.|page)\s+(\d+)$"#
+                                if let regex = try? NSRegularExpression(pattern: pageInBookPattern, options: .caseInsensitive) {
+                                    let range = NSRange(location: 0, length: bookTitleText.utf16.count)
+                                    if let match = regex.firstMatch(in: bookTitleText, options: [], range: range) {
+                                        if let titleRange = Range(match.range(at: 1), in: bookTitleText),
+                                           let pageRange = Range(match.range(at: 3), in: bookTitleText) {
+                                            bookTitle = String(bookTitleText[titleRange]).trimmingCharacters(in: .whitespaces)
+                                            pageNumber = Int(String(bookTitleText[pageRange]))
+                                        }
+                                    } else {
+                                        bookTitle = bookTitleText
+                                    }
+                                } else {
+                                    bookTitle = bookTitleText
+                                }
+                            }
+                            if parts.count >= 3 {
+                                let pageStr = parts[2]
+                                // Only extract page if we didn't already get it from book title
+                                if pageNumber == nil {
+                                    // Extract page number from strings like "pg 30", "p. 30", "page 30"
+                                    if let pageMatch = pageStr.range(of: #"\d+"#, options: .regularExpression) {
+                                        pageNumber = Int(pageStr[pageMatch])
+                                    }
+                                }
+                            }
+                        } else {
+                            // Parse space-separated format with dash: "- Gandalf Lord of the Rings pg 230"
+                            var cleanAttribution = attribution
+                            
+                            // Remove leading dash if present
+                            if cleanAttribution.hasPrefix("-") {
+                                cleanAttribution = String(cleanAttribution.dropFirst()).trimmingCharacters(in: .whitespaces)
+                            }
+                            
+                            // Try to parse "Author BookTitle pg 123" format
+                            let attributionPattern = #"^(\S+)\s+(.+?)\s+(pg|p\.|page)\s+(\d+)$"#
+                            if let regex = try? NSRegularExpression(pattern: attributionPattern, options: .caseInsensitive) {
+                                let range = NSRange(location: 0, length: cleanAttribution.utf16.count)
+                                if let match = regex.firstMatch(in: cleanAttribution, options: [], range: range) {
+                                    if let authorRange = Range(match.range(at: 1), in: cleanAttribution),
+                                       let titleRange = Range(match.range(at: 2), in: cleanAttribution),
+                                       let pageRange = Range(match.range(at: 4), in: cleanAttribution) {
+                                        author = String(cleanAttribution[authorRange])
+                                        bookTitle = String(cleanAttribution[titleRange])
+                                        pageNumber = Int(String(cleanAttribution[pageRange]))
+                                    }
+                                }
+                            } else {
+                                // Fallback: just try to find the first word as author and rest as book
+                                let words = cleanAttribution.split(separator: " ", maxSplits: 1).map(String.init)
+                                if words.count >= 2 {
+                                    author = words[0]
+                                    bookTitle = words[1]
+                                    
+                                    // Try to extract page from book title
+                                    let pageInBookPattern = #"^(.+?)\s+(pg|p\.|page)\s+(\d+)$"#
+                                    if let regex = try? NSRegularExpression(pattern: pageInBookPattern, options: .caseInsensitive) {
+                                        let range = NSRange(location: 0, length: bookTitle!.utf16.count)
+                                        if let match = regex.firstMatch(in: bookTitle!, options: [], range: range) {
+                                            if let titleRange = Range(match.range(at: 1), in: bookTitle!),
+                                               let pageRange = Range(match.range(at: 3), in: bookTitle!) {
+                                                let extractedTitle = String(bookTitle![titleRange]).trimmingCharacters(in: .whitespaces)
+                                                pageNumber = Int(String(bookTitle![pageRange]))
+                                                bookTitle = extractedTitle
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        print("📚 Parsed - Author: \(author ?? "nil"), Book: \(bookTitle ?? "nil"), Page: \(pageNumber?.description ?? "nil")")
+                        
+                        return (content: quoteContent, author: author, bookTitle: bookTitle, pageNumber: pageNumber)
+                    }
+                }
+            }
+        }
+        
+        print("❌ No quote pattern matched")
+        
+        // If no quote pattern matched, return the original text as content
+        return (content: text, author: nil, bookTitle: nil, pageNumber: nil)
+    }
+    
+    private func saveComposition() {
+        switch composerMode {
+        case .note:
+            let parsed = parseNoteAttribution(commandText)
+            
+            // Try to match with a book in the library
+            var matchedBook: Book? = nil
+            if let bookTitle = parsed.bookTitle {
+                matchedBook = libraryViewModel.findMatchingBook(title: bookTitle, author: parsed.author)
+            }
+            
+            let note = Note(
+                type: .note,
+                content: parsed.content,
+                bookId: matchedBook?.localId,
+                bookTitle: matchedBook?.title ?? parsed.bookTitle,
+                author: matchedBook?.author ?? parsed.author,
+                pageNumber: nil,
+                dateCreated: Date()
+            )
+            
+            notesViewModel.addNote(note)
+            
+            // Link note to book if matched
+            if let book = matchedBook {
+                libraryViewModel.addNoteToBook(book.localId, note: note)
+            }
+            
+            HapticManager.shared.success()
+            
+        case .quote:
+            let parsed = parseFullTextForQuote(commandText)
+            
+            print("📝 Quote parsed - Content: '\(parsed.content)', Author: '\(parsed.author ?? "nil")', Book: '\(parsed.bookTitle ?? "nil")', Page: \(parsed.pageNumber?.description ?? "nil")")
+            
+            // Try to match with a book in the library
+            var matchedBook: Book? = nil
+            if let bookTitle = parsed.bookTitle {
+                print("🔍 Attempting to match book title: '\(bookTitle)' with author: '\(parsed.author ?? "nil")'")
+                matchedBook = libraryViewModel.findMatchingBook(title: bookTitle, author: parsed.author)
+                if let book = matchedBook {
+                    print("✅ Found matching book: '\(book.title)' by '\(book.author)'")
+                } else {
+                    print("❌ No matching book found in library")
+                }
+            }
+            
+            let note = Note(
+                type: .quote,
+                content: parsed.content,
+                bookId: matchedBook?.localId,
+                bookTitle: matchedBook?.title ?? parsed.bookTitle,
+                author: matchedBook?.author ?? parsed.author,
+                pageNumber: parsed.pageNumber,
+                dateCreated: Date()
+            )
+            
+            notesViewModel.addNote(note)
+            
+            // Link note to book if matched
+            if let book = matchedBook {
+                libraryViewModel.addNoteToBook(book.localId, note: note)
+            }
+            
+            HapticManager.shared.success()
+            
+        case .none:
+            break
+        }
+        
+        // Navigate to Notes tab
+        selectedTab = 1
+        
+        // Reset any filters in NotesView
+        NotificationCenter.default.post(name: Notification.Name("ResetNotesFilter"), object: nil)
+        
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            composerMode = .none
+            commandText = ""
+            collapse()
+        }
+    }
+}
+
+// MARK: - Inline Composer View
+struct InlineComposerView: View {
+    @Binding var mode: UniversalCommandBar.ComposerMode
+    @Binding var text: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Text(mode == .note ? "New Note" : "New Quote")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Button(action: onSave) {
+                    Text("Save")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                }
+                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            
+            // Text editor
+            TextField(
+                mode == .note ? "What's on your mind?" : "Enter a memorable quote...",
+                text: $text,
+                axis: .vertical
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 17))
+            .foregroundStyle(.white)
+            .focused($isFocused)
+            .lineLimit(3...10)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity)
+        .background(.clear)
+        .onAppear {
+            isFocused = true
+        }
     }
 }
 
@@ -765,6 +1180,8 @@ struct TabBarItem: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
     }
 }
+
+
 
 // MARK: - Extensions
 extension CommandIntent {

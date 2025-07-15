@@ -92,32 +92,35 @@ struct LibraryView: View {
                             GridItem(.flexible(), spacing: 16)
                         ], spacing: 20) {
                             ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
-                                LibraryBookCard(book: book, viewModel: viewModel)
-                                    .transition(.asymmetric(
-                                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                        removal: .scale(scale: 1.2).combined(with: .opacity)
-                                    ))
-                                    .animation(
-                                        .spring(response: 0.5, dampingFraction: 0.8)
-                                        .delay(Double(index) * 0.05),
-                                        value: viewModel.books.count
-                                    )
-                                    .contextMenu {
-                                        Button(action: {
-                                            selectedBookForEdit = book
-                                            showingCoverPicker = true
-                                        }) {
-                                            Label("Change Cover", systemImage: "photo")
-                                        }
-                                        
-                                        Button(role: .destructive, action: {
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                                viewModel.removeBook(book)
-                                            }
-                                        }) {
-                                            Label("Delete from Library", systemImage: "trash")
-                                        }
+                                NavigationLink(destination: BookDetailView(book: book)) {
+                                    LibraryBookCard(book: book, viewModel: viewModel)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                    removal: .scale(scale: 1.2).combined(with: .opacity)
+                                ))
+                                .animation(
+                                    .spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.05),
+                                    value: viewModel.books.count
+                                )
+                                .contextMenu {
+                                    Button(action: {
+                                        selectedBookForEdit = book
+                                        showingCoverPicker = true
+                                    }) {
+                                        Label("Change Cover", systemImage: "photo")
                                     }
+                                    
+                                    Button(role: .destructive, action: {
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                            viewModel.removeBook(book)
+                                        }
+                                    }) {
+                                        Label("Delete from Library", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -125,32 +128,35 @@ struct LibraryView: View {
                     } else {
                         LazyVStack(spacing: 20) {
                             ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
-                                LibraryBookListItem(book: book, viewModel: viewModel)
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    ))
-                                    .animation(
-                                        .spring(response: 0.5, dampingFraction: 0.8)
-                                        .delay(Double(index) * 0.05),
-                                        value: viewMode
-                                    )
-                                    .contextMenu {
-                                        Button(action: {
-                                            selectedBookForEdit = book
-                                            showingCoverPicker = true
-                                        }) {
-                                            Label("Change Cover", systemImage: "photo")
-                                        }
-                                        
-                                        Button(role: .destructive, action: {
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                                viewModel.removeBook(book)
-                                            }
-                                        }) {
-                                            Label("Delete from Library", systemImage: "trash")
-                                        }
+                                NavigationLink(destination: BookDetailView(book: book)) {
+                                    LibraryBookListItem(book: book, viewModel: viewModel)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                                .animation(
+                                    .spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.05),
+                                    value: viewMode
+                                )
+                                .contextMenu {
+                                    Button(action: {
+                                        selectedBookForEdit = book
+                                        showingCoverPicker = true
+                                    }) {
+                                        Label("Change Cover", systemImage: "photo")
                                     }
+                                    
+                                    Button(role: .destructive, action: {
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                            viewModel.removeBook(book)
+                                        }
+                                    }) {
+                                        Label("Delete from Library", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -171,7 +177,15 @@ struct LibraryView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
         .sheet(isPresented: $showingCoverPicker) {
             if let book = selectedBookForEdit {
-                CoverPickerView(book: book, viewModel: viewModel, isPresented: $showingCoverPicker)
+                BookSearchSheet(
+                    searchQuery: book.title,
+                    onBookSelected: { newBook in
+                        // Update the existing book with the new cover
+                        viewModel.updateBookCover(book, newCoverURL: newBook.coverImageURL)
+                        showingCoverPicker = false
+                        selectedBookForEdit = nil
+                    }
+                )
             }
         }
     }
@@ -223,7 +237,7 @@ struct LibraryBookCard: View {
                     }
                 }
             
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(book.title)
                     .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96)) // Warm white
@@ -250,13 +264,6 @@ struct LibraryBookCard: View {
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .onTapGesture {
-            HapticManager.shared.lightTap()
-            
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                tilt = tilt == 0 ? 5 : 0
-            }
-        }
         .onLongPressGesture(minimumDuration: 0.5) {
             HapticManager.shared.mediumImpact()
             
@@ -792,7 +799,7 @@ struct LibraryBookListItem: View {
                 .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                 
                 // Book details
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
                     // Title
                     Text(book.title)
                         .font(.system(size: 17, weight: .semibold, design: .serif))
@@ -1053,140 +1060,6 @@ struct MinimalParticleSystem: View {
         }
     }
 }
-
-// MARK: - Cover Picker View
-struct CoverPickerView: View {
-    let book: Book
-    let viewModel: LibraryViewModel
-    @Binding var isPresented: Bool
-    @State private var searchQuery: String = ""
-    @State private var searchResults: [Book] = []
-    @State private var isSearching = false
-    @StateObject private var googleBooksService = GoogleBooksService()
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                Color(red: 0.11, green: 0.11, blue: 0.12)
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Current book info
-                        HStack(spacing: 16) {
-                            BookCoverView(coverURL: book.coverImageURL)
-                                .frame(width: 80, height: 120)
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(book.title)
-                                    .font(.system(size: 18, weight: .semibold, design: .serif))
-                                    .foregroundStyle(.white)
-                                
-                                Text(book.author)
-                                    .font(.system(size: 14, design: .monospaced))
-                                    .kerning(1.2) // Letter spacing for author names
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding()
-                        .background {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.ultraThinMaterial)
-                                .opacity(0.5)
-                        }
-                        
-                        // Search field
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.white.opacity(0.5))
-                            
-                            TextField("Search for covers...", text: $searchQuery)
-                                .foregroundStyle(.white)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                                .onSubmit {
-                                    searchForCovers()
-                                }
-                        }
-                        .padding()
-                        .background {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(.white.opacity(0.1))
-                        }
-                        
-                        if isSearching {
-                            ProgressView("Searching...")
-                                .foregroundStyle(.white)
-                                .padding(.top, 40)
-                        } else if !searchResults.isEmpty {
-                            LazyVGrid(columns: [
-                                GridItem(.flexible(), spacing: 16),
-                                GridItem(.flexible(), spacing: 16),
-                                GridItem(.flexible(), spacing: 16)
-                            ], spacing: 20) {
-                                ForEach(searchResults) { result in
-                                    Button(action: {
-                                        // Update the book cover
-                                        viewModel.updateBookCover(book, newCoverURL: result.coverImageURL)
-                                        isPresented = false
-                                    }) {
-                                        VStack(spacing: 8) {
-                                            BookCoverView(coverURL: result.coverImageURL)
-                                                .frame(width: 100, height: 150)
-                                            
-                                            if let year = result.publishedYear {
-                                                Text(year)
-                                                    .font(.system(size: 12, design: .monospaced))
-                                                    .foregroundStyle(.white.opacity(0.5))
-                                            }
-                                        }
-                                        .padding(8)
-                                        .background {
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(.white.opacity(0.05))
-                                        }
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("Choose Cover")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                    .foregroundStyle(.white)
-                }
-            }
-        }
-        .onAppear {
-            // Pre-populate search with book title and author
-            searchQuery = "\(book.title) \(book.author)"
-            searchForCovers()
-        }
-    }
-    
-    private func searchForCovers() {
-        Task {
-            isSearching = true
-            await googleBooksService.searchBooks(query: searchQuery)
-            searchResults = googleBooksService.searchResults
-            isSearching = false
-        }
-    }
-}
-
 // MARK: - Library View Model
 @MainActor
 class LibraryViewModel: ObservableObject {
@@ -1240,5 +1113,238 @@ class LibraryViewModel: ObservableObject {
             books[index].coverImageURL = newCoverURL
             saveBooks()
         }
+    }
+    
+    func replaceBook(originalBook: Book, with newBook: Book) {
+        if let index = books.firstIndex(where: { $0.id == originalBook.id }) {
+            var updatedBook = newBook
+            // Preserve user data from original book
+            updatedBook.isInLibrary = true
+            updatedBook.readingStatus = originalBook.readingStatus
+            updatedBook.userRating = originalBook.userRating
+            updatedBook.userNotes = originalBook.userNotes
+            updatedBook.dateAdded = originalBook.dateAdded
+            
+            books[index] = updatedBook
+            saveBooks()
+            
+            // Update any existing notes to link to the new book
+            updateNotesForReplacedBook(oldLocalId: originalBook.localId, newLocalId: updatedBook.localId)
+        }
+    }
+    
+    private func updateNotesForReplacedBook(oldLocalId: UUID, newLocalId: UUID) {
+        // This would ideally be handled by NotesViewModel, but we can trigger it here
+        NotificationCenter.default.post(
+            name: Notification.Name("BookReplaced"),
+            object: nil,
+            userInfo: ["oldLocalId": oldLocalId, "newLocalId": newLocalId]
+        )
+    }
+    
+    // MARK: - Book Matching System
+    
+    /// Find a matching book in the library using fuzzy matching
+    func findMatchingBook(title: String, author: String? = nil) -> Book? {
+        guard !title.isEmpty else { return nil }
+        
+        print("🔎 findMatchingBook called with title: '\(title)', author: '\(author ?? "nil")'")
+        
+        let normalizedTitle = normalizeTitle(title)
+        print("📝 Normalized search title: '\(normalizedTitle)'")
+        
+        var bestMatch: Book? = nil
+        var bestScore: Double = 0.0
+        
+        for book in books {
+            let normalizedBookTitle = normalizeTitle(book.title)
+            print("📚 Checking against book: '\(book.title)' -> normalized: '\(normalizedBookTitle)'")
+            
+            let score = calculateMatchScore(
+                searchTitle: normalizedTitle,
+                bookTitle: normalizedBookTitle,
+                searchAuthor: author?.lowercased(),
+                bookAuthor: book.author.lowercased()
+            )
+            
+            print("   Score: \(score)")
+            
+            if score > bestScore && score > 0.6 { // Lowered threshold for better fuzzy matching
+                bestScore = score
+                bestMatch = book
+                print("   ✅ New best match!")
+            }
+        }
+        
+        if let match = bestMatch {
+            print("🎯 Final match: '\(match.title)' with score: \(bestScore)")
+        } else {
+            print("❌ No match found (best score was: \(bestScore))")
+        }
+        
+        return bestMatch
+    }
+    
+    /// Normalize title for better matching
+    private func normalizeTitle(_ title: String) -> String {
+        let lowercased = title.lowercased()
+        
+        // Remove common prefixes
+        let prefixes = ["the ", "a ", "an "]
+        var normalized = lowercased
+        
+        for prefix in prefixes {
+            if normalized.hasPrefix(prefix) {
+                normalized = String(normalized.dropFirst(prefix.count))
+                break
+            }
+        }
+        
+        // Remove subtitles and series information in parentheses
+        normalized = normalized.replacingOccurrences(of: "\\([^)]*\\)", with: "", options: .regularExpression)
+        
+        // Remove colons and everything after them (for subtitles)
+        if let colonIndex = normalized.firstIndex(of: ":") {
+            normalized = String(normalized[..<colonIndex])
+        }
+        
+        // Remove common series indicators
+        let seriesToRemove = [
+            " book 1", " book 2", " book 3", " book one", " book two", " book three",
+            " volume 1", " volume 2", " volume 3", " vol 1", " vol 2", " vol 3",
+            " part 1", " part 2", " part 3", " part one", " part two", " part three"
+        ]
+        
+        for series in seriesToRemove {
+            normalized = normalized.replacingOccurrences(of: series, with: "")
+        }
+        
+        // Remove punctuation and extra spaces
+        normalized = normalized.replacingOccurrences(of: "[^a-z0-9\\s]", with: "", options: .regularExpression)
+        normalized = normalized.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        normalized = normalized.trimmingCharacters(in: .whitespaces)
+        
+        return normalized
+    }
+    
+    /// Calculate match score between search term and book
+    private func calculateMatchScore(searchTitle: String, bookTitle: String, searchAuthor: String?, bookAuthor: String) -> Double {
+        // Exact title match
+        if searchTitle == bookTitle {
+            return searchAuthor == nil ? 1.0 : (searchAuthor == bookAuthor ? 1.0 : 0.9)
+        }
+        
+        // Check for acronym matches (e.g., "LOTR" -> "Lord of the Rings")
+        if isAcronymMatch(searchTitle, bookTitle) {
+            return searchAuthor == nil ? 0.95 : (searchAuthor == bookAuthor ? 0.95 : 0.85)
+        }
+        
+        // Check for series matches (e.g., "fellowship of the ring" matches "lord of the rings")
+        let seriesScore = calculateSeriesMatch(searchTitle, bookTitle)
+        if seriesScore > 0.8 {
+            let authorBonus = (searchAuthor == nil || bookAuthor.contains(searchAuthor!) || searchAuthor!.contains(bookAuthor)) ? 0.1 : 0.0
+            return seriesScore + authorBonus
+        }
+        
+        // Check for partial matches
+        let titleWords = searchTitle.split(separator: " ")
+        let bookWords = bookTitle.split(separator: " ")
+        
+        let matchingWords = titleWords.filter { searchWord in
+            bookWords.contains { bookWord in
+                bookWord.contains(searchWord) || searchWord.contains(bookWord) || 
+                levenshteinDistance(String(searchWord), String(bookWord)) <= 2
+            }
+        }
+        
+        let titleScore = Double(matchingWords.count) / Double(max(titleWords.count, bookWords.count))
+        
+        // Author bonus
+        let authorScore: Double = {
+            guard let searchAuthor = searchAuthor else { return 0.0 }
+            if bookAuthor.contains(searchAuthor) || searchAuthor.contains(bookAuthor) {
+                return 0.2
+            }
+            return 0.0
+        }()
+        
+        return titleScore + authorScore
+    }
+    
+    /// Check if search term is an acronym of the book title
+    private func isAcronymMatch(_ acronym: String, _ title: String) -> Bool {
+        let words = title.split(separator: " ")
+        let firstLetters = words.compactMap { $0.first?.lowercased() }.joined()
+        
+        return acronym.lowercased() == firstLetters
+    }
+    
+    /// Calculate series match score for titles that might be related (e.g., LOTR series)
+    private func calculateSeriesMatch(_ searchTitle: String, _ bookTitle: String) -> Double {
+        let searchWords = Set(searchTitle.split(separator: " ").map(String.init))
+        let bookWords = Set(bookTitle.split(separator: " ").map(String.init))
+        
+        // Check for Lord of the Rings specific patterns
+        let lotrKeywords = Set(["lord", "rings", "fellowship", "towers", "return", "king", "tolkien"])
+        let searchLotrWords = searchWords.intersection(lotrKeywords)
+        let bookLotrWords = bookWords.intersection(lotrKeywords)
+        
+        if searchLotrWords.count >= 2 && bookLotrWords.count >= 2 {
+            // High score for LOTR series matches
+            return 0.9
+        }
+        
+        // Check for other common series keywords
+        let commonSeriesKeywords = Set(["chronicles", "tales", "saga", "trilogy", "series"])
+        let hasSeriesKeyword = !searchWords.intersection(commonSeriesKeywords).isEmpty || 
+                              !bookWords.intersection(commonSeriesKeywords).isEmpty
+        
+        if hasSeriesKeyword {
+            let overlap = searchWords.intersection(bookWords)
+            return Double(overlap.count) / Double(max(searchWords.count, bookWords.count)) + 0.2
+        }
+        
+        // Regular overlap calculation
+        let overlap = searchWords.intersection(bookWords)
+        return Double(overlap.count) / Double(max(searchWords.count, bookWords.count))
+    }
+    
+    /// Calculate Levenshtein distance between two strings for fuzzy matching
+    private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
+        let a = Array(s1)
+        let b = Array(s2)
+        
+        var matrix = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
+        
+        for i in 0...a.count {
+            matrix[i][0] = i
+        }
+        
+        for j in 0...b.count {
+            matrix[0][j] = j
+        }
+        
+        for i in 1...a.count {
+            for j in 1...b.count {
+                if a[i-1] == b[j-1] {
+                    matrix[i][j] = matrix[i-1][j-1]
+                } else {
+                    matrix[i][j] = min(
+                        matrix[i-1][j] + 1,
+                        matrix[i][j-1] + 1,
+                        matrix[i-1][j-1] + 1
+                    )
+                }
+            }
+        }
+        
+        return matrix[a.count][b.count]
+    }
+    
+    /// Add a note to a specific book
+    func addNoteToBook(_ localId: UUID, note: Note) {
+        // This could be expanded to store book-specific notes if needed
+        // For now, we rely on the bookId in the note itself
+        print("📚 Linked note '\(note.content.prefix(50))...' to book with localId: \(localId)")
     }
 }

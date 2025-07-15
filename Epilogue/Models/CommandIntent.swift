@@ -78,10 +78,12 @@ struct CommandParser {
             return .addBook(query: query)
         }
         
-        // Quotes
+        // Quotes - enhanced detection
         if lowercased.starts(with: "quote:") ||
            lowercased.starts(with: "\"") ||
-           (lowercased.contains("page ") && lowercased.contains("\"")) {
+           lowercased.starts(with: "\u{201C}") || // smart quote
+           (lowercased.contains("page ") && lowercased.contains("\"")) ||
+           isQuoteFormat(input) {
             return .createQuote(text: input)
         }
         
@@ -126,6 +128,132 @@ struct CommandParser {
     private static func containsActionKeywords(_ text: String) -> Bool {
         let actionKeywords = ["add", "new", "create", "quote", "note", "thought"]
         return actionKeywords.contains { text.contains($0) }
+    }
+    
+    // Check if text matches quote format: "content" - author
+    private static func isQuoteFormat(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        
+        // Check for "content" - author format
+        let quotePattern = #"^["\u{201C}].*["\u{201D}]\s*[-–—]\s*.+"#
+        if let regex = try? NSRegularExpression(pattern: quotePattern, options: []) {
+            let range = NSRange(location: 0, length: trimmed.utf16.count)
+            if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
+                return true
+            }
+        }
+        
+        // Also check for simple quoted text
+        return (trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"")) ||
+               (trimmed.hasPrefix("\u{201C}") && trimmed.hasSuffix("\u{201D}"))
+    }
+    
+    // Parse quote content and attribution
+    static func parseQuote(_ text: String) -> (content: String, author: String?) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        
+        // Remove "quote:" prefix if present
+        var workingText = trimmed
+        if workingText.lowercased().hasPrefix("quote:") {
+            workingText = String(workingText.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+        }
+        
+        // Try to parse "content" - author format or "content" author format
+        // First try with dash separator
+        let quoteWithDashPattern = #"^["\u{201C}](.+?)["\u{201D}]\s*[-–—]\s*(.+)$"#
+        if let regex = try? NSRegularExpression(pattern: quoteWithDashPattern, options: []) {
+            let range = NSRange(location: 0, length: workingText.utf16.count)
+            if let match = regex.firstMatch(in: workingText, options: [], range: range) {
+                if let contentRange = Range(match.range(at: 1), in: workingText),
+                   let authorRange = Range(match.range(at: 2), in: workingText) {
+                    let content = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                    let author = String(workingText[authorRange]).trimmingCharacters(in: .whitespaces)
+                    
+                    // Process the author part which might contain book and page
+                    return processAttribution(content: content, attribution: author)
+                }
+            }
+        }
+        
+        // Try without dash - just "content" followed by attribution
+        let quoteWithoutDashPattern = #"^["\u{201C}](.+?)["\u{201D}]\s+(.+)$"#
+        if let regex = try? NSRegularExpression(pattern: quoteWithoutDashPattern, options: []) {
+            let range = NSRange(location: 0, length: workingText.utf16.count)
+            if let match = regex.firstMatch(in: workingText, options: [], range: range) {
+                if let contentRange = Range(match.range(at: 1), in: workingText),
+                   let authorRange = Range(match.range(at: 2), in: workingText) {
+                    let content = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                    let author = String(workingText[authorRange]).trimmingCharacters(in: .whitespaces)
+                    
+                    // Process the author part which might contain book and page
+                    return processAttribution(content: content, attribution: author)
+                }
+            }
+        }
+        
+        // Check for simple dash attribution without quotes
+        if let dashRange = workingText.range(of: " — ") ?? workingText.range(of: " - ") {
+            let content = String(workingText[..<dashRange.lowerBound]).trimmingCharacters(in: .whitespaces)
+            var attribution = String(workingText[dashRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+            
+            // Remove quotes if present
+            var cleanContent = content
+            if (cleanContent.hasPrefix("\"") && cleanContent.hasSuffix("\"")) ||
+               (cleanContent.hasPrefix("\u{201C}") && cleanContent.hasSuffix("\u{201D}")) {
+                cleanContent = String(cleanContent.dropFirst().dropLast())
+            }
+            
+            // Process the attribution using helper function
+            return processAttribution(content: cleanContent, attribution: attribution)
+        }
+        
+        // If no author pattern, just extract content
+        var content = workingText
+        
+        // Remove surrounding quotes if present
+        if (content.hasPrefix("\"") && content.hasSuffix("\"")) ||
+           (content.hasPrefix("\u{201C}") && content.hasSuffix("\u{201D}")) {
+            content = String(content.dropFirst().dropLast())
+        }
+        
+        return (content, nil)
+    }
+    
+    // Helper function to process attribution that might contain author, book, and page
+    private static func processAttribution(content: String, attribution: String) -> (content: String, author: String?) {
+        // Check if attribution contains commas (e.g., "Seneca, On the Shortness of Life, pg 30")
+        let parts = attribution.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        
+        if parts.count >= 2 {
+            let author = parts[0]
+            var book = parts[1]
+            var pageInfo: String? = nil
+            
+            // Check if we have page info in the last part
+            if parts.count >= 3 {
+                let lastPart = parts[2]
+                // Check for page patterns: "p. 47", "page 47", "pg 47", or just "47"
+                if lastPart.lowercased().hasPrefix("p.") || 
+                   lastPart.lowercased().hasPrefix("page") || 
+                   lastPart.lowercased().hasPrefix("pg") ||
+                   Int(lastPart) != nil {
+                    pageInfo = lastPart
+                } else {
+                    // If not a page number, it might be part of the book title
+                    book = "\(book), \(lastPart)"
+                }
+            }
+            
+            // Format with our special separator including page if present
+            var result = "\(author)|||BOOK|||\(book)"
+            if let page = pageInfo {
+                result += "|||PAGE|||\(page)"
+            }
+            return (content, result)
+        }
+        
+        // No commas, just return the attribution as author
+        return (content, attribution.isEmpty ? nil : attribution)
     }
 }
 

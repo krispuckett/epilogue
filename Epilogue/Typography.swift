@@ -149,19 +149,31 @@ struct Note: Identifiable, Codable, Equatable {
     let id: UUID
     let type: NoteType
     let content: String
+    let bookId: UUID?  // Link to specific book
     let bookTitle: String?
     let author: String?
     let pageNumber: Int?
     let dateCreated: Date
     
-    init(type: NoteType, content: String, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID()) {
+    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID()) {
         self.id = id
         self.type = type
         self.content = content
+        self.bookId = bookId
         self.bookTitle = bookTitle
         self.author = author
         self.pageNumber = pageNumber
         self.dateCreated = dateCreated
+    }
+    
+    /// Check if this note is linked to a specific book
+    var isLinkedToBook: Bool {
+        return bookId != nil
+    }
+    
+    /// Check if this note has book information but no link
+    var hasUnlinkedBookInfo: Bool {
+        return bookId == nil && (bookTitle != nil || author != nil)
     }
     
     var formattedDate: String {
@@ -201,6 +213,15 @@ class NotesViewModel: ObservableObject {
         if notes.isEmpty {
             print("⚠️ DEBUG: No notes after loadNotes(), forcing sample data")
             loadSampleData()
+        }
+        
+        // Listen for book replacements
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("BookReplaced"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleBookReplacement(notification)
         }
     }
     
@@ -298,6 +319,40 @@ class NotesViewModel: ObservableObject {
     func reloadNotes() {
         print("🔄 DEBUG: Manual reload requested")
         loadNotes()
+    }
+    
+    // Handle book replacement by updating note bookId references
+    private func handleBookReplacement(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let oldLocalId = userInfo["oldLocalId"] as? UUID,
+              let newLocalId = userInfo["newLocalId"] as? UUID else {
+            return
+        }
+        
+        print("📚 DEBUG: Handling book replacement: \(oldLocalId) -> \(newLocalId)")
+        
+        var updatedNotes = false
+        for i in notes.indices {
+            if notes[i].bookId == oldLocalId {
+                notes[i] = Note(
+                    type: notes[i].type,
+                    content: notes[i].content,
+                    bookId: newLocalId,
+                    bookTitle: notes[i].bookTitle,
+                    author: notes[i].author,
+                    pageNumber: notes[i].pageNumber,
+                    dateCreated: notes[i].dateCreated,
+                    id: notes[i].id
+                )
+                updatedNotes = true
+                print("📚 DEBUG: Updated note \(notes[i].id) to new book")
+            }
+        }
+        
+        if updatedNotes {
+            saveNotes()
+            print("📚 DEBUG: Saved updated notes after book replacement")
+        }
     }
     
     // Debug method to check UserDefaults
