@@ -29,60 +29,39 @@ fragment float4 ambientFragment(VertexOut in [[stage_in]],
                                constant float& time [[buffer(0)]]) {
     float2 uv = in.uv;
     
+    // DEBUG: Simple gradient to verify shader is working
+    // return float4(uv.x, uv.y, 0.5, 1.0);
+    
     // Center of our calm orb
-    float2 center = float2(0.5, 0.4);
+    float2 center = float2(0.5, 0.45);
     float dist = length(uv - center);
     
-    // Base orb with soft edges
-    float orb = 1.0 - smoothstep(0.0, 0.3, dist);
-    orb = pow(orb, 1.5); // Softer falloff
+    // Create a multi-layered orb
+    float orb = 1.0 - smoothstep(0.0, 0.25, dist);
+    float glow = 1.0 - smoothstep(0.0, 0.4, dist);
+    float outerGlow = 1.0 - smoothstep(0.2, 0.6, dist);
     
-    // Gentle breathing pulse
-    float breathe = sin(time * 0.3) * 0.1 + 0.9;
+    // Gentle breathing animation
+    float breathe = sin(time * 1.5) * 0.05 + 0.95;
     orb *= breathe;
     
-    // Subtle inner movement - like flames or plasma
-    float innerGlow = 0.0;
-    for(int i = 0; i < 3; i++) {
-        float speed = 0.2 + float(i) * 0.1;
-        float offset = float(i) * 2.094; // Golden angle
-        
-        float2 polarUV = uv - center;
-        float angle = atan2(polarUV.y, polarUV.x);
-        float radius = length(polarUV);
-        
-        // Gentle wavering motion
-        float wave = sin(angle * 3.0 + time * speed + offset) * 0.02;
-        float glow = 1.0 - smoothstep(0.0, 0.2 + wave, radius);
-        glow *= sin(time * speed * 0.7 + offset) * 0.3 + 0.7;
-        
-        innerGlow += glow * (1.0 / 3.0);
-    }
-    
     // Color palette - warm literary amber
-    float3 innerColor = float3(1.0, 0.55, 0.26); // Warm amber
-    float3 outerColor = float3(0.9, 0.35, 0.1);  // Deep orange
-    float3 coreColor = float3(1.0, 0.9, 0.7);    // Almost white
+    float3 coreColor = float3(1.0, 0.9, 0.7);      // Almost white core
+    float3 innerColor = float3(1.0, 0.6, 0.3);     // Warm amber
+    float3 outerColor = float3(0.8, 0.3, 0.1);     // Deep orange
+    float3 backgroundColor = float3(0.08, 0.07, 0.07); // Dark background
     
-    // Mix colors based on distance and glow
-    float3 color = mix(outerColor, innerColor, orb);
-    color = mix(color, coreColor, innerGlow * orb * 0.5);
+    // Create the orb with multiple layers
+    float3 color = backgroundColor;
+    color = mix(color, outerColor, outerGlow * 0.3);
+    color = mix(color, innerColor, glow * 0.6);
+    color = mix(color, coreColor, orb * 0.9);
     
-    // Very subtle noise for organic feel
-    float noise = fract(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
-    color += noise * 0.02 * orb;
+    // Add subtle vignette
+    float vignette = 1.0 - length(uv - 0.5) * 0.8;
+    color *= vignette;
     
-    // Final composition with dark background
-    float3 backgroundColor = float3(0.08, 0.07, 0.07);
-    float alpha = orb * 0.9 + innerGlow * orb * 0.3;  // Increased opacity
-    
-    float3 finalColor = mix(backgroundColor, color, alpha);
-    
-    // Subtle vignette
-    float vignette = 1.0 - length(uv - 0.5) * 0.7;
-    finalColor *= vignette;
-    
-    return float4(finalColor, 1.0);
+    return float4(color, 1.0);
 }
 
 // Alternative: Abstract fireplace shader

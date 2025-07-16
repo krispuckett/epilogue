@@ -197,18 +197,32 @@ struct CalmLiteraryBackground: View {
             }
             
             // Style switcher (optional, for testing)
-            if true {  // Set to true to enable style switching
+            if false {  // Set to true to enable style switching
                 VStack {
+                    Spacer()
+                        .frame(height: 60) // Space for Dynamic Island
                     HStack {
-                        Button("Cosmic Orb") {
+                        Button(action: {
                             selectedStyle = .cosmicOrb
+                            print("Selected Cosmic Orb")
+                        }) {
+                            Text("Cosmic Orb")
+                                .padding()
+                                .background(selectedStyle == .cosmicOrb ? Color.orange : Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
                         }
-                        .padding()
                         
-                        Button("Fireplace") {
+                        Button(action: {
                             selectedStyle = .abstractFireplace
+                            print("Selected Fireplace")
+                        }) {
+                            Text("Fireplace")
+                                .padding()
+                                .background(selectedStyle == .abstractFireplace ? Color.orange : Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
                         }
-                        .padding()
                     }
                     Spacer()
                 }
