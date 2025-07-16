@@ -112,3 +112,7 @@ iOSInjectionProject/
 # IDE
 .vscode/
 .idea/
+
+# API Keys and Configuration
+Config.xcconfig
+*.xcconfig
