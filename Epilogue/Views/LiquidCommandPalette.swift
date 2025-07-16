@@ -8,16 +8,19 @@ struct LiquidCommandPalette: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     @State private var currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26) // Amber initial
-    @State private var containerOpacity: Double = 0
     @State private var isAnimating = false
+    
+    // Animation namespace for matched geometry
+    var animationNamespace: Namespace.ID
     
     // Optional initial content for editing
     let initialContent: String?
     let editingNote: Note?
     let onUpdate: ((Note) -> Void)?
     
-    init(isPresented: Binding<Bool>, initialContent: String? = nil, editingNote: Note? = nil, onUpdate: ((Note) -> Void)? = nil) {
+    init(isPresented: Binding<Bool>, animationNamespace: Namespace.ID, initialContent: String? = nil, editingNote: Note? = nil, onUpdate: ((Note) -> Void)? = nil) {
         self._isPresented = isPresented
+        self.animationNamespace = animationNamespace
         self.initialContent = initialContent
         self.editingNote = editingNote
         self.onUpdate = onUpdate
@@ -134,15 +137,9 @@ struct LiquidCommandPalette: View {
                 .shadow(color: currentGlowColor.opacity(0.25), radius: 16, y: 4)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8) // Small padding from keyboard
-                .opacity(containerOpacity)
             }
         }
         .onAppear {
-            guard !isAnimating else { return }
-            
-            // Reset state
-            containerOpacity = 0
-            
             // Initialize with existing content if editing
             if let initialContent = initialContent {
                 commandText = initialContent
@@ -154,23 +151,13 @@ struct LiquidCommandPalette: View {
                 currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26)
             }
             
-            // Animate container appearance
-            isAnimating = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    containerOpacity = 1
-                }
-                
-                // Delay keyboard focus
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    isFocused = true
-                    isAnimating = false
-                }
+            // Auto-focus after appearing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                isFocused = true
             }
         }
         .onDisappear {
-            // Clean up state
-            containerOpacity = 0
+            // Clear on dismiss
             isFocused = false
             isAnimating = false
         }
@@ -199,12 +186,11 @@ struct LiquidCommandPalette: View {
         isAnimating = true
         isFocused = false
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            containerOpacity = 0
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            isPresented = false
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            isPresented = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isAnimating = false
         }
     }

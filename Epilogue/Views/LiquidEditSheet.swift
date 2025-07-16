@@ -7,6 +7,7 @@ struct LiquidEditSheet: View {
     let onDismiss: () -> Void
     
     @State private var isPresented = true
+    @Namespace private var animation
     
     init(note: Note? = nil, noteType: NoteType = .note, onSave: @escaping (Note) -> Void, onDismiss: @escaping () -> Void) {
         self.note = note
@@ -18,6 +19,7 @@ struct LiquidEditSheet: View {
     var body: some View {
         LiquidCommandPalette(
             isPresented: $isPresented,
+            animationNamespace: animation,
             initialContent: formatNoteForEditing(note),
             editingNote: note,
             onUpdate: onSave

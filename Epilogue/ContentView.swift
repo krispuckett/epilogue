@@ -53,6 +53,8 @@ struct ContentView: View {
                 .tag(2)
             }
             .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+            .environmentObject(libraryViewModel)
+            .environmentObject(notesViewModel)
             .safeAreaInset(edge: .bottom) {
                 // Quick Add button positioned right above tab bar
                 if selectedTab != 2 && !showCommandPalette && !notesViewModel.isEditingNote {
@@ -78,7 +80,7 @@ struct ContentView: View {
                             .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
                     }
                     .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    .matchedGeometryEffect(id: "commandGlass", in: animation)
+                    .matchedGeometryEffect(id: "commandInput", in: animation)
                     .padding(.bottom, 56) // 4-6px above tab bar
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
@@ -87,24 +89,26 @@ struct ContentView: View {
                 }
             }
         }
+        
+        // Command palette overlay
         .overlay {
             if showCommandPalette {
-                LiquidCommandPalette(isPresented: $showCommandPalette)
-                    .environmentObject(libraryViewModel)
-                    .environmentObject(notesViewModel)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.9, anchor: .bottom)
-                            .combined(with: .opacity)
-                            .combined(with: .offset(y: 50)),
-                        removal: .scale(scale: 0.95, anchor: .bottom)
-                            .combined(with: .opacity)
-                    ))
+                LiquidCommandPalette(
+                    isPresented: $showCommandPalette,
+                    animationNamespace: animation
+                )
+                .environmentObject(libraryViewModel)
+                .environmentObject(notesViewModel)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9, anchor: .bottom)
+                        .combined(with: .opacity),
+                    removal: .scale(scale: 0.95, anchor: .bottom)
+                        .combined(with: .opacity)
+                ))
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showCommandPalette)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
-        .environmentObject(libraryViewModel)
-        .environmentObject(notesViewModel)
         .preferredColorScheme(.dark)
     }
 }

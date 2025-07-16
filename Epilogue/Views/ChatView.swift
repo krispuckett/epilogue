@@ -30,33 +30,35 @@ struct ChatView: View {
     
     var body: some View {
         ZStack {
-            // Ambient background
-            AmbientBackground(animationPhase: $animationPhase, orbPositions: $orbPositions)
+            // Show appropriate background
+            if viewModel.messages.isEmpty {
+                // Literary empty state
+                LiteraryCompanionEmptyState()
+                    .transition(.opacity)
+                    .ignoresSafeArea()
+            } else {
+                // Regular ambient background for conversations
+                AmbientBackground(animationPhase: $animationPhase, orbPositions: $orbPositions)
+            }
             
-            // Messages ScrollView
-            ScrollViewReader { scrollProxy in
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Welcome message
-                        if viewModel.messages.isEmpty {
-                            WelcomeCard()
-                                .padding(.top, 100)
-                                .transition(.scale(scale: 0.9).combined(with: .opacity))
-                        }
-                        
-                        // Messages
-                        ForEach(viewModel.messages) { message in
-                            MessageCard(
-                                message: message,
-                                namespace: animation
-                            )
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.95, anchor: message.isUser ? .bottomTrailing : .bottomLeading)
-                                    .combined(with: .opacity),
-                                removal: .scale(scale: 0.95).combined(with: .opacity)
-                            ))
-                            .id(message.id)
-                        }
+            // Messages ScrollView (only show when there are messages)
+            if !viewModel.messages.isEmpty {
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // Messages
+                            ForEach(viewModel.messages) { message in
+                                MessageCard(
+                                    message: message,
+                                    namespace: animation
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.95, anchor: message.isUser ? .bottomTrailing : .bottomLeading)
+                                        .combined(with: .opacity),
+                                    removal: .scale(scale: 0.95).combined(with: .opacity)
+                                ))
+                                .id(message.id)
+                            }
                         
                         // Spacer for input field
                         Color.clear
@@ -71,8 +73,9 @@ struct ChatView: View {
                         scrollProxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
-            }
-        }
+            } // End ScrollViewReader
+        } // End if !viewModel.messages.isEmpty
+        } // End ZStack
         .safeAreaInset(edge: .bottom) {
             LiteraryInputField(
                 text: $messageText,
@@ -88,7 +91,7 @@ struct ChatView: View {
         .onAppear {
             startAmbientAnimation()
         }
-    }
+    } // End of body
     
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { 
@@ -107,24 +110,26 @@ struct ChatView: View {
         messageText = ""
         isLoadingResponse = true
         
+        // Show loading message immediately
+        let loadingMessage = ChatMessage(
+            content: "",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: currentBook
+        )
+        viewModel.receiveMessage(loadingMessage)
+        
         // Get AI response from Perplexity
         Task {
             do {
-                // Get response from Perplexity
+                // Get response from Perplexity (fast non-streaming for now)
                 let response = try await PerplexityService.staticChat(
                     message: userMessage.content,
                     bookContext: currentBook
                 )
                 
-                // Create AI message
-                let aiMessage = ChatMessage(
-                    content: response,
-                    isUser: false,
-                    timestamp: Date(),
-                    bookContext: currentBook
-                )
-                
-                viewModel.receiveMessage(aiMessage)
+                // Update the loading message with actual content
+                viewModel.updateLastMessage(content: response)
                 isLoadingResponse = false
                 
             } catch {
@@ -316,12 +321,7 @@ struct MessageCard: View {
                         }
                         .padding(.vertical, 8)
                     } else {
-                        Text(message.content)
-                            .font(message.isUser ? 
-                                  .system(size: 16, weight: .regular, design: .default) :
-                                  .custom("Georgia", size: 17))
-                            .foregroundStyle(message.isUser ? .white : Color(red: 0.98, green: 0.97, blue: 0.96))
-                            .lineSpacing(message.isUser ? 2 : 4)
+                        MarkdownText(text: message.content, isUserMessage: message.isUser)
                             .opacity(isRevealed ? 1 : 0)
                             .mask(
                                 LinearGradient(
@@ -399,7 +399,7 @@ struct LiteraryInputField: View {
             // Input field
             HStack(spacing: 12) {
                 // Book context indicator
-                if let book = currentBook {
+                if currentBook != nil {
                     Image(systemName: "book.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
@@ -437,9 +437,9 @@ struct LiteraryInputField: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .glassEffect(in: Capsule())
+            .glassEffect(in: RoundedRectangle(cornerRadius: 20))
             .overlay {
-                Capsule()
+                RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
             }
             .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
@@ -491,9 +491,9 @@ struct SmartSuggestions: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .glassEffect(in: Capsule())
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
                             .overlay {
-                                Capsule()
+                                RoundedRectangle(cornerRadius: 16)
                                     .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
                             }
                     }
@@ -536,3 +536,4 @@ class ChatViewModel: ObservableObject {
     }
     .preferredColorScheme(.dark)
 }
+

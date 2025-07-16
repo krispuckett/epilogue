@@ -4,8 +4,17 @@ import Foundation
 class PerplexityService: ObservableObject {
     private let apiKey: String
     private let baseURL = "https://api.perplexity.ai/chat/completions"
+    private let session: URLSession
+    private var responseCache = [String: String]()  // Simple cache
     
     init() {
+        // Configure URLSession for optimal performance
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15  // Faster timeout
+        config.timeoutIntervalForResource = 15
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = nil  // Disable caching for real-time responses
+        self.session = URLSession(configuration: config)
         // Load API key from Info.plist
         guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
               !apiKey.isEmpty,
@@ -25,12 +34,69 @@ class PerplexityService: ObservableObject {
         print("✅ Perplexity Service initialized")
     }
     
-    // MARK: - Simple Chat Method
+    // MARK: - Chat Methods
     static func staticChat(message: String, bookContext: Book? = nil) async throws -> String {
         let service = PerplexityService()
         return try await service.chat(with: message, bookContext: bookContext)
     }
     
+    // Fast streaming chat for real-time responses
+    func streamChat(message: String, bookContext: Book? = nil) async throws -> AsyncThrowingStream<String, Error> {
+        guard let url = URL(string: baseURL) else {
+            throw PerplexityError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        // Optimized for streaming
+        let systemPrompt = "Literary assistant. Brief, insightful responses."
+        let requestBody: [String: Any] = [
+            "model": "sonar",
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": message]
+            ],
+            "stream": true,  // Enable streaming
+            "temperature": 0.7,
+            "max_tokens": 150
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let (bytes, response) = try await session.bytes(for: request)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          httpResponse.statusCode == 200 else {
+                        continuation.finish(throwing: PerplexityError.invalidResponse)
+                        return
+                    }
+                    
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data: "),
+                           let data = line.dropFirst(6).data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let choices = json["choices"] as? [[String: Any]],
+                           let delta = choices.first?["delta"] as? [String: Any],
+                           let content = delta["content"] as? String {
+                            continuation.yield(content)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+    
+    // Original non-streaming method
     func chat(with message: String, bookContext: Book? = nil) async throws -> String {
         guard let url = URL(string: baseURL) else {
             throw PerplexityError.invalidURL
@@ -42,24 +108,26 @@ class PerplexityService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
-        // Create system prompt
+        // Create concise system prompt for faster responses
         let systemPrompt = bookContext != nil ? 
-            "You are a thoughtful literary companion discussing '\(bookContext!.title)' by \(bookContext!.author). Be warm, insightful, and engaging." :
-            "You are a thoughtful literary companion. Be warm, insightful, and engaging in discussing books and literature."
+            "Literary companion discussing '\(bookContext!.title)'. Be concise and insightful. Use *italics* for book titles and **bold** for key concepts." :
+            "Literary companion. Be concise and insightful about books. Use *italics* for book titles and **bold** for key concepts."
         
-        // Build request body
+        // Build request body with faster model
         let requestBody: [String: Any] = [
-            "model": "sonar-pro",
+            "model": "sonar",  // Faster model, still high quality
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": message]
-            ]
+            ],
+            "temperature": 0.7,
+            "max_tokens": 150  // Limit response length for speed
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        // Make request
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // Make request with configured session
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw PerplexityError.invalidResponse
