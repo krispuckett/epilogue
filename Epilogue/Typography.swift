@@ -193,6 +193,7 @@ class NotesViewModel: ObservableObject {
             objectWillChange.send()
         }
     }
+    @Published var isEditingNote: Bool = false
     
     private let userDefaults = UserDefaults.standard
     private let notesKey = "com.epilogue.savedNotes"
@@ -309,6 +310,30 @@ class NotesViewModel: ObservableObject {
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
             print("✏️ DEBUG: Found note at index: \(index)")
             notes[index] = note
+            saveNotes()
+        } else {
+            print("❌ DEBUG: Note not found for update")
+        }
+    }
+    
+    func updateNote(_ oldNote: Note, with newNote: Note) {
+        print("✏️ DEBUG: updateNote() called for note ID: \(oldNote.id)")
+        
+        if let index = notes.firstIndex(where: { $0.id == oldNote.id }) {
+            print("✏️ DEBUG: Found note at index: \(index)")
+            // Keep the same ID but update the content
+            var updatedNote = newNote
+            updatedNote = Note(
+                type: newNote.type,
+                content: newNote.content,
+                bookId: newNote.bookId,
+                bookTitle: newNote.bookTitle,
+                author: newNote.author,
+                pageNumber: newNote.pageNumber,
+                dateCreated: oldNote.dateCreated,
+                id: oldNote.id
+            )
+            notes[index] = updatedNote
             saveNotes()
         } else {
             print("❌ DEBUG: Note not found for update")

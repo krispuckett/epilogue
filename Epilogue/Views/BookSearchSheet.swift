@@ -189,15 +189,23 @@ struct BookSearchResultRow: View {
             
             Spacer()
             
-            // Add button with glass effect
+            // Add button with liquid glass effect and amber tint
             Button(action: onSelect) {
                 Image(systemName: "plus")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
+                    .background {
+                        Circle()
+                            .fill(.regularMaterial)
+                            .overlay {
+                                Circle()
+                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.35))
+                            }
+                    }
             }
             .glassEffect(in: Circle())
-            .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), radius: 8)
+            .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 10)
         }
         .padding(16)
         .frame(height: 114) // Match library list item height

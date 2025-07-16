@@ -7,10 +7,12 @@ struct NotesView: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @State private var selectedFilter: NoteType? = nil
     @State private var showingAddNote = false
-    @State private var searchText = ""
     @State private var isSelectionMode = false
     @State private var selectedNotes: Set<UUID> = []
     @State private var showingFilterOptions = false
+    @State private var showingEditSheet = false
+    @State private var noteToEdit: Note? = nil
+    @State private var openOptionsNoteId: UUID? = nil
     
     var filteredNotes: [Note] {
         var filtered = notesViewModel.notes
@@ -20,14 +22,6 @@ struct NotesView: View {
             filtered = filtered.filter { $0.type == selectedFilter }
         }
         
-        // Apply search filter
-        if !searchText.isEmpty {
-            filtered = filtered.filter { note in
-                note.content.localizedCaseInsensitiveContains(searchText) ||
-                note.bookTitle?.localizedCaseInsensitiveContains(searchText) == true ||
-                note.author?.localizedCaseInsensitiveContains(searchText) == true
-            }
-        }
         
         return filtered.sorted { $0.dateCreated > $1.dateCreated }
     }
@@ -159,8 +153,11 @@ struct NotesView: View {
                                         } else {
                                             selectedNotes.insert(note.id)
                                         }
-                                    }
+                                    },
+                                    openOptionsNoteId: $openOptionsNoteId
                                 )
+                                .id(note.id) // Add stable ID for tracking
+                                .zIndex(openOptionsNoteId == note.id ? 1 : 0) // Higher z-index when showing options
                                 .transition(.asymmetric(
                                     insertion: .scale(scale: 0.95).combined(with: .opacity),
                                     removal: .scale(scale: 1.05).combined(with: .opacity)
@@ -238,27 +235,67 @@ struct NotesView: View {
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: filteredNotes.count)
-        .sheet(isPresented: $showingAddNote) {
-            EditNoteSheet(
-                note: Note(
-                    type: .note,
-                    content: "",
-                    bookTitle: nil,
-                    author: nil,
-                    pageNumber: nil,
-                    dateCreated: Date()
-                ),
-                onSave: { newNote in
-                    notesViewModel.addNote(newNote)
-                }
-            )
-            .presentationBackground(.clear)
-            .environmentObject(libraryViewModel)
+        .overlay {
+            if showingAddNote {
+                LiquidEditSheet(
+                    noteType: .note,
+                    onSave: { newNote in
+                        notesViewModel.addNote(newNote)
+                    },
+                    onDismiss: {
+                        showingAddNote = false
+                    }
+                )
+                .environmentObject(libraryViewModel)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9, anchor: .bottom)
+                        .combined(with: .opacity)
+                        .combined(with: .offset(y: 50)),
+                    removal: .scale(scale: 0.95, anchor: .bottom)
+                        .combined(with: .opacity)
+                ))
+            }
         }
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showingAddNote)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ResetNotesFilter"))) { _ in
             // Reset filter to show all notes when coming from command bar
             selectedFilter = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
+            if let note = notification.object as? Note {
+                noteToEdit = note
+                showingEditSheet = true
+                notesViewModel.isEditingNote = true
+            }
+        }
+        .overlay {
+            if showingEditSheet, let noteToEdit = noteToEdit {
+                LiquidEditSheet(
+                    note: noteToEdit,
+                    noteType: noteToEdit.type,
+                    onSave: { updatedNote in
+                        notesViewModel.updateNote(noteToEdit, with: updatedNote)
+                        showingEditSheet = false
+                        self.noteToEdit = nil
+                        notesViewModel.isEditingNote = false
+                    },
+                    onDismiss: {
+                        showingEditSheet = false
+                        self.noteToEdit = nil
+                        notesViewModel.isEditingNote = false
+                    }
+                )
+                .environmentObject(libraryViewModel)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9, anchor: .bottom)
+                        .combined(with: .opacity)
+                        .combined(with: .offset(y: 50)),
+                    removal: .scale(scale: 0.95, anchor: .bottom)
+                        .combined(with: .opacity)
+                ))
+            }
+        }
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showingEditSheet)
     }
 }
 
@@ -323,21 +360,22 @@ struct NoteCard: View {
     let onSelectionToggle: () -> Void
     @State private var isPressed = false
     @State private var showingOptions = false
-    @State private var showingEditSheet = false
+    @Binding var openOptionsNoteId: UUID?
     
-    init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}) {
+    init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}, openOptionsNoteId: Binding<UUID?> = .constant(nil)) {
         self.note = note
         self.isSelectionMode = isSelectionMode
         self.isSelected = isSelected
         self.onSelectionToggle = onSelectionToggle
+        self._openOptionsNoteId = openOptionsNoteId
     }
     
     var body: some View {
         ZStack {
             if note.type == .quote {
-                QuoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions, showingEditSheet: $showingEditSheet)
+                QuoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions)
             } else {
-                RegularNoteCard(note: note, isPressed: $isPressed, showingEditSheet: $showingEditSheet)
+                RegularNoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions)
             }
             
             // Selection overlay
@@ -365,6 +403,13 @@ struct NoteCard: View {
                     }
             }
         }
+        .onChange(of: showingOptions) { _, newValue in
+            if newValue {
+                openOptionsNoteId = note.id
+            } else if openOptionsNoteId == note.id {
+                openOptionsNoteId = nil
+            }
+        }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
     }
@@ -375,7 +420,6 @@ struct QuoteCard: View {
     let note: Note
     @Binding var isPressed: Bool
     @Binding var showingOptions: Bool
-    @Binding var showingEditSheet: Bool
     @EnvironmentObject var notesViewModel: NotesViewModel
     
     var firstLetter: String {
@@ -462,28 +506,30 @@ struct QuoteCard: View {
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .onTapGesture {
-            HapticManager.shared.lightTap()
-            showingEditSheet = true
-        }
-        .onLongPressGesture(minimumDuration: 0.5) {
+        .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity) {
+            print("🔵 QuoteCard: Long press detected")
             HapticManager.shared.mediumImpact()
             showingOptions = true
-        } onPressingChanged: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
+            print("🔵 QuoteCard: showingOptions set to true")
+        }
+        .overlay {
+            // Show options menu with higher Z-order
+            if showingOptions {
+                GlassOptionsMenu(
+                    note: note,
+                    isPresented: $showingOptions
+                )
+                .environmentObject(notesViewModel)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9, anchor: .bottom)
+                        .combined(with: .opacity),
+                    removal: .scale(scale: 0.95, anchor: .bottom)
+                        .combined(with: .opacity)
+                ))
+                .zIndex(2) // Higher Z-order
             }
         }
-        .popover(isPresented: $showingOptions) {
-            QuoteOptionsPopover(note: note)
-                .presentationCompactAdaptation(.popover)
-        }
-        .sheet(isPresented: $showingEditSheet) {
-            EditNoteSheet(note: note) { updatedNote in
-                notesViewModel.updateNote(updatedNote)
-            }
-            .presentationBackground(.regularMaterial)
-        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingOptions)
     }
 }
 
@@ -491,9 +537,8 @@ struct QuoteCard: View {
 struct RegularNoteCard: View {
     let note: Note
     @Binding var isPressed: Bool
-    @Binding var showingEditSheet: Bool
+    @Binding var showingOptions: Bool
     @EnvironmentObject var notesViewModel: NotesViewModel
-    @State private var showingOptions = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -581,26 +626,29 @@ struct RegularNoteCard: View {
                 }
             }
             HapticManager.shared.lightTap()
-            showingEditSheet = true
         }
-        .onLongPressGesture(minimumDuration: 0.5) {
+        .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity) {
             HapticManager.shared.mediumImpact()
             showingOptions = true
-        } onPressingChanged: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
+        }
+        .overlay {
+            // Show options menu with higher Z-order
+            if showingOptions {
+                GlassOptionsMenu(
+                    note: note,
+                    isPresented: $showingOptions
+                )
+                .environmentObject(notesViewModel)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9, anchor: .bottom)
+                        .combined(with: .opacity),
+                    removal: .scale(scale: 0.95, anchor: .bottom)
+                        .combined(with: .opacity)
+                ))
+                .zIndex(2) // Higher Z-order
             }
         }
-        .popover(isPresented: $showingOptions) {
-            NoteOptionsPopover(note: note)
-                .presentationCompactAdaptation(.popover)
-        }
-        .sheet(isPresented: $showingEditSheet) {
-            EditNoteSheet(note: note) { updatedNote in
-                notesViewModel.updateNote(updatedNote)
-            }
-            .presentationBackground(.regularMaterial)
-        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingOptions)
     }
 }
 
@@ -783,7 +831,8 @@ struct NoteOptionsPopover: View {
     
     private func edit() {
         HapticManager.shared.lightTap()
-        // TODO: Open edit sheet
+        // Find the parent view and trigger edit mode
+        NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
         dismiss()
     }
     

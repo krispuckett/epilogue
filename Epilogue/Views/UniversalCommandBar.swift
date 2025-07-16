@@ -742,6 +742,10 @@ struct UniversalCommandBar: View {
             saveNote(text)
         case .searchLibrary(let query):
             searchLibrary(query)
+        case .searchNotes(let query):
+            searchNotes(query)
+        case .searchAll(let query):
+            searchAll(query)
         case .unknown:
             break
         }
@@ -828,6 +832,22 @@ struct UniversalCommandBar: View {
         selectedTab = 0
         
         // TODO: Implement search in LibraryView
+        collapse()
+    }
+    
+    private func searchNotes(_ query: String) {
+        // Switch to notes tab and set search
+        selectedTab = 1
+        
+        // TODO: Implement search in NotesView through command palette
+        collapse()
+    }
+    
+    private func searchAll(_ query: String) {
+        // For now, just go to notes tab as default
+        selectedTab = 1
+        
+        // TODO: Implement universal search
         collapse()
     }
     

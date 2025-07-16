@@ -306,7 +306,8 @@ struct BookCoverView: View {
                 )
             
             if let coverURL = coverURL,
-               let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
+               !coverURL.isEmpty,
+               let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? coverURL) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
@@ -323,7 +324,10 @@ struct BookCoverView: View {
                             .frame(width: 170, height: 255)
                             .clipped()
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    case .failure(_):
+                            .onAppear {
+                                print("📚 DEBUG: Cover loaded successfully: \(url.absoluteString)")
+                            }
+                    case .failure(let error):
                         // Error state - show book icon
                         VStack(spacing: 12) {
                             Image(systemName: "book.closed.fill")
@@ -334,22 +338,32 @@ struct BookCoverView: View {
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.3))
                         }
+                        .onAppear {
+                            print("📚 DEBUG: Cover failed to load: \(error.localizedDescription)")
+                        }
                     @unknown default:
                         EmptyView()
                     }
                 }
-                .onAppear {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        isLoading = false
-                    }
-                }
             } else {
-                // No URL provided - show default
+                // No cover URL available - show placeholder
                 VStack(spacing: 12) {
                     Image(systemName: "book.closed.fill")
                         .font(.system(size: 50))
                         .foregroundStyle(.white.opacity(0.3))
+                    
+                    Text("No Cover")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.3))
                 }
+                .onAppear {
+                    print("📚 DEBUG: No cover URL available - coverURL: \(coverURL ?? "nil")")
+                }
+            }
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.3)) {
+                isLoading = false
             }
         }
         .frame(width: 170, height: 255)

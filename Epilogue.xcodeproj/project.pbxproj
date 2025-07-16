@@ -7,9 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */; };
 		01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C32E2491BD00E04A55 /* NotesView.swift */; };
 		01BC21C62E25806C00E04A55 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C52E25806C00E04A55 /* BookDetailView.swift */; };
 		01BC21C82E260B8A00E04A55 /* EditBookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */; };
+		01BC21CF2E26AB3E00E04A55 /* GlassMaterialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21CB2E26AB3E00E04A55 /* GlassMaterialization.swift */; };
+		01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */; };
+		39CF5568A7D14D8682126B61 /* GlassEditNoteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC479BA9510B431F97969E53 /* GlassEditNoteSheet.swift */; };
+		8343304CC97A4B7B82B14E17 /* NotesSearchPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A6069AA8F84A2D8E73EDEE /* NotesSearchPalette.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* GlassOptionsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* GlassOptionsMenu.swift */; };
 		2B1234561234567890123456 /* EpilogueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234551234567890123456 /* EpilogueApp.swift */; };
 		2B1234581234567890123456 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234571234567890123456 /* ContentView.swift */; };
 		2B12345A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B1234591234567890123456 /* Assets.xcassets */; };
@@ -47,9 +53,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidEditSheet.swift; sourceTree = "<group>"; };
 		01BC21C32E2491BD00E04A55 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
 		01BC21C52E25806C00E04A55 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditBookSheet.swift; sourceTree = "<group>"; };
+		01BC21CB2E26AB3E00E04A55 /* GlassMaterialization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassMaterialization.swift; sourceTree = "<group>"; };
+		01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidCommandPalette.swift; sourceTree = "<group>"; };
+		AC479BA9510B431F97969E53 /* GlassEditNoteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassEditNoteSheet.swift; sourceTree = "<group>"; };
+		C9A6069AA8F84A2D8E73EDEE /* NotesSearchPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSearchPalette.swift; sourceTree = "<group>"; };
+		F2E1D0C9B8A7F6E5D4C3B2A1 /* GlassOptionsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassOptionsMenu.swift; sourceTree = "<group>"; };
 		2B1234521234567890123456 /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B1234551234567890123456 /* EpilogueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpilogueApp.swift; sourceTree = "<group>"; };
 		2B1234571234567890123456 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -161,6 +173,12 @@
 		2B1234831234567890123456 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				01BC21CB2E26AB3E00E04A55 /* GlassMaterialization.swift */,
+				01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */,
+				AC479BA9510B431F97969E53 /* GlassEditNoteSheet.swift */,
+				C9A6069AA8F84A2D8E73EDEE /* NotesSearchPalette.swift */,
+				F2E1D0C9B8A7F6E5D4C3B2A1 /* GlassOptionsMenu.swift */,
+				A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */,
 				01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */,
 				01BC21C52E25806C00E04A55 /* BookDetailView.swift */,
 				01BC21C32E2491BD00E04A55 /* NotesView.swift */,
@@ -314,6 +332,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				01BC21CF2E26AB3E00E04A55 /* GlassMaterialization.swift in Sources */,
+				01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */,
+				39CF5568A7D14D8682126B61 /* GlassEditNoteSheet.swift in Sources */,
+				8343304CC97A4B7B82B14E17 /* NotesSearchPalette.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* GlassOptionsMenu.swift in Sources */,
+				87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */,
 				2B1234581234567890123456 /* ContentView.swift in Sources */,
 				2B1234561234567890123456 /* EpilogueApp.swift in Sources */,
 				2B12348C1234567890123456 /* Typography.swift in Sources */,

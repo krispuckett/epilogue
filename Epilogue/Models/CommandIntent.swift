@@ -6,6 +6,8 @@ enum CommandIntent: Equatable {
     case createQuote(text: String)
     case createNote(text: String)
     case searchLibrary(query: String)
+    case searchNotes(query: String)
+    case searchAll(query: String)
     case unknown
     
     var icon: String {
@@ -18,6 +20,10 @@ enum CommandIntent: Equatable {
             return "note.text"
         case .searchLibrary:
             return "magnifyingglass"
+        case .searchNotes:
+            return "doc.text.magnifyingglass"
+        case .searchAll:
+            return "magnifyingglass.circle"
         case .unknown:
             return "questionmark.circle"
         }
@@ -33,6 +39,10 @@ enum CommandIntent: Equatable {
             return .green
         case .searchLibrary:
             return .orange
+        case .searchNotes:
+            return .blue
+        case .searchAll:
+            return .purple
         case .unknown:
             return .gray
         }
@@ -47,9 +57,32 @@ enum CommandIntent: Equatable {
         case .createNote:
             return "Save Note"
         case .searchLibrary:
-            return "Search"
+            return "Search Books"
+        case .searchNotes:
+            return "Search Notes"
+        case .searchAll:
+            return "Search All"
         case .unknown:
             return "Enter"
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .addBook:
+            return "Add Book"
+        case .createQuote:
+            return "New Quote"
+        case .createNote:
+            return "New Note"
+        case .searchLibrary:
+            return "Search Library"
+        case .searchNotes:
+            return "Search Notes"
+        case .searchAll:
+            return "Search Everything"
+        case .unknown:
+            return "Command"
         }
     }
 }
@@ -83,26 +116,43 @@ struct CommandParser {
            lowercased.starts(with: "\"") ||
            lowercased.starts(with: "\u{201C}") || // smart quote
            (lowercased.contains("page ") && lowercased.contains("\"")) ||
-           isQuoteFormat(input) {
+           isQuoteFormat(input) ||
+           hasQuoteAttribution(input) {
             return .createQuote(text: input)
         }
         
-        // Notes
+        // Notes - enhanced detection
         if lowercased.starts(with: "note:") ||
+           lowercased.starts(with: "note -") ||
+           lowercased.starts(with: "note ") ||
            lowercased.starts(with: "thought:") ||
-           lowercased.starts(with: "idea:") {
+           lowercased.starts(with: "idea:") ||
+           lowercased.starts(with: "reminder:") ||
+           lowercased.starts(with: "todo:") {
             return .createNote(text: input)
         }
         
-        // Library search (default for simple text)
+        // Search patterns
+        if lowercased.starts(with: "search ") {
+            let query = String(input.dropFirst(7)).trimmingCharacters(in: .whitespaces)
+            if lowercased.starts(with: "search notes") || lowercased.starts(with: "search note") {
+                return .searchNotes(query: String(input.dropFirst(12)).trimmingCharacters(in: .whitespaces))
+            } else if lowercased.starts(with: "search books") || lowercased.starts(with: "search library") {
+                return .searchLibrary(query: query)
+            } else {
+                return .searchAll(query: query)
+            }
+        }
+        
+        // Default to search all for simple text
         if !containsActionKeywords(lowercased) {
-            return .searchLibrary(query: input)
+            return .searchAll(query: input)
         }
         
         return .unknown
     }
     
-    private static func cleanBookQuery(from input: String) -> String {
+    static func cleanBookQuery(from input: String) -> String {
         var query = input
         
         // Remove common prefixes
@@ -158,6 +208,116 @@ struct CommandParser {
             workingText = String(workingText.dropFirst(6)).trimmingCharacters(in: .whitespaces)
         }
         
+        // First try to match quoted text with attribution: "content" author, book, page
+        let quotePatterns = [
+            "^\"(.+?)\"\\s*(.+)$",                          // Regular double quotes
+            "^[\u{201C}](.+?)[\u{201D}]\\s*(.+)$",         // Smart quotes
+            "^'(.+?)'\\s*(.+)$",                            // Single quotes
+            "^[\u{2018}](.+?)[\u{2019}]\\s*(.+)$"          // Smart single quotes
+        ]
+        
+        for pattern in quotePatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
+                let range = NSRange(location: 0, length: workingText.utf16.count)
+                if let match = regex.firstMatch(in: workingText, options: [], range: range) {
+                    if let contentRange = Range(match.range(at: 1), in: workingText),
+                       let attributionRange = Range(match.range(at: 2), in: workingText) {
+                        // Extract the quote content (without quotes)
+                        var quoteContent = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                        
+                        // Clean any trailing dashes that might have been included
+                        while quoteContent.hasSuffix("-") || quoteContent.hasSuffix("—") || quoteContent.hasSuffix("–") {
+                            quoteContent = String(quoteContent.dropLast()).trimmingCharacters(in: .whitespaces)
+                        }
+                        let attribution = String(workingText[attributionRange]).trimmingCharacters(in: .whitespaces)
+                        
+                        // Parse the attribution (e.g., "Ryan Holiday, The Obstacle is the Way, pg 40")
+                        let parts = attribution.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                        
+                        var author: String? = nil
+                        var bookTitle: String? = nil
+                        var pageNumber: Int? = nil
+                        
+                        if parts.count >= 1 {
+                            author = parts[0]
+                        }
+                        if parts.count >= 2 {
+                            bookTitle = parts[1]
+                        }
+                        if parts.count >= 3 {
+                            let pageStr = parts[2]
+                            // Extract page number from strings like "pg 30", "p. 30", "page 30"
+                            if let pageMatch = pageStr.range(of: #"\d+"#, options: .regularExpression) {
+                                pageNumber = Int(pageStr[pageMatch])
+                            }
+                        }
+                        
+                        // Format with our special separator
+                        if let author = author {
+                            var result = author
+                            if let book = bookTitle {
+                                result += "|||BOOK|||" + book
+                            }
+                            if let page = pageNumber {
+                                result += "|||PAGE|||" + String(page)
+                            }
+                            return (content: quoteContent, author: result)
+                        }
+                        
+                        return (content: quoteContent, author: author)
+                    }
+                }
+            }
+        }
+        
+        // Check if it's a quote without quotation marks but with attribution
+        if hasQuoteAttribution(workingText) && !workingText.contains("\"") && !workingText.contains("\u{201C}") {
+            // Parse pattern: "quote content author, book, page"
+            // Split by commas first
+            let parts = workingText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            
+            if parts.count >= 2 {
+                // Try to find where the quote ends and author begins
+                // Look for capital letters that might indicate author name
+                let firstPart = parts[0]
+                
+                // Split by spaces and find potential author name start
+                let words = firstPart.split(separator: " ")
+                var quoteEndIndex = words.count
+                
+                // Work backwards to find where author might start
+                // (usually the last 1-2 capitalized words before the comma)
+                for i in stride(from: words.count - 1, through: 0, by: -1) {
+                    let word = String(words[i])
+                    if word.first?.isUppercase == true && i < words.count - 1 {
+                        // Check if this and next word could be author name
+                        if i > 0 {  // Make sure there's content before
+                            quoteEndIndex = i
+                            break
+                        }
+                    }
+                }
+                
+                // Extract quote and author
+                let quoteWords = words.prefix(quoteEndIndex)
+                let authorWords = words.suffix(from: quoteEndIndex)
+                
+                if !quoteWords.isEmpty && !authorWords.isEmpty {
+                    let content = quoteWords.joined(separator: " ")
+                    let author = authorWords.joined(separator: " ")
+                    
+                    // Reconstruct attribution with remaining parts
+                    var attributionParts = [author]
+                    if parts.count > 1 {
+                        attributionParts.append(contentsOf: parts.suffix(from: 1))
+                    }
+                    let fullAttribution = attributionParts.joined(separator: ", ")
+                    
+                    return processAttribution(content: content, attribution: fullAttribution)
+                }
+            }
+        }
+        
         // Try to parse "content" - author format or "content" author format
         // First try with dash separator
         let quoteWithDashPattern = #"^["\u{201C}](.+?)["\u{201D}]\s*[-–—]\s*(.+)$"#
@@ -166,7 +326,12 @@ struct CommandParser {
             if let match = regex.firstMatch(in: workingText, options: [], range: range) {
                 if let contentRange = Range(match.range(at: 1), in: workingText),
                    let authorRange = Range(match.range(at: 2), in: workingText) {
-                    let content = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                    var content = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                    
+                    // Clean any trailing dashes
+                    while content.hasSuffix("-") || content.hasSuffix("—") || content.hasSuffix("–") {
+                        content = String(content.dropLast()).trimmingCharacters(in: .whitespaces)
+                    }
                     let author = String(workingText[authorRange]).trimmingCharacters(in: .whitespaces)
                     
                     // Process the author part which might contain book and page
@@ -182,7 +347,12 @@ struct CommandParser {
             if let match = regex.firstMatch(in: workingText, options: [], range: range) {
                 if let contentRange = Range(match.range(at: 1), in: workingText),
                    let authorRange = Range(match.range(at: 2), in: workingText) {
-                    let content = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                    var content = String(workingText[contentRange]).trimmingCharacters(in: .whitespaces)
+                    
+                    // Clean any trailing dashes
+                    while content.hasSuffix("-") || content.hasSuffix("—") || content.hasSuffix("–") {
+                        content = String(content.dropLast()).trimmingCharacters(in: .whitespaces)
+                    }
                     let author = String(workingText[authorRange]).trimmingCharacters(in: .whitespaces)
                     
                     // Process the author part which might contain book and page
@@ -217,6 +387,29 @@ struct CommandParser {
         }
         
         return (content, nil)
+    }
+    
+    // Check if text has quote attribution pattern
+    private static func hasQuoteAttribution(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        
+        // Check for patterns like "text author, book, page"
+        // Must have at least one comma to indicate author and book
+        let commaCount = trimmed.filter { $0 == "," }.count
+        if commaCount >= 1 {
+            // Check if it contains page indicators
+            let lowercased = trimmed.lowercased()
+            if lowercased.contains("pg ") || lowercased.contains("page ") || lowercased.contains("p. ") {
+                return true
+            }
+            // Or if it has author, book pattern (at least 2 parts)
+            let parts = trimmed.split(separator: ",")
+            if parts.count >= 2 && !parts[0].isEmpty && !parts[1].isEmpty {
+                return true
+            }
+        }
+        
+        return false
     }
     
     // Helper function to process attribution that might contain author, book, and page
@@ -269,9 +462,21 @@ struct CommandSuggestion: Identifiable {
         
         var suggestions: [CommandSuggestion] = []
         
-        // Always suggest searching library
+        // Search suggestions
         suggestions.append(CommandSuggestion(
-            text: "Search for \"\(input)\" in library",
+            text: "Search everywhere for \"\(input)\"",
+            icon: "magnifyingglass.circle",
+            intent: .searchAll(query: input)
+        ))
+        
+        suggestions.append(CommandSuggestion(
+            text: "Search notes for \"\(input)\"",
+            icon: "doc.text.magnifyingglass",
+            intent: .searchNotes(query: input)
+        ))
+        
+        suggestions.append(CommandSuggestion(
+            text: "Search books for \"\(input)\"",
             icon: "magnifyingglass",
             intent: .searchLibrary(query: input)
         ))
