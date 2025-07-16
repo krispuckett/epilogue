@@ -298,62 +298,38 @@ struct BookIcon: View {
 
 // MARK: - Literary Companion Empty State
 struct LiteraryCompanionEmptyState: View {
-    @State private var breathingScale = 1.0
-    @State private var glowOpacity = 0.3
-    @State private var floatingOffset: CGFloat = 0
-    @State private var pageRotation: Double = 0
-    @State private var isAnimating = false
     @State private var metalFailed = false
     
     var body: some View {
         ZStack {
-            // Background layers
-            if !metalFailed {
-                // Advanced Metal particle system
-                MetalLiteraryView()
-                    .ignoresSafeArea()
-                    .opacity(0.8)
-                    .onAppear {
-                        // Check if Metal is available
-                        if MTLCreateSystemDefaultDevice() == nil {
-                            metalFailed = true
-                        }
-                    }
+            // Calm Metal background
+            CalmLiteraryBackground()
+                .ignoresSafeArea()
+            
+            // Minimal UI overlay
+            VStack {
+                Spacer()
                 
-                // Subtle vignette over Metal
-                if !metalFailed {
-                    VignetteOverlay()
+                // Content with very subtle glass
+                VStack(spacing: 20) {
+                    Image(systemName: "books.vertical.fill")
+                        .font(.system(size: 60, weight: .light))
+                        .foregroundStyle(.white.opacity(0.7))
+                    
+                    Text("Your Literary Companion")
+                        .font(.system(size: 28, weight: .light, design: .serif))
+                        .foregroundStyle(.white.opacity(0.9))
+                    
+                    Text("Discuss books, explore themes, and deepen your understanding")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
                 }
-            } else {
-                // Fallback SwiftUI background
-                EmptyStateBackground()
-            }
-            
-            // Main content
-            EmptyStateContent(
-                breathingScale: breathingScale,
-                glowOpacity: glowOpacity,
-                floatingOffset: floatingOffset,
-                pageRotation: pageRotation
-            )
-        }
-        .onAppear {
-            startAnimations()
-        }
-    }
-    
-    private func startAnimations() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Breathing animation
-            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
-                breathingScale = 1.08
-                glowOpacity = 0.5
-                floatingOffset = -10
-            }
-            
-            // Page rotation
-            withAnimation(.linear(duration: 30).repeatForever(autoreverses: false)) {
-                pageRotation = 360
+                .padding(.vertical, 40)
+                
+                Spacer()
+                Spacer()
             }
         }
     }

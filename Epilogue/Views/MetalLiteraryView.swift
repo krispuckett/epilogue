@@ -3,6 +3,12 @@ import MetalKit
 import simd
 
 struct MetalLiteraryView: UIViewRepresentable {
+    @State var style: AmbientStyle = .cosmicOrb
+    
+    enum AmbientStyle: String {
+        case cosmicOrb = "ambientFragment"
+        case abstractFireplace = "fireplaceFragment"
+    }
     
     func makeUIView(context: Context) -> MTKView {
         let mtkView = MTKView()
@@ -20,7 +26,9 @@ struct MetalLiteraryView: UIViewRepresentable {
         mtkView.isPaused = false
         mtkView.colorPixelFormat = .bgra8Unorm
         
-        // Delay setup until view has proper size
+        context.coordinator.style = style
+        
+        // Setup Metal after view is configured
         DispatchQueue.main.async {
             context.coordinator.setupMetal(mtkView: mtkView)
         }
@@ -29,7 +37,7 @@ struct MetalLiteraryView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MTKView, context: Context) {
-        // Update logic if needed
+        context.coordinator.style = style
     }
     
     func makeCoordinator() -> Coordinator {
@@ -41,29 +49,10 @@ struct MetalLiteraryView: UIViewRepresentable {
         var metalDevice: MTLDevice?
         var metalCommandQueue: MTLCommandQueue?
         var pipelineState: MTLRenderPipelineState?
-        var computePipelineState: MTLComputePipelineState?
         
-        // Particle system
-        var particleBuffer: MTLBuffer?
-        var particleCount = 5000
+        var style: AmbientStyle = .cosmicOrb
         var time: Float = 0.0
-        
-        // Fluid simulation textures
-        var velocityTexture: MTLTexture?
-        var densityTexture: MTLTexture?
-        var pressureTexture: MTLTexture?
-        
-        // Track initialization state
         var isInitialized = false
-        
-        struct Particle {
-            var position: SIMD2<Float>
-            var velocity: SIMD2<Float>
-            var life: Float
-            var size: Float
-            var heat: Float
-            var turbulence: Float
-        }
         
         init(_ parent: MetalLiteraryView) {
             self.parent = parent
@@ -71,9 +60,9 @@ struct MetalLiteraryView: UIViewRepresentable {
         }
         
         func setupMetal(mtkView: MTKView) {
-            guard let device = mtkView.device else { 
+            guard let device = mtkView.device else {
                 print("Metal device not available")
-                return 
+                return
             }
             metalDevice = device
             
@@ -84,43 +73,31 @@ struct MetalLiteraryView: UIViewRepresentable {
             metalCommandQueue = commandQueue
             
             setupShaders()
-            setupBuffers()
-            
-            // Only setup textures if we have a valid size
-            if mtkView.drawableSize.width > 0 && mtkView.drawableSize.height > 0 {
-                setupTextures(size: mtkView.drawableSize)
-            }
-            
             isInitialized = true
         }
         
         func setupShaders() {
-            // Load the default library
-            guard let device = metalDevice,
-                  let defaultLibrary = device.makeDefaultLibrary() else {
-                print("Failed to create default library")
+            guard let device = metalDevice else {
+                print("Metal device not available")
                 return
             }
             
-            // Create compute pipeline
-            if let computeFunction = defaultLibrary.makeFunction(name: "updateParticles") {
-                do {
-                    computePipelineState = try device.makeComputePipelineState(function: computeFunction)
-                } catch {
-                    print("Failed to create compute pipeline state: \(error)")
-                }
+            guard let defaultLibrary = device.makeDefaultLibrary() else {
+                print("Failed to create default library - check that LiteraryCompanion.metal is added to the target")
+                return
             }
             
             // Create render pipeline
+            guard let vertexFunction = defaultLibrary.makeFunction(name: "ambientVertex"),
+                  let fragmentFunction = defaultLibrary.makeFunction(name: style.rawValue) else {
+                print("Failed to find vertex or fragment functions in Metal shader")
+                return
+            }
+            
             let pipelineDescriptor = MTLRenderPipelineDescriptor()
-            pipelineDescriptor.vertexFunction = defaultLibrary.makeFunction(name: "particleVertex")
-            pipelineDescriptor.fragmentFunction = defaultLibrary.makeFunction(name: "particleFragment")
+            pipelineDescriptor.vertexFunction = vertexFunction
+            pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-            pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-            pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-            pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-            pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             
             do {
                 pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
@@ -129,98 +106,22 @@ struct MetalLiteraryView: UIViewRepresentable {
             }
         }
         
-        func setupBuffers() {
-            guard let device = metalDevice else { return }
-            
-            // Initialize particles
-            var particles = [Particle]()
-            for i in 0..<particleCount {
-                let angle = Float(i) * 2.0 * Float.pi / Float(particleCount)
-                let radius = Float.random(in: 0.1...0.5)
-                
-                let particle = Particle(
-                    position: SIMD2<Float>(
-                        0.5 + radius * cos(angle),
-                        0.5 + radius * sin(angle)
-                    ),
-                    velocity: SIMD2<Float>(
-                        Float.random(in: -0.001...0.001),
-                        Float.random(in: -0.001...0.001)
-                    ),
-                    life: Float.random(in: 0.5...1.0),
-                    size: Float.random(in: 0.5...1.5),
-                    heat: 0.0,
-                    turbulence: Float.random(in: 0.5...1.5)
-                )
-                particles.append(particle)
-            }
-            
-            let bufferSize = particles.count * MemoryLayout<Particle>.stride
-            particleBuffer = device.makeBuffer(bytes: particles, length: bufferSize, options: [.storageModeShared])
-        }
-        
-        func setupTextures(size: CGSize) {
-            guard let device = metalDevice else { return }
-            
-            // Ensure valid dimensions
-            let width = max(1, Int(size.width))
-            let height = max(1, Int(size.height))
-            
-            let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: .rgba32Float,
-                width: width,
-                height: height,
-                mipmapped: false
-            )
-            textureDescriptor.usage = [.shaderRead, .shaderWrite]
-            textureDescriptor.storageMode = .shared
-            
-            velocityTexture = device.makeTexture(descriptor: textureDescriptor)
-            densityTexture = device.makeTexture(descriptor: textureDescriptor)
-            pressureTexture = device.makeTexture(descriptor: textureDescriptor)
-            
-            if velocityTexture == nil || densityTexture == nil || pressureTexture == nil {
-                print("Failed to create textures")
-            }
-        }
-        
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-            // Only setup textures if Metal is already initialized
-            guard isInitialized, metalDevice != nil else { return }
-            setupTextures(size: size)
+            // No special handling needed for full-screen quad
         }
         
         func draw(in view: MTKView) {
             guard isInitialized,
-                  metalDevice != nil,
-                  metalCommandQueue != nil,
-                  pipelineState != nil,
-                  computePipelineState != nil,
-                  particleBuffer != nil else {
-                // Silently return if not ready yet
+                  let device = metalDevice,
+                  let commandQueue = metalCommandQueue,
+                  let pipelineState = pipelineState else {
                 return
             }
             
             guard let drawable = view.currentDrawable,
-                  let commandBuffer = metalCommandQueue.makeCommandBuffer() else { return }
+                  let commandBuffer = commandQueue.makeCommandBuffer() else { return }
             
-            time += 0.016
-            
-            // Compute pass for particle physics
-            if let computeEncoder = commandBuffer.makeComputeCommandEncoder(),
-               let computePipeline = computePipelineState,
-               let buffer = particleBuffer {
-                computeEncoder.setComputePipelineState(computePipeline)
-                computeEncoder.setBuffer(buffer, offset: 0, index: 0)
-                computeEncoder.setBytes(&time, length: MemoryLayout<Float>.size, index: 1)
-                
-                let threadsPerGrid = MTLSize(width: particleCount, height: 1, depth: 1)
-                let maxThreadsPerThreadgroup = computePipeline.maxTotalThreadsPerThreadgroup
-                let threadsPerThreadgroup = MTLSize(width: min(256, maxThreadsPerThreadgroup), height: 1, depth: 1)
-                
-                computeEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
-                computeEncoder.endEncoding()
-            }
+            time += 0.016  // ~60fps
             
             // Render pass
             let renderPassDescriptor = MTLRenderPassDescriptor()
@@ -228,22 +129,89 @@ struct MetalLiteraryView: UIViewRepresentable {
             renderPassDescriptor.colorAttachments[0].loadAction = .clear
             renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.08, green: 0.07, blue: 0.07, alpha: 1.0)
             
-            if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor),
-               let renderPipeline = pipelineState,
-               let buffer = particleBuffer {
-                renderEncoder.setRenderPipelineState(renderPipeline)
-                renderEncoder.setVertexBuffer(buffer, offset: 0, index: 0)
-                renderEncoder.setVertexBytes(&time, length: MemoryLayout<Float>.size, index: 1)
+            if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
+                renderEncoder.setRenderPipelineState(pipelineState)
+                renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.size, index: 0)
                 
-                var viewportSize = SIMD2<Float>(Float(view.drawableSize.width), Float(view.drawableSize.height))
-                renderEncoder.setVertexBytes(&viewportSize, length: MemoryLayout<SIMD2<Float>>.size, index: 2)
-                
-                renderEncoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: particleCount)
+                // Draw full-screen quad (6 vertices for 2 triangles)
+                renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
                 renderEncoder.endEncoding()
             }
             
             commandBuffer.present(drawable)
             commandBuffer.commit()
+        }
+    }
+}
+
+// MARK: - Calm Literary Background
+struct CalmLiteraryBackground: View {
+    @State private var metalFailed = false
+    @State private var selectedStyle: MetalLiteraryView.AmbientStyle = .cosmicOrb
+    
+    var body: some View {
+        ZStack {
+            if !metalFailed {
+                MetalLiteraryView(style: selectedStyle)
+                    .ignoresSafeArea()
+                    .onAppear {
+                        if MTLCreateSystemDefaultDevice() == nil {
+                            metalFailed = true
+                        }
+                    }
+            } else {
+                // Fallback to SwiftUI animation
+                FallbackAmbientView()
+            }
+            
+            // Style switcher (optional, for testing)
+            if false {  // Set to true to enable style switching
+                VStack {
+                    HStack {
+                        Button("Cosmic Orb") {
+                            selectedStyle = .cosmicOrb
+                        }
+                        .padding()
+                        
+                        Button("Fireplace") {
+                            selectedStyle = .abstractFireplace
+                        }
+                        .padding()
+                    }
+                    Spacer()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Fallback View
+struct FallbackAmbientView: View {
+    @State private var phase: Double = 0
+    
+    var body: some View {
+        ZStack {
+            // Dark background
+            Color(red: 0.08, green: 0.07, blue: 0.07)
+                .ignoresSafeArea()
+            
+            // Simple animated gradient orb
+            RadialGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
+                    Color(red: 0.9, green: 0.35, blue: 0.1).opacity(0.3),
+                    Color.clear
+                ]),
+                center: .center,
+                startRadius: 50,
+                endRadius: 200
+            )
+            .scaleEffect(1 + sin(phase) * 0.1)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                    phase = .pi * 2
+                }
+            }
         }
     }
 }
