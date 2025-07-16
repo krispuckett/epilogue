@@ -3,7 +3,7 @@ import MetalKit
 import simd
 
 struct MetalLiteraryView: UIViewRepresentable {
-    @State var style: AmbientStyle = .cosmicOrb
+    var style: AmbientStyle = .cosmicOrb
     
     enum AmbientStyle: String {
         case cosmicOrb = "ambientFragment"
@@ -37,7 +37,10 @@ struct MetalLiteraryView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MTKView, context: Context) {
-        context.coordinator.style = style
+        if context.coordinator.style != style {
+            context.coordinator.style = style
+            context.coordinator.setupShaders()
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -82,15 +85,39 @@ struct MetalLiteraryView: UIViewRepresentable {
                 return
             }
             
-            guard let defaultLibrary = device.makeDefaultLibrary() else {
-                print("Failed to create default library - check that LiteraryCompanion.metal is added to the target")
+            // Try to load the Metal library
+            var library: MTLLibrary? = nil
+            
+            // First try the default library
+            library = device.makeDefaultLibrary()
+            
+            // If that fails, try loading from the bundle
+            if library == nil {
+                let bundle = Bundle.main
+                do {
+                    library = try device.makeDefaultLibrary(bundle: bundle)
+                } catch {
+                    print("Failed to load library from bundle: \(error)")
+                }
+            }
+            
+            guard let defaultLibrary = library else {
+                print("Failed to create Metal library - check that LiteraryCompanion.metal is added to the target")
                 return
             }
             
+            // List all functions in the library for debugging
+            let functionNames = defaultLibrary.functionNames
+            print("Available Metal functions: \(functionNames)")
+            
             // Create render pipeline
-            guard let vertexFunction = defaultLibrary.makeFunction(name: "ambientVertex"),
-                  let fragmentFunction = defaultLibrary.makeFunction(name: style.rawValue) else {
-                print("Failed to find vertex or fragment functions in Metal shader")
+            guard let vertexFunction = defaultLibrary.makeFunction(name: "ambientVertex") else {
+                print("Failed to find ambientVertex function in Metal shader")
+                return
+            }
+            
+            guard let fragmentFunction = defaultLibrary.makeFunction(name: style.rawValue) else {
+                print("Failed to find \(style.rawValue) function in Metal shader")
                 return
             }
             
@@ -111,10 +138,15 @@ struct MetalLiteraryView: UIViewRepresentable {
         }
         
         func draw(in view: MTKView) {
-            guard isInitialized,
-                  let device = metalDevice,
+            guard isInitialized else {
+                print("Metal not initialized yet")
+                return
+            }
+            
+            guard let device = metalDevice,
                   let commandQueue = metalCommandQueue,
                   let pipelineState = pipelineState else {
+                print("Metal components missing - device: \(metalDevice != nil), queue: \(metalCommandQueue != nil), pipeline: \(pipelineState != nil)")
                 return
             }
             
@@ -165,7 +197,7 @@ struct CalmLiteraryBackground: View {
             }
             
             // Style switcher (optional, for testing)
-            if false {  // Set to true to enable style switching
+            if true {  // Set to true to enable style switching
                 VStack {
                     HStack {
                         Button("Cosmic Orb") {
@@ -180,6 +212,8 @@ struct CalmLiteraryBackground: View {
                     }
                     Spacer()
                 }
+                .foregroundStyle(.white)
+                .background(Color.black.opacity(0.5))
             }
         }
     }

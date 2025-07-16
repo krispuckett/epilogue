@@ -17,7 +17,7 @@
 		01BC21D82E275A6900E04A55 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21D92E275A6900E04A55 /* MarkdownText.swift */; };
 		01BC21DA2E275A6A00E04A55 /* AmbientLiteraryBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */; };
 		01BC21DC2E28371900E04A55 /* MetalLiteraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */; };
-		01BC21DF2E2839FC00E04A55 /* LiteraryCompanion.metal in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DE2E28376600E04A55 /* LiteraryCompanion.metal */; };
+		01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */; };
 		2B1234561234567890123456 /* EpilogueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234551234567890123456 /* EpilogueApp.swift */; };
 		2B1234581234567890123456 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234571234567890123456 /* ContentView.swift */; };
 		2B12345A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B1234591234567890123456 /* Assets.xcassets */; };
@@ -70,7 +70,7 @@
 		01BC21D92E275A6900E04A55 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
 		01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLiteraryBackground.swift; sourceTree = "<group>"; };
 		01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalLiteraryView.swift; sourceTree = "<group>"; };
-		01BC21DE2E28376600E04A55 /* LiteraryCompanion.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = LiteraryCompanion.metal; sourceTree = "<group>"; };
+		01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; name = LiteraryCompanion.metal; path = Epilogue/Shaders/LiteraryCompanion.metal; sourceTree = SOURCE_ROOT; };
 		2B1234521234567890123456 /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B1234551234567890123456 /* EpilogueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpilogueApp.swift; sourceTree = "<group>"; };
 		2B1234571234567890123456 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -126,7 +126,7 @@
 		01BC21DD2E28371D00E04A55 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
-				01BC21DE2E28376600E04A55 /* LiteraryCompanion.metal */,
+				01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */,
 			);
 			path = Shaders;
 			sourceTree = "<group>";
@@ -360,8 +360,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01BC21DF2E2839FC00E04A55 /* LiteraryCompanion.metal in Sources */,
 				01BC21CF2E26AB3E00E04A55 /* GlassMaterialization.swift in Sources */,
+				01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */,
 				01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */,
 				39CF5568A7D14D8682126B61 /* GlassEditNoteSheet.swift in Sources */,
 				8343304CC97A4B7B82B14E17 /* NotesSearchPalette.swift in Sources */,

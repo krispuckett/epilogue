@@ -2,20 +2,32 @@
 #include <simd/simd.h>
 using namespace metal;
 
+// Vertex output structure
+struct VertexOut {
+    float4 position [[position]];
+    float2 uv;
+};
+
 // Vertex shader for full-screen quad
-vertex float4 ambientVertex(uint vid [[vertex_id]]) {
+vertex VertexOut ambientVertex(uint vid [[vertex_id]]) {
     float2 positions[6] = {
         float2(-1, -1), float2(1, -1), float2(-1, 1),
         float2(1, -1), float2(1, 1), float2(-1, 1)
     };
-    return float4(positions[vid], 0, 1);
+    
+    VertexOut out;
+    out.position = float4(positions[vid], 0, 1);
+    // Convert from clip space (-1,1) to UV space (0,1)
+    out.uv = positions[vid] * 0.5 + 0.5;
+    out.uv.y = 1.0 - out.uv.y; // Flip Y for Metal coordinate system
+    
+    return out;
 }
 
 // Calm, focused fragment shader - cosmic orb meets fireplace
-fragment float4 ambientFragment(float4 position [[position]],
+fragment float4 ambientFragment(VertexOut in [[stage_in]],
                                constant float& time [[buffer(0)]]) {
-    float2 uv = position.xy / float2(position.w);
-    uv = uv * 0.5 + 0.5; // Convert to 0-1 range
+    float2 uv = in.uv;
     
     // Center of our calm orb
     float2 center = float2(0.5, 0.4);
@@ -62,7 +74,7 @@ fragment float4 ambientFragment(float4 position [[position]],
     
     // Final composition with dark background
     float3 backgroundColor = float3(0.08, 0.07, 0.07);
-    float alpha = orb * 0.8 + innerGlow * orb * 0.2;
+    float alpha = orb * 0.9 + innerGlow * orb * 0.3;  // Increased opacity
     
     float3 finalColor = mix(backgroundColor, color, alpha);
     
@@ -74,10 +86,9 @@ fragment float4 ambientFragment(float4 position [[position]],
 }
 
 // Alternative: Abstract fireplace shader
-fragment float4 fireplaceFragment(float4 position [[position]],
+fragment float4 fireplaceFragment(VertexOut in [[stage_in]],
                                  constant float& time [[buffer(0)]]) {
-    float2 uv = position.xy / float2(position.w);
-    uv = uv * 0.5 + 0.5;
+    float2 uv = in.uv;
     
     // Focus on bottom center - like a fireplace
     float2 flameOrigin = float2(0.5, 0.1);
