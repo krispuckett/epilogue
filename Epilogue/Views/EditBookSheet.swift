@@ -193,12 +193,37 @@ struct EditBookSheet: View {
 struct CurrentBookRow: View {
     let book: Book
     
+    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
+        // Google Books image URLs support zoom parameter for higher resolution
+        var enhanced = urlString
+        
+        // Remove existing zoom parameter if present
+        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+            let range = NSRange(location: 0, length: enhanced.utf16.count)
+            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
+        }
+        
+        // Add high quality zoom parameter
+        if enhanced.contains("?") {
+            enhanced += "&zoom=2"
+        } else {
+            enhanced += "?zoom=2"
+        }
+        
+        // Also remove edge curl parameter if present (makes covers look cleaner)
+        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
+        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
+        
+        return enhanced
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Book cover
             Group {
-                if let coverURL = book.coverImageURL,
-                   let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
+                if let coverURL = book.coverImageURL {
+                    let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
+                    if let url = URL(string: enhancedURL.replacingOccurrences(of: "http://", with: "https://")) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
@@ -224,6 +249,7 @@ struct CurrentBookRow: View {
                         @unknown default:
                             EmptyView()
                         }
+                    }
                     }
                 } else {
                     RoundedRectangle(cornerRadius: 6)
@@ -281,6 +307,30 @@ struct CurrentBookRow: View {
 struct EditBookResultRow: View {
     let book: Book
     let currentBook: Book
+    
+    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
+        // Google Books image URLs support zoom parameter for higher resolution
+        var enhanced = urlString
+        
+        // Remove existing zoom parameter if present
+        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+            let range = NSRange(location: 0, length: enhanced.utf16.count)
+            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
+        }
+        
+        // Add high quality zoom parameter
+        if enhanced.contains("?") {
+            enhanced += "&zoom=2"
+        } else {
+            enhanced += "?zoom=2"
+        }
+        
+        // Also remove edge curl parameter if present (makes covers look cleaner)
+        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
+        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
+        
+        return enhanced
+    }
     let onReplace: () -> Void
     
     var isCurrentBook: Bool {
@@ -291,8 +341,9 @@ struct EditBookResultRow: View {
         HStack(spacing: 12) {
             // Book cover
             Group {
-                if let coverURL = book.coverImageURL,
-                   let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
+                if let coverURL = book.coverImageURL {
+                    let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
+                    if let url = URL(string: enhancedURL.replacingOccurrences(of: "http://", with: "https://")) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
@@ -318,6 +369,7 @@ struct EditBookResultRow: View {
                         @unknown default:
                             EmptyView()
                         }
+                    }
                     }
                 } else {
                     RoundedRectangle(cornerRadius: 6)

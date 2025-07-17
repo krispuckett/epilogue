@@ -13,10 +13,15 @@ struct GoogleBookItem: Codable, Identifiable {
     
     var book: Book {
         // Get the best available image URL
-        let imageURL = volumeInfo.imageLinks?.large 
+        var imageURL = volumeInfo.imageLinks?.large 
             ?? volumeInfo.imageLinks?.medium 
             ?? volumeInfo.imageLinks?.small 
             ?? volumeInfo.imageLinks?.thumbnail
+        
+        // Enhance Google Books image URL for higher resolution
+        if let url = imageURL {
+            imageURL = enhanceGoogleBooksImageURL(url)
+        }
         
         return Book(
             id: id,
@@ -29,6 +34,33 @@ struct GoogleBookItem: Codable, Identifiable {
             pageCount: volumeInfo.pageCount,
             localId: UUID()
         )
+    }
+    
+    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
+        // Google Books image URLs support zoom parameter for higher resolution
+        // Default URLs often have zoom=1 or no zoom parameter
+        // We can request zoom=2 or zoom=3 for higher quality
+        
+        var enhanced = urlString
+        
+        // Remove existing zoom parameter if present
+        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+            let range = NSRange(location: 0, length: enhanced.utf16.count)
+            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
+        }
+        
+        // Add high quality zoom parameter
+        if enhanced.contains("?") {
+            enhanced += "&zoom=2"
+        } else {
+            enhanced += "?zoom=2"
+        }
+        
+        // Also remove edge curl parameter if present (makes covers look cleaner)
+        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
+        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
+        
+        return enhanced
     }
 }
 
@@ -137,15 +169,21 @@ class GoogleBooksService: ObservableObject {
     @Published var errorMessage: String?
     
     func searchBooks(query: String) async {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { 
+            print("GoogleBooksAPI: Empty query")
+            return 
+        }
         
+        print("GoogleBooksAPI: Starting search for: '\(query)'")
         isLoading = true
         errorMessage = nil
         
         do {
             let books = try await performSearch(query: query)
+            print("GoogleBooksAPI: Found \(books.count) books")
             searchResults = books
         } catch {
+            print("GoogleBooksAPI: Error - \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             searchResults = []
         }
@@ -174,8 +212,11 @@ class GoogleBooksService: ObservableObject {
         ]
         
         guard let url = components.url else {
+            print("GoogleBooksAPI: Invalid URL")
             throw APIError.invalidURL
         }
+        
+        print("GoogleBooksAPI: Making request to: \(url.absoluteString)")
         
         // Perform the request
         let (data, response) = try await session.data(from: url)

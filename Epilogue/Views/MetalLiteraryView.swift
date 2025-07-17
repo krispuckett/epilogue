@@ -3,12 +3,6 @@ import MetalKit
 import simd
 
 struct MetalLiteraryView: UIViewRepresentable {
-    var style: AmbientStyle = .cosmicOrb
-    
-    enum AmbientStyle: String {
-        case cosmicOrb = "ambientFragment"
-        case abstractFireplace = "fireplaceFragment"
-    }
     
     func makeUIView(context: Context) -> MTKView {
         let mtkView = MTKView()
@@ -26,8 +20,6 @@ struct MetalLiteraryView: UIViewRepresentable {
         mtkView.isPaused = false
         mtkView.colorPixelFormat = .bgra8Unorm
         
-        context.coordinator.style = style
-        
         // Setup Metal after view is configured
         DispatchQueue.main.async {
             context.coordinator.setupMetal(mtkView: mtkView)
@@ -37,10 +29,7 @@ struct MetalLiteraryView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MTKView, context: Context) {
-        if context.coordinator.style != style {
-            context.coordinator.style = style
-            context.coordinator.setupShaders()
-        }
+        // Nothing to update
     }
     
     func makeCoordinator() -> Coordinator {
@@ -53,7 +42,6 @@ struct MetalLiteraryView: UIViewRepresentable {
         var metalCommandQueue: MTLCommandQueue?
         var pipelineState: MTLRenderPipelineState?
         
-        var style: AmbientStyle = .cosmicOrb
         var time: Float = 0.0
         var isInitialized = false
         
@@ -116,8 +104,8 @@ struct MetalLiteraryView: UIViewRepresentable {
                 return
             }
             
-            guard let fragmentFunction = defaultLibrary.makeFunction(name: style.rawValue) else {
-                print("Failed to find \(style.rawValue) function in Metal shader")
+            guard let fragmentFunction = defaultLibrary.makeFunction(name: "ambientFragment") else {
+                print("Failed to find ambientFragment function in Metal shader")
                 return
             }
             
@@ -163,7 +151,13 @@ struct MetalLiteraryView: UIViewRepresentable {
             
             if let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
                 renderEncoder.setRenderPipelineState(pipelineState)
-                renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.size, index: 0)
+                
+                // Pass time and resolution
+                var currentTime = time
+                var viewportSize = SIMD2<Float>(Float(view.drawableSize.width), Float(view.drawableSize.height))
+                
+                renderEncoder.setFragmentBytes(&currentTime, length: MemoryLayout<Float>.size, index: 0)
+                renderEncoder.setFragmentBytes(&viewportSize, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
                 
                 // Draw full-screen quad (6 vertices for 2 triangles)
                 renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
@@ -179,12 +173,11 @@ struct MetalLiteraryView: UIViewRepresentable {
 // MARK: - Calm Literary Background
 struct CalmLiteraryBackground: View {
     @State private var metalFailed = false
-    @State private var selectedStyle: MetalLiteraryView.AmbientStyle = .cosmicOrb
     
     var body: some View {
         ZStack {
             if !metalFailed {
-                MetalLiteraryView(style: selectedStyle)
+                MetalLiteraryView()
                     .ignoresSafeArea()
                     .onAppear {
                         if MTLCreateSystemDefaultDevice() == nil {
@@ -194,40 +187,6 @@ struct CalmLiteraryBackground: View {
             } else {
                 // Fallback to SwiftUI animation
                 FallbackAmbientView()
-            }
-            
-            // Style switcher (optional, for testing)
-            if false {  // Set to true to enable style switching
-                VStack {
-                    Spacer()
-                        .frame(height: 60) // Space for Dynamic Island
-                    HStack {
-                        Button(action: {
-                            selectedStyle = .cosmicOrb
-                            print("Selected Cosmic Orb")
-                        }) {
-                            Text("Cosmic Orb")
-                                .padding()
-                                .background(selectedStyle == .cosmicOrb ? Color.orange : Color.gray)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-                        
-                        Button(action: {
-                            selectedStyle = .abstractFireplace
-                            print("Selected Fireplace")
-                        }) {
-                            Text("Fireplace")
-                                .padding()
-                                .background(selectedStyle == .abstractFireplace ? Color.orange : Color.gray)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-                    }
-                    Spacer()
-                }
-                .foregroundStyle(.white)
-                .background(Color.black.opacity(0.5))
             }
         }
     }

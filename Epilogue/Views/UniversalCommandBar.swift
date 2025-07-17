@@ -523,6 +523,8 @@ struct UniversalCommandBar: View {
                                 }
                                 
                                 detectedIntent = CommandParser.parse(updatedText)
+                                print("UniversalCommandBar: Detected intent: \(detectedIntent), composerMode: \(composerMode)")
+                                print("UniversalCommandBar: Button should show: '\(detectedIntent.actionText)'")
                                 suggestions = CommandSuggestion.suggestions(for: updatedText)
                                 showSuggestions = !updatedText.isEmpty
                                 
@@ -551,21 +553,34 @@ struct UniversalCommandBar: View {
                                 }
                             }
                             .onSubmit {
+                                print("UniversalCommandBar: onSubmit called, showNoteComposer: \(showNoteComposer)")
                                 // Don't execute if we're about to show the composer
                                 if !showNoteComposer {
                                     executeCommand()
+                                } else {
+                                    print("UniversalCommandBar: Execution blocked by showNoteComposer")
                                 }
                             }
                         
                         if !commandText.isEmpty {
-                            Button(action: executeCommand) {
-                                Text(detectedIntent.actionText)
-                                    .font(.labelMedium)
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(detectedIntent.color)
-                                    .clipShape(Capsule())
+                            VStack {
+                                // Debug info
+                                Text("Intent: \(String(describing: detectedIntent))")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                
+                                Button(action: {
+                                    print("UniversalCommandBar: Button tapped!")
+                                    executeCommand()
+                                }) {
+                                    Text(detectedIntent.actionText)
+                                        .font(.labelMedium)
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(detectedIntent.color)
+                                        .clipShape(Capsule())
+                                }
                             }
                             .transition(.scale.combined(with: .opacity))
                         }
@@ -733,8 +748,10 @@ struct UniversalCommandBar: View {
     
     private func executeCommand() {
         HapticManager.shared.lightTap()
+        print("UniversalCommandBar: Executing command with intent: \(detectedIntent)")
         switch detectedIntent {
         case .addBook:
+            print("UniversalCommandBar: Opening book search")
             showBookSearch = true
         case .createQuote(let text):
             saveQuote(text)

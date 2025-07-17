@@ -13,6 +13,8 @@ struct NotesView: View {
     @State private var showingEditSheet = false
     @State private var noteToEdit: Note? = nil
     @State private var openOptionsNoteId: UUID? = nil
+    @State private var selectedNoteForOptions: Note? = nil
+    @State private var selectedNoteRect: CGRect = .zero
     
     var filteredNotes: [Note] {
         var filtered = notesViewModel.notes
@@ -361,6 +363,7 @@ struct NoteCard: View {
     @State private var isPressed = false
     @State private var showingOptions = false
     @Binding var openOptionsNoteId: UUID?
+    @State private var cardRect: CGRect = .zero
     
     init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}, openOptionsNoteId: Binding<UUID?> = .constant(nil)) {
         self.note = note
@@ -403,6 +406,17 @@ struct NoteCard: View {
                     }
             }
         }
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear {
+                        cardRect = geo.frame(in: .global)
+                    }
+                    .onChange(of: geo.frame(in: .global)) { _, newValue in
+                        cardRect = newValue
+                    }
+            }
+        )
         .onChange(of: showingOptions) { _, newValue in
             if newValue {
                 openOptionsNoteId = note.id
@@ -412,7 +426,20 @@ struct NoteCard: View {
         }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .overlay {
+            if showingOptions && openOptionsNoteId == note.id {
+                NoteContextMenu(
+                    note: note,
+                    sourceRect: cardRect,
+                    isPresented: $showingOptions
+                )
+                .environmentObject(notesViewModel)
+                .zIndex(1000)
+            }
+        }
     }
+    
+    @EnvironmentObject var notesViewModel: NotesViewModel
 }
 
 // MARK: - Quote Card (Literary Design)
@@ -512,24 +539,6 @@ struct QuoteCard: View {
             showingOptions = true
             print("🔵 QuoteCard: showingOptions set to true")
         }
-        .overlay {
-            // Show options menu with higher Z-order
-            if showingOptions {
-                GlassOptionsMenu(
-                    note: note,
-                    isPresented: $showingOptions
-                )
-                .environmentObject(notesViewModel)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.9, anchor: .bottom)
-                        .combined(with: .opacity),
-                    removal: .scale(scale: 0.95, anchor: .bottom)
-                        .combined(with: .opacity)
-                ))
-                .zIndex(2) // Higher Z-order
-            }
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingOptions)
     }
 }
 
@@ -631,24 +640,6 @@ struct RegularNoteCard: View {
             HapticManager.shared.mediumImpact()
             showingOptions = true
         }
-        .overlay {
-            // Show options menu with higher Z-order
-            if showingOptions {
-                GlassOptionsMenu(
-                    note: note,
-                    isPresented: $showingOptions
-                )
-                .environmentObject(notesViewModel)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.9, anchor: .bottom)
-                        .combined(with: .opacity),
-                    removal: .scale(scale: 0.95, anchor: .bottom)
-                        .combined(with: .opacity)
-                ))
-                .zIndex(2) // Higher Z-order
-            }
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingOptions)
     }
 }
 

@@ -9,6 +9,7 @@ struct LiquidCommandPalette: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     @State private var currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26) // Amber initial
     @State private var isAnimating = false
+    @State private var showBookSearch = false
     
     // Animation namespace for matched geometry
     var animationNamespace: Namespace.ID
@@ -161,6 +162,21 @@ struct LiquidCommandPalette: View {
             isFocused = false
             isAnimating = false
         }
+        .sheet(isPresented: $showBookSearch) {
+            BookSearchSheet(
+                searchQuery: {
+                    if case .addBook(let query) = detectedIntent {
+                        return query
+                    }
+                    return commandText
+                }(),
+                onBookSelected: { book in
+                    libraryViewModel.addBook(book)
+                    HapticManager.shared.success()
+                    dismissPalette()
+                }
+            )
+        }
     }
     
     private func updateGlowColor() {
@@ -220,9 +236,8 @@ struct LiquidCommandPalette: View {
         case .createQuote(let text):
             createQuote(from: text)
         case .addBook(let query):
-            // TODO: Show book search sheet
-            HapticManager.shared.success()
-            dismissPalette()
+            // Show book search sheet
+            showBookSearch = true
         case .searchLibrary(let query):
             // TODO: Implement library search
             HapticManager.shared.success()

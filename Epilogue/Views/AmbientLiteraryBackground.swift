@@ -298,37 +298,108 @@ struct BookIcon: View {
 
 // MARK: - Literary Companion Empty State
 struct LiteraryCompanionEmptyState: View {
-    @State private var metalFailed = false
+    @State private var titleOpacity: Double = 0
     
     var body: some View {
         ZStack {
-            // Calm Metal background
+            // Beautiful silk background
             CalmLiteraryBackground()
                 .ignoresSafeArea()
             
-            // Minimal UI overlay
-            VStack {
+            // Centered, focused content
+            VStack(spacing: 0) {
                 Spacer()
                 
-                // Content with very subtle glass
-                VStack(spacing: 20) {
+                // App icon
+                Image(systemName: "books.vertical.fill")
+                    .font(.system(size: 56, weight: .light))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(.bottom, 32)
+                    .opacity(titleOpacity)
+                
+                // Main heading
+                Text("Chat with Epilogue")
+                    .font(.system(size: 36, weight: .light, design: .serif))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .opacity(titleOpacity)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 32)
+        }
+        .onAppear {
+            // Simple fade in
+            withAnimation(.easeOut(duration: 1.0).delay(0.5)) {
+                titleOpacity = 1.0
+            }
+        }
+    }
+}
+
+// MARK: - Conversation Prompt Component
+struct ConversationPrompt: View {
+    let text: String
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: {
+            // Handle prompt tap
+        }) {
+            HStack {
+                Text(text)
+                    .font(.system(size: 16, weight: .regular, design: .serif))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(4)
+                
+                Spacer()
+                
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .opacity(isHovered ? 1 : 0.6)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+                    )
+            )
+        }
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.2)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+// MARK: - Alternative Minimal Version
+struct MinimalLiteraryEmptyState: View {
+    var body: some View {
+        ZStack {
+            CalmLiteraryBackground()
+                .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                Spacer()
+                
+                // Single focused message
+                VStack(spacing: 16) {
                     Image(systemName: "books.vertical.fill")
-                        .font(.system(size: 60, weight: .light))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(.system(size: 48, weight: .ultraLight))
+                        .foregroundStyle(.white.opacity(0.6))
                     
-                    Text("Your Literary Companion")
+                    Text("What are you reading?")
                         .font(.system(size: 28, weight: .light, design: .serif))
                         .foregroundStyle(.white.opacity(0.9))
-                    
-                    Text("Discuss books, explore themes, and deepen your understanding")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
                 }
-                .padding(.vertical, 40)
                 
-                Spacer()
                 Spacer()
             }
         }

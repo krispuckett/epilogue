@@ -12,6 +12,9 @@ struct LibraryView: View {
     @State private var selectedBookForEdit: Book?
     @State private var bookRotation: Double = -5.0
     @State private var floatingOffset: Double = -10.0
+    @State private var showingBookOptions = false
+    @State private var selectedBookForOptions: Book?
+    @State private var selectedBookRect: CGRect = .zero
     
     enum ViewMode {
         case grid, list
@@ -92,35 +95,31 @@ struct LibraryView: View {
                             GridItem(.flexible(), spacing: 16)
                         ], spacing: 20) {
                             ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
-                                NavigationLink(destination: BookDetailView(book: book)) {
-                                    LibraryBookCard(book: book, viewModel: viewModel)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                    removal: .scale(scale: 1.2).combined(with: .opacity)
-                                ))
-                                .animation(
-                                    .spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.05),
-                                    value: viewModel.books.count
-                                )
-                                .contextMenu {
-                                    Button(action: {
-                                        selectedBookForEdit = book
-                                        showingCoverPicker = true
-                                    }) {
-                                        Label("Change Cover", systemImage: "photo")
+                                GeometryReader { geo in
+                                    NavigationLink(destination: BookDetailView(book: book)) {
+                                        LibraryBookCard(book: book, viewModel: viewModel)
                                     }
-                                    
-                                    Button(role: .destructive, action: {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                            viewModel.removeBook(book)
-                                        }
-                                    }) {
-                                        Label("Delete from Library", systemImage: "trash")
-                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .transition(.asymmetric(
+                                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                        removal: .scale(scale: 1.2).combined(with: .opacity)
+                                    ))
+                                    .animation(
+                                        .spring(response: 0.5, dampingFraction: 0.8)
+                                        .delay(Double(index) * 0.05),
+                                        value: viewModel.books.count
+                                    )
+                                    .simultaneousGesture(
+                                        LongPressGesture(minimumDuration: 0.5)
+                                            .onEnded { _ in
+                                                HapticManager.shared.mediumImpact()
+                                                selectedBookForOptions = book
+                                                selectedBookRect = geo.frame(in: .global)
+                                                showingBookOptions = true
+                                            }
+                                    )
                                 }
+                                .aspectRatio(2/3, contentMode: .fit)
                             }
                         }
                         .padding(.horizontal)
@@ -128,35 +127,31 @@ struct LibraryView: View {
                     } else {
                         LazyVStack(spacing: 20) {
                             ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
-                                NavigationLink(destination: BookDetailView(book: book)) {
-                                    LibraryBookListItem(book: book, viewModel: viewModel)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
-                                .animation(
-                                    .spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.05),
-                                    value: viewMode
-                                )
-                                .contextMenu {
-                                    Button(action: {
-                                        selectedBookForEdit = book
-                                        showingCoverPicker = true
-                                    }) {
-                                        Label("Change Cover", systemImage: "photo")
+                                GeometryReader { geo in
+                                    NavigationLink(destination: BookDetailView(book: book)) {
+                                        LibraryBookListItem(book: book, viewModel: viewModel)
                                     }
-                                    
-                                    Button(role: .destructive, action: {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                            viewModel.removeBook(book)
-                                        }
-                                    }) {
-                                        Label("Delete from Library", systemImage: "trash")
-                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    ))
+                                    .animation(
+                                        .spring(response: 0.5, dampingFraction: 0.8)
+                                        .delay(Double(index) * 0.05),
+                                        value: viewMode
+                                    )
+                                    .simultaneousGesture(
+                                        LongPressGesture(minimumDuration: 0.5)
+                                            .onEnded { _ in
+                                                HapticManager.shared.mediumImpact()
+                                                selectedBookForOptions = book
+                                                selectedBookRect = geo.frame(in: .global)
+                                                showingBookOptions = true
+                                            }
+                                    )
                                 }
+                                .frame(height: 100)
                             }
                         }
                         .padding(.horizontal)
@@ -186,6 +181,18 @@ struct LibraryView: View {
                         selectedBookForEdit = nil
                     }
                 )
+            }
+        }
+        .overlay {
+            if showingBookOptions, let book = selectedBookForOptions {
+                BookContextMenu(
+                    book: book,
+                    sourceRect: selectedBookRect,
+                    isPresented: $showingBookOptions
+                )
+                .environmentObject(viewModel)
+                .zIndex(999)
+                .transition(.opacity.combined(with: .scale))
             }
         }
     }
@@ -226,16 +233,6 @@ struct LibraryBookCard: View {
                 .scaleEffect(isPressed ? 0.98 : (isHovered ? 1.02 : 1.0))
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isHovered)
-                .overlay(alignment: .bottom) {
-                    if isHovered {
-                        // Amber glow line
-                        Rectangle()
-                            .fill(Color(red: 0.83, green: 0.65, blue: 0.45)) // Soft amber
-                            .frame(height: 2)
-                            .shadow(color: Color(red: 0.83, green: 0.65, blue: 0.45), radius: 4)
-                            .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .bottom)))
-                    }
-                }
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(book.title)
@@ -290,6 +287,30 @@ struct BookCoverView: View {
     @State private var isLoading = true
     @State private var showShimmer = false
     
+    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
+        // Google Books image URLs support zoom parameter for higher resolution
+        var enhanced = urlString
+        
+        // Remove existing zoom parameter if present
+        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+            let range = NSRange(location: 0, length: enhanced.utf16.count)
+            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
+        }
+        
+        // Add high quality zoom parameter
+        if enhanced.contains("?") {
+            enhanced += "&zoom=2"
+        } else {
+            enhanced += "?zoom=2"
+        }
+        
+        // Also remove edge curl parameter if present (makes covers look cleaner)
+        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
+        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
+        
+        return enhanced
+    }
+    
     var body: some View {
         ZStack {
             // Background placeholder
@@ -306,8 +327,9 @@ struct BookCoverView: View {
                 )
             
             if let coverURL = coverURL,
-               !coverURL.isEmpty,
-               let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? coverURL) {
+               !coverURL.isEmpty {
+                let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
+                if let url = URL(string: enhancedURL.replacingOccurrences(of: "http://", with: "https://").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? enhancedURL) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
@@ -320,12 +342,14 @@ struct BookCoverView: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .scaledToFill()
+                            .aspectRatio(contentMode: .fill)
                             .frame(width: 170, height: 255)
                             .clipped()
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                             .onAppear {
-                                print("📚 DEBUG: Cover loaded successfully: \(url.absoluteString)")
+                                withAnimation(.easeOut(duration: 0.3)) {
+                                    isLoading = false
+                                }
                             }
                     case .failure(let error):
                         // Error state - show book icon
@@ -344,6 +368,7 @@ struct BookCoverView: View {
                     @unknown default:
                         EmptyView()
                     }
+                }
                 }
             } else {
                 // No cover URL available - show placeholder

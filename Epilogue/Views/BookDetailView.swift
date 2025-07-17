@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
@@ -50,8 +51,12 @@ struct BookDetailView: View {
     @State private var selectedSection: BookSection = .notes
     @Namespace private var sectionAnimation
     
-    // Questions data - will be replaced with real chat integration
-    @State private var questions: [BookQuestion] = []
+    // Chat integration
+    @Query private var threads: [ChatThread]
+    @Environment(\.modelContext) private var modelContext
+    @State private var bookThread: ChatThread?
+    @State private var messageText = ""
+    @FocusState private var isInputFocused: Bool
     
     // UI States
     @State private var summaryExpanded = false
@@ -91,13 +96,13 @@ struct BookDetailView: View {
     enum BookSection: String, CaseIterable {
         case notes = "Notes"
         case quotes = "Quotes"
-        case questions = "Questions"
+        case chat = "Chat"
         
         var icon: String {
             switch self {
             case .notes: return "note.text"
             case .quotes: return "quote.opening"
-            case .questions: return "questionmark.circle"
+            case .chat: return "bubble.left.and.bubble.right.fill"
             }
         }
     }
@@ -169,6 +174,7 @@ struct BookDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                // Edit button
                 Button("Edit") {
                     editedTitle = book.title
                     showingBookSearch = true
@@ -190,6 +196,7 @@ struct BookDetailView: View {
         }
         .onAppear {
             loadCoverImage()
+            findOrCreateThreadForBook()
         }
     }
     
@@ -400,8 +407,8 @@ struct BookDetailView: View {
                 notesSection
             case .quotes:
                 quotesSection
-            case .questions:
-                questionsSection
+            case .chat:
+                chatSection
             }
         }
         .animation(.easeInOut(duration: 0.2), value: selectedSection)
@@ -469,23 +476,88 @@ struct BookDetailView: View {
         }
     }
     
-    private var questionsSection: some View {
-        VStack(spacing: 16) {
-            if questions.isEmpty {
-                emptyStateView(
-                    icon: "questionmark.circle",
-                    title: "No questions yet",
-                    subtitle: "Navigate to Chat to ask about this book"
-                )
-            } else {
-                ForEach(questions) { question in
-                    QuestionCard(question: question)
-                        .padding(.horizontal, 24)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.9).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
+    private var chatSection: some View {
+        VStack(spacing: 0) {
+            if let thread = bookThread {
+                // Messages ScrollView
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // Welcome message
+                            if thread.messages.isEmpty {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                                        .font(.system(size: 48))
+                                        .foregroundColor(.warmAmber.opacity(0.6))
+                                    
+                                    Text("Ask me about this book")
+                                        .font(.system(size: 18, weight: .medium))
+                                        .foregroundColor(.warmWhite.opacity(0.8))
+                                    
+                                    Text("I can help you explore themes, characters, or discuss any aspect of \"\(book.title)\"")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.warmWhite.opacity(0.6))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 40)
+                                }
+                                .padding(.vertical, 60)
+                            }
+                            
+                            // Messages
+                            ForEach(thread.messages) { message in
+                                ChatMessageBubble(message: message)
+                                    .padding(.horizontal, 24)
+                                    .id(message.id)
+                            }
+                            
+                            // Spacer for input
+                            Color.clear
+                                .frame(height: 20)
+                                .id("bottom")
+                        }
+                    }
+                    .onChange(of: thread.messages.count) { _, _ in
+                        withAnimation {
+                            scrollProxy.scrollTo("bottom", anchor: .bottom)
+                        }
+                    }
                 }
+                
+                // Input field
+                HStack(spacing: 12) {
+                    TextField("Ask about this book...", text: $messageText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.warmWhite.opacity(0.1))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.warmWhite.opacity(0.2), lineWidth: 1)
+                        )
+                        .focused($isInputFocused)
+                    
+                    Button {
+                        sendMessage()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(messageText.isEmpty ? .warmWhite.opacity(0.3) : .warmAmber)
+                    }
+                    .disabled(messageText.isEmpty)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+            } else {
+                // Loading state
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .tint(.warmAmber)
+                    Text("Setting up chat...")
+                        .font(.system(size: 14))
+                        .foregroundColor(.warmWhite.opacity(0.6))
+                }
+                .padding(.vertical, 60)
             }
         }
     }
@@ -511,11 +583,72 @@ struct BookDetailView: View {
         .padding(.vertical, 60)
     }
     
+    // MARK: - Chat Functions
+    
+    private func findOrCreateThreadForBook() {
+        // Check if thread already exists for this book
+        if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
+            bookThread = existingThread
+        } else {
+            // Create new thread for this book
+            let newThread = ChatThread(book: book)
+            modelContext.insert(newThread)
+            try? modelContext.save()
+            bookThread = newThread
+        }
+    }
+    
+    private func sendMessage() {
+        guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let thread = bookThread else { return }
+        
+        // Create user message
+        let userMessage = ThreadedChatMessage(
+            content: messageText,
+            isUser: true,
+            bookTitle: book.title,
+            bookAuthor: book.author
+        )
+        
+        thread.messages.append(userMessage)
+        thread.lastMessageDate = Date()
+        
+        // Clear input
+        let messageCopy = messageText
+        messageText = ""
+        
+        // Save context
+        try? modelContext.save()
+        
+        // Simulate AI response (in real app, this would call an API)
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+            
+            let aiResponse = ThreadedChatMessage(
+                content: "I'd be happy to discuss \"\(book.title)\" with you. What aspects of the book would you like to explore?",
+                isUser: false,
+                bookTitle: book.title,
+                bookAuthor: book.author
+            )
+            
+            await MainActor.run {
+                thread.messages.append(aiResponse)
+                thread.lastMessageDate = Date()
+                try? modelContext.save()
+            }
+        }
+    }
+    
     // MARK: - Color Extraction
     
     private func loadCoverImage() {
-        guard let urlString = book.coverImageURL?.replacingOccurrences(of: "http://", with: "https://"),
-              let url = URL(string: urlString) else { return }
+        guard let coverURL = book.coverImageURL else { return }
+        
+        // Enhance Google Books image URL for higher resolution
+        let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
+        let httpsURL = enhancedURL.replacingOccurrences(of: "http://", with: "https://")
+        
+        guard let url = URL(string: httpsURL) else { return }
         
         URLSession.shared.dataTask(with: url) { data, _, _ in
             if let data = data, let uiImage = UIImage(data: data) {
@@ -525,6 +658,30 @@ struct BookDetailView: View {
                 }
             }
         }.resume()
+    }
+    
+    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
+        // Google Books image URLs support zoom parameter for higher resolution
+        var enhanced = urlString
+        
+        // Remove existing zoom parameter if present
+        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+            let range = NSRange(location: 0, length: enhanced.utf16.count)
+            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
+        }
+        
+        // Add high quality zoom parameter
+        if enhanced.contains("?") {
+            enhanced += "&zoom=2"
+        } else {
+            enhanced += "?zoom=2"
+        }
+        
+        // Also remove edge curl parameter if present (makes covers look cleaner)
+        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
+        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
+        
+        return enhanced
     }
     
     private func extractDominantColor(from image: UIImage) {
@@ -861,6 +1018,39 @@ struct QuestionCard: View {
     }
 }
 
+struct ChatMessageBubble: View {
+    let message: ThreadedChatMessage
+    
+    var body: some View {
+        HStack {
+            if message.isUser {
+                Spacer(minLength: 60)
+            }
+            
+            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
+                Text(message.content)
+                    .font(.system(size: 16))
+                    .foregroundColor(message.isUser ? .white : .black.opacity(0.85))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(message.isUser ? Color.warmAmber : Color(hex: "FAF8F5"))
+                    )
+                
+                Text(message.timestamp.formatted(date: .omitted, time: .shortened))
+                    .font(.system(size: 11))
+                    .foregroundColor(.warmWhite.opacity(0.5))
+                    .padding(.horizontal, 4)
+            }
+            
+            if !message.isUser {
+                Spacer(minLength: 60)
+            }
+        }
+    }
+}
+
 // MARK: - Preview
 
 struct BookDetailView_Previews: PreviewProvider {
@@ -882,5 +1072,7 @@ struct BookDetailView_Previews: PreviewProvider {
         }
         .preferredColorScheme(.dark)
         .environmentObject(NotesViewModel())
+        .environmentObject(LibraryViewModel())
+        .modelContainer(for: [ChatThread.self])
     }
 }

@@ -91,9 +91,11 @@ enum CommandIntent: Equatable {
 struct CommandParser {
     static func parse(_ input: String) -> CommandIntent {
         let lowercased = input.lowercased().trimmingCharacters(in: .whitespaces)
+        print("CommandParser: Parsing input: '\(input)' (lowercased: '\(lowercased)')")
         
         // Empty input
         if lowercased.isEmpty {
+            print("CommandParser: Empty input, returning .unknown")
             return .unknown
         }
         
@@ -108,6 +110,7 @@ struct CommandParser {
            (lowercased.contains(" by ") && !lowercased.contains("quote")) {
             
             let query = cleanBookQuery(from: input)
+            print("CommandParser: Detected book intent, query: '\(query)'")
             return .addBook(query: query)
         }
         
@@ -146,9 +149,11 @@ struct CommandParser {
         
         // Default to search all for simple text
         if !containsActionKeywords(lowercased) {
+            print("CommandParser: No action keywords found, returning .searchAll")
             return .searchAll(query: input)
         }
         
+        print("CommandParser: Falling back to .unknown")
         return .unknown
     }
     

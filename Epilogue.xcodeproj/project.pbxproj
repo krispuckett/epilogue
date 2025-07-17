@@ -18,6 +18,14 @@
 		01BC21DA2E275A6A00E04A55 /* AmbientLiteraryBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */; };
 		01BC21DC2E28371900E04A55 /* MetalLiteraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */; };
 		01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */; };
+		01BC21E42E2931C100E04A55 /* ChatThreadListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E32E2931C100E04A55 /* ChatThreadListView.swift */; };
+		01BC21E52E2931C100E04A55 /* ChatConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E22E2931C100E04A55 /* ChatConversationView.swift */; };
+		01BC21E72E29362300E04A55 /* ChatThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E62E29362300E04A55 /* ChatThread.swift */; };
+		01BC21E92E2949B300E04A55 /* AmbientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E82E2949B300E04A55 /* AmbientBackground.swift */; };
+		01BC21EB2E294D7600E04A55 /* BookPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */; };
+		01BC21ED2E29533C00E04A55 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */; };
+		01BC21F42E295D8900E04A55 /* BookContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F52E295D8900E04A55 /* BookContextMenu.swift */; };
+		01BC21F62E295E8900E04A55 /* NoteContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */; };
 		2B1234561234567890123456 /* EpilogueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234551234567890123456 /* EpilogueApp.swift */; };
 		2B1234581234567890123456 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234571234567890123456 /* ContentView.swift */; };
 		2B12345A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B1234591234567890123456 /* Assets.xcassets */; };
@@ -71,6 +79,14 @@
 		01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLiteraryBackground.swift; sourceTree = "<group>"; };
 		01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalLiteraryView.swift; sourceTree = "<group>"; };
 		01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; name = LiteraryCompanion.metal; path = Epilogue/Shaders/LiteraryCompanion.metal; sourceTree = SOURCE_ROOT; };
+		01BC21E22E2931C100E04A55 /* ChatConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationView.swift; sourceTree = "<group>"; };
+		01BC21E32E2931C100E04A55 /* ChatThreadListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatThreadListView.swift; sourceTree = "<group>"; };
+		01BC21E62E29362300E04A55 /* ChatThread.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatThread.swift; sourceTree = "<group>"; };
+		01BC21E82E2949B300E04A55 /* AmbientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBackground.swift; sourceTree = "<group>"; };
+		01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookPickerSheet.swift; sourceTree = "<group>"; };
+		01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputBar.swift; sourceTree = "<group>"; };
+		01BC21F52E295D8900E04A55 /* BookContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookContextMenu.swift; sourceTree = "<group>"; };
+		01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteContextMenu.swift; sourceTree = "<group>"; };
 		2B1234521234567890123456 /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B1234551234567890123456 /* EpilogueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpilogueApp.swift; sourceTree = "<group>"; };
 		2B1234571234567890123456 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -196,6 +212,13 @@
 		2B1234831234567890123456 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				01BC21F52E295D8900E04A55 /* BookContextMenu.swift */,
+				01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */,
+				01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */,
+				01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */,
+				01BC21E82E2949B300E04A55 /* AmbientBackground.swift */,
+				01BC21E22E2931C100E04A55 /* ChatConversationView.swift */,
+				01BC21E32E2931C100E04A55 /* ChatThreadListView.swift */,
 				01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */,
 				01BC21D62E275A6800E04A55 /* PerplexityService.swift */,
 				01BC21D92E275A6900E04A55 /* MarkdownText.swift */,
@@ -224,6 +247,7 @@
 		2B12349A1234567890123456 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				01BC21E62E29362300E04A55 /* ChatThread.swift */,
 				2B1234971234567890123456 /* CommandIntent.swift */,
 				2B12349E1234567890123456 /* GoogleBooksAPI.swift */,
 			);
@@ -364,7 +388,12 @@
 				01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */,
 				01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */,
 				39CF5568A7D14D8682126B61 /* GlassEditNoteSheet.swift in Sources */,
+				01BC21F42E295D8900E04A55 /* BookContextMenu.swift in Sources */,
+				01BC21F62E295E8900E04A55 /* NoteContextMenu.swift in Sources */,
 				8343304CC97A4B7B82B14E17 /* NotesSearchPalette.swift in Sources */,
+				01BC21E92E2949B300E04A55 /* AmbientBackground.swift in Sources */,
+				01BC21E42E2931C100E04A55 /* ChatThreadListView.swift in Sources */,
+				01BC21E52E2931C100E04A55 /* ChatConversationView.swift in Sources */,
 				01BC21D42E27566800E04A55 /* ChatView.swift in Sources */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* GlassOptionsMenu.swift in Sources */,
 				01BC21DC2E28371900E04A55 /* MetalLiteraryView.swift in Sources */,
@@ -374,19 +403,23 @@
 				2B12348C1234567890123456 /* Typography.swift in Sources */,
 				2B1234961234567890123456 /* CommandIntent.swift in Sources */,
 				01BC21D72E275A6800E04A55 /* PerplexityService.swift in Sources */,
+				01BC21F32E295BEF00E04A55 /* GlassPopover.swift in Sources */,
 				01BC21D82E275A6900E04A55 /* MarkdownText.swift in Sources */,
+				01BC21EB2E294D7600E04A55 /* BookPickerSheet.swift in Sources */,
 				01BC21DA2E275A6A00E04A55 /* AmbientLiteraryBackground.swift in Sources */,
 				2B1234981234567890123456 /* UniversalCommandBar.swift in Sources */,
 				2B12349B1234567890123456 /* CommandSuggestionsView.swift in Sources */,
 				01BC21C62E25806C00E04A55 /* BookDetailView.swift in Sources */,
 				2B1234901234567890123456 /* LibraryView.swift in Sources */,
 				01BC21C82E260B8A00E04A55 /* EditBookSheet.swift in Sources */,
+				01BC21ED2E29533C00E04A55 /* ChatInputBar.swift in Sources */,
 				2B1234921234567890123456 /* QuickCaptureSheet.swift in Sources */,
 				2B1234941234567890123456 /* BookSearchSheet.swift in Sources */,
 				01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */,
 				2B12348E1234567890123456 /* MainNavigationView.swift in Sources */,
 				2B12348A1234567890123456 /* GlassBlurTest.swift in Sources */,
 				2B12349D1234567890123456 /* GoogleBooksAPI.swift in Sources */,
+				01BC21E72E29362300E04A55 /* ChatThread.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
