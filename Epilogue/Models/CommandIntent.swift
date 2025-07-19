@@ -1,13 +1,15 @@
 import SwiftUI
 
 // MARK: - Command Intent
-enum CommandIntent: Equatable {
+enum CommandIntent {
     case addBook(query: String)
     case createQuote(text: String)
     case createNote(text: String)
     case searchLibrary(query: String)
     case searchNotes(query: String)
     case searchAll(query: String)
+    case existingBook(book: Book)
+    case existingNote(note: Note)
     case unknown
     
     var icon: String {
@@ -18,9 +20,9 @@ enum CommandIntent: Equatable {
             return "quote.opening"
         case .createNote:
             return "note.text"
-        case .searchLibrary:
+        case .searchLibrary, .existingBook:
             return "magnifyingglass"
-        case .searchNotes:
+        case .searchNotes, .existingNote:
             return "doc.text.magnifyingglass"
         case .searchAll:
             return "magnifyingglass.circle"
@@ -32,17 +34,11 @@ enum CommandIntent: Equatable {
     var color: Color {
         switch self {
         case .addBook:
-            return .blue
-        case .createQuote:
-            return .purple
-        case .createNote:
-            return .green
-        case .searchLibrary:
-            return .orange
-        case .searchNotes:
-            return .blue
-        case .searchAll:
-            return .purple
+            return Color(red: 0.6, green: 0.4, blue: 0.8) // Purple for new books
+        case .createQuote, .createNote:
+            return Color(red: 1.0, green: 0.55, blue: 0.26) // Orange for notes
+        case .searchLibrary, .existingBook, .searchNotes, .existingNote, .searchAll:
+            return Color(red: 0.4, green: 0.6, blue: 0.9) // Blue for search
         case .unknown:
             return .gray
         }
@@ -62,6 +58,10 @@ enum CommandIntent: Equatable {
             return "Search Notes"
         case .searchAll:
             return "Search All"
+        case .existingBook:
+            return "Open Book"
+        case .existingNote:
+            return "View Note"
         case .unknown:
             return "Enter"
         }
@@ -81,58 +81,115 @@ enum CommandIntent: Equatable {
             return "Search Notes"
         case .searchAll:
             return "Search Everything"
+        case .existingBook:
+            return "Found in Library"
+        case .existingNote:
+            return "Found Note"
         case .unknown:
             return "Command"
         }
     }
 }
 
+// MARK: - Equatable Conformance
+extension CommandIntent: Equatable {
+    static func == (lhs: CommandIntent, rhs: CommandIntent) -> Bool {
+        switch (lhs, rhs) {
+        case (.addBook(let a), .addBook(let b)):
+            return a == b
+        case (.createQuote(let a), .createQuote(let b)):
+            return a == b
+        case (.createNote(let a), .createNote(let b)):
+            return a == b
+        case (.searchLibrary(let a), .searchLibrary(let b)):
+            return a == b
+        case (.searchNotes(let a), .searchNotes(let b)):
+            return a == b
+        case (.searchAll(let a), .searchAll(let b)):
+            return a == b
+        case (.existingBook(let a), .existingBook(let b)):
+            return a.id == b.id
+        case (.existingNote(let a), .existingNote(let b)):
+            return a.id == b.id
+        case (.unknown, .unknown):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 // MARK: - Command Parser
 struct CommandParser {
-    static func parse(_ input: String) -> CommandIntent {
-        let lowercased = input.lowercased().trimmingCharacters(in: .whitespaces)
+    static func parse(_ input: String, books: [Book] = [], notes: [Note] = []) -> CommandIntent {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        let lowercased = trimmed.lowercased()
         print("CommandParser: Parsing input: '\(input)' (lowercased: '\(lowercased)')")
+        print("CommandParser: Available books count: \(books.count)")
+        print("CommandParser: Available notes count: \(notes.count)")
+        
+        // Debug: Print first few book titles
+        if books.count > 0 {
+            print("CommandParser: First book: '\(books[0].title)'")
+            if books.count > 1 {
+                print("CommandParser: Books in library: \(books.prefix(3).map { $0.title }.joined(separator: ", "))")
+            }
+        }
         
         // Empty input
-        if lowercased.isEmpty {
+        if trimmed.isEmpty {
             print("CommandParser: Empty input, returning .unknown")
             return .unknown
         }
         
-        // Book additions - be more specific to avoid false positives
-        if lowercased.starts(with: "add book") ||
-           lowercased.starts(with: "add the ") ||
-           (lowercased.starts(with: "add ") && lowercased.count > 4) ||
-           lowercased.starts(with: "reading ") ||
-           lowercased.starts(with: "finished ") ||
-           lowercased.starts(with: "i'm reading ") ||
-           lowercased.starts(with: "currently reading ") ||
-           (lowercased.contains(" by ") && !lowercased.contains("quote")) {
-            
-            let query = cleanBookQuery(from: input)
-            print("CommandParser: Detected book intent, query: '\(query)'")
-            return .addBook(query: query)
+        // Phase 1: Check for exact matches with existing books
+        if let matchedBook = findExistingBook(input: trimmed, books: books) {
+            print("CommandParser: Found existing book match: '\(matchedBook.title)'")
+            return .existingBook(book: matchedBook)
         }
         
-        // Quotes - enhanced detection
-        if lowercased.starts(with: "quote:") ||
-           lowercased.starts(with: "\"") ||
-           lowercased.starts(with: "\u{201C}") || // smart quote
-           (lowercased.contains("page ") && lowercased.contains("\"")) ||
-           isQuoteFormat(input) ||
-           hasQuoteAttribution(input) {
+        // Phase 2: Check for exact matches with existing notes
+        if let matchedNote = findExistingNote(input: trimmed, notes: notes) {
+            print("CommandParser: Found existing note match")
+            return .existingNote(note: matchedNote)
+        }
+        
+        // Phase 3: Smart Quote Detection
+        if isLikelyQuote(input: trimmed) {
+            print("CommandParser: Detected quote pattern")
             return .createQuote(text: input)
         }
         
-        // Notes - enhanced detection
-        if lowercased.starts(with: "note:") ||
-           lowercased.starts(with: "note -") ||
-           lowercased.starts(with: "note ") ||
-           lowercased.starts(with: "thought:") ||
-           lowercased.starts(with: "idea:") ||
-           lowercased.starts(with: "reminder:") ||
-           lowercased.starts(with: "todo:") {
+        // Phase 4: Smart Book Title Detection - Check for "by" pattern first
+        if trimmed.lowercased().contains(" by ") {
+            let query = cleanBookQuery(from: input)
+            print("CommandParser: Detected 'by' pattern for book, query: '\(query)'")
+            return .addBook(query: query)
+        }
+        
+        // Phase 5: General Book Title Detection
+        if isLikelyBookTitle(input: trimmed) && !isLikelyNote(input: trimmed) {
+            let query = cleanBookQuery(from: input)
+            print("CommandParser: Detected book title pattern, query: '\(query)'")
+            return .addBook(query: query)
+        }
+        
+        // Phase 5: Note Detection
+        if isLikelyNote(input: trimmed) {
+            print("CommandParser: Detected note pattern")
             return .createNote(text: input)
+        }
+        
+        // Phase 6: Explicit Commands
+        // Book additions - explicit commands
+        if lowercased.starts(with: "add book") ||
+           lowercased.starts(with: "reading ") ||
+           lowercased.starts(with: "finished ") ||
+           lowercased.starts(with: "i'm reading ") ||
+           lowercased.starts(with: "currently reading ") {
+            let query = cleanBookQuery(from: input)
+            print("CommandParser: Detected explicit book command, query: '\(query)'")
+            return .addBook(query: query)
         }
         
         // Search patterns
@@ -147,14 +204,251 @@ struct CommandParser {
             }
         }
         
-        // Default to search all for simple text
-        if !containsActionKeywords(lowercased) {
-            print("CommandParser: No action keywords found, returning .searchAll")
+        // Default: If no clear intent, check if it might be a search
+        if trimmed.count < 50 && !trimmed.contains(".") && !trimmed.contains("?") {
+            // One more attempt to find books with very loose matching
+            if trimmed.count >= 2 {
+                for book in books {
+                    if book.title.lowercased().contains(trimmed.lowercased()) || 
+                       book.author.lowercased().contains(trimmed.lowercased()) {
+                        print("CommandParser: Found book in final search: '\(book.title)'")
+                        return .existingBook(book: book)
+                    }
+                }
+            }
+            
+            print("CommandParser: Short input without punctuation, returning .searchAll")
             return .searchAll(query: input)
+        }
+        
+        // Very long text defaults to note
+        if trimmed.count > 50 {
+            print("CommandParser: Long text, defaulting to .createNote")
+            return .createNote(text: input)
         }
         
         print("CommandParser: Falling back to .unknown")
         return .unknown
+    }
+    
+    // MARK: - Smart Detection Heuristics
+    
+    private static func isLikelyBookTitle(input: String) -> Bool {
+        // Book Title Detection:
+        // - 2-7 words, first letters capitalized
+        // - Contains "by [Author Name]"
+        // - Doesn't start with lowercase
+        // - Not a question
+        
+        let words = input.split(separator: " ")
+        let wordCount = words.count
+        
+        // Check word count
+        guard wordCount >= 2 && wordCount <= 7 else { return false }
+        
+        // Check if it's a question
+        if input.contains("?") { return false }
+        
+        // Check if starts with lowercase
+        if let firstChar = input.first, firstChar.isLowercase { return false }
+        
+        // Check for "by Author" pattern
+        if input.lowercased().contains(" by ") {
+            return true
+        }
+        
+        // Check if most words are capitalized (title case)
+        let capitalizedWords = words.filter { word in
+            guard let first = word.first else { return false }
+            return first.isUppercase || word.count <= 3 // Allow short words like "of", "the"
+        }
+        
+        // If more than half the words are capitalized, likely a title
+        return Double(capitalizedWords.count) / Double(words.count) > 0.5
+    }
+    
+    private static func isLikelyQuote(input: String) -> Bool {
+        // Quote Detection:
+        // - Starts with quotation marks
+        // - Or contains "..."
+        // - Or is > 50 characters without being a question
+        // - Has quote attribution pattern
+        
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        
+        // Check for quotation marks
+        if trimmed.hasPrefix("\"") || trimmed.hasPrefix("\u{201C}") ||
+           trimmed.hasPrefix("'") || trimmed.hasPrefix("\u{2018}") {
+            return true
+        }
+        
+        // Check for quote attribution format
+        if isQuoteFormat(input) || hasQuoteAttribution(input) {
+            return true
+        }
+        
+        // Check for ellipsis
+        if trimmed.contains("...") {
+            return true
+        }
+        
+        // Long text that's not a question might be a quote
+        if trimmed.count > 50 && !trimmed.contains("?") && !isLikelyNote(input: trimmed) {
+            // Check if it reads like a quote (more formal language)
+            let hasQuoteLikeStructure = trimmed.contains(",") || trimmed.contains(";") || trimmed.contains("—")
+            return hasQuoteLikeStructure
+        }
+        
+        return false
+    }
+    
+    private static func isLikelyNote(input: String) -> Bool {
+        // Note Detection:
+        // - Starts with "note:", "thought:", "re:"
+        // - Or is a complete sentence with punctuation
+        // - Or references a page number
+        // - Or starts with common note patterns
+        
+        let lowercased = input.lowercased()
+        
+        // Explicit note prefixes
+        let notePrefixes = ["note:", "note -", "thought:", "idea:", "reminder:", "todo:", "re:", "regarding:"]
+        for prefix in notePrefixes {
+            if lowercased.starts(with: prefix) {
+                return true
+            }
+        }
+        
+        // Check for page references
+        if lowercased.contains("page ") || lowercased.contains("p. ") || lowercased.contains("pg ") {
+            return true
+        }
+        
+        // Check if it's a complete sentence (ends with punctuation)
+        let lastChar = input.last
+        if lastChar == "." || lastChar == "!" {
+            // But not if it looks like a book title
+            if !isLikelyBookTitle(input: input) {
+                return true
+            }
+        }
+        
+        // Informal language patterns that suggest notes
+        let notePatterns = ["i think", "remember", "todo", "need to", "should", "must", "don't forget"]
+        for pattern in notePatterns {
+            if lowercased.contains(pattern) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    private static func findExistingBook(input: String, books: [Book]) -> Book? {
+        let searchTerms = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").map(String.init)
+        
+        print("CommandParser: Searching for book with terms: \(searchTerms)")
+        
+        // First, try exact title match
+        if let book = books.first(where: { $0.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == input.lowercased() }) {
+            print("CommandParser: Found exact match: '\(book.title)'")
+            return book
+        }
+        
+        // Then try to find books that contain all search terms
+        if searchTerms.count > 0 {
+            for book in books {
+                let titleLower = book.title.lowercased()
+                let authorLower = book.author.lowercased()
+                
+                // Check if all search terms are in the title
+                let allTermsInTitle = searchTerms.allSatisfy { term in
+                    titleLower.contains(term)
+                }
+                
+                if allTermsInTitle {
+                    print("CommandParser: Found book by title match: '\(book.title)'")
+                    return book
+                }
+                
+                // Check if search contains "by" and the author name matches after "by"
+                if let byIndex = searchTerms.firstIndex(of: "by"), byIndex < searchTerms.count - 1 {
+                    let authorSearchTerms = Array(searchTerms.suffix(from: byIndex + 1))
+                    let authorSearchString = authorSearchTerms.joined(separator: " ")
+                    
+                    if authorLower.contains(authorSearchString) || authorSearchString.count >= 3 && authorLower.hasPrefix(authorSearchString) {
+                        print("CommandParser: Found book by author match: '\(book.title)' by '\(book.author)'")
+                        return book
+                    }
+                }
+            }
+        }
+        
+        // Finally, try single partial match if input is long enough
+        if input.count >= 3 {
+            if let book = books.first(where: { $0.title.lowercased().contains(input.lowercased()) }) {
+                print("CommandParser: Found book by partial match: '\(book.title)'")
+                return book
+            }
+        }
+        
+        print("CommandParser: No book match found for: '\(input)'")
+        return nil
+    }
+    
+    private static func findExistingNote(input: String, notes: [Note]) -> Note? {
+        let searchTerms = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").map(String.init)
+        
+        print("CommandParser: Searching for note with terms: \(searchTerms)")
+        print("CommandParser: Available notes count: \(notes.count)")
+        
+        // Debug: Print all note contents to find the issue
+        if notes.count > 0 {
+            print("CommandParser: All notes:")
+            for (index, note) in notes.enumerated() {
+                print("  \(index): '\(note.content.prefix(40))...' (type: \(note.type))")
+            }
+        }
+        
+        // First, try exact content match
+        if let note = notes.first(where: { $0.content.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == input.lowercased() }) {
+            print("CommandParser: Found exact note match")
+            return note
+        }
+        
+        // Then try to find notes that contain all search terms
+        if searchTerms.count > 0 {
+            for note in notes {
+                let contentLower = note.content.lowercased()
+                
+                // Check if all search terms are in the content
+                let allTermsInContent = searchTerms.allSatisfy { term in
+                    contentLower.contains(term)
+                }
+                
+                if allTermsInContent {
+                    print("CommandParser: Found note match: '\(note.content.prefix(50))...'")
+                    return note
+                }
+                
+                // Also check if it's a partial match of the beginning
+                if contentLower.hasPrefix(input.lowercased()) {
+                    print("CommandParser: Found note by prefix match: '\(note.content.prefix(50))...'")
+                    return note
+                }
+            }
+        }
+        
+        // Finally, try partial match if input is long enough (reduced threshold)
+        if input.count >= 3 {
+            if let note = notes.first(where: { $0.content.lowercased().contains(input.lowercased()) }) {
+                print("CommandParser: Found note by partial match: '\(note.content.prefix(50))...'")
+                return note
+            }
+        }
+        
+        print("CommandParser: No note match found for: '\(input)'")
+        return nil
     }
     
     static func cleanBookQuery(from input: String) -> String {

@@ -117,14 +117,14 @@ struct QuoteCard: View {
                 // Drop cap
                 Text(firstLetter)
                     .font(.custom("Georgia", size: 56))
-                    .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                     .padding(.trailing, 4)
                     .offset(y: -8)
                 
                 // Rest of quote
                 Text(restOfContent)
                     .font(.custom("Georgia", size: 24))
-                    .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                     .lineSpacing(11) // Line height 1.5
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
@@ -136,9 +136,9 @@ struct QuoteCard: View {
                 // Thin horizontal rule with gradient
                 LinearGradient(
                     gradient: Gradient(stops: [
-                        .init(color: Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.1), location: 0),
-                        .init(color: Color(red: 0.11, green: 0.105, blue: 0.102).opacity(1.0), location: 0.5),
-                        .init(color: Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.1), location: 1.0)
+                        .init(color: Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.1), location: 0),
+                        .init(color: Color(red: 0.98, green: 0.97, blue: 0.96).opacity(1.0), location: 0.5),
+                        .init(color: Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.1), location: 1.0)
                     ]),
                     startPoint: .leading,
                     endPoint: .trailing
@@ -152,21 +152,21 @@ struct QuoteCard: View {
                         Text(author.uppercased())
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                             .kerning(1.5)
-                            .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.8))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                     }
                     
                     if let bookTitle = note.bookTitle {
                         Text(bookTitle.uppercased())
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                             .kerning(1.2)
-                            .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.6))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
                     }
                     
                     if let pageNumber = note.pageNumber {
                         Text("PAGE \(pageNumber)")
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
                             .kerning(1.0)
-                            .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.5))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
                     }
                 }
             }
@@ -174,16 +174,49 @@ struct QuoteCard: View {
         .padding(32) // Generous padding
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.98, green: 0.97, blue: 0.96)) // #FAF8F5
+                .fill(Color(red: 0.11, green: 0.105, blue: 0.102)) // Dark charcoal matching LibraryView
         )
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity) {
-            print("🔵 QuoteCard: Long press detected")
-            HapticManager.shared.mediumImpact()
-            showingOptions = true
-            print("🔵 QuoteCard: showingOptions set to true")
+        .contextMenu {
+            // Edit
+            Button {
+                HapticManager.shared.lightTap()
+                NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            
+            Divider()
+            
+            // Copy
+            Button {
+                HapticManager.shared.lightTap()
+                UIPasteboard.general.string = note.content
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            
+            // Share as Image
+            Button {
+                HapticManager.shared.lightTap()
+                // TODO: Implement share as image
+            } label: {
+                Label("Share as Image", systemImage: "square.and.arrow.up")
+            }
+            
+            Divider()
+            
+            // Delete
+            Button(role: .destructive) {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    notesViewModel.deleteNote(note)
+                }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 }
@@ -279,9 +312,49 @@ struct RegularNoteCard: View {
             }
             HapticManager.shared.lightTap()
         }
-        .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity) {
-            HapticManager.shared.mediumImpact()
-            showingOptions = true
+        .contextMenu {
+            // Edit
+            Button {
+                HapticManager.shared.lightTap()
+                NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            
+            Divider()
+            
+            // Copy
+            Button {
+                HapticManager.shared.lightTap()
+                UIPasteboard.general.string = note.content
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            
+            // Share
+            Button {
+                HapticManager.shared.lightTap()
+                let activityVC = UIActivityViewController(activityItems: [note.content], applicationActivities: nil)
+                
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = windowScene.windows.first {
+                    window.rootViewController?.present(activityVC, animated: true)
+                }
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            
+            Divider()
+            
+            // Delete
+            Button(role: .destructive) {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    notesViewModel.deleteNote(note)
+                }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 }

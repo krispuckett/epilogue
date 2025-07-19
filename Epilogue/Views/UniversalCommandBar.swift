@@ -522,7 +522,7 @@ struct UniversalCommandBar: View {
                                     commandText = updatedText
                                 }
                                 
-                                detectedIntent = CommandParser.parse(updatedText)
+                                detectedIntent = CommandParser.parse(updatedText, books: libraryViewModel.books, notes: notesViewModel.notes)
                                 print("UniversalCommandBar: Detected intent: \(detectedIntent), composerMode: \(composerMode)")
                                 print("UniversalCommandBar: Button should show: '\(detectedIntent.actionText)'")
                                 suggestions = CommandSuggestion.suggestions(for: updatedText)
@@ -766,6 +766,20 @@ struct UniversalCommandBar: View {
             searchNotes(query)
         case .searchAll(let query):
             searchAll(query)
+        case .existingBook(let book):
+            // Navigate to book detail
+            print("UniversalCommandBar: Navigate to book: \(book.title)")
+            selectedTab = 0  // Switch to library tab
+            // TODO: Implement navigation to specific book
+            HapticManager.shared.success()
+            collapse()
+        case .existingNote(let note):
+            // Navigate to notes and highlight/edit note
+            print("UniversalCommandBar: Open note: \(note.content)")
+            selectedTab = 1  // Switch to notes tab
+            // TODO: Implement note highlighting/editing
+            HapticManager.shared.success()
+            collapse()
         case .unknown:
             break
         }

@@ -12,6 +12,9 @@ struct LiquidCommandPalette: View {
     @State private var isAnimating = false
     @State private var showBookSearch = false
     @State private var textEditorHeight: CGFloat = 36
+    @State private var noteToEdit: Note? = nil
+    @State private var showPreview = false
+    @State private var previewDelay: DispatchWorkItem?
     
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -41,6 +44,29 @@ struct LiquidCommandPalette: View {
     
     private var showActionButton: Bool {
         !commandText.isEmpty && detectedIntent != .unknown
+    }
+    
+    private var placeholderText: String {
+        if editingNote != nil {
+            return "Edit your note..."
+        }
+        
+        switch detectedIntent {
+        case .addBook:
+            return "Adding new book..."
+        case .createQuote:
+            return "Creating quote..."
+        case .createNote:
+            return "Creating note..."
+        case .searchLibrary, .existingBook:
+            return "Found in your library"
+        case .searchNotes, .existingNote:
+            return "Searching notes..."
+        case .searchAll:
+            return "Searching everything..."
+        case .unknown:
+            return "What's on your mind?"
+        }
     }
     
     var body: some View {
@@ -114,6 +140,32 @@ struct LiquidCommandPalette: View {
                     .padding(.bottom, 8)
                 }
                 
+                // Preview for matched content
+                if showPreview {
+                    VStack(spacing: 0) {
+                        switch detectedIntent {
+                        case .existingBook(let book):
+                            BookPreviewCard(book: book)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .move(edge: .bottom).combined(with: .opacity)
+                                ))
+                        case .existingNote(let note):
+                            NotePreviewCard(note: note)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .move(edge: .bottom).combined(with: .opacity)
+                                ))
+                        default:
+                            EmptyView()
+                        }
+                    }
+                }
+                
                 // iMessage-style input bar
                 HStack(spacing: 8) {
                     // Plus button (left side)
@@ -158,7 +210,7 @@ struct LiquidCommandPalette: View {
                         // Text field
                         ZStack(alignment: .leading) {
                             if commandText.isEmpty {
-                                Text(editingNote != nil ? "Edit your note..." : "What's on your mind?")
+                                Text(placeholderText)
                                     .foregroundColor(.white.opacity(0.5))
                                     .font(.system(size: 16))
                             }
@@ -170,7 +222,8 @@ struct LiquidCommandPalette: View {
                                 .focused($isFocused)
                                 .lineLimit(1...5)
                                 .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
+                                .autocorrectionDisabled(true)
+                                .keyboardType(.default)
                                 .submitLabel(.done)
                                 .onChange(of: commandText) { _, newValue in
                                     // Hide suggestions when user starts typing
@@ -191,9 +244,37 @@ struct LiquidCommandPalette: View {
                                         .replacingOccurrences(of: "\u{2018}", with: "'")
                                         .replacingOccurrences(of: "\u{2019}", with: "'")
                                     
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        detectedIntent = CommandParser.parse(normalizedText)
-                                        updateGlowColor()
+                                    DispatchQueue.main.async {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            detectedIntent = CommandParser.parse(normalizedText, books: libraryViewModel.books, notes: notesViewModel.notes)
+                                            updateGlowColor()
+                                        }
+                                    }
+                                    
+                                    // Cancel previous preview delay
+                                    previewDelay?.cancel()
+                                    
+                                    // Show preview after a short delay for existing content
+                                    if case .existingBook = detectedIntent {
+                                        showPreview = false
+                                        let workItem = DispatchWorkItem {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                showPreview = true
+                                            }
+                                        }
+                                        previewDelay = workItem
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+                                    } else if case .existingNote = detectedIntent {
+                                        showPreview = false
+                                        let workItem = DispatchWorkItem {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                showPreview = true
+                                            }
+                                        }
+                                        previewDelay = workItem
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+                                    } else {
+                                        showPreview = false
                                     }
                                 }
                                 .onSubmit {
@@ -244,7 +325,7 @@ struct LiquidCommandPalette: View {
             // Initialize with existing content if editing
             if let initialContent = initialContent {
                 commandText = initialContent
-                detectedIntent = CommandParser.parse(initialContent)
+                detectedIntent = CommandParser.parse(initialContent, books: libraryViewModel.books, notes: notesViewModel.notes)
                 updateGlowColor()
             } else {
                 commandText = ""
@@ -305,18 +386,7 @@ struct LiquidCommandPalette: View {
     
     private func updateGlowColor() {
         withAnimation(.easeInOut(duration: 0.3)) {
-            switch detectedIntent {
-            case .createQuote:
-                currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26) // Orange
-            case .createNote:
-                currentGlowColor = Color(red: 0.4, green: 0.6, blue: 0.9) // Blue
-            case .addBook:
-                currentGlowColor = Color(red: 0.6, green: 0.4, blue: 0.8) // Purple
-            case .searchLibrary:
-                currentGlowColor = Color(red: 0.3, green: 0.7, blue: 0.5) // Green
-            default:
-                currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26) // Amber default
-            }
+            currentGlowColor = detectedIntent.color
         }
     }
     
@@ -366,6 +436,28 @@ struct LiquidCommandPalette: View {
             // TODO: Implement library search
             HapticManager.shared.success()
             dismissPalette()
+        case .existingBook(let book):
+            // Navigate to the book
+            HapticManager.shared.success()
+            dismissPalette()
+            // Post notification to navigate to book
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: Notification.Name("NavigateToBook"),
+                    object: book
+                )
+            }
+        case .existingNote(let note):
+            // Navigate to note
+            HapticManager.shared.success()
+            dismissPalette()
+            // Post notification to navigate to note
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: Notification.Name("NavigateToNote"),
+                    object: note
+                )
+            }
         default:
             break
         }
@@ -537,5 +629,136 @@ struct LiquidCommandPalette: View {
         onUpdate(updatedQuote)
         HapticManager.shared.success()
         dismissPalette()
+    }
+}
+
+// MARK: - Preview Cards
+struct BookPreviewCard: View {
+    let book: Book
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Book cover
+            if let coverURL = book.coverImageURL {
+                // Enhance the URL for better quality
+                let enhancedURL = coverURL
+                    .replacingOccurrences(of: "http://", with: "https://")
+                    .appending(coverURL.contains("?") ? "&zoom=2" : "?zoom=2")
+                
+                if let url = URL(string: enhancedURL) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.3))
+                            .overlay {
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                                    .tint(.white.opacity(0.5))
+                            }
+                    }
+                    .frame(width: 40, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                }
+            } else {
+                // No cover URL - show book icon
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
+                    .frame(width: 40, height: 60)
+                    .overlay {
+                        Image(systemName: "book.closed.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(book.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                Text("by \(book.author)")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.right.circle")
+                        .font(.system(size: 12))
+                    Text("Press Enter to open")
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            }
+            
+            Spacer()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1)
+        }
+    }
+}
+
+struct NotePreviewCard: View {
+    let note: Note
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: note.type == .quote ? "quote.opening" : "note.text")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text(note.type == .quote ? "Quote" : "Note")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                
+                Spacer()
+                
+                Text(note.formattedDate)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            
+            Text(note.content)
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            
+            if let bookTitle = note.bookTitle {
+                HStack(spacing: 4) {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 11))
+                    Text(bookTitle)
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(.white.opacity(0.6))
+            }
+            
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.right.circle")
+                    .font(.system(size: 12))
+                Text("Press Enter to view")
+                    .font(.system(size: 12))
+            }
+            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            .padding(.top, 4)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1)
+        }
     }
 }

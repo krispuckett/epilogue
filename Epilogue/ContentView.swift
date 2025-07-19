@@ -8,13 +8,18 @@ struct ContentView: View {
     @State private var selectedDetent: PresentationDetent = .height(300)
     @Namespace private var animation
     
+    #if DEBUG
+    @State private var showTestResults = false
+    #endif
+    
     init() {
         print("🏠 DEBUG: ContentView init")
         
         // Customize tab bar appearance for iOS 26
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
         
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -59,10 +64,8 @@ struct ContentView: View {
                 // Quick Add button positioned right above tab bar
                 if selectedTab != 2 && !showCommandPalette && !notesViewModel.isEditingNote {
                     Button(action: {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            HapticManager.shared.lightTap()
-                            showCommandPalette = true
-                        }
+                        HapticManager.shared.lightTap()
+                        showCommandPalette = true
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
@@ -107,9 +110,46 @@ struct ContentView: View {
                 ))
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showCommandPalette)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandPalette)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
         .preferredColorScheme(.dark)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
+            if let book = notification.object as? Book {
+                selectedTab = 0  // Switch to library tab
+                // TODO: Implement scrolling to specific book in LibraryView
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNote"))) { notification in
+            if let note = notification.object as? Note {
+                selectedTab = 1  // Switch to notes tab
+                // NotesView will handle the scrolling and editing
+            }
+        }
+        #if DEBUG
+        .overlay(alignment: .topTrailing) {
+            // Debug menu button
+            Menu {
+                Button("Run Intent Tests") {
+                    // TODO: Add intent tests
+                    print("Intent tests not yet implemented")
+                }
+                Button("Clear All Data") {
+                    // Clear all books and notes
+                    print("Clearing all data...")
+                }
+                Button("Load Sample Data") {
+                    // Load sample data
+                    print("Loading sample data...")
+                }
+            } label: {
+                Image(systemName: "hammer.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.orange)
+                    .padding()
+            }
+            .padding(.top, 50)
+        }
+        #endif
     }
 }
 

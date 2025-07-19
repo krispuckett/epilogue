@@ -12,150 +12,168 @@ struct LibraryView: View {
     @State private var selectedBookForEdit: Book?
     @State private var bookRotation: Double = -5.0
     @State private var floatingOffset: Double = -10.0
-    @State private var showingBookOptions = false
-    @State private var selectedBookForOptions: Book?
-    @State private var selectedBookRect: CGRect = .zero
+    @State private var highlightedBookId: UUID? = nil
+    @State private var scrollToBookId: UUID? = nil
+    @State private var navigateToBookDetail: Bool = false
+    @State private var selectedBookForNavigation: Book? = nil
     
     enum ViewMode {
         case grid, list
     }
     
+    // Helper function to change book cover
+    private func changeCover(for book: Book) {
+        selectedBookForEdit = book
+        showingCoverPicker = true
+    }
+    
+    @ViewBuilder
+    private var emptyStateView: some View {
+        ZStack {
+            VStack(spacing: 20) {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Glowing orange #FF8C42
+                    .shadow(color: .orange.opacity(0.3), radius: 20)
+                    .shadow(color: .orange.opacity(0.2), radius: 40)
+                    .rotationEffect(.degrees(bookRotation))
+                    .offset(y: floatingOffset)
+                    .onAppear {
+                        withAnimation(
+                            .easeInOut(duration: 4)
+                            .repeatForever(autoreverses: true)
+                        ) {
+                            bookRotation = 5
+                        }
+                        
+                        withAnimation(
+                            .easeInOut(duration: 3)
+                            .repeatForever(autoreverses: true)
+                        ) {
+                            floatingOffset = 10
+                        }
+                    }
+            
+                Text("Your library awaits")
+                    .font(.system(size: 24, weight: .medium, design: .serif))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96)) // Warm white
+                
+                Text("Tap + to add your first book")
+                    .font(.system(size: 14, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.7))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 100)
+    }
+    
+    @ViewBuilder
+    private var backgroundView: some View {
+        // Midnight scholar background with warm charcoal
+        Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
+            .ignoresSafeArea(.all)
+        
+        // Soft vignette effect - simplified
+        RadialGradient(
+            gradient: Gradient(colors: [
+                Color.clear,
+                Color.black.opacity(0.15)
+            ]),
+            center: .center,
+            startRadius: 200,
+            endRadius: 400
+        )
+        .ignoresSafeArea(.all)
+        .allowsHitTesting(false) // Performance optimization
+    }
+    
+    @ViewBuilder
+    private var navigationLink: some View {
+        NavigationLink(
+            destination: selectedBookForNavigation.map { BookDetailView(book: $0) },
+            isActive: $navigateToBookDetail
+        ) {
+            EmptyView()
+        }
+        .hidden()
+    }
+    
+    @ViewBuilder
+    private var gridContent: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
+        ], spacing: 40) {
+            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
+                LibraryGridItem(
+                    book: book,
+                    index: index,
+                    viewModel: viewModel,
+                    highlightedBookId: highlightedBookId,
+                    onChangeCover: { book in changeCover(for: book) }
+                )
+                .frame(height: 360) // Fixed height: 255 (cover) + 12 (spacing) + ~93 (text area)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 100)
+    }
+    
+    @ViewBuilder
+    private var listContent: some View {
+        LazyVStack(spacing: 20) {
+            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
+                LibraryListItemWrapper(
+                    book: book,
+                    index: index,
+                    viewModel: viewModel,
+                    viewMode: viewMode,
+                    highlightedBookId: highlightedBookId,
+                    onChangeCover: { book in changeCover(for: book) }
+                )
+                .frame(height: 100)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .padding(.bottom, 100)
+    }
+    
     var body: some View {
         ZStack {
-            // Midnight scholar background with warm charcoal
-            Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
-                .ignoresSafeArea(.all)
+            backgroundView
             
-            // Soft vignette effect - simplified
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    Color.black.opacity(0.15)
-                ]),
-                center: .center,
-                startRadius: 200,
-                endRadius: 400
-            )
-            .ignoresSafeArea(.all)
-            .allowsHitTesting(false) // Performance optimization
+            navigationLink
             
             // Content
-            ScrollView {
-                if viewModel.isLoading {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    if viewModel.isLoading {
                     LiteraryLoadingView(message: "Loading books...")
                         .padding(.top, 100)
                 } else if viewModel.books.isEmpty {
-                    // Empty state
-                    ZStack {
-                        VStack(spacing: 20) {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 80))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Glowing orange #FF8C42
-                                .shadow(color: .orange.opacity(0.3), radius: 20)
-                                .shadow(color: .orange.opacity(0.2), radius: 40)
-                                .rotationEffect(.degrees(bookRotation))
-                                .offset(y: floatingOffset)
-                                .onAppear {
-                                    withAnimation(
-                                        .easeInOut(duration: 4)
-                                        .repeatForever(autoreverses: true)
-                                    ) {
-                                        bookRotation = 5
-                                    }
-                                    
-                                    withAnimation(
-                                        .easeInOut(duration: 3)
-                                        .repeatForever(autoreverses: true)
-                                    ) {
-                                        floatingOffset = 10
-                                    }
-                                }
-                        
-                            Text("Your library awaits")
-                                .font(.system(size: 24, weight: .medium, design: .serif))
-                                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96)) // Warm white
-                            
-                            Text("Tap + to add your first book")
-                                .font(.system(size: 14, weight: .regular, design: .monospaced))
-                                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.7))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, 100)
+                    emptyStateView
                 } else {
                     if viewMode == .grid {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 16),
-                            GridItem(.flexible(), spacing: 16)
-                        ], spacing: 40) {
-                            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
-                                GeometryReader { geo in
-                                    NavigationLink(destination: BookDetailView(book: book)) {
-                                        LibraryBookCard(book: book, viewModel: viewModel)
-                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .simultaneousGesture(
-                                        LongPressGesture(minimumDuration: 0.5)
-                                            .onEnded { _ in
-                                                HapticManager.shared.mediumImpact()
-                                                selectedBookForOptions = book
-                                                selectedBookRect = geo.frame(in: .global)
-                                                showingBookOptions = true
-                                            }
-                                    )
-                                }
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                    removal: .scale(scale: 1.2).combined(with: .opacity)
-                                ))
-                                .animation(
-                                    .spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.05),
-                                    value: viewModel.books.count
-                                )
-                                .frame(height: 360) // Fixed height: 255 (cover) + 12 (spacing) + ~93 (text area)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 100)
+                        gridContent
                     } else {
-                        LazyVStack(spacing: 20) {
-                            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
-                                GeometryReader { geo in
-                                    NavigationLink(destination: BookDetailView(book: book)) {
-                                        LibraryBookListItem(book: book, viewModel: viewModel)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    ))
-                                    .animation(
-                                        .spring(response: 0.5, dampingFraction: 0.8)
-                                        .delay(Double(index) * 0.05),
-                                        value: viewMode
-                                    )
-                                    .simultaneousGesture(
-                                        LongPressGesture(minimumDuration: 0.5)
-                                            .onEnded { _ in
-                                                HapticManager.shared.mediumImpact()
-                                                selectedBookForOptions = book
-                                                selectedBookRect = geo.frame(in: .global)
-                                                showingBookOptions = true
-                                            }
-                                    )
-                                }
-                                .frame(height: 100)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .padding(.bottom, 100)
+                        listContent
                     }
                 }
             }
             .ignoresSafeArea(edges: .bottom) // Allow scroll content to go under tab bar
+            .onChange(of: scrollToBookId) { _, bookId in
+                if let bookId = bookId {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo(bookId, anchor: .center)
+                    }
+                    // Clear the scroll request after scrolling
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        scrollToBookId = nil
+                    }
+                }
+            }
+        } // End ScrollViewReader
         }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
@@ -178,30 +196,218 @@ struct LibraryView: View {
                 )
             }
         }
-        .overlay {
-            if showingBookOptions, let book = selectedBookForOptions {
-                BookContextMenu(
-                    book: book,
-                    sourceRect: selectedBookRect,
-                    isPresented: $showingBookOptions
-                )
-                .environmentObject(viewModel)
-                .zIndex(999)
-                .transition(.opacity.combined(with: .scale))
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
+            if let book = notification.object as? Book {
+                // Navigate directly to book detail
+                selectedBookForNavigation = book
+                navigateToBookDetail = true
             }
         }
     }
 }
 
 
+// MARK: - Library Grid Item Wrapper
+struct LibraryGridItem: View {
+    let book: Book
+    let index: Int
+    let viewModel: LibraryViewModel
+    let highlightedBookId: UUID?
+    let onChangeCover: (Book) -> Void
+    
+    var body: some View {
+        GeometryReader { geo in
+            NavigationLink(destination: BookDetailView(book: book)) {
+                LibraryBookCard(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(highlightOverlay)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .id(book.localId)
+            .contextMenu {
+                // Same menu items as card
+                Button {
+                    HapticManager.shared.lightTap()
+                    withAnimation {
+                        viewModel.toggleReadingStatus(for: book)
+                    }
+                } label: {
+                    Label(
+                        book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
+                        systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                    )
+                }
+                
+                Divider()
+                
+                Button {
+                    HapticManager.shared.lightTap()
+                    // Share functionality
+                    let text = "Check out \"\(book.title)\" by \(book.author)"
+                    let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+                    
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let window = windowScene.windows.first {
+                        window.rootViewController?.present(activityVC, animated: true)
+                    }
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                
+                Divider()
+                
+                Button {
+                    HapticManager.shared.lightTap()
+                    onChangeCover(book)
+                } label: {
+                    Label("Change Cover", systemImage: "photo")
+                }
+                
+                Divider()
+                
+                Button(role: .destructive) {
+                    HapticManager.shared.lightTap()
+                    withAnimation {
+                        viewModel.deleteBook(book)
+                    }
+                } label: {
+                    Label("Delete from Library", systemImage: "trash")
+                }
+            }
+        }
+        .transition(gridTransition)
+        .animation(gridAnimation, value: viewModel.books.count)
+    }
+    
+    private var highlightOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+            .opacity(highlightedBookId == book.localId ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: highlightedBookId)
+    }
+    
+    private var gridTransition: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.8).combined(with: .opacity),
+            removal: .scale(scale: 1.2).combined(with: .opacity)
+        )
+    }
+    
+    private var gridAnimation: Animation {
+        .spring(response: 0.5, dampingFraction: 0.8)
+        .delay(Double(index) * 0.05)
+    }
+}
+
+// MARK: - Library List Item Wrapper
+struct LibraryListItemWrapper: View {
+    let book: Book
+    let index: Int
+    let viewModel: LibraryViewModel
+    let viewMode: LibraryView.ViewMode
+    let highlightedBookId: UUID?
+    let onChangeCover: (Book) -> Void
+    
+    var body: some View {
+        GeometryReader { geo in
+            NavigationLink(destination: BookDetailView(book: book)) {
+                LibraryBookListItem(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
+                    .overlay(highlightOverlay)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .id(book.localId)
+            .transition(listTransition)
+            .animation(listAnimation, value: viewMode)
+            .contextMenu {
+                // Same menu items
+                Button {
+                    HapticManager.shared.lightTap()
+                    withAnimation {
+                        viewModel.toggleReadingStatus(for: book)
+                    }
+                } label: {
+                    Label(
+                        book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
+                        systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                    )
+                }
+                
+                Divider()
+                
+                Button {
+                    HapticManager.shared.lightTap()
+                    let text = "Check out \"\(book.title)\" by \(book.author)"
+                    let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+                    
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let window = windowScene.windows.first {
+                        window.rootViewController?.present(activityVC, animated: true)
+                    }
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                
+                Divider()
+                
+                Button {
+                    HapticManager.shared.lightTap()
+                    onChangeCover(book)
+                } label: {
+                    Label("Change Cover", systemImage: "photo")
+                }
+                
+                Divider()
+                
+                Button(role: .destructive) {
+                    HapticManager.shared.lightTap()
+                    withAnimation {
+                        viewModel.deleteBook(book)
+                    }
+                } label: {
+                    Label("Delete from Library", systemImage: "trash")
+                }
+            }
+        }
+    }
+    
+    private var highlightOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+            .opacity(highlightedBookId == book.localId ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: highlightedBookId)
+    }
+    
+    private var listTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: .trailing).combined(with: .opacity),
+            removal: .move(edge: .leading).combined(with: .opacity)
+        )
+    }
+    
+    private var listAnimation: Animation {
+        .spring(response: 0.5, dampingFraction: 0.8)
+        .delay(Double(index) * 0.05)
+    }
+}
+
 // MARK: - Library Book Card
 struct LibraryBookCard: View {
     let book: Book
     let viewModel: LibraryViewModel
+    let onChangeCover: ((Book) -> Void)?
     @State private var isPressed = false
-    @State private var showingOptions = false
     @State private var tilt: Double = 0
     @State private var isHovered = false
+    
+    private func shareBook() {
+        let text = "Check out \"\(book.title)\" by \(book.author)"
+        let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            window.rootViewController?.present(activityVC, animated: true)
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -258,16 +464,50 @@ struct LibraryBookCard: View {
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 0.5) {
-            HapticManager.shared.mediumImpact()
-            
-            showingOptions = true
-        } onPressingChanged: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
-                if pressing {
-                    isHovered = true
+        .contextMenu {
+            // Mark as Read/Want to Read
+            Button {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    viewModel.toggleReadingStatus(for: book)
                 }
+            } label: {
+                Label(
+                    book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
+                    systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                )
+            }
+            
+            Divider()
+            
+            // Share
+            Button {
+                HapticManager.shared.lightTap()
+                shareBook()
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            
+            Divider()
+            
+            // Change Cover
+            Button {
+                HapticManager.shared.lightTap()
+                onChangeCover?(book)
+            } label: {
+                Label("Change Cover", systemImage: "photo")
+            }
+            
+            Divider()
+            
+            // Delete
+            Button(role: .destructive) {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    viewModel.deleteBook(book)
+                }
+            } label: {
+                Label("Delete from Library", systemImage: "trash")
             }
         }
         .onHover { hovering in
@@ -410,6 +650,7 @@ struct ViewModeToggle: View {
 struct LibraryBookListItem: View {
     let book: Book
     let viewModel: LibraryViewModel
+    let onChangeCover: ((Book) -> Void)?
     @State private var isPressed = false
     @State private var showActions = false
     
@@ -619,10 +860,54 @@ struct LibraryBookListItem: View {
                 }
             }
         }
-        .onLongPressGesture(minimumDuration: 0.4) {
-            HapticManager.shared.mediumImpact()
-        } onPressingChanged: { pressing in
-            isPressed = pressing
+        .contextMenu {
+            // Same menu items
+            Button {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    viewModel.toggleReadingStatus(for: book)
+                }
+            } label: {
+                Label(
+                    book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
+                    systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                )
+            }
+            
+            Divider()
+            
+            Button {
+                HapticManager.shared.lightTap()
+                let text = "Check out \"\(book.title)\" by \(book.author)"
+                let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+                
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = windowScene.windows.first {
+                    window.rootViewController?.present(activityVC, animated: true)
+                }
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            
+            Divider()
+            
+            Button {
+                HapticManager.shared.lightTap()
+                onChangeCover?(book)
+            } label: {
+                Label("Change Cover", systemImage: "photo")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive) {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    viewModel.deleteBook(book)
+                }
+            } label: {
+                Label("Delete from Library", systemImage: "trash")
+            }
         }
     }
     
@@ -684,6 +969,30 @@ class LibraryViewModel: ObservableObject {
     func removeBook(_ book: Book) {
         books.removeAll { $0.id == book.id }
         saveBooks()
+    }
+    
+    func deleteBook(_ book: Book) {
+        removeBook(book)
+    }
+    
+    func toggleReadingStatus(for book: Book) {
+        let newStatus: ReadingStatus = book.readingStatus == .finished ? .wantToRead : .finished
+        updateReadingStatus(for: book.id, status: newStatus)
+    }
+    
+    func loadSampleBooks() {
+        // Add some sample books for testing
+        let sampleBooks = [
+            Book(id: "hobbit123", title: "The Hobbit", author: "J.R.R. Tolkien", description: "A fantasy adventure", pageCount: 310),
+            Book(id: "1984_456", title: "1984", author: "George Orwell", description: "A dystopian novel", pageCount: 328),
+            Book(id: "pride789", title: "Pride and Prejudice", author: "Jane Austen", description: "A romantic novel", pageCount: 432)
+        ]
+        
+        for book in sampleBooks {
+            if !books.contains(where: { $0.title == book.title }) {
+                addBook(book)
+            }
+        }
     }
     
     func updateReadingStatus(for bookId: String, status: ReadingStatus) {
