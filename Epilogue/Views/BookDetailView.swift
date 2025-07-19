@@ -65,6 +65,22 @@ struct BookDetailView: View {
     @State private var secondaryColor: Color = .clear
     @State private var scrollOffset: CGFloat = 0
     
+    // Computed property for the accent color to use
+    private var accentColor: Color {
+        // Check if dominant color is too dark (near black)
+        if dominantColor != .midnightScholar {
+            let uiColor = UIColor(dominantColor)
+            var brightness: CGFloat = 0
+            uiColor.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
+            
+            // If too dark, use secondary color or fallback
+            if brightness < 0.3 && secondaryColor != .clear {
+                return secondaryColor
+            }
+        }
+        return dominantColor == .midnightScholar ? .warmAmber : dominantColor
+    }
+    
     // Edit book states
     @State private var showingBookSearch = false
     @State private var editedTitle = ""
@@ -174,13 +190,16 @@ struct BookDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                // Edit button
-                Button("Edit") {
-                    editedTitle = book.title
-                    showingBookSearch = true
-                }
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.warmAmber)
+                Text("Edit")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .glassEffect(.clear.tint(secondaryColor.opacity(0.4)), in: RoundedRectangle(cornerRadius: 16))
+                    .onTapGesture {
+                        editedTitle = book.title
+                        showingBookSearch = true
+                    }
             }
         }
         .sheet(isPresented: $showingBookSearch) {

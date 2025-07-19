@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 struct ChatThreadListView: View {
     @Binding var selectedThread: ChatThread?
@@ -15,7 +17,7 @@ struct ChatThreadListView: View {
         ZStack {
             // Show literary empty state when no book threads exist (even if general exists)
             if bookThreads.isEmpty {
-                LiteraryCompanionEmptyState()
+                MetalLiteraryView()
                     .ignoresSafeArea()
             } else {
                 // Background for when we have book threads
@@ -65,6 +67,7 @@ struct ChatThreadListView: View {
                                             threadToDelete = thread
                                             showingDeleteConfirmation = true
                                         }
+                                        .environmentObject(libraryViewModel)
                                         .padding(.horizontal)
                                     }
                                 }
@@ -79,27 +82,10 @@ struct ChatThreadListView: View {
         }
         .navigationTitle("Epilogue")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingBookPicker = true
-                } label: {
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                }
-            }
-        }
         .safeAreaInset(edge: .bottom) {
             ChatInputBar(
                 onStartGeneralChat: {
-                    // Create or select general thread
-                    if let general = generalThread {
-                        selectedThread = general
-                    } else {
-                        selectedThread = createGeneralThread()
-                    }
-                    showingThreadList = false
+                    // Don't auto-navigate, just focus the input
                 },
                 onSelectBook: {
                     showingBookPicker = true
@@ -111,11 +97,16 @@ struct ChatThreadListView: View {
         .sheet(isPresented: $showingBookPicker) {
             BookPickerSheet(
                 onBookSelected: { book in
+                    // Debug: Check if book has cover URL
+                    print("Selected book: \(book.title)")
+                    print("Book cover URL: \(book.coverImageURL ?? "nil")")
+                    
                     // Create or select thread for this book
                     if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
                         selectedThread = existingThread
                     } else {
                         let newThread = ChatThread(book: book)
+                        print("New thread cover URL: \(newThread.bookCoverURL ?? "nil")")
                         modelContext.insert(newThread)
                         try? modelContext.save()
                         selectedThread = newThread
@@ -247,18 +238,51 @@ struct BookChatCard: View {
     let thread: ChatThread
     let onTap: () -> Void
     let onDelete: () -> Void
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @State private var dominantColor: Color = Color(red: 0.11, green: 0.105, blue: 0.102)
+    @State private var coverImage: UIImage?
+    
+    // Try to get cover URL from thread or find matching book in library
+    private var effectiveCoverURL: String? {
+        if let url = thread.bookCoverURL {
+            return url
+        }
+        
+        // Fallback: try to find book in library by ID or title
+        if let bookId = thread.bookId,
+           let book = libraryViewModel.books.first(where: { $0.localId == bookId }) {
+            return book.coverImageURL
+        } else if let title = thread.bookTitle,
+                  let book = libraryViewModel.books.first(where: { $0.title == title }) {
+            return book.coverImageURL
+        }
+        
+        return nil
+    }
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 16) {
-                // Book icon or cover
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                    .frame(width: 50, height: 70)
-                    .overlay {
-                        Image(systemName: "book.fill")
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                    }
+                // Book cover
+                if let coverURL = effectiveCoverURL {
+                    SharedBookCoverView(coverURL: coverURL, width: 50, height: 70)
+                        .onAppear {
+                            print("BookChatCard - Book: \(thread.bookTitle ?? "Unknown"), Cover URL: \(coverURL)")
+                            loadAndExtractColors(from: coverURL)
+                        }
+                } else {
+                    // Fallback icon
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                        .frame(width: 50, height: 70)
+                        .overlay {
+                            Image(systemName: "book.fill")
+                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        }
+                        .onAppear {
+                            print("BookChatCard - Book: \(thread.bookTitle ?? "Unknown"), Cover URL is nil (thread: \(thread.bookCoverURL ?? "nil"), effective: nil)")
+                        }
+                }
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(thread.bookTitle ?? "Unknown Book")
@@ -292,7 +316,29 @@ struct BookChatCard: View {
                     .foregroundStyle(.white.opacity(0.3))
             }
             .padding(16)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+            .background {
+                ZStack {
+                    // Gradient background based on book cover color
+                    LinearGradient(
+                        colors: [
+                            dominantColor.opacity(0.3),
+                            dominantColor.opacity(0.1),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    // Glass effect on top
+                    Color.white.opacity(0.05)
+                        .background(.ultraThinMaterial)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            }
         }
         .buttonStyle(PlainButtonStyle())
         .contextMenu {
@@ -301,6 +347,95 @@ struct BookChatCard: View {
             } label: {
                 Label("Delete Chat", systemImage: "trash")
             }
+        }
+    }
+    
+    private func loadAndExtractColors(from urlString: String) {
+        // Enhance URL for better quality
+        var enhanced = urlString.replacingOccurrences(of: "http://", with: "https://")
+        if !enhanced.contains("zoom=") {
+            enhanced += enhanced.contains("?") ? "&zoom=2" : "?zoom=2"
+        }
+        
+        guard let url = URL(string: enhanced) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data = data, let uiImage = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    self.coverImage = uiImage
+                    self.extractDominantColor(from: uiImage)
+                }
+            }
+        }.resume()
+    }
+    
+    private func extractDominantColor(from image: UIImage) {
+        guard let ciImage = CIImage(image: image) else { return }
+        
+        let context = CIContext()
+        let size = CGSize(width: 20, height: 20) // Smaller for performance
+        
+        // Scale down
+        guard let filter = CIFilter(name: "CILanczosScaleTransform") else { return }
+        filter.setValue(ciImage, forKey: kCIInputImageKey)
+        filter.setValue(size.width / ciImage.extent.width, forKey: kCIInputScaleKey)
+        
+        guard let outputImage = filter.outputImage,
+              let cgImage = context.createCGImage(outputImage, from: outputImage.extent) else { return }
+        
+        // Simple color extraction - get average color
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        
+        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let bitmapContext = CGContext(
+                data: &pixelData,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return }
+        
+        bitmapContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        // Find the most vibrant color
+        var bestColor = UIColor.gray
+        var maxSaturation: CGFloat = 0
+        
+        for y in 0..<height {
+            for x in 0..<width {
+                let index = ((width * y) + x) * bytesPerPixel
+                let r = CGFloat(pixelData[index]) / 255.0
+                let g = CGFloat(pixelData[index + 1]) / 255.0
+                let b = CGFloat(pixelData[index + 2]) / 255.0
+                
+                let color = UIColor(red: r, green: g, blue: b, alpha: 1.0)
+                var h: CGFloat = 0, s: CGFloat = 0, br: CGFloat = 0
+                color.getHue(&h, saturation: &s, brightness: &br, alpha: nil)
+                
+                // Pick vibrant colors
+                if s > maxSaturation && br > 0.3 && br < 0.9 {
+                    maxSaturation = s
+                    bestColor = color
+                }
+            }
+        }
+        
+        // Convert to SwiftUI Color and boost saturation
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+        bestColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+        
+        let boostedS = min(s * 1.5, 1.0)
+        let boostedB = min(b * 1.2, 0.85)
+        
+        withAnimation(.easeInOut(duration: 0.8)) {
+            dominantColor = Color(hue: Double(h), saturation: Double(boostedS), brightness: Double(boostedB))
         }
     }
 }

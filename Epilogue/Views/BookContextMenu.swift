@@ -19,7 +19,7 @@ struct BookContextMenu: View {
                         dismissMenu()
                     }
                 
-                // Positioned popover
+                // Positioned popover with iOS 26 style
                 VStack(spacing: 0) {
                     // Menu options
                     VStack(spacing: 0) {
@@ -34,7 +34,7 @@ struct BookContextMenu: View {
                         )
                         
                         Divider()
-                            .background(Color.white.opacity(0.15))
+                            .background(Color.white.opacity(0.08))
                         
                         // Share
                         ContextMenuButton(
@@ -47,7 +47,7 @@ struct BookContextMenu: View {
                         )
                         
                         Divider()
-                            .background(Color.white.opacity(0.15))
+                            .background(Color.white.opacity(0.08))
                         
                         // Change Cover
                         ContextMenuButton(
@@ -62,7 +62,7 @@ struct BookContextMenu: View {
                         )
                         
                         Divider()
-                            .background(Color.white.opacity(0.15))
+                            .background(Color.white.opacity(0.08))
                         
                         // Delete
                         ContextMenuButton(
@@ -76,23 +76,16 @@ struct BookContextMenu: View {
                         )
                     }
                 }
-                .frame(width: 260) // Thinner width like Apple Music
-                .glassEffect(in: RoundedRectangle(cornerRadius: 24))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.5
+                .frame(width: 340) // Wider like iOS 26 photos
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(white: 0.11)) // Dark gray background
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
                         )
-                }
-                .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                )
+                .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
                 .scaleEffect(containerScale)
                 .opacity(containerOpacity)
                 .position(calculatePosition(in: geometry))
@@ -117,7 +110,7 @@ struct BookContextMenu: View {
     
     private func calculatePosition(in geometry: GeometryProxy) -> CGPoint {
         let menuHeight: CGFloat = 220 // Approximate height
-        let menuWidth: CGFloat = 260
+        let menuWidth: CGFloat = 340
         let padding: CGFloat = 8 // Smaller padding for closer positioning
         
         // Calculate x position - center on the book
@@ -194,23 +187,19 @@ private struct ContextMenuButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.system(size: 17))
+                    .font(.system(size: 20))
                     .frame(width: 24)
                 
                 Text(title)
                     .font(.system(size: 17, weight: .regular))
                 
                 Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .medium))
-                    .opacity(0.3)
             }
             .foregroundStyle(isDestructive ? Color.red : .white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .padding(.vertical) // Standard iOS padding
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())

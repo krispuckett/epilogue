@@ -7,6 +7,7 @@ class ChatThread {
     var bookId: UUID? // nil for general chat
     var bookTitle: String?
     var bookAuthor: String?
+    var bookCoverURL: String?
     var messages: [ThreadedChatMessage] = []
     var lastMessageDate: Date = Date()
     var createdDate: Date = Date()
@@ -16,6 +17,7 @@ class ChatThread {
             self.bookId = book.localId
             self.bookTitle = book.title
             self.bookAuthor = book.author
+            self.bookCoverURL = book.coverImageURL
         }
     }
 }

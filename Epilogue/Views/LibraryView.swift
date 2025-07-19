@@ -26,21 +26,18 @@ struct LibraryView: View {
             Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
                 .ignoresSafeArea(.all)
             
-            // Soft vignette effect
+            // Soft vignette effect - simplified
             RadialGradient(
                 gradient: Gradient(colors: [
                     Color.clear,
-                    Color.black.opacity(0.2)
+                    Color.black.opacity(0.15)
                 ]),
                 center: .center,
                 startRadius: 200,
                 endRadius: 400
             )
             .ignoresSafeArea(.all)
-            
-            // Subtle wood grain texture overlay
-            WoodGrainOverlay()
-                .ignoresSafeArea(.all)
+            .allowsHitTesting(false) // Performance optimization
             
             // Content
             ScrollView {
@@ -50,9 +47,6 @@ struct LibraryView: View {
                 } else if viewModel.books.isEmpty {
                     // Empty state
                     ZStack {
-                        // Minimal particle system
-                        MinimalParticleSystem()
-                        
                         VStack(spacing: 20) {
                             Image(systemName: "book.closed.fill")
                                 .font(.system(size: 80))
@@ -93,22 +87,14 @@ struct LibraryView: View {
                         LazyVGrid(columns: [
                             GridItem(.flexible(), spacing: 16),
                             GridItem(.flexible(), spacing: 16)
-                        ], spacing: 20) {
+                        ], spacing: 40) {
                             ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
                                 GeometryReader { geo in
                                     NavigationLink(destination: BookDetailView(book: book)) {
                                         LibraryBookCard(book: book, viewModel: viewModel)
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    .transition(.asymmetric(
-                                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                        removal: .scale(scale: 1.2).combined(with: .opacity)
-                                    ))
-                                    .animation(
-                                        .spring(response: 0.5, dampingFraction: 0.8)
-                                        .delay(Double(index) * 0.05),
-                                        value: viewModel.books.count
-                                    )
                                     .simultaneousGesture(
                                         LongPressGesture(minimumDuration: 0.5)
                                             .onEnded { _ in
@@ -119,7 +105,16 @@ struct LibraryView: View {
                                             }
                                     )
                                 }
-                                .aspectRatio(2/3, contentMode: .fit)
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                    removal: .scale(scale: 1.2).combined(with: .opacity)
+                                ))
+                                .animation(
+                                    .spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.05),
+                                    value: viewModel.books.count
+                                )
+                                .frame(height: 360) // Fixed height: 255 (cover) + 12 (spacing) + ~93 (text area)
                             }
                         }
                         .padding(.horizontal)
@@ -209,7 +204,7 @@ struct LibraryBookCard: View {
     @State private var isHovered = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             // Book cover with 3D effect
             BookCoverView(coverURL: book.coverImageURL)
                 .frame(width: 170, height: 255)
@@ -234,12 +229,13 @@ struct LibraryBookCard: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isHovered)
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(book.title)
                     .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96)) // Warm white
                     .lineLimit(2)
                     .truncationMode(.tail)
+                    .frame(minHeight: 40) // Ensure minimum height for 2 lines
                 
                 Text(book.author)
                     .font(.system(size: 13, weight: .regular, design: .monospaced))
@@ -258,6 +254,7 @@ struct LibraryBookCard: View {
                     .padding(.top, 4)
                 }
             }
+            .padding(.bottom, 8) // Add extra padding at bottom of text
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
@@ -284,111 +281,58 @@ struct LibraryBookCard: View {
 // MARK: - Book Cover View
 struct BookCoverView: View {
     let coverURL: String?
-    @State private var isLoading = true
-    @State private var showShimmer = false
+    @State private var isImageLoaded = false
     
-    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
-        // Google Books image URLs support zoom parameter for higher resolution
-        var enhanced = urlString
+    // Simplified URL enhancement
+    private var imageURL: URL? {
+        guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
-        // Remove existing zoom parameter if present
-        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
-            let range = NSRange(location: 0, length: enhanced.utf16.count)
-            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
+        // Quick enhancement without regex
+        var enhanced = coverURL.replacingOccurrences(of: "http://", with: "https://")
+        if !enhanced.contains("zoom=") {
+            enhanced += enhanced.contains("?") ? "&zoom=2" : "?zoom=2"
         }
         
-        // Add high quality zoom parameter
-        if enhanced.contains("?") {
-            enhanced += "&zoom=2"
-        } else {
-            enhanced += "?zoom=2"
-        }
-        
-        // Also remove edge curl parameter if present (makes covers look cleaner)
-        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
-        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
-        
-        return enhanced
+        return URL(string: enhanced)
     }
     
     var body: some View {
         ZStack {
-            // Background placeholder
+            // Lightweight placeholder
             RoundedRectangle(cornerRadius: 8)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.3, green: 0.3, blue: 0.35),
-                            Color(red: 0.25, green: 0.25, blue: 0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
             
-            if let coverURL = coverURL,
-               !coverURL.isEmpty {
-                let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
-                if let url = URL(string: enhancedURL.replacingOccurrences(of: "http://", with: "https://").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? enhancedURL) {
-                AsyncImage(url: url) { phase in
+            if let url = imageURL {
+                AsyncImage(url: url, scale: 2) { phase in
                     switch phase {
                     case .empty:
-                        // Loading state with shimmer
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
-                            .overlay {
-                                ShimmerView()
-                            }
+                        // Minimal loading state
+                        if !isImageLoaded {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .tint(.white.opacity(0.5))
+                        }
                     case .success(let image):
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 170, height: 255)
                             .clipped()
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                            .onAppear {
-                                withAnimation(.easeOut(duration: 0.3)) {
-                                    isLoading = false
-                                }
-                            }
-                    case .failure(let error):
-                        // Error state - show book icon
-                        VStack(spacing: 12) {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 50))
-                                .foregroundStyle(.white.opacity(0.3))
-                            
-                            Text("Cover Unavailable")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.3))
-                        }
-                        .onAppear {
-                            print("📚 DEBUG: Cover failed to load: \(error.localizedDescription)")
-                        }
+                            .onAppear { isImageLoaded = true }
+                    case .failure:
+                        // Simple failure state
+                        Image(systemName: "book.closed.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.white.opacity(0.2))
                     @unknown default:
                         EmptyView()
                     }
                 }
-                }
             } else {
-                // No cover URL available - show placeholder
-                VStack(spacing: 12) {
-                    Image(systemName: "book.closed.fill")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.white.opacity(0.3))
-                    
-                    Text("No Cover")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.3))
-                }
-                .onAppear {
-                    print("📚 DEBUG: No cover URL available - coverURL: \(coverURL ?? "nil")")
-                }
-            }
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.3)) {
-                isLoading = false
+                // No cover URL
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.white.opacity(0.2))
             }
         }
         .frame(width: 170, height: 255)
@@ -397,35 +341,6 @@ struct BookCoverView: View {
     }
 }
 
-// MARK: - Shimmer View
-struct ShimmerView: View {
-    @State private var phase: CGFloat = -1.0
-    
-    var body: some View {
-        GeometryReader { geometry in
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .white.opacity(0.3), location: 0.5),
-                    .init(color: .clear, location: 1)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(width: geometry.size.width * 3)
-            .offset(x: geometry.size.width * phase)
-            .onAppear {
-                withAnimation(
-                    .linear(duration: 1.5)
-                    .repeatForever(autoreverses: false)
-                ) {
-                    phase = 1
-                }
-            }
-        }
-        .mask(RoundedRectangle(cornerRadius: 8))
-    }
-}
 
 // MARK: - Placeholder Views
 // NotesView moved to NotesView.swift
@@ -730,97 +645,6 @@ struct LibraryBookListItem: View {
     }
 }
 
-// MARK: - Wood Grain Overlay
-struct WoodGrainOverlay: View {
-    var body: some View {
-        GeometryReader { geometry in
-            Canvas { context, size in
-                // Create subtle wood grain pattern
-                for i in 0..<50 {
-                    let y = CGFloat(i) * size.height / 50
-                    let path = Path { path in
-                        path.move(to: CGPoint(x: 0, y: y))
-                        
-                        // Create organic wood grain lines
-                        for x in stride(from: 0, to: size.width, by: 10) {
-                            let variation = sin(x / 100 + Double(i)) * 2
-                            path.addLine(to: CGPoint(x: x, y: y + variation))
-                        }
-                    }
-                    
-                    context.stroke(
-                        path,
-                        with: .color(Color(red: 0.2, green: 0.19, blue: 0.18).opacity(0.03)),
-                        lineWidth: 0.5
-                    )
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Minimal Particle System
-struct MinimalParticleSystem: View {
-    @State private var particles: [Particle] = []
-    
-    struct Particle: Identifiable {
-        let id = UUID()
-        var position: CGPoint
-        var velocity: CGVector
-        var opacity: Double
-        var scale: CGFloat
-    }
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ForEach(particles) { particle in
-                Circle()
-                    .fill(Color(red: 0.83, green: 0.65, blue: 0.45)) // Soft amber
-                    .frame(width: 4 * particle.scale, height: 4 * particle.scale)
-                    .opacity(particle.opacity)
-                    .position(particle.position)
-                    .blur(radius: 2)
-            }
-            .onAppear {
-                // Create 8 particles
-                for _ in 0..<8 {
-                    particles.append(Particle(
-                        position: CGPoint(
-                            x: CGFloat.random(in: 0...geometry.size.width),
-                            y: CGFloat.random(in: 0...geometry.size.height)
-                        ),
-                        velocity: CGVector(
-                            dx: CGFloat.random(in: -0.5...0.5),
-                            dy: CGFloat.random(in: -0.3...(-0.1))
-                        ),
-                        opacity: Double.random(in: 0.2...0.4),
-                        scale: CGFloat.random(in: 0.8...1.2)
-                    ))
-                }
-                
-                // Animate particles
-                Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-                    for i in particles.indices {
-                        particles[i].position.x += particles[i].velocity.dx
-                        particles[i].position.y += particles[i].velocity.dy
-                        
-                        // Wrap around
-                        if particles[i].position.y < -10.0 {
-                            particles[i].position.y = geometry.size.height + 10
-                            particles[i].position.x = CGFloat.random(in: 0...geometry.size.width)
-                        }
-                        
-                        if particles[i].position.x < -10.0 {
-                            particles[i].position.x = geometry.size.width + 10
-                        } else if particles[i].position.x > geometry.size.width + 10 {
-                            particles[i].position.x = -10.0
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 // MARK: - Library View Model
 @MainActor
 class LibraryViewModel: ObservableObject {

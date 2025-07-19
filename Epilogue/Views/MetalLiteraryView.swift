@@ -14,11 +14,12 @@ struct MetalLiteraryView: UIViewRepresentable {
         
         mtkView.device = device
         mtkView.delegate = context.coordinator
-        mtkView.preferredFramesPerSecond = 60
-        mtkView.enableSetNeedsDisplay = false
-        mtkView.framebufferOnly = false
+        mtkView.preferredFramesPerSecond = 30 // Reduce from 60 for battery life
+        mtkView.enableSetNeedsDisplay = true // Only redraw when needed
+        mtkView.framebufferOnly = true // Optimize for display only
         mtkView.isPaused = false
         mtkView.colorPixelFormat = .bgra8Unorm
+        mtkView.clearColor = MTLClearColor(red: 0.11, green: 0.105, blue: 0.102, alpha: 1.0)
         
         // Setup Metal after view is configured
         DispatchQueue.main.async {
@@ -141,7 +142,7 @@ struct MetalLiteraryView: UIViewRepresentable {
             guard let drawable = view.currentDrawable,
                   let commandBuffer = commandQueue.makeCommandBuffer() else { return }
             
-            time += 0.016  // ~60fps
+            time += 0.033  // ~30fps to match reduced frame rate
             
             // Render pass
             let renderPassDescriptor = MTLRenderPassDescriptor()

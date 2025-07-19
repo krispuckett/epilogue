@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
 import Combine
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 struct ChatConversationView: View {
     let thread: ChatThread
     @Binding var showingThreadList: Bool
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
     
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
@@ -22,28 +25,89 @@ struct ChatConversationView: View {
     
     @State private var showingClearConfirmation = false
     
+    // Book cover color extraction
+    @State private var dominantColor: Color = Color(red: 0.11, green: 0.105, blue: 0.102)
+    @State private var secondaryColor: Color = Color(red: 0.15, green: 0.14, blue: 0.135)
+    
+    // Computed property for the accent color to use
+    private var accentColor: Color {
+        // Check if dominant color is too dark (near black)
+        let uiColor = UIColor(dominantColor)
+        var brightness: CGFloat = 0
+        uiColor.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
+        
+        // If too dark, use secondary color or fallback
+        if brightness < 0.3 {
+            return secondaryColor != Color(red: 0.15, green: 0.14, blue: 0.135) ? secondaryColor : Color(red: 1.0, green: 0.55, blue: 0.26)
+        }
+        return dominantColor
+    }
+    
+    // Try to get cover URL from thread or find matching book in library
+    private var effectiveCoverURL: String? {
+        if let url = thread.bookCoverURL {
+            return url
+        }
+        
+        // Fallback: try to find book in library by ID or title
+        if let bookId = thread.bookId,
+           let book = libraryViewModel.books.first(where: { $0.localId == bookId }) {
+            return book.coverImageURL
+        } else if let title = thread.bookTitle,
+                  let book = libraryViewModel.books.first(where: { $0.title == title }) {
+            return book.coverImageURL
+        }
+        
+        return nil
+    }
+    
     var body: some View {
         ZStack {
-            // Ambient background
-            AmbientBackground(animationPhase: $animationPhase, orbPositions: $orbPositions)
+            // Book-themed background with extracted colors
+            if thread.bookId != nil {
+                BookChatBackground(
+                    dominantColor: dominantColor,
+                    secondaryColor: secondaryColor,
+                    animationPhase: $animationPhase
+                )
+            } else {
+                // General discussion background
+                AmbientBackground(animationPhase: $animationPhase, orbPositions: $orbPositions)
+            }
             
-            // Messages ScrollView
+            // Messages ScrollView with padding for header
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Thread start indicator - minimal
-                        Text("Conversation started \(thread.createdDate.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .multilineTextAlignment(.center)
-                            .padding(.vertical, 20)
-                            .frame(maxWidth: .infinity) // Ensure full width for proper centering
+                        // Thread start indicator - with clear chat on long press
+                        VStack(spacing: 4) {
+                            Text("Conversation started \(thread.createdDate.formatted(date: .abbreviated, time: .omitted))")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.4))
+                            
+                            if thread.messages.count > 2 {
+                                Text("Hold to clear")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.2))
+                            }
+                        }
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture(minimumDuration: 1.5, maximumDistance: .infinity) {
+                            HapticManager.shared.mediumImpact()
+                            showingClearConfirmation = true
+                        } onPressingChanged: { _ in
+                            // Empty to prevent visual feedback
+                        }
                         
                         // Messages
                         ForEach(thread.messages) { message in
                             ThreadMessageCard(
                                 message: message,
-                                namespace: animation
+                                namespace: animation,
+                                accentColor: thread.bookId != nil ? accentColor : Color(red: 1.0, green: 0.55, blue: 0.26)
                             )
                             .transition(.asymmetric(
                                 insertion: .scale(scale: 0.95, anchor: message.isUser ? .bottomTrailing : .bottomLeading)
@@ -59,6 +123,7 @@ struct ChatConversationView: View {
                             .id("bottom")
                     }
                     .padding(.horizontal, 16)
+                    .padding(.top, 60) // Space for custom header
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: thread.messages.count) { _, _ in
@@ -67,41 +132,30 @@ struct ChatConversationView: View {
                     }
                 }
             }
+            
+            // Custom header overlay
+            VStack {
+                CustomChatHeader(
+                    title: thread.bookTitle ?? "General Discussion",
+                    onBack: { showingThreadList = true },
+                    onClear: { showingClearConfirmation = true },
+                    accentColor: thread.bookId != nil ? accentColor : Color(red: 1.0, green: 0.55, blue: 0.26)
+                )
+                Spacer()
+            }
         }
         .safeAreaInset(edge: .bottom) {
             ThreadInputField(
                 text: $messageText,
                 thread: thread,
                 isInputFocused: $isInputFocused,
-                onSend: sendMessage
+                onSend: sendMessage,
+                accentColor: thread.bookId != nil ? accentColor : Color(red: 1.0, green: 0.55, blue: 0.26)
             )
             .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
         }
-        .navigationTitle(thread.bookTitle ?? "General Discussion")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Chats") {
-                    showingThreadList = true
-                }
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-            }
-            
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(role: .destructive) {
-                        showingClearConfirmation = true
-                    } label: {
-                        Label("Clear Chat", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-            }
-        }
+        .navigationBarHidden(true)
         .alert("Clear all messages?", isPresented: $showingClearConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Clear Chat", role: .destructive) {
@@ -112,6 +166,20 @@ struct ChatConversationView: View {
         }
         .onAppear {
             startAmbientAnimation()
+            extractBookCoverColors()
+            // Limit messages to prevent memory issues
+            if thread.messages.count > 100 {
+                // Keep only the last 50 messages
+                let messagesToKeep = Array(thread.messages.suffix(50))
+                thread.messages = messagesToKeep
+            }
+        }
+        .onDisappear {
+            // Additional cleanup on disappear
+            if thread.messages.count > 50 {
+                let messagesToKeep = Array(thread.messages.suffix(50))
+                thread.messages = messagesToKeep
+            }
         }
     }
     
@@ -207,6 +275,133 @@ struct ChatConversationView: View {
         }
     }
     
+    private func extractBookCoverColors() {
+        guard let coverURL = effectiveCoverURL else { return }
+        
+        // Enhance URL for better quality
+        var enhanced = coverURL.replacingOccurrences(of: "http://", with: "https://")
+        if !enhanced.contains("zoom=") {
+            enhanced += enhanced.contains("?") ? "&zoom=2" : "?zoom=2"
+        }
+        
+        guard let url = URL(string: enhanced) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data = data, let uiImage = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    self.extractColors(from: uiImage)
+                }
+            }
+        }.resume()
+    }
+    
+    private func extractColors(from image: UIImage) {
+        guard let ciImage = CIImage(image: image) else { return }
+        
+        let context = CIContext()
+        let size = CGSize(width: 50, height: 50)
+        
+        // Scale down for performance
+        let scaleFilter = CIFilter.lanczosScaleTransform()
+        scaleFilter.inputImage = ciImage
+        scaleFilter.scale = Float(size.width / ciImage.extent.width)
+        
+        guard let outputImage = scaleFilter.outputImage else { return }
+        
+        // Extract colors
+        let extent = outputImage.extent
+        let bitmap = context.createCGImage(outputImage, from: extent)
+        
+        guard let cgImage = bitmap else { return }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        let bitsPerComponent = 8
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        
+        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        
+        let bitmapContext = CGContext(
+            data: &pixelData,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        
+        bitmapContext?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        // Collect all colors with their frequencies
+        var colorCounts: [UIColor: Int] = [:]
+        
+        for y in 0..<height {
+            for x in 0..<width {
+                let index = ((width * y) + x) * bytesPerPixel
+                let r = CGFloat(pixelData[index]) / 255.0
+                let g = CGFloat(pixelData[index + 1]) / 255.0
+                let b = CGFloat(pixelData[index + 2]) / 255.0
+                
+                // Quantize colors to reduce variations
+                let quantizedR = round(r * 10) / 10
+                let quantizedG = round(g * 10) / 10
+                let quantizedB = round(b * 10) / 10
+                
+                let color = UIColor(red: quantizedR, green: quantizedG, blue: quantizedB, alpha: 1.0)
+                colorCounts[color, default: 0] += 1
+            }
+        }
+        
+        // Sort colors by frequency and filter out very dark/light colors
+        let sortedColors = colorCounts.sorted { $0.value > $1.value }
+            .compactMap { (color, _) -> (UIColor, CGFloat, CGFloat, CGFloat)? in
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                
+                // Filter out very dark, very light, or desaturated colors
+                if b > 0.2 && b < 0.95 && s > 0.2 {
+                    return (color, h, s, b)
+                }
+                return nil
+            }
+        
+        // Get primary and secondary colors
+        if let firstColor = sortedColors.first {
+            let (_, h1, s1, b1) = firstColor
+            
+            // Boost saturation for primary color
+            let boostedS1 = min(s1 * 1.5, 1.0)
+            let boostedB1 = min(b1 * 1.3, 0.85)
+            
+            withAnimation(.easeInOut(duration: 0.8)) {
+                dominantColor = Color(hue: Double(h1), saturation: Double(boostedS1), brightness: Double(boostedB1))
+            }
+            
+            // Look for a contrasting secondary color
+            if sortedColors.count > 1 {
+                // Find a color with different hue
+                for i in 1..<min(sortedColors.count, 10) {
+                    let (_, h2, s2, b2) = sortedColors[i]
+                    let hueDiff = abs(h1 - h2)
+                    
+                    // If hue is different enough (at least 30 degrees on color wheel)
+                    if hueDiff > 0.083 && hueDiff < 0.917 { // 30/360 and not opposite
+                        let boostedS2 = min(s2 * 1.4, 1.0)
+                        let boostedB2 = min(b2 * 1.2, 0.8)
+                        
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            secondaryColor = Color(hue: Double(h2), saturation: Double(boostedS2), brightness: Double(boostedB2))
+                        }
+                        break
+                    }
+                }
+            }
+        }
+    }
+    
     private func generateLiteraryResponse(to message: String) -> String {
         if thread.bookId == nil {
             // General chat responses
@@ -236,6 +431,7 @@ struct ChatConversationView: View {
 struct ThreadMessageCard: View {
     let message: ThreadedChatMessage
     let namespace: Namespace.ID
+    let accentColor: Color
     @State private var isRevealed = false
     @State private var glowOpacity: Double = 0
     
@@ -260,7 +456,7 @@ struct ThreadMessageCard: View {
                         HStack(spacing: 4) {
                             ForEach(0..<3) { index in
                                 Circle()
-                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                    .fill(accentColor)
                                     .frame(width: 6, height: 6)
                                     .opacity(isRevealed ? 1.0 : 0.3)
                                     .animation(
@@ -304,7 +500,7 @@ struct ThreadMessageCard: View {
                 .overlay {
                     // New message glow
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(glowOpacity), lineWidth: 2)
+                        .stroke(accentColor.opacity(glowOpacity), lineWidth: 2)
                         .blur(radius: 4)
                 }
             }
@@ -326,121 +522,278 @@ struct ThreadInputField: View {
     let thread: ChatThread
     @FocusState.Binding var isInputFocused: Bool
     let onSend: () -> Void
+    let accentColor: Color
     
     @State private var showSuggestions = false
     
     var body: some View {
         VStack(spacing: 8) {
-            // Suggestions (appear above input when focused)
-            if showSuggestions && isInputFocused {
-                ThreadSmartSuggestions(thread: thread)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            // Suggestions (appear above input when plus button is tapped)
+            if showSuggestions {
+                ThreadSmartSuggestions(thread: thread, onSelectSuggestion: { suggestion in
+                    text = suggestion
+                    showSuggestions = false
+                })
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             
-            // Input field
-            HStack(spacing: 12) {
-                // Question icon (similar to command palette)
-                Image(systemName: "questionmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                
-                // Text editor
-                ZStack(alignment: .leading) {
-                    if text.isEmpty {
-                        Text(thread.bookId == nil ? "Ask about books..." : "Discuss \(thread.bookTitle ?? "this book")...")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.horizontal, 4)
+            // Input field - iMessage style
+            HStack(spacing: 8) {
+                // Plus button (left side)
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showSuggestions.toggle()
                     }
-                    
-                    TextEditor(text: $text)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .scrollContentBackground(.hidden)
-                        .focused($isInputFocused)
-                        .frame(height: 32) // Fixed initial height
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 4)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: 36, height: 36)
+                        .glassEffect(.regular.tint(Color.white.opacity(0.1)), in: Circle())
                 }
                 
-                // Send button
+                // Input field container with glass effect
+                HStack(spacing: 0) {
+                    // Question mark icon
+                    Image(systemName: "questionmark.circle.fill")
+                        .foregroundStyle(accentColor)
+                        .font(.system(size: 20, weight: .medium))
+                        .padding(.leading, 12)
+                        .padding(.trailing, 8)
+                    
+                    // Text field
+                    ZStack(alignment: .leading) {
+                        if text.isEmpty {
+                            Text(thread.bookId == nil ? "Ask about books..." : "Discuss \(thread.bookTitle ?? "this book")...")
+                                .foregroundColor(.white.opacity(0.5))
+                                .font(.system(size: 16))
+                        }
+                        
+                        TextField("", text: $text, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                            .focused($isInputFocused)
+                            .lineLimit(1...5)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .submitLabel(.send)
+                            .onSubmit {
+                                onSend()
+                            }
+                            .onChange(of: text) { _, newValue in
+                                // Hide suggestions when user starts typing
+                                if !newValue.isEmpty && showSuggestions {
+                                    showSuggestions = false
+                                }
+                            }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .padding(.trailing, 12)
+                }
+                .frame(minHeight: 36)
+                .glassEffect(.regular.tint(accentColor.opacity(0.15)), in: RoundedRectangle(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    accentColor.opacity(0.3),
+                                    accentColor.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                
+                // Send button (appears when there's text)
                 if !text.isEmpty {
                     Button(action: onSend) {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .font(.system(size: 32))
+                            .foregroundStyle(.white, accentColor)
                     }
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 56) // Consistent height with ChatInputBar
-            .padding(.vertical, 12)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 20))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+            .padding(.bottom, 8)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: text.isEmpty)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSuggestions)
-        .onChange(of: isInputFocused) { _, newValue in
-            withAnimation {
-                showSuggestions = newValue && text.isEmpty
-            }
-        }
-        .onChange(of: text) { _, _ in
-            withAnimation {
-                showSuggestions = isInputFocused && text.isEmpty
-            }
-        }
     }
 }
 
 // MARK: - Thread Smart Suggestions
 struct ThreadSmartSuggestions: View {
     let thread: ChatThread
+    let onSelectSuggestion: (String) -> Void
     
-    var suggestions: [String] {
+    var suggestions: [(String, String, String)] {
         if thread.bookId == nil {
             return [
-                "What should I read next?",
-                "Recommend books like Harry Potter",
-                "Tell me about classic literature",
-                "What are the best sci-fi novels?"
+                ("Next Read", "book", "What should I read next?"),
+                ("Similar", "books.vertical", "Recommend books like Harry Potter"),
+                ("Classics", "text.book.closed", "Tell me about classic literature"),
+                ("Sci-Fi", "sparkles", "What are the best sci-fi novels?")
             ]
         } else {
             return [
-                "What are the main themes?",
-                "Analyze the protagonist",
-                "Discuss the ending",
-                "Compare to similar books"
+                ("Themes", "lightbulb", "What are the main themes?"),
+                ("Character", "person.text.rectangle", "Analyze the protagonist"),
+                ("Ending", "text.alignright", "Discuss the ending"),
+                ("Compare", "books.vertical", "Compare to similar books")
             ]
         }
     }
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(suggestions, id: \.self) { suggestion in
-                    Button(action: {
-                        // Handle suggestion tap
-                    }) {
-                        Text(suggestion)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-                            }
+            HStack(spacing: 10) {
+                ForEach(suggestions, id: \.2) { (title, icon, suggestion) in
+                    Button {
+                        onSelectSuggestion(suggestion)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: icon)
+                                .font(.system(size: 14, weight: .medium))
+                            Text(title)
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .glassEffect(.regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3)), in: RoundedRectangle(cornerRadius: 16))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5),
+                                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        }
+                        .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), radius: 8, y: 4)
                     }
                 }
             }
             .padding(.horizontal, 16)
+        }
+        .frame(height: 40)
+        .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Custom Chat Header
+struct CustomChatHeader: View {
+    let title: String
+    let onBack: () -> Void
+    let onClear: () -> Void
+    let accentColor: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Back button
+            Button(action: onBack) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .medium))
+                    Text("Chats")
+                        .font(.system(size: 16, weight: .medium))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+            .glassEffect(.clear.tint(accentColor.opacity(0.2)), in: RoundedRectangle(cornerRadius: 16))
+            
+            // Title with proper spacing and wrapping
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2) // Allow up to 2 lines
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .padding(.trailing, 100) // Add padding to balance the back button width
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Book Chat Background
+struct BookChatBackground: View {
+    let dominantColor: Color
+    let secondaryColor: Color
+    @Binding var animationPhase: Double
+    
+    var body: some View {
+        ZStack {
+            // Base midnight scholar background
+            Color(red: 0.11, green: 0.105, blue: 0.102)
+                .ignoresSafeArea()
+            
+            // Ambient gradient background from book colors (matching BookDetailView)
+            LinearGradient(
+                colors: [
+                    dominantColor.opacity(0.4),
+                    secondaryColor.opacity(0.3),
+                    dominantColor.opacity(0.2),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            // Radial glow at the top with secondary color accent
+            RadialGradient(
+                colors: [
+                    secondaryColor == .clear ? dominantColor.opacity(0.3) : secondaryColor.opacity(0.4),
+                    dominantColor.opacity(0.2),
+                    Color.clear
+                ],
+                center: .top,
+                startRadius: 50,
+                endRadius: 300
+            )
+            .ignoresSafeArea()
+            .blendMode(.plusLighter)
+            
+            // Subtle animated glow orbs
+            ForEach(0..<2) { index in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                index == 0 ? dominantColor.opacity(0.2) : secondaryColor.opacity(0.2),
+                                Color.clear
+                            ]),
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 50)
+                    .offset(
+                        x: sin(animationPhase + Double(index) * .pi) * 80,
+                        y: cos(animationPhase + Double(index) * .pi) * 120
+                    )
+                    .opacity(0.6)
+            }
         }
     }
 }

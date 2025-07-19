@@ -701,7 +701,7 @@ struct UniversalCommandBar: View {
         }
         */
         .sheet(isPresented: $showQuoteComposer) {
-            EditNoteSheet(
+            LiquidEditSheet(
                 note: Note(
                     type: .quote,
                     content: quoteComposerText,
@@ -721,9 +721,12 @@ struct UniversalCommandBar: View {
                     quoteComposerText = ""
                     
                     HapticManager.shared.success()
+                },
+                onDismiss: {
+                    showQuoteComposer = false
                 }
             )
-            .presentationBackground(.regularMaterial)
+            .presentationBackground(Color(red: 0.11, green: 0.105, blue: 0.102))
         }
     }
     

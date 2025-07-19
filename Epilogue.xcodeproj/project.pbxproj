@@ -8,14 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C32E2491BD00E04A55 /* NotesView.swift */; };
+		F7802A44A6D54149A56326BD /* NoteCardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */; };
 		01BC21C62E25806C00E04A55 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C52E25806C00E04A55 /* BookDetailView.swift */; };
 		01BC21C82E260B8A00E04A55 /* EditBookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */; };
-		01BC21CF2E26AB3E00E04A55 /* GlassMaterialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21CB2E26AB3E00E04A55 /* GlassMaterialization.swift */; };
 		01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */; };
 		01BC21D42E27566800E04A55 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21D32E27566800E04A55 /* ChatView.swift */; };
 		01BC21D72E275A6800E04A55 /* PerplexityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21D62E275A6800E04A55 /* PerplexityService.swift */; };
 		01BC21D82E275A6900E04A55 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21D92E275A6900E04A55 /* MarkdownText.swift */; };
-		01BC21DA2E275A6A00E04A55 /* AmbientLiteraryBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */; };
 		01BC21DC2E28371900E04A55 /* MetalLiteraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */; };
 		01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */; };
 		01BC21E42E2931C100E04A55 /* ChatThreadListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21E32E2931C100E04A55 /* ChatThreadListView.swift */; };
@@ -25,7 +24,11 @@
 		01BC21EB2E294D7600E04A55 /* BookPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */; };
 		01BC21ED2E29533C00E04A55 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */; };
 		01BC21F42E295D8900E04A55 /* BookContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F52E295D8900E04A55 /* BookContextMenu.swift */; };
+		01BC21F52E2A0E1A00E04A55 /* GlassButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F42E2A0E1A00E04A55 /* GlassButton.swift */; };
 		01BC21F62E295E8900E04A55 /* NoteContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */; };
+		01BC21F72E2A0E3800E04A55 /* QuickSuggestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F62E2A0E3800E04A55 /* QuickSuggestionsView.swift */; };
+		01BC21F82E295F8900E04A55 /* InteractiveChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */; };
+		01BC21FA2E295F9900E04A55 /* SharedBookCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */; };
 		2B1234561234567890123456 /* EpilogueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234551234567890123456 /* EpilogueApp.swift */; };
 		2B1234581234567890123456 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234571234567890123456 /* ContentView.swift */; };
 		2B12345A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B1234591234567890123456 /* Assets.xcassets */; };
@@ -43,10 +46,7 @@
 		2B1234981234567890123456 /* UniversalCommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234991234567890123456 /* UniversalCommandBar.swift */; };
 		2B12349B1234567890123456 /* CommandSuggestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B12349C1234567890123456 /* CommandSuggestionsView.swift */; };
 		2B12349D1234567890123456 /* GoogleBooksAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B12349E1234567890123456 /* GoogleBooksAPI.swift */; };
-		39CF5568A7D14D8682126B61 /* GlassEditNoteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC479BA9510B431F97969E53 /* GlassEditNoteSheet.swift */; };
-		8343304CC97A4B7B82B14E17 /* NotesSearchPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A6069AA8F84A2D8E73EDEE /* NotesSearchPalette.swift */; };
 		87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* GlassOptionsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* GlassOptionsMenu.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,15 +68,14 @@
 
 /* Begin PBXFileReference section */
 		01BC21C32E2491BD00E04A55 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
+		AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCardComponents.swift; sourceTree = "<group>"; };
 		01BC21C52E25806C00E04A55 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditBookSheet.swift; sourceTree = "<group>"; };
-		01BC21CB2E26AB3E00E04A55 /* GlassMaterialization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassMaterialization.swift; sourceTree = "<group>"; };
 		01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidCommandPalette.swift; sourceTree = "<group>"; };
 		01BC21D32E27566800E04A55 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		01BC21D52E2759D200E04A55 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		01BC21D62E275A6800E04A55 /* PerplexityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerplexityService.swift; sourceTree = "<group>"; };
 		01BC21D92E275A6900E04A55 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
-		01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLiteraryBackground.swift; sourceTree = "<group>"; };
 		01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalLiteraryView.swift; sourceTree = "<group>"; };
 		01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; name = LiteraryCompanion.metal; path = Epilogue/Shaders/LiteraryCompanion.metal; sourceTree = SOURCE_ROOT; };
 		01BC21E22E2931C100E04A55 /* ChatConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatConversationView.swift; sourceTree = "<group>"; };
@@ -85,8 +84,12 @@
 		01BC21E82E2949B300E04A55 /* AmbientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBackground.swift; sourceTree = "<group>"; };
 		01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookPickerSheet.swift; sourceTree = "<group>"; };
 		01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputBar.swift; sourceTree = "<group>"; };
+		01BC21F42E2A0E1A00E04A55 /* GlassButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassButton.swift; sourceTree = "<group>"; };
 		01BC21F52E295D8900E04A55 /* BookContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookContextMenu.swift; sourceTree = "<group>"; };
+		01BC21F62E2A0E3800E04A55 /* QuickSuggestionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickSuggestionsView.swift; sourceTree = "<group>"; };
 		01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteContextMenu.swift; sourceTree = "<group>"; };
+		01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveChatInputBar.swift; sourceTree = "<group>"; };
+		01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedBookCoverView.swift; sourceTree = "<group>"; };
 		2B1234521234567890123456 /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B1234551234567890123456 /* EpilogueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpilogueApp.swift; sourceTree = "<group>"; };
 		2B1234571234567890123456 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -109,9 +112,6 @@
 		2B12349C1234567890123456 /* CommandSuggestionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandSuggestionsView.swift; sourceTree = "<group>"; };
 		2B12349E1234567890123456 /* GoogleBooksAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleBooksAPI.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidEditSheet.swift; sourceTree = "<group>"; };
-		AC479BA9510B431F97969E53 /* GlassEditNoteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassEditNoteSheet.swift; sourceTree = "<group>"; };
-		C9A6069AA8F84A2D8E73EDEE /* NotesSearchPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSearchPalette.swift; sourceTree = "<group>"; };
-		F2E1D0C9B8A7F6E5D4C3B2A1 /* GlassOptionsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassOptionsMenu.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -212,9 +212,13 @@
 		2B1234831234567890123456 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				01BC21F62E2A0E3800E04A55 /* QuickSuggestionsView.swift */,
+				01BC21F42E2A0E1A00E04A55 /* GlassButton.swift */,
 				01BC21F52E295D8900E04A55 /* BookContextMenu.swift */,
 				01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */,
 				01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */,
+				01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */,
+				01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */,
 				01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */,
 				01BC21E82E2949B300E04A55 /* AmbientBackground.swift */,
 				01BC21E22E2931C100E04A55 /* ChatConversationView.swift */,
@@ -222,17 +226,13 @@
 				01BC21DB2E28371900E04A55 /* MetalLiteraryView.swift */,
 				01BC21D62E275A6800E04A55 /* PerplexityService.swift */,
 				01BC21D92E275A6900E04A55 /* MarkdownText.swift */,
-				01BC21DB2E275A6A00E04A55 /* AmbientLiteraryBackground.swift */,
 				01BC21D32E27566800E04A55 /* ChatView.swift */,
-				01BC21CB2E26AB3E00E04A55 /* GlassMaterialization.swift */,
 				01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */,
-				AC479BA9510B431F97969E53 /* GlassEditNoteSheet.swift */,
-				C9A6069AA8F84A2D8E73EDEE /* NotesSearchPalette.swift */,
-				F2E1D0C9B8A7F6E5D4C3B2A1 /* GlassOptionsMenu.swift */,
 				A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */,
 				01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */,
 				01BC21C52E25806C00E04A55 /* BookDetailView.swift */,
 				01BC21C32E2491BD00E04A55 /* NotesView.swift */,
+				AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */,
 				2B1234991234567890123456 /* UniversalCommandBar.swift */,
 				2B12349C1234567890123456 /* CommandSuggestionsView.swift */,
 				2B1234911234567890123456 /* LibraryView.swift */,
@@ -384,39 +384,38 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01BC21CF2E26AB3E00E04A55 /* GlassMaterialization.swift in Sources */,
 				01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */,
 				01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */,
-				39CF5568A7D14D8682126B61 /* GlassEditNoteSheet.swift in Sources */,
 				01BC21F42E295D8900E04A55 /* BookContextMenu.swift in Sources */,
 				01BC21F62E295E8900E04A55 /* NoteContextMenu.swift in Sources */,
-				8343304CC97A4B7B82B14E17 /* NotesSearchPalette.swift in Sources */,
 				01BC21E92E2949B300E04A55 /* AmbientBackground.swift in Sources */,
 				01BC21E42E2931C100E04A55 /* ChatThreadListView.swift in Sources */,
 				01BC21E52E2931C100E04A55 /* ChatConversationView.swift in Sources */,
 				01BC21D42E27566800E04A55 /* ChatView.swift in Sources */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* GlassOptionsMenu.swift in Sources */,
 				01BC21DC2E28371900E04A55 /* MetalLiteraryView.swift in Sources */,
 				87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */,
 				2B1234581234567890123456 /* ContentView.swift in Sources */,
 				2B1234561234567890123456 /* EpilogueApp.swift in Sources */,
 				2B12348C1234567890123456 /* Typography.swift in Sources */,
 				2B1234961234567890123456 /* CommandIntent.swift in Sources */,
+				01BC21F52E2A0E1A00E04A55 /* GlassButton.swift in Sources */,
 				01BC21D72E275A6800E04A55 /* PerplexityService.swift in Sources */,
-				01BC21F32E295BEF00E04A55 /* GlassPopover.swift in Sources */,
 				01BC21D82E275A6900E04A55 /* MarkdownText.swift in Sources */,
 				01BC21EB2E294D7600E04A55 /* BookPickerSheet.swift in Sources */,
-				01BC21DA2E275A6A00E04A55 /* AmbientLiteraryBackground.swift in Sources */,
 				2B1234981234567890123456 /* UniversalCommandBar.swift in Sources */,
 				2B12349B1234567890123456 /* CommandSuggestionsView.swift in Sources */,
 				01BC21C62E25806C00E04A55 /* BookDetailView.swift in Sources */,
 				2B1234901234567890123456 /* LibraryView.swift in Sources */,
 				01BC21C82E260B8A00E04A55 /* EditBookSheet.swift in Sources */,
 				01BC21ED2E29533C00E04A55 /* ChatInputBar.swift in Sources */,
+				01BC21F82E295F8900E04A55 /* InteractiveChatInputBar.swift in Sources */,
+				01BC21FA2E295F9900E04A55 /* SharedBookCoverView.swift in Sources */,
 				2B1234921234567890123456 /* QuickCaptureSheet.swift in Sources */,
 				2B1234941234567890123456 /* BookSearchSheet.swift in Sources */,
 				01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */,
+				F7802A44A6D54149A56326BD /* NoteCardComponents.swift in Sources */,
 				2B12348E1234567890123456 /* MainNavigationView.swift in Sources */,
+				01BC21F72E2A0E3800E04A55 /* QuickSuggestionsView.swift in Sources */,
 				2B12348A1234567890123456 /* GlassBlurTest.swift in Sources */,
 				2B12349D1234567890123456 /* GoogleBooksAPI.swift in Sources */,
 				01BC21E72E29362300E04A55 /* ChatThread.swift in Sources */,

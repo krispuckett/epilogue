@@ -5,14 +5,26 @@ struct LiquidCommandPalette: View {
     @State private var commandText = ""
     @State private var detectedIntent: CommandIntent = .unknown
     @FocusState private var isFocused: Bool
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @State private var showQuickSuggestions = false
+    @State private var pillOpacities: [Double] = [0, 0, 0, 0]
+    @State private var pillScales: [CGFloat] = [0.8, 0.8, 0.8, 0.8]
     @State private var currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26) // Amber initial
     @State private var isAnimating = false
     @State private var showBookSearch = false
+    @State private var textEditorHeight: CGFloat = 36
+    
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @EnvironmentObject var notesViewModel: NotesViewModel
     
     // Animation namespace for matched geometry
     var animationNamespace: Namespace.ID
+    
+    let suggestions = [
+        ("Note", "note: ", "Add a quick thought"),
+        ("Quote", "\"", "Save a memorable quote"),
+        ("Book", "add book ", "Add to your library"),
+        ("Search", "search ", "Find in your library")
+    ]
     
     // Optional initial content for editing
     let initialContent: String?
@@ -33,9 +45,9 @@ struct LiquidCommandPalette: View {
     
     var body: some View {
         ZStack {
-            // Semi-transparent backdrop
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
+            // Invisible backdrop to catch taps
+            Color.clear
+                .contentShape(Rectangle())
                 .onTapGesture {
                     dismissPalette()
                 }
@@ -43,101 +55,189 @@ struct LiquidCommandPalette: View {
             VStack {
                 Spacer()
                 
-                // Compact glass container
-                VStack(spacing: 12) {
-                    // Drag indicator
-                    Capsule()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 36, height: 5)
-                        .padding(.top, 8)
-                    
-                    // Compact input field
-                    HStack(spacing: 10) {
-                        Image(systemName: detectedIntent.icon)
-                            .foregroundStyle(currentGlowColor)
-                            .font(.system(size: 16, weight: .medium))
-                        
-                        TextField(editingNote != nil ? "Edit your note..." : "What's on your mind?", text: $commandText, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white)
-                            .focused($isFocused)
-                            .lineLimit(1...3)  // Allow expansion up to 3 lines
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()  // Prevent smart quote conversion
-                            .submitLabel(.done)
-                            .onChange(of: commandText) { _, newValue in
-                                // Normalize smart quotes to regular quotes
-                                let normalizedText = newValue
-                                    .replacingOccurrences(of: "\u{201C}", with: "\"")
-                                    .replacingOccurrences(of: "\u{201D}", with: "\"")
-                                    .replacingOccurrences(of: "\u{2018}", with: "'")
-                                    .replacingOccurrences(of: "\u{2019}", with: "'")
-                                
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    detectedIntent = CommandParser.parse(normalizedText)
-                                    updateGlowColor()
+                // Quick suggestions pills floating above
+                if showQuickSuggestions {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
+                                let (title, prefix, _) = suggestion
+                                Button {
+                                    commandText = prefix
+                                    // Hide all pills with staggered animation
+                                    for i in (0..<suggestions.count).reversed() {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(suggestions.count - i - 1) * 0.05)) {
+                                            pillOpacities[i] = 0
+                                            pillScales[i] = 0.8
+                                        }
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        showQuickSuggestions = false
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: iconForTitle(title))
+                                            .font(.system(size: 14, weight: .medium))
+                                        Text(title)
+                                            .font(.system(size: 14, weight: .medium))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .glassEffect(.regular.tint(colorForTitle(title).opacity(0.4)), in: RoundedRectangle(cornerRadius: 16))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(
+                                                LinearGradient(
+                                                    colors: [
+                                                        colorForTitle(title).opacity(0.5),
+                                                        colorForTitle(title).opacity(0.2)
+                                                    ],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 0.5
+                                            )
+                                    }
+                                    .shadow(color: colorForTitle(title).opacity(0.2), radius: 8, y: 4)
+                                }
+                                .opacity(pillOpacities[index])
+                                .scaleEffect(pillScales[index])
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .frame(height: 40)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                    .padding(.bottom, 8)
+                }
+                
+                // iMessage-style input bar
+                HStack(spacing: 8) {
+                    // Plus button (left side)
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showQuickSuggestions.toggle()
+                            if showQuickSuggestions {
+                                // Show pills with staggered animation
+                                for i in 0..<suggestions.count {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75).delay(Double(i) * 0.05)) {
+                                        pillOpacities[i] = 1
+                                        pillScales[i] = 1
+                                    }
+                                }
+                            } else {
+                                // Hide pills
+                                for i in (0..<suggestions.count).reversed() {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(suggestions.count - i - 1) * 0.05)) {
+                                        pillOpacities[i] = 0
+                                        pillScales[i] = 0.8
+                                    }
                                 }
                             }
-                            .onSubmit {
-                                executeCommand()
-                            }
-                        
-                        // Clear button - always present, animated with opacity
-                        Button {
-                            commandText = ""
-                            detectedIntent = .unknown
-                            updateGlowColor()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white.opacity(0.4))
                         }
-                        .opacity(commandText.isEmpty ? 0 : 1)
-                        .scaleEffect(commandText.isEmpty ? 0.5 : 1)
-                        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: commandText.isEmpty)
-                        .allowsHitTesting(!commandText.isEmpty)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    
-                    // Action button - always present, animated with opacity
-                    Button {
-                        executeCommand()
                     } label: {
-                        HStack(spacing: 8) {
-                            Text(editingNote != nil ? "Update" : detectedIntent.actionText)
-                                .font(.system(size: 15, weight: .semibold))
-                            Image(systemName: editingNote != nil ? "checkmark.circle.fill" : "arrow.right.circle.fill")
-                                .font(.system(size: 14))
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(currentGlowColor.gradient.opacity(0.3))
-                        )
+                        Image(systemName: "plus")
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .frame(width: 36, height: 36)
+                            .glassEffect(.regular.tint(Color.white.opacity(0.1)), in: Circle())
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                    .opacity(showActionButton ? 1 : 0)
-                    .scaleEffect(showActionButton ? 1 : 0.8)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showActionButton)
-                    .allowsHitTesting(showActionButton)
-                    .disabled(!showActionButton)
+                    
+                    // Input field container with glass effect
+                    HStack(spacing: 0) {
+                        // Question mark icon
+                        Image(systemName: "questionmark.circle.fill")
+                            .foregroundStyle(currentGlowColor)
+                            .font(.system(size: 20, weight: .medium))
+                            .padding(.leading, 12)
+                            .padding(.trailing, 8)
+                        
+                        // Text field
+                        ZStack(alignment: .leading) {
+                            if commandText.isEmpty {
+                                Text(editingNote != nil ? "Edit your note..." : "What's on your mind?")
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .font(.system(size: 16))
+                            }
+                            
+                            TextField("", text: $commandText, axis: .vertical)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white)
+                                .focused($isFocused)
+                                .lineLimit(1...5)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .submitLabel(.done)
+                                .onChange(of: commandText) { _, newValue in
+                                    // Hide suggestions when user starts typing
+                                    if !newValue.isEmpty && showQuickSuggestions {
+                                        showQuickSuggestions = false
+                                        for i in (0..<suggestions.count).reversed() {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(suggestions.count - i - 1) * 0.05)) {
+                                                pillOpacities[i] = 0
+                                                pillScales[i] = 0.8
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Normalize smart quotes to regular quotes
+                                    let normalizedText = newValue
+                                        .replacingOccurrences(of: "\u{201C}", with: "\"")
+                                        .replacingOccurrences(of: "\u{201D}", with: "\"")
+                                        .replacingOccurrences(of: "\u{2018}", with: "'")
+                                        .replacingOccurrences(of: "\u{2019}", with: "'")
+                                    
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        detectedIntent = CommandParser.parse(normalizedText)
+                                        updateGlowColor()
+                                    }
+                                }
+                                .onSubmit {
+                                    executeCommand()
+                                }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.trailing, 12)
+                    }
+                    .frame(minHeight: 36)
+                    .glassEffect(.regular.tint(currentGlowColor.opacity(0.15)), in: RoundedRectangle(cornerRadius: 18))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        currentGlowColor.opacity(0.3),
+                                        currentGlowColor.opacity(0.1)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.5
+                            )
+                    }
+                    
+                    // Send button (appears when there's text and valid intent)
+                    if showActionButton {
+                        Button {
+                            executeCommand()
+                        } label: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.white, currentGlowColor)
+                        }
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .scale.combined(with: .opacity)
+                        ))
+                    }
                 }
-                .glassEffect(in: RoundedRectangle(cornerRadius: 20))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(
-                            currentGlowColor.opacity(0.4),
-                            lineWidth: 0.5
-                        )
-                }
-                .shadow(color: currentGlowColor.opacity(0.25), radius: 16, y: 4)
                 .padding(.horizontal, 16)
-                .padding(.bottom, 8) // Small padding from keyboard
+                .padding(.bottom, 8)
             }
         }
         .onAppear {
@@ -152,15 +252,19 @@ struct LiquidCommandPalette: View {
                 currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26)
             }
             
-            // Auto-focus after appearing
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                isFocused = true
-            }
+            // Auto-focus immediately
+            isFocused = true
+            
+            // Pills are hidden initially - only show when plus button is tapped
         }
         .onDisappear {
             // Clear on dismiss
             isFocused = false
             isAnimating = false
+            showQuickSuggestions = false
+            // Reset pill states
+            pillOpacities = [0, 0, 0, 0]
+            pillScales = [0.8, 0.8, 0.8, 0.8]
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
@@ -176,6 +280,26 @@ struct LiquidCommandPalette: View {
                     dismissPalette()
                 }
             )
+        }
+    }
+    
+    private func iconForTitle(_ title: String) -> String {
+        switch title {
+        case "Note": return "note.text"
+        case "Quote": return "quote.opening"
+        case "Book": return "book"
+        case "Search": return "magnifyingglass"
+        default: return "circle"
+        }
+    }
+    
+    private func colorForTitle(_ title: String) -> Color {
+        switch title {
+        case "Note": return Color(red: 0.4, green: 0.6, blue: 0.9)
+        case "Quote": return Color(red: 1.0, green: 0.55, blue: 0.26)
+        case "Book": return Color(red: 0.6, green: 0.4, blue: 0.8)
+        case "Search": return Color(red: 0.3, green: 0.7, blue: 0.5)
+        default: return .gray
         }
     }
     
