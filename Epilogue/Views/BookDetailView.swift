@@ -237,12 +237,31 @@ struct BookDetailView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
             
-            // Author
-            Text("by \(book.author)")
-                .font(.system(size: 16, weight: .regular, design: .monospaced))
-                .kerning(1.2)
-                .foregroundColor(.warmWhite.opacity(0.8))
-                .padding(.top, -8)
+            // Author(s) - Handle multiple authors by splitting on comma
+            VStack(spacing: 4) {
+                let authors = book.author.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                
+                if authors.count == 1 {
+                    Text("by \(book.author)")
+                        .font(.system(size: 16, weight: .regular, design: .monospaced))
+                        .kerning(1.2)
+                        .foregroundColor(.warmWhite.opacity(0.8))
+                } else {
+                    Text("by")
+                        .font(.system(size: 14, weight: .regular, design: .monospaced))
+                        .kerning(1.2)
+                        .foregroundColor(.warmWhite.opacity(0.6))
+                    
+                    ForEach(authors, id: \.self) { author in
+                        Text(author)
+                            .font(.system(size: 16, weight: .regular, design: .monospaced))
+                            .kerning(1.2)
+                            .foregroundColor(.warmWhite.opacity(0.8))
+                    }
+                }
+            }
+            .multilineTextAlignment(.center)
+            .padding(.top, -8)
             
             // Status and page info
             HStack(spacing: 16) {
