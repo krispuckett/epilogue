@@ -9,28 +9,8 @@ struct GlossyBookCover: View {
         GeometryReader { geometry in
             ZStack {
                 // Base book cover
-                Group {
-                    if let coverImageName = book.coverImageName {
-                        Image(coverImageName)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } else {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(LinearGradient(
-                                colors: [.gray.opacity(0.3), .gray.opacity(0.5)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .overlay(
-                                Text(book.title)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .multilineTextAlignment(.center)
-                                    .padding()
-                            )
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                SharedBookCoverView(coverURL: book.coverImageURL)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 // Glossy overlay with interactive lighting
                 RoundedRectangle(cornerRadius: 8)
@@ -103,8 +83,14 @@ struct GlossyBookCover: View {
 // Preview
 struct GlossyBookCover_Previews: PreviewProvider {
     static var previews: some View {
-        GlossyBookCover(book: Book.sampleBooks[0])
-            .frame(width: 200, height: 300)
-            .padding()
+        GlossyBookCover(book: Book(
+            id: "1",
+            title: "The Great Gatsby",
+            author: "F. Scott Fitzgerald",
+            publishedYear: "1925",
+            coverImageURL: nil
+        ))
+        .frame(width: 200, height: 300)
+        .padding()
     }
 }

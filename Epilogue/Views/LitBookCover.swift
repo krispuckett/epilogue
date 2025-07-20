@@ -13,7 +13,7 @@ struct LitBookCover: View {
         GeometryReader { geometry in
             ZStack {
                 // Base book cover
-                BookCoverView(book: book)
+                SharedBookCoverView(coverURL: book.coverImageURL)
                 
                 // Simulated room light reflection
                 RoundedRectangle(cornerRadius: 8)
@@ -84,46 +84,18 @@ struct LitBookCover: View {
     }
 }
 
-// Book cover base view
-struct BookCoverView: View {
-    let book: Book
-    
-    var body: some View {
-        Group {
-            if let coverImageName = book.coverImageName {
-                Image(coverImageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(LinearGradient(
-                        colors: [.gray.opacity(0.3), .gray.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .overlay(
-                        VStack(spacing: 8) {
-                            Text(book.title)
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .multilineTextAlignment(.center)
-                            
-                            Text(book.author)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding()
-                    )
-            }
-        }
-    }
-}
 
 // Preview
 struct LitBookCover_Previews: PreviewProvider {
     static var previews: some View {
-        LitBookCover(book: Book.sampleBooks[0])
-            .frame(width: 200, height: 300)
-            .padding()
+        LitBookCover(book: Book(
+            id: "1",
+            title: "The Great Gatsby",
+            author: "F. Scott Fitzgerald",
+            publishedYear: "1925",
+            coverImageURL: nil
+        ))
+        .frame(width: 200, height: 300)
+        .padding()
     }
 }

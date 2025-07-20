@@ -11,6 +11,7 @@
 		01634D7D2E2C82D500A75D84 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D7C2E2C82D500A75D84 /* BookDetailView.swift */; };
 		01634D7F2E2C849800A75D84 /* GradientTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D7E2E2C849800A75D84 /* GradientTestView.swift */; };
 		01634D822E2C950000A75D84 /* FluidGradientSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D832E2C950000A75D84 /* FluidGradientSystem.swift */; };
+		01634D822E2D243600A75D84 /* BookCoverLighting.metal in Sources */ = {isa = PBXBuildFile; fileRef = 01634D812E2D243600A75D84 /* BookCoverLighting.metal */; };
 		01634D842E2C960000A75D84 /* BoldLuminanceGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D852E2C960000A75D84 /* BoldLuminanceGradient.swift */; };
 		01634D862E2C970000A75D84 /* MeshLuminanceGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D872E2C970000A75D84 /* MeshLuminanceGradient.swift */; };
 		01634D882E2C980000A75D84 /* CinematicBookGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D892E2C980000A75D84 /* CinematicBookGradient.swift */; };
@@ -35,10 +36,6 @@
 		01BC21F72E2A0E3800E04A55 /* QuickSuggestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F62E2A0E3800E04A55 /* QuickSuggestionsView.swift */; };
 		01BC21F82E295F8900E04A55 /* InteractiveChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */; };
 		01BC21FA2E295F9900E04A55 /* SharedBookCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */; };
-		3985C3197461482996029E43 /* GlossyBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB898150FE0474A9D4F0ACC /* GlossyBookCover.swift */; };
-		CA5A8C943D754A0DBB32E5CC /* LitBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */; };
-		EEC16D652D29417C9689BC2D /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77AE2837A001440AB6CFE891 /* MotionManager.swift */; };
-		37EA4F912CDA4B569B952A5B /* BookCoverLighting.metal in Sources */ = {isa = PBXBuildFile; fileRef = DCAF6614686D45F19F0BBB60 /* BookCoverLighting.metal */; };
 		2B1234561234567890123456 /* EpilogueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234551234567890123456 /* EpilogueApp.swift */; };
 		2B1234581234567890123456 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234571234567890123456 /* ContentView.swift */; };
 		2B12345A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B1234591234567890123456 /* Assets.xcassets */; };
@@ -56,7 +53,10 @@
 		2B1234981234567890123456 /* UniversalCommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234991234567890123456 /* UniversalCommandBar.swift */; };
 		2B12349B1234567890123456 /* CommandSuggestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B12349C1234567890123456 /* CommandSuggestionsView.swift */; };
 		2B12349D1234567890123456 /* GoogleBooksAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B12349E1234567890123456 /* GoogleBooksAPI.swift */; };
+		3985C3197461482996029E43 /* GlossyBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB898150FE0474A9D4F0ACC /* GlossyBookCover.swift */; };
 		87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */; };
+		CA5A8C943D754A0DBB32E5CC /* LitBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */; };
+		EEC16D652D29417C9689BC2D /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77AE2837A001440AB6CFE891 /* MotionManager.swift */; };
 		F7802A44A6D54149A56326BD /* NoteCardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */; };
 /* End PBXBuildFile section */
 
@@ -81,6 +81,7 @@
 		01634D3E2E2C492D00A75D84 /* MeshGradientSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshGradientSystem.swift; sourceTree = "<group>"; };
 		01634D7C2E2C82D500A75D84 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		01634D7E2E2C849800A75D84 /* GradientTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientTestView.swift; sourceTree = "<group>"; };
+		01634D812E2D243600A75D84 /* BookCoverLighting.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; name = BookCoverLighting.metal; path = Epilogue/Shaders/BookCoverLighting.metal; sourceTree = SOURCE_ROOT; };
 		01634D832E2C950000A75D84 /* FluidGradientSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FluidGradientSystem.swift; sourceTree = "<group>"; };
 		01634D852E2C960000A75D84 /* BoldLuminanceGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoldLuminanceGradient.swift; sourceTree = "<group>"; };
 		01634D872E2C970000A75D84 /* MeshLuminanceGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshLuminanceGradient.swift; sourceTree = "<group>"; };
@@ -108,9 +109,6 @@
 		01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveChatInputBar.swift; sourceTree = "<group>"; };
 		01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedBookCoverView.swift; sourceTree = "<group>"; };
 		1AB898150FE0474A9D4F0ACC /* GlossyBookCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlossyBookCover.swift; sourceTree = "<group>"; };
-		B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LitBookCover.swift; sourceTree = "<group>"; };
-		77AE2837A001440AB6CFE891 /* MotionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionManager.swift; sourceTree = "<group>"; };
-		DCAF6614686D45F19F0BBB60 /* BookCoverLighting.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = BookCoverLighting.metal; sourceTree = "<group>"; };
 		2B1234521234567890123456 /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B1234551234567890123456 /* EpilogueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpilogueApp.swift; sourceTree = "<group>"; };
 		2B1234571234567890123456 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -132,8 +130,10 @@
 		2B1234991234567890123456 /* UniversalCommandBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalCommandBar.swift; sourceTree = "<group>"; };
 		2B12349C1234567890123456 /* CommandSuggestionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandSuggestionsView.swift; sourceTree = "<group>"; };
 		2B12349E1234567890123456 /* GoogleBooksAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleBooksAPI.swift; sourceTree = "<group>"; };
+		77AE2837A001440AB6CFE891 /* MotionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidEditSheet.swift; sourceTree = "<group>"; };
 		AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCardComponents.swift; sourceTree = "<group>"; };
+		B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LitBookCover.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,8 +164,8 @@
 		01BC21DD2E28371D00E04A55 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
+				01634D812E2D243600A75D84 /* BookCoverLighting.metal */,
 				01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */,
-				DCAF6614686D45F19F0BBB60 /* BookCoverLighting.metal */,
 			);
 			path = Shaders;
 			sourceTree = "<group>";
@@ -214,14 +214,6 @@
 				2B12345C1234567890123456 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		BBEE76E7478141A09767FA56 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-				77AE2837A001440AB6CFE891 /* MotionManager.swift */,
-			);
-			path = Utilities;
 			sourceTree = "<group>";
 		};
 		2B1234651234567890123456 /* EpilogueTests */ = {
@@ -293,6 +285,14 @@
 				2B12349E1234567890123456 /* GoogleBooksAPI.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		BBEE76E7478141A09767FA56 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				77AE2837A001440AB6CFE891 /* MotionManager.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -456,7 +456,6 @@
 				3985C3197461482996029E43 /* GlossyBookCover.swift in Sources */,
 				CA5A8C943D754A0DBB32E5CC /* LitBookCover.swift in Sources */,
 				EEC16D652D29417C9689BC2D /* MotionManager.swift in Sources */,
-				37EA4F912CDA4B569B952A5B /* BookCoverLighting.metal in Sources */,
 				01634D7F2E2C849800A75D84 /* GradientTestView.swift in Sources */,
 				01634D822E2C950000A75D84 /* FluidGradientSystem.swift in Sources */,
 				01634D842E2C960000A75D84 /* BoldLuminanceGradient.swift in Sources */,
@@ -464,6 +463,7 @@
 				01634D882E2C980000A75D84 /* CinematicBookGradient.swift in Sources */,
 				2B1234921234567890123456 /* QuickCaptureSheet.swift in Sources */,
 				2B1234941234567890123456 /* BookSearchSheet.swift in Sources */,
+				01634D822E2D243600A75D84 /* BookCoverLighting.metal in Sources */,
 				01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */,
 				F7802A44A6D54149A56326BD /* NoteCardComponents.swift in Sources */,
 				2B12348E1234567890123456 /* MainNavigationView.swift in Sources */,
