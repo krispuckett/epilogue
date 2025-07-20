@@ -206,15 +206,29 @@ struct BookDetailView: View {
     
     private var centeredHeaderView: some View {
         VStack(spacing: 16) {
-            // Book Cover with lighting effects
-            LitBookCover(book: book)
-                .frame(width: 180, height: 270)
-                .rotation3DEffect(
-                    .degrees(5),
-                    axis: (x: 0, y: 1, z: 0),
-                    perspective: 0.5
-                )
-                .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset / 1000 : 0))
+            // Book Cover with 3D effect
+            Group {
+                if let coverImage = coverImage {
+                    Image(uiImage: coverImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 180, height: 270)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+                } else {
+                    SharedBookCoverView(
+                        coverURL: book.coverImageURL,
+                        width: 180,
+                        height: 270
+                    )
+                }
+            }
+            .rotation3DEffect(
+                Angle(degrees: 5),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.5
+            )
+            .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset / 1000 : 0))
             
             // Title
             Text(book.title)

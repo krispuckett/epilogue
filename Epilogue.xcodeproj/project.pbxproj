@@ -35,6 +35,10 @@
 		01BC21F72E2A0E3800E04A55 /* QuickSuggestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F62E2A0E3800E04A55 /* QuickSuggestionsView.swift */; };
 		01BC21F82E295F8900E04A55 /* InteractiveChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */; };
 		01BC21FA2E295F9900E04A55 /* SharedBookCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */; };
+		3985C3197461482996029E43 /* GlossyBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB898150FE0474A9D4F0ACC /* GlossyBookCover.swift */; };
+		CA5A8C943D754A0DBB32E5CC /* LitBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */; };
+		EEC16D652D29417C9689BC2D /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77AE2837A001440AB6CFE891 /* MotionManager.swift */; };
+		37EA4F912CDA4B569B952A5B /* BookCoverLighting.metal in Sources */ = {isa = PBXBuildFile; fileRef = DCAF6614686D45F19F0BBB60 /* BookCoverLighting.metal */; };
 		2B1234561234567890123456 /* EpilogueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234551234567890123456 /* EpilogueApp.swift */; };
 		2B1234581234567890123456 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1234571234567890123456 /* ContentView.swift */; };
 		2B12345A1234567890123456 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2B1234591234567890123456 /* Assets.xcassets */; };
@@ -103,6 +107,10 @@
 		01BC21F72E295E8900E04A55 /* NoteContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteContextMenu.swift; sourceTree = "<group>"; };
 		01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveChatInputBar.swift; sourceTree = "<group>"; };
 		01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedBookCoverView.swift; sourceTree = "<group>"; };
+		1AB898150FE0474A9D4F0ACC /* GlossyBookCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlossyBookCover.swift; sourceTree = "<group>"; };
+		B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LitBookCover.swift; sourceTree = "<group>"; };
+		77AE2837A001440AB6CFE891 /* MotionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionManager.swift; sourceTree = "<group>"; };
+		DCAF6614686D45F19F0BBB60 /* BookCoverLighting.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = BookCoverLighting.metal; sourceTree = "<group>"; };
 		2B1234521234567890123456 /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B1234551234567890123456 /* EpilogueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpilogueApp.swift; sourceTree = "<group>"; };
 		2B1234571234567890123456 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -157,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				01BC21E02E28413800E04A55 /* LiteraryCompanion.metal */,
+				DCAF6614686D45F19F0BBB60 /* BookCoverLighting.metal */,
 			);
 			path = Shaders;
 			sourceTree = "<group>";
@@ -191,6 +200,7 @@
 				2B12348D1234567890123456 /* Typography.swift */,
 				2B12349A1234567890123456 /* Models */,
 				2B1234831234567890123456 /* Views */,
+				BBEE76E7478141A09767FA56 /* Utilities */,
 				2B1234591234567890123456 /* Assets.xcassets */,
 				2B1234801234567890123456 /* Info.plist */,
 				2B12345B1234567890123456 /* Preview Content */,
@@ -204,6 +214,14 @@
 				2B12345C1234567890123456 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		BBEE76E7478141A09767FA56 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				77AE2837A001440AB6CFE891 /* MotionManager.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		2B1234651234567890123456 /* EpilogueTests */ = {
@@ -240,6 +258,8 @@
 				01BC21EC2E29533C00E04A55 /* ChatInputBar.swift */,
 				01BC21F92E295F8900E04A55 /* InteractiveChatInputBar.swift */,
 				01BC21FB2E295F9900E04A55 /* SharedBookCoverView.swift */,
+				1AB898150FE0474A9D4F0ACC /* GlossyBookCover.swift */,
+				B88AD069BA8A40F8B07B8ADB /* LitBookCover.swift */,
 				01BC21EA2E294D7600E04A55 /* BookPickerSheet.swift */,
 				01BC21E82E2949B300E04A55 /* AmbientBackground.swift */,
 				01BC21E22E2931C100E04A55 /* ChatConversationView.swift */,
@@ -433,6 +453,10 @@
 				01BC21ED2E29533C00E04A55 /* ChatInputBar.swift in Sources */,
 				01BC21F82E295F8900E04A55 /* InteractiveChatInputBar.swift in Sources */,
 				01BC21FA2E295F9900E04A55 /* SharedBookCoverView.swift in Sources */,
+				3985C3197461482996029E43 /* GlossyBookCover.swift in Sources */,
+				CA5A8C943D754A0DBB32E5CC /* LitBookCover.swift in Sources */,
+				EEC16D652D29417C9689BC2D /* MotionManager.swift in Sources */,
+				37EA4F912CDA4B569B952A5B /* BookCoverLighting.metal in Sources */,
 				01634D7F2E2C849800A75D84 /* GradientTestView.swift in Sources */,
 				01634D822E2C950000A75D84 /* FluidGradientSystem.swift in Sources */,
 				01634D842E2C960000A75D84 /* BoldLuminanceGradient.swift in Sources */,
