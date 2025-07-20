@@ -60,26 +60,11 @@ struct BookDetailView: View {
     
     // UI States
     @State private var summaryExpanded = false
+    @State private var scrollOffset: CGFloat = 0
     @State private var coverImage: UIImage?
     @State private var dominantColor: Color = .midnightScholar
     @State private var secondaryColor: Color = .clear
-    @State private var scrollOffset: CGFloat = 0
-    
-    // Computed property for the accent color to use
-    private var accentColor: Color {
-        // Check if dominant color is too dark (near black)
-        if dominantColor != .midnightScholar {
-            let uiColor = UIColor(dominantColor)
-            var brightness: CGFloat = 0
-            uiColor.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
-            
-            // If too dark, use secondary color or fallback
-            if brightness < 0.3 && secondaryColor != .clear {
-                return secondaryColor
-            }
-        }
-        return dominantColor == .midnightScholar ? .warmAmber : dominantColor
-    }
+    @State private var accentColor: Color = .warmAmber
     
     // Edit book states
     @State private var showingBookSearch = false
@@ -125,36 +110,36 @@ struct BookDetailView: View {
     
     var body: some View {
         ZStack {
-            // Base midnight scholar background
-            Color.midnightScholar
+            // Cinematic gradient background (Netflix-style)
+            if let coverImage = coverImage {
+                CinematicBookGradient(
+                    bookCoverImage: coverImage,
+                    bookTitle: book.title,
+                    bookAuthor: book.author,
+                    scrollOffset: scrollOffset,
+                    onAccentColorExtracted: { extractedAccent in
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            accentColor = extractedAccent
+                        }
+                    }
+                )
                 .ignoresSafeArea()
-            
-            // Ambient gradient background from book colors
-            LinearGradient(
-                colors: [
-                    dominantColor.opacity(0.4),
-                    secondaryColor.opacity(0.3),
-                    dominantColor.opacity(0.2),
-                    Color.clear
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            // Radial glow at the top with secondary color accent
-            RadialGradient(
-                colors: [
-                    secondaryColor == .clear ? dominantColor.opacity(0.3) : secondaryColor.opacity(0.4),
-                    dominantColor.opacity(0.2),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 50,
-                endRadius: 300
-            )
-            .ignoresSafeArea()
-            .blendMode(.plusLighter)
+                .transition(.opacity.animation(.easeInOut(duration: 0.8)))
+            } else {
+                // Fallback gradient while loading
+                LinearGradient(
+                    colors: [
+                        dominantColor.opacity(0.4),
+                        secondaryColor.opacity(0.3),
+                        dominantColor.opacity(0.2),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.8), value: dominantColor)
+            }
             
             // Content
             ScrollView {
@@ -195,7 +180,7 @@ struct BookDetailView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .glassEffect(.clear.tint(secondaryColor.opacity(0.4)), in: RoundedRectangle(cornerRadius: 16))
+                    .glassEffect(in: RoundedRectangle(cornerRadius: 16))
                     .onTapGesture {
                         editedTitle = book.title
                         showingBookSearch = true
@@ -230,23 +215,20 @@ struct BookDetailView: View {
                         .frame(width: 180, height: 270)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
-                        .rotation3DEffect(
-                            .degrees(5),
-                            axis: (x: 0, y: 1, z: 0),
-                            perspective: 0.5
-                        )
-                        .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset / 1000 : 0))
                 } else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 180, height: 270)
-                        .overlay(
-                            ProgressView()
-                                .tint(.warmWhite.opacity(0.5))
-                        )
-                        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+                    SharedBookCoverView(
+                        coverURL: book.coverImageURL,
+                        width: 180,
+                        height: 270
+                    )
                 }
             }
+            .rotation3DEffect(
+                .degrees(5),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.5
+            )
+            .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset / 1000 : 0))
             
             // Title
             Text(book.title)
@@ -264,7 +246,26 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                StatusPill(text: book.readingStatus.rawValue, color: .warmAmber)
+                // Interactive reading status dropdown
+                Menu {
+                    ForEach(ReadingStatus.allCases, id: \.self) { status in
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                libraryViewModel.updateReadingStatus(for: book.id, status: status)
+                                HapticManager.shared.lightTap()
+                            }
+                        } label: {
+                            Label {
+                                Text(status.rawValue)
+                            } icon: {
+                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(status == book.readingStatus ? accentColor : .secondary)
+                            }
+                        }
+                    }
+                } label: {
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                }
                 
                 if let pageCount = book.pageCount {
                     Text("\(book.currentPage) of \(pageCount) pages")
@@ -273,7 +274,7 @@ struct BookDetailView: View {
                 }
                 
                 if let rating = book.userRating {
-                    StatusPill(text: "★ \(rating)", color: .warmWhite.opacity(0.7))
+                    StatusPill(text: "★ \(rating)", color: accentColor.opacity(0.8))
                 }
             }
             .padding(.top, 8)
@@ -290,7 +291,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "text.book.closed")
                     .font(.system(size: 16))
-                    .foregroundColor(.warmAmber.opacity(0.8))
+                    .foregroundColor(accentColor.opacity(0.8))
                 
                 Text("Summary")
                     .font(.system(size: 18, weight: .semibold))
@@ -332,7 +333,7 @@ struct BookDetailView: View {
                             Image(systemName: "arrow.right")
                                 .font(.system(size: 12))
                         }
-                        .foregroundColor(.warmAmber)
+                        .foregroundColor(accentColor)
                     }
                 }
             }
@@ -400,17 +401,17 @@ struct BookDetailView: View {
                 } label: {
                     Image(systemName: section.icon)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(selectedSection == section ? .warmAmber : .warmWhite.opacity(0.6))
+                        .foregroundColor(selectedSection == section ? accentColor : .warmWhite.opacity(0.6))
                         .frame(width: 44, height: 44)
                         .background {
                             if selectedSection == section {
                                 Circle()
-                                    .fill(Color.warmAmber.opacity(0.15))
+                                    .fill(accentColor.opacity(0.15))
                                     .overlay {
                                         Circle()
-                                            .strokeBorder(Color.warmAmber.opacity(0.3), lineWidth: 1)
+                                            .strokeBorder(accentColor.opacity(0.3), lineWidth: 1)
                                     }
-                                    .shadow(color: Color.warmAmber.opacity(0.3), radius: 6)
+                                    .shadow(color: accentColor.opacity(0.3), radius: 6)
                                     .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
                             }
                         }
@@ -507,7 +508,7 @@ struct BookDetailView: View {
                                 VStack(spacing: 12) {
                                     Image(systemName: "bubble.left.and.bubble.right.fill")
                                         .font(.system(size: 48))
-                                        .foregroundColor(.warmAmber.opacity(0.6))
+                                        .foregroundColor(accentColor.opacity(0.6))
                                     
                                     Text("Ask me about this book")
                                         .font(.system(size: 18, weight: .medium))
@@ -524,7 +525,7 @@ struct BookDetailView: View {
                             
                             // Messages
                             ForEach(thread.messages) { message in
-                                ChatMessageBubble(message: message)
+                                ChatMessageBubble(message: message, accentColor: accentColor)
                                     .padding(.horizontal, 24)
                                     .id(message.id)
                             }
@@ -548,11 +549,11 @@ struct BookDetailView: View {
                         .textFieldStyle(PlainTextFieldStyle())
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color.warmWhite.opacity(0.1))
+                        .background(accentColor.opacity(0.15))
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .strokeBorder(Color.warmWhite.opacity(0.2), lineWidth: 1)
+                                .strokeBorder(accentColor.opacity(0.3), lineWidth: 1)
                         )
                         .focused($isInputFocused)
                     
@@ -561,7 +562,7 @@ struct BookDetailView: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 32))
-                            .foregroundColor(messageText.isEmpty ? .warmWhite.opacity(0.3) : .warmAmber)
+                            .foregroundColor(messageText.isEmpty ? accentColor.opacity(0.3) : accentColor)
                     }
                     .disabled(messageText.isEmpty)
                 }
@@ -571,7 +572,7 @@ struct BookDetailView: View {
                 // Loading state
                 VStack(spacing: 16) {
                     ProgressView()
-                        .tint(.warmAmber)
+                        .tint(accentColor)
                     Text("Setting up chat...")
                         .font(.system(size: 14))
                         .foregroundColor(.warmWhite.opacity(0.6))
@@ -585,7 +586,7 @@ struct BookDetailView: View {
         VStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 48))
-                .foregroundColor(.warmWhite.opacity(0.3))
+                .foregroundColor(accentColor.opacity(0.3))
             
             VStack(spacing: 8) {
                 Text(title)
@@ -633,7 +634,6 @@ struct BookDetailView: View {
         thread.lastMessageDate = Date()
         
         // Clear input
-        let messageCopy = messageText
         messageText = ""
         
         // Save context
@@ -793,12 +793,12 @@ struct BookDetailView: View {
                 // Find a color with different hue
                 for i in 1..<min(sortedColors.count, 10) {
                     let (_, h2, s2, b2) = sortedColors[i]
-                    let hueDiff = abs(h1 - h2)
                     
-                    // If hue is different enough (at least 30 degrees on color wheel)
-                    if hueDiff > 0.083 && hueDiff < 0.917 { // 30/360 and not opposite
-                        let boostedS2 = min(s2 * 1.4, 1.0)
-                        let boostedB2 = min(b2 * 1.2, 0.8)
+                    let hueDiff = abs(h1 - h2)
+                    if hueDiff > 0.15 || hueDiff < 0.85 {
+                        // Found a contrasting color
+                        let boostedS2 = min(s2 * 1.5, 1.0)
+                        let boostedB2 = min(b2 * 1.3, 0.85)
                         
                         withAnimation(.easeInOut(duration: 0.8)) {
                             secondaryColor = Color(hue: Double(h2), saturation: Double(boostedS2), brightness: Double(boostedB2))
@@ -809,6 +809,7 @@ struct BookDetailView: View {
             }
         }
     }
+    
 }
 
 // MARK: - Scroll Offset Preference Key
@@ -824,18 +825,26 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
 struct StatusPill: View {
     let text: String
     let color: Color
+    var interactive: Bool = false
     
     var body: some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .glassEffect(in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(color.opacity(0.3), lineWidth: 0.5)
+        HStack(spacing: 4) {
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+            
+            if interactive {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .medium))
             }
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .glassEffect(in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(color.opacity(0.3), lineWidth: 0.5)
+        }
     }
 }
 
@@ -1039,6 +1048,7 @@ struct QuestionCard: View {
 
 struct ChatMessageBubble: View {
     let message: ThreadedChatMessage
+    let accentColor: Color
     
     var body: some View {
         HStack {
@@ -1054,7 +1064,7 @@ struct ChatMessageBubble: View {
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 18)
-                            .fill(message.isUser ? Color.warmAmber : Color(hex: "FAF8F5"))
+                            .fill(message.isUser ? accentColor : Color(hex: "FAF8F5"))
                     )
                 
                 Text(message.timestamp.formatted(date: .omitted, time: .shortened))

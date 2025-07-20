@@ -13,10 +13,9 @@ struct ChatMessage: Identifiable {
 
 // MARK: - Chat View
 struct ChatView: View {
-    @State private var selectedThread: ChatThread?
-    @State private var showingThreadList = true
     @Query private var threads: [ChatThread]
     @Environment(\.modelContext) private var modelContext
+    @State private var navigationPath = NavigationPath()
     
     private let bookToChat: Book?
     
@@ -25,18 +24,16 @@ struct ChatView: View {
     }
     
     var body: some View {
-        Group {
-            if showingThreadList {
-                ChatThreadListView(
-                    selectedThread: $selectedThread,
-                    showingThreadList: $showingThreadList
-                )
-            } else if let thread = selectedThread {
-                ChatConversationView(
-                    thread: thread,
-                    showingThreadList: $showingThreadList
-                )
-            }
+        NavigationStack(path: $navigationPath) {
+            ChatThreadListView(navigationPath: $navigationPath)
+                .navigationDestination(for: ChatThread.self) { thread in
+                    ChatConversationView(thread: thread)
+                }
+                .navigationDestination(for: String.self) { destination in
+                    if destination == "gradient-showcase" {
+                        GradientTestView()
+                    }
+                }
         }
         .onAppear {
             // If we have a book to chat about, find or create its thread
@@ -49,23 +46,19 @@ struct ChatView: View {
     private func findOrCreateThreadForBook(_ book: Book) {
         // Check if thread already exists for this book
         if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
-            selectedThread = existingThread
-            showingThreadList = false
+            navigationPath.append(existingThread)
         } else {
             // Create new thread for this book
             let newThread = ChatThread(book: book)
             modelContext.insert(newThread)
             try? modelContext.save()
-            selectedThread = newThread
-            showingThreadList = false
+            navigationPath.append(newThread)
         }
     }
 }
 
 // MARK: - Preview
 #Preview {
-    NavigationStack {
-        ChatView()
-    }
-    .preferredColorScheme(.dark)
+    ChatView()
+        .preferredColorScheme(.dark)
 }

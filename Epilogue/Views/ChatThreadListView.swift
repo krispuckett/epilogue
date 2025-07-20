@@ -4,84 +4,39 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 
 struct ChatThreadListView: View {
-    @Binding var selectedThread: ChatThread?
-    @Binding var showingThreadList: Bool
     @Query private var threads: [ChatThread]
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @State private var showingDeleteConfirmation = false
     @State private var threadToDelete: ChatThread?
     @State private var showingBookPicker = false
+    @Binding var navigationPath: NavigationPath
     
     var body: some View {
         ZStack {
-            // Show literary empty state when no book threads exist (even if general exists)
-            if bookThreads.isEmpty {
-                MetalLiteraryView()
-                    .ignoresSafeArea()
-            } else {
-                // Background for when we have book threads
-                Color(red: 0.11, green: 0.105, blue: 0.102)
-                    .ignoresSafeArea()
-            }
+            // ALWAYS show the background, not conditionally
+            backgroundView
             
-            VStack {
-                // Only show "Chat with Epilogue" text in the center
-                if threads.isEmpty {
-                    Spacer()
-                    
-                    Text("Chat with Epilogue")
-                        .font(.system(size: 36, weight: .light, design: .serif))
-                        .foregroundStyle(.white.opacity(0.95))
-                    
-                    Spacer()
-                } else {
-                    // Regular scroll view when threads exist
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            // Only show General Chat if it has messages
-                            if let general = generalThread, !general.messages.isEmpty {
-                                GeneralChatCard(
-                                    messageCount: general.messages.count,
-                                    lastMessage: general.messages.last
-                                ) {
-                                    selectedThread = general
-                                    showingThreadList = false
-                                }
-                                .padding(.horizontal)
-                            }
-                            
-                            // Book Chats Section
-                            if !bookThreads.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Book Discussions")
-                                        .font(.system(size: 20, weight: .medium, design: .serif))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                        .padding(.horizontal)
-                                    
-                                    ForEach(bookThreads) { thread in
-                                        BookChatCard(thread: thread) {
-                                            selectedThread = thread
-                                            showingThreadList = false
-                                        } onDelete: {
-                                            threadToDelete = thread
-                                            showingDeleteConfirmation = true
-                                        }
-                                        .environmentObject(libraryViewModel)
-                                        .padding(.horizontal)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.vertical)
-                    }
-                    
-                    Spacer()
-                }
-            }
+            // Content layer
+            contentView
         }
         .navigationTitle("Epilogue")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        // Navigate to gradient test view
+                        navigationPath.append("gradient-showcase")
+                    } label: {
+                        Label("Gradient Showcase", systemImage: "paintbrush.fill")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             ChatInputBar(
                 onStartGeneralChat: {
@@ -97,22 +52,7 @@ struct ChatThreadListView: View {
         .sheet(isPresented: $showingBookPicker) {
             BookPickerSheet(
                 onBookSelected: { book in
-                    // Debug: Check if book has cover URL
-                    print("Selected book: \(book.title)")
-                    print("Book cover URL: \(book.coverImageURL ?? "nil")")
-                    
-                    // Create or select thread for this book
-                    if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
-                        selectedThread = existingThread
-                    } else {
-                        let newThread = ChatThread(book: book)
-                        print("New thread cover URL: \(newThread.bookCoverURL ?? "nil")")
-                        modelContext.insert(newThread)
-                        try? modelContext.save()
-                        selectedThread = newThread
-                    }
-                    showingThreadList = false
-                    showingBookPicker = false
+                    handleBookSelection(book)
                 }
             )
             .environmentObject(libraryViewModel)
@@ -129,6 +69,96 @@ struct ChatThreadListView: View {
         }
     }
     
+    // MARK: - Background View (ALWAYS visible)
+    @ViewBuilder
+    private var backgroundView: some View {
+        // Base midnight color
+        Color(red: 0.11, green: 0.105, blue: 0.102)
+            .ignoresSafeArea()
+        
+        // Show literary background when no book threads
+        if bookThreads.isEmpty {
+            MetalLiteraryView()
+                .ignoresSafeArea()
+                .transition(.opacity.animation(.easeInOut(duration: 0.5)))
+        }
+        
+        // Subtle vignette overlay
+        RadialGradient(
+            gradient: Gradient(colors: [
+                Color.clear,
+                Color.black.opacity(0.15)
+            ]),
+            center: .center,
+            startRadius: 200,
+            endRadius: 400
+        )
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+    
+    // MARK: - Content View
+    @ViewBuilder
+    private var contentView: some View {
+        if threads.isEmpty {
+            // Empty state
+            VStack {
+                Spacer()
+                
+                Text("Chat with Epilogue")
+                    .font(.system(size: 36, weight: .light, design: .serif))
+                    .foregroundStyle(.white.opacity(0.95))
+                
+                Spacer()
+            }
+        } else {
+            // Thread list
+            ScrollView {
+                VStack(spacing: 16) {
+                    // General chat (if has messages)
+                    if let general = generalThread, !general.messages.isEmpty {
+                        NavigationLink(value: general) {
+                            GeneralChatCard(
+                                messageCount: general.messages.count,
+                                lastMessage: general.messages.last
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+                    }
+                    
+                    // Book discussions
+                    if !bookThreads.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Book Discussions")
+                                .font(.system(size: 20, weight: .medium, design: .serif))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .padding(.horizontal)
+                            
+                            ForEach(bookThreads) { thread in
+                                NavigationLink(value: thread) {
+                                    BookChatCard(
+                                        thread: thread,
+                                        onDelete: {
+                                            threadToDelete = thread
+                                            showingDeleteConfirmation = true
+                                        }
+                                    )
+                                    .environmentObject(libraryViewModel)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .padding(.horizontal)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical)
+            }
+            .scrollContentBackground(.hidden)
+        }
+    }
+    
+    // MARK: - Helper Properties
     private var generalThread: ChatThread? {
         threads.first { $0.bookId == nil }
     }
@@ -138,11 +168,21 @@ struct ChatThreadListView: View {
             .sorted { $0.lastMessageDate > $1.lastMessageDate }
     }
     
-    private func createGeneralThread() -> ChatThread {
-        let thread = ChatThread()
-        modelContext.insert(thread)
-        try? modelContext.save()
-        return thread
+    // MARK: - Helper Methods
+    private func handleBookSelection(_ book: Book) {
+        print("Selected book: \(book.title)")
+        print("Book cover URL: \(book.coverImageURL ?? "nil")")
+        
+        if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
+            navigationPath.append(existingThread)
+        } else {
+            let newThread = ChatThread(book: book)
+            print("New thread cover URL: \(newThread.bookCoverURL ?? "nil")")
+            modelContext.insert(newThread)
+            try? modelContext.save()
+            navigationPath.append(newThread)
+        }
+        showingBookPicker = false
     }
     
     private func deleteThread(_ thread: ChatThread) {
@@ -156,87 +196,66 @@ struct ChatThreadListView: View {
 struct GeneralChatCard: View {
     let messageCount: Int
     let lastMessage: ThreadedChatMessage?
-    let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 16) {
-                // Icon and title
-                HStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
-                            .frame(width: 56, height: 56)
-                        
-                        Image(systemName: "bubble.left.and.bubble.right.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("General Discussion")
-                            .font(.system(size: 18, weight: .semibold, design: .serif))
-                            .foregroundStyle(.white)
-                        
-                        Text("Book recommendations & literary chat")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.3))
-                }
+        HStack(spacing: 16) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                    .frame(width: 50, height: 50)
                 
-                // Last message preview
+                Image(systemName: "message.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text("General Discussion")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                
                 if let lastMessage = lastMessage {
-                    HStack {
-                        Text(lastMessage.content)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        Text(lastMessage.timestamp.formatted(date: .omitted, time: .shortened))
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.3))
-                    }
-                    .padding(.top, -8)
+                    Text(lastMessage.content)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
                 
-                // Message count
-                if messageCount > 0 {
-                    HStack {
-                        Text("\(messageCount) messages")
+                HStack {
+                    Text("\(messageCount) messages")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.4))
+                    
+                    if let date = lastMessage?.timestamp {
+                        Text("• \(date.formatted(date: .abbreviated, time: .omitted))")
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.4))
-                        
-                        Spacer()
                     }
                 }
             }
-            .padding(20)
-            .background {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.05))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.3))
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
     }
 }
 
 // MARK: - Book Chat Card
 struct BookChatCard: View {
     let thread: ChatThread
-    let onTap: () -> Void
     let onDelete: () -> Void
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @State private var dominantColor: Color = Color(red: 0.11, green: 0.105, blue: 0.102)
@@ -261,86 +280,89 @@ struct BookChatCard: View {
     }
     
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 16) {
-                // Book cover
-                if let coverURL = effectiveCoverURL {
-                    SharedBookCoverView(coverURL: coverURL, width: 50, height: 70)
-                        .onAppear {
-                            print("BookChatCard - Book: \(thread.bookTitle ?? "Unknown"), Cover URL: \(coverURL)")
-                            loadAndExtractColors(from: coverURL)
-                        }
-                } else {
-                    // Fallback icon
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                        .frame(width: 50, height: 70)
-                        .overlay {
-                            Image(systemName: "book.fill")
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                        }
-                        .onAppear {
-                            print("BookChatCard - Book: \(thread.bookTitle ?? "Unknown"), Cover URL is nil (thread: \(thread.bookCoverURL ?? "nil"), effective: nil)")
-                        }
+        HStack(spacing: 16) {
+            // Book cover
+            if let coverURL = effectiveCoverURL {
+                SharedBookCoverView(coverURL: coverURL, width: 50, height: 70)
+                    .onAppear {
+                        print("BookChatCard - Book: \(thread.bookTitle ?? "Unknown"), Cover URL: \(coverURL)")
+                        loadAndExtractColors(from: coverURL)
+                    }
+            } else {
+                // Fallback icon
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                    .frame(width: 50, height: 70)
+                    .overlay {
+                        Image(systemName: "book.fill")
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    }
+                    .onAppear {
+                        print("BookChatCard - No cover URL for book: \(thread.bookTitle ?? "Unknown")")
+                    }
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(thread.bookTitle ?? "Unknown Book")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                if let author = thread.bookAuthor {
+                    Text(author)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
                 }
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(thread.bookTitle ?? "Unknown Book")
-                        .font(.system(size: 17, weight: .medium, design: .serif))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    
-                    if let author = thread.bookAuthor, !author.isEmpty {
-                        Text(author)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .lineLimit(1)
-                    }
-                    
+                HStack {
                     if let lastMessage = thread.messages.last {
+                        Image(systemName: lastMessage.isUser ? "person.fill" : "sparkles")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.4))
+                        
                         Text(lastMessage.content)
-                            .font(.system(size: 14))
+                            .font(.system(size: 12))
                             .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(2)
+                            .lineLimit(1)
                     }
                     
                     Text(thread.lastMessageDate.formatted(date: .abbreviated, time: .omitted))
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.3))
                 }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.3))
             }
-            .padding(16)
-            .background {
-                ZStack {
-                    // Gradient background based on book cover color
-                    LinearGradient(
-                        colors: [
-                            dominantColor.opacity(0.3),
-                            dominantColor.opacity(0.1),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    
-                    // Glass effect on top
-                    Color.white.opacity(0.05)
-                        .background(.ultraThinMaterial)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.3))
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(16)
+        .background {
+            ZStack {
+                // Gradient background based on book cover color
+                LinearGradient(
+                    colors: [
+                        dominantColor.opacity(0.3),
+                        dominantColor.opacity(0.1),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                
+                // Glass effect on top
+                Color.white.opacity(0.05)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+        }
         .contextMenu {
             Button(role: .destructive) {
                 onDelete()
@@ -439,4 +461,3 @@ struct BookChatCard: View {
         }
     }
 }
-

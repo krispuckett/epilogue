@@ -238,10 +238,13 @@ Verify glass effects render properly
 Commit working code immediately
 Use Apple's exact syntax from documentation
 
+
+
 Core Architecture Requirements
 1. Natural Language Capture System
 swift// DIRECTIVE: Create intelligent capture system with fuzzy matching
 struct CaptureIntent {
+    
     enum IntentType {
         case addBook(title: String, author: String?)
         case saveQuote(text: String, page: Int?)

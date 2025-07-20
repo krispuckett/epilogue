@@ -8,10 +8,6 @@ struct ContentView: View {
     @State private var selectedDetent: PresentationDetent = .height(300)
     @Namespace private var animation
     
-    #if DEBUG
-    @State private var showTestResults = false
-    #endif
-    
     init() {
         print("🏠 DEBUG: ContentView init")
         
@@ -49,9 +45,7 @@ struct ContentView: View {
                 }
                 .tag(1)
                 
-                NavigationStack {
-                    ChatView()
-                }
+                ChatView()
                 .tabItem {
                     Label("Chat", systemImage: "message.fill")
                 }
@@ -125,31 +119,6 @@ struct ContentView: View {
                 // NotesView will handle the scrolling and editing
             }
         }
-        #if DEBUG
-        .overlay(alignment: .topTrailing) {
-            // Debug menu button
-            Menu {
-                Button("Run Intent Tests") {
-                    // TODO: Add intent tests
-                    print("Intent tests not yet implemented")
-                }
-                Button("Clear All Data") {
-                    // Clear all books and notes
-                    print("Clearing all data...")
-                }
-                Button("Load Sample Data") {
-                    // Load sample data
-                    print("Loading sample data...")
-                }
-            } label: {
-                Image(systemName: "hammer.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.orange)
-                    .padding()
-            }
-            .padding(.top, 50)
-        }
-        #endif
     }
 }
 

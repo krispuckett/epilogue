@@ -6,9 +6,9 @@ import CoreImage.CIFilterBuiltins
 
 struct ChatConversationView: View {
     let thread: ChatThread
-    @Binding var showingThreadList: Bool
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(\.dismiss) private var dismiss
     
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
@@ -25,22 +25,10 @@ struct ChatConversationView: View {
     
     @State private var showingClearConfirmation = false
     
-    // Book cover color extraction
-    @State private var dominantColor: Color = Color(red: 0.11, green: 0.105, blue: 0.102)
-    @State private var secondaryColor: Color = Color(red: 0.15, green: 0.14, blue: 0.135)
-    
     // Computed property for the accent color to use
     private var accentColor: Color {
-        // Check if dominant color is too dark (near black)
-        let uiColor = UIColor(dominantColor)
-        var brightness: CGFloat = 0
-        uiColor.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
-        
-        // If too dark, use secondary color or fallback
-        if brightness < 0.3 {
-            return secondaryColor != Color(red: 0.15, green: 0.14, blue: 0.135) ? secondaryColor : Color(red: 1.0, green: 0.55, blue: 0.26)
-        }
-        return dominantColor
+        // Use warm amber as the default accent color
+        return Color(red: 1.0, green: 0.55, blue: 0.26)
     }
     
     // Try to get cover URL from thread or find matching book in library
@@ -63,13 +51,11 @@ struct ChatConversationView: View {
     
     var body: some View {
         ZStack {
-            // Book-themed background with extracted colors
+            // Background based on chat type
             if thread.bookId != nil {
-                BookChatBackground(
-                    dominantColor: dominantColor,
-                    secondaryColor: secondaryColor,
-                    animationPhase: $animationPhase
-                )
+                // Book chat - simple dark background
+                Color.midnightScholar
+                    .ignoresSafeArea()
             } else {
                 // General discussion background
                 AmbientBackground(animationPhase: $animationPhase, orbPositions: $orbPositions)
@@ -123,7 +109,7 @@ struct ChatConversationView: View {
                             .id("bottom")
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 60) // Space for custom header
+                    .padding(.top, 8)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: thread.messages.count) { _, _ in
@@ -133,16 +119,6 @@ struct ChatConversationView: View {
                 }
             }
             
-            // Custom header overlay
-            VStack {
-                CustomChatHeader(
-                    title: thread.bookTitle ?? "General Discussion",
-                    onBack: { showingThreadList = true },
-                    onClear: { showingClearConfirmation = true },
-                    accentColor: thread.bookId != nil ? accentColor : Color(red: 1.0, green: 0.55, blue: 0.26)
-                )
-                Spacer()
-            }
         }
         .safeAreaInset(edge: .bottom) {
             ThreadInputField(
@@ -155,7 +131,22 @@ struct ChatConversationView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .navigationBarHidden(true)
+        .navigationTitle(thread.bookTitle ?? "General Discussion")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive) {
+                        showingClearConfirmation = true
+                    } label: {
+                        Label("Clear Chat", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.white)
+                }
+            }
+        }
         .alert("Clear all messages?", isPresented: $showingClearConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Clear Chat", role: .destructive) {
@@ -166,7 +157,6 @@ struct ChatConversationView: View {
         }
         .onAppear {
             startAmbientAnimation()
-            extractBookCoverColors()
             // Limit messages to prevent memory issues
             if thread.messages.count > 100 {
                 // Keep only the last 50 messages
@@ -272,133 +262,6 @@ struct ChatConversationView: View {
     private func startAmbientAnimation() {
         withAnimation(.linear(duration: 60).repeatForever(autoreverses: false)) {
             animationPhase = 2 * .pi
-        }
-    }
-    
-    private func extractBookCoverColors() {
-        guard let coverURL = effectiveCoverURL else { return }
-        
-        // Enhance URL for better quality
-        var enhanced = coverURL.replacingOccurrences(of: "http://", with: "https://")
-        if !enhanced.contains("zoom=") {
-            enhanced += enhanced.contains("?") ? "&zoom=2" : "?zoom=2"
-        }
-        
-        guard let url = URL(string: enhanced) else { return }
-        
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            if let data = data, let uiImage = UIImage(data: data) {
-                DispatchQueue.main.async {
-                    self.extractColors(from: uiImage)
-                }
-            }
-        }.resume()
-    }
-    
-    private func extractColors(from image: UIImage) {
-        guard let ciImage = CIImage(image: image) else { return }
-        
-        let context = CIContext()
-        let size = CGSize(width: 50, height: 50)
-        
-        // Scale down for performance
-        let scaleFilter = CIFilter.lanczosScaleTransform()
-        scaleFilter.inputImage = ciImage
-        scaleFilter.scale = Float(size.width / ciImage.extent.width)
-        
-        guard let outputImage = scaleFilter.outputImage else { return }
-        
-        // Extract colors
-        let extent = outputImage.extent
-        let bitmap = context.createCGImage(outputImage, from: extent)
-        
-        guard let cgImage = bitmap else { return }
-        
-        let width = cgImage.width
-        let height = cgImage.height
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * width
-        let bitsPerComponent = 8
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        
-        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
-        
-        let bitmapContext = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
-            bitsPerComponent: bitsPerComponent,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )
-        
-        bitmapContext?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        
-        // Collect all colors with their frequencies
-        var colorCounts: [UIColor: Int] = [:]
-        
-        for y in 0..<height {
-            for x in 0..<width {
-                let index = ((width * y) + x) * bytesPerPixel
-                let r = CGFloat(pixelData[index]) / 255.0
-                let g = CGFloat(pixelData[index + 1]) / 255.0
-                let b = CGFloat(pixelData[index + 2]) / 255.0
-                
-                // Quantize colors to reduce variations
-                let quantizedR = round(r * 10) / 10
-                let quantizedG = round(g * 10) / 10
-                let quantizedB = round(b * 10) / 10
-                
-                let color = UIColor(red: quantizedR, green: quantizedG, blue: quantizedB, alpha: 1.0)
-                colorCounts[color, default: 0] += 1
-            }
-        }
-        
-        // Sort colors by frequency and filter out very dark/light colors
-        let sortedColors = colorCounts.sorted { $0.value > $1.value }
-            .compactMap { (color, _) -> (UIColor, CGFloat, CGFloat, CGFloat)? in
-                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
-                color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                
-                // Filter out very dark, very light, or desaturated colors
-                if b > 0.2 && b < 0.95 && s > 0.2 {
-                    return (color, h, s, b)
-                }
-                return nil
-            }
-        
-        // Get primary and secondary colors
-        if let firstColor = sortedColors.first {
-            let (_, h1, s1, b1) = firstColor
-            
-            // Boost saturation for primary color
-            let boostedS1 = min(s1 * 1.5, 1.0)
-            let boostedB1 = min(b1 * 1.3, 0.85)
-            
-            withAnimation(.easeInOut(duration: 0.8)) {
-                dominantColor = Color(hue: Double(h1), saturation: Double(boostedS1), brightness: Double(boostedB1))
-            }
-            
-            // Look for a contrasting secondary color
-            if sortedColors.count > 1 {
-                // Find a color with different hue
-                for i in 1..<min(sortedColors.count, 10) {
-                    let (_, h2, s2, b2) = sortedColors[i]
-                    let hueDiff = abs(h1 - h2)
-                    
-                    // If hue is different enough (at least 30 degrees on color wheel)
-                    if hueDiff > 0.083 && hueDiff < 0.917 { // 30/360 and not opposite
-                        let boostedS2 = min(s2 * 1.4, 1.0)
-                        let boostedB2 = min(b2 * 1.2, 0.8)
-                        
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            secondaryColor = Color(hue: Double(h2), saturation: Double(boostedS2), brightness: Double(boostedB2))
-                        }
-                        break
-                    }
-                }
-            }
         }
     }
     
@@ -622,8 +485,6 @@ struct ThreadInputField: View {
                     ))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: text.isEmpty)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSuggestions)
@@ -688,112 +549,7 @@ struct ThreadSmartSuggestions: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
         }
         .frame(height: 40)
-        .padding(.bottom, 8)
-    }
-}
-
-// MARK: - Custom Chat Header
-struct CustomChatHeader: View {
-    let title: String
-    let onBack: () -> Void
-    let onClear: () -> Void
-    let accentColor: Color
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Back button
-            Button(action: onBack) {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Chats")
-                        .font(.system(size: 16, weight: .medium))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-            }
-            .glassEffect(.clear.tint(accentColor.opacity(0.2)), in: RoundedRectangle(cornerRadius: 16))
-            
-            // Title with proper spacing and wrapping
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .lineLimit(2) // Allow up to 2 lines
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity)
-                .padding(.trailing, 100) // Add padding to balance the back button width
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-}
-
-// MARK: - Book Chat Background
-struct BookChatBackground: View {
-    let dominantColor: Color
-    let secondaryColor: Color
-    @Binding var animationPhase: Double
-    
-    var body: some View {
-        ZStack {
-            // Base midnight scholar background
-            Color(red: 0.11, green: 0.105, blue: 0.102)
-                .ignoresSafeArea()
-            
-            // Ambient gradient background from book colors (matching BookDetailView)
-            LinearGradient(
-                colors: [
-                    dominantColor.opacity(0.4),
-                    secondaryColor.opacity(0.3),
-                    dominantColor.opacity(0.2),
-                    Color.clear
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            // Radial glow at the top with secondary color accent
-            RadialGradient(
-                colors: [
-                    secondaryColor == .clear ? dominantColor.opacity(0.3) : secondaryColor.opacity(0.4),
-                    dominantColor.opacity(0.2),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 50,
-                endRadius: 300
-            )
-            .ignoresSafeArea()
-            .blendMode(.plusLighter)
-            
-            // Subtle animated glow orbs
-            ForEach(0..<2) { index in
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            gradient: Gradient(colors: [
-                                index == 0 ? dominantColor.opacity(0.2) : secondaryColor.opacity(0.2),
-                                Color.clear
-                            ]),
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 100
-                        )
-                    )
-                    .frame(width: 200, height: 200)
-                    .blur(radius: 50)
-                    .offset(
-                        x: sin(animationPhase + Double(index) * .pi) * 80,
-                        y: cos(animationPhase + Double(index) * .pi) * 120
-                    )
-                    .opacity(0.6)
-            }
-        }
     }
 }

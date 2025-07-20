@@ -7,8 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01634D3F2E2C492D00A75D84 /* MeshGradientSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D3E2E2C492D00A75D84 /* MeshGradientSystem.swift */; };
+		01634D7D2E2C82D500A75D84 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D7C2E2C82D500A75D84 /* BookDetailView.swift */; };
+		01634D7F2E2C849800A75D84 /* GradientTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D7E2E2C849800A75D84 /* GradientTestView.swift */; };
+		01634D822E2C950000A75D84 /* FluidGradientSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D832E2C950000A75D84 /* FluidGradientSystem.swift */; };
+		01634D842E2C960000A75D84 /* BoldLuminanceGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D852E2C960000A75D84 /* BoldLuminanceGradient.swift */; };
+		01634D862E2C970000A75D84 /* MeshLuminanceGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D872E2C970000A75D84 /* MeshLuminanceGradient.swift */; };
+		01634D882E2C980000A75D84 /* CinematicBookGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01634D892E2C980000A75D84 /* CinematicBookGradient.swift */; };
 		01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C32E2491BD00E04A55 /* NotesView.swift */; };
-		F7802A44A6D54149A56326BD /* NoteCardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */; };
 		01BC21C62E25806C00E04A55 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C52E25806C00E04A55 /* BookDetailView.swift */; };
 		01BC21C82E260B8A00E04A55 /* EditBookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */; };
 		01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */; };
@@ -47,6 +53,7 @@
 		2B12349B1234567890123456 /* CommandSuggestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B12349C1234567890123456 /* CommandSuggestionsView.swift */; };
 		2B12349D1234567890123456 /* GoogleBooksAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B12349E1234567890123456 /* GoogleBooksAPI.swift */; };
 		87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */; };
+		F7802A44A6D54149A56326BD /* NoteCardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,8 +74,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		01634D3E2E2C492D00A75D84 /* MeshGradientSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshGradientSystem.swift; sourceTree = "<group>"; };
+		01634D7C2E2C82D500A75D84 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
+		01634D7E2E2C849800A75D84 /* GradientTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientTestView.swift; sourceTree = "<group>"; };
+		01634D832E2C950000A75D84 /* FluidGradientSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FluidGradientSystem.swift; sourceTree = "<group>"; };
+		01634D852E2C960000A75D84 /* BoldLuminanceGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoldLuminanceGradient.swift; sourceTree = "<group>"; };
+		01634D872E2C970000A75D84 /* MeshLuminanceGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshLuminanceGradient.swift; sourceTree = "<group>"; };
+		01634D892E2C980000A75D84 /* CinematicBookGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinematicBookGradient.swift; sourceTree = "<group>"; };
 		01BC21C32E2491BD00E04A55 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
-		AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCardComponents.swift; sourceTree = "<group>"; };
 		01BC21C52E25806C00E04A55 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		01BC21C72E260B8A00E04A55 /* EditBookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditBookSheet.swift; sourceTree = "<group>"; };
 		01BC21CC2E26AB3E00E04A55 /* LiquidCommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidCommandPalette.swift; sourceTree = "<group>"; };
@@ -112,6 +125,7 @@
 		2B12349C1234567890123456 /* CommandSuggestionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandSuggestionsView.swift; sourceTree = "<group>"; };
 		2B12349E1234567890123456 /* GoogleBooksAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleBooksAPI.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6789012345678 /* LiquidEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidEditSheet.swift; sourceTree = "<group>"; };
+		AE066155B5A44AAA89244F02 /* NoteCardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCardComponents.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -212,6 +226,13 @@
 		2B1234831234567890123456 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				01634D7E2E2C849800A75D84 /* GradientTestView.swift */,
+				01634D832E2C950000A75D84 /* FluidGradientSystem.swift */,
+				01634D852E2C960000A75D84 /* BoldLuminanceGradient.swift */,
+				01634D872E2C970000A75D84 /* MeshLuminanceGradient.swift */,
+				01634D892E2C980000A75D84 /* CinematicBookGradient.swift */,
+				01634D7C2E2C82D500A75D84 /* BookDetailView.swift */,
+				01634D3E2E2C492D00A75D84 /* MeshGradientSystem.swift */,
 				01BC21F62E2A0E3800E04A55 /* QuickSuggestionsView.swift */,
 				01BC21F42E2A0E1A00E04A55 /* GlassButton.swift */,
 				01BC21F52E295D8900E04A55 /* BookContextMenu.swift */,
@@ -387,10 +408,12 @@
 				01BC21E12E28413800E04A55 /* LiteraryCompanion.metal in Sources */,
 				01BC21D02E26AB3E00E04A55 /* LiquidCommandPalette.swift in Sources */,
 				01BC21F42E295D8900E04A55 /* BookContextMenu.swift in Sources */,
+				01634D7D2E2C82D500A75D84 /* BookDetailView.swift in Sources */,
 				01BC21F62E295E8900E04A55 /* NoteContextMenu.swift in Sources */,
 				01BC21E92E2949B300E04A55 /* AmbientBackground.swift in Sources */,
 				01BC21E42E2931C100E04A55 /* ChatThreadListView.swift in Sources */,
 				01BC21E52E2931C100E04A55 /* ChatConversationView.swift in Sources */,
+				01634D3F2E2C492D00A75D84 /* MeshGradientSystem.swift in Sources */,
 				01BC21D42E27566800E04A55 /* ChatView.swift in Sources */,
 				01BC21DC2E28371900E04A55 /* MetalLiteraryView.swift in Sources */,
 				87654321FEDCBA9876543210 /* LiquidEditSheet.swift in Sources */,
@@ -410,6 +433,11 @@
 				01BC21ED2E29533C00E04A55 /* ChatInputBar.swift in Sources */,
 				01BC21F82E295F8900E04A55 /* InteractiveChatInputBar.swift in Sources */,
 				01BC21FA2E295F9900E04A55 /* SharedBookCoverView.swift in Sources */,
+				01634D7F2E2C849800A75D84 /* GradientTestView.swift in Sources */,
+				01634D822E2C950000A75D84 /* FluidGradientSystem.swift in Sources */,
+				01634D842E2C960000A75D84 /* BoldLuminanceGradient.swift in Sources */,
+				01634D862E2C970000A75D84 /* MeshLuminanceGradient.swift in Sources */,
+				01634D882E2C980000A75D84 /* CinematicBookGradient.swift in Sources */,
 				2B1234921234567890123456 /* QuickCaptureSheet.swift in Sources */,
 				2B1234941234567890123456 /* BookSearchSheet.swift in Sources */,
 				01BC21C42E2491BD00E04A55 /* NotesView.swift in Sources */,
