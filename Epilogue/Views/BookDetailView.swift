@@ -396,7 +396,15 @@ struct BookDetailView: View {
             }
         }
         .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 20))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .background {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.03))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5)
+                }
+        }
     }
     
     private var quotesSection: some View {
