@@ -396,10 +396,7 @@ struct BookDetailView: View {
             }
         }
         .padding(20)
-        .background {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.03))  // Very subtle fill
-        }
+        .glassEffect(in: RoundedRectangle(cornerRadius: 20))
     }
     
     private var quotesSection: some View {
