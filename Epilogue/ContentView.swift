@@ -64,7 +64,7 @@ struct ContentView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 16, weight: .medium))
-                            Text("Quick Add")
+                            Text("Quick Actions")
                                 .font(.system(size: 14, weight: .medium))
                         }
                         .foregroundStyle(.white)

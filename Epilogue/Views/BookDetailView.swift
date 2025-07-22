@@ -305,9 +305,9 @@ struct BookDetailView: View {
                                 Text(status.rawValue)
                             } icon: {
                                 Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(status == book.readingStatus ? adaptiveAccentColor : adaptiveSecondaryTextColor)
                             }
                         }
+                        .tint(adaptiveAccentColor)
                     }
                 } label: {
                     StatusPill(text: book.readingStatus.rawValue, color: adaptiveAccentColor, interactive: true)
