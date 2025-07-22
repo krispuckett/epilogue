@@ -16,6 +16,7 @@ struct LibraryView: View {
     @State private var scrollToBookId: UUID? = nil
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
+    @State private var showingAccentColorDebug = false
     
     enum ViewMode {
         case grid, list
@@ -181,6 +182,17 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
             }
+            
+            #if DEBUG
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    showingAccentColorDebug = true
+                } label: {
+                    Image(systemName: "paintpalette")
+                        .foregroundColor(.warmAmber)
+                }
+            }
+            #endif
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
         .sheet(isPresented: $showingCoverPicker) {
@@ -195,6 +207,10 @@ struct LibraryView: View {
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showingAccentColorDebug) {
+            AccentColorDebugView()
+                .environmentObject(viewModel)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {
@@ -217,7 +233,7 @@ struct LibraryGridItem: View {
     
     var body: some View {
         GeometryReader { geo in
-            NavigationLink(destination: BookDetailView(book: book)) {
+            NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
                 LibraryBookCard(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .overlay(highlightOverlay)
@@ -310,7 +326,7 @@ struct LibraryListItemWrapper: View {
     
     var body: some View {
         GeometryReader { geo in
-            NavigationLink(destination: BookDetailView(book: book)) {
+            NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
                 LibraryBookListItem(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
                     .overlay(highlightOverlay)
             }

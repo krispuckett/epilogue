@@ -65,6 +65,29 @@ struct BookDetailView: View {
     @State private var dominantColor: Color = .midnightScholar
     @State private var secondaryColor: Color = .clear
     @State private var accentColor: Color = .warmAmber
+    @State private var needsHighContrast: Bool = false
+    @State private var backgroundLuminance: Double = 0.5
+    
+    // Computed properties for adaptive UI colors
+    private var adaptiveTextColor: Color {
+        needsHighContrast ? Color.white : .warmWhite
+    }
+    
+    private var adaptiveSecondaryTextColor: Color {
+        needsHighContrast ? Color.white.opacity(0.8) : .warmWhite.opacity(0.6)
+    }
+    
+    private var adaptiveAccentColor: Color {
+        if needsHighContrast {
+            // For blue/monochromatic backgrounds, use bright white or light blue
+            if backgroundLuminance < 0.4 {
+                return Color(red: 0.7, green: 0.9, blue: 1.0) // Bright light blue
+            } else {
+                return Color.white // Pure white for medium backgrounds
+            }
+        }
+        return accentColor
+    }
     
     // Edit book states
     @State private var showingBookSearch = false
@@ -121,6 +144,12 @@ struct BookDetailView: View {
                         withAnimation(.easeInOut(duration: 0.5)) {
                             accentColor = extractedAccent
                         }
+                    },
+                    onBackgroundAnalyzed: { luminance, needsContrast in
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            backgroundLuminance = luminance
+                            needsHighContrast = needsContrast
+                        }
                     }
                 )
                 .ignoresSafeArea()
@@ -175,16 +204,14 @@ struct BookDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Text("Edit")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .glassEffect(in: RoundedRectangle(cornerRadius: 16))
-                    .onTapGesture {
-                        editedTitle = book.title
-                        showingBookSearch = true
-                    }
+                Button("Edit Book") {
+                    editedTitle = book.title
+                    showingBookSearch = true
+                    HapticManager.shared.lightTap()
+                }
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white)
+                // No background, glassEffect, or overlay!
             }
         }
         .sheet(isPresented: $showingBookSearch) {
@@ -233,7 +260,7 @@ struct BookDetailView: View {
             // Title
             Text(book.title)
                 .font(.system(size: 28, weight: .semibold, design: .serif))
-                .foregroundColor(.warmWhite)
+                .foregroundColor(adaptiveTextColor)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
             
@@ -245,18 +272,18 @@ struct BookDetailView: View {
                     Text("by \(book.author)")
                         .font(.system(size: 16, weight: .regular, design: .monospaced))
                         .kerning(1.2)
-                        .foregroundColor(.warmWhite.opacity(0.8))
+                        .foregroundColor(adaptiveTextColor.opacity(0.8))
                 } else {
                     Text("by")
                         .font(.system(size: 14, weight: .regular, design: .monospaced))
                         .kerning(1.2)
-                        .foregroundColor(.warmWhite.opacity(0.6))
+                        .foregroundColor(adaptiveSecondaryTextColor)
                     
                     ForEach(authors, id: \.self) { author in
                         Text(author)
                             .font(.system(size: 16, weight: .regular, design: .monospaced))
                             .kerning(1.2)
-                            .foregroundColor(.warmWhite.opacity(0.8))
+                            .foregroundColor(adaptiveTextColor.opacity(0.8))
                     }
                 }
             }
@@ -278,22 +305,22 @@ struct BookDetailView: View {
                                 Text(status.rawValue)
                             } icon: {
                                 Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(status == book.readingStatus ? accentColor : .secondary)
+                                    .foregroundColor(status == book.readingStatus ? adaptiveAccentColor : adaptiveSecondaryTextColor)
                             }
                         }
                     }
                 } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                    StatusPill(text: book.readingStatus.rawValue, color: adaptiveAccentColor, interactive: true)
                 }
                 
                 if let pageCount = book.pageCount {
                     Text("\(book.currentPage) of \(pageCount) pages")
                         .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        .foregroundColor(.warmWhite.opacity(0.7))
+                        .foregroundColor(adaptiveTextColor.opacity(0.7))
                 }
                 
                 if let rating = book.userRating {
-                    StatusPill(text: "★ \(rating)", color: accentColor.opacity(0.8))
+                    StatusPill(text: "★ \(rating)", color: adaptiveAccentColor.opacity(0.8))
                 }
             }
             .padding(.top, 8)
@@ -310,17 +337,15 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "text.book.closed")
                     .font(.system(size: 16))
-                    .foregroundColor(accentColor.opacity(0.8))
+                    .foregroundColor(adaptiveAccentColor)
+                    .padding(6)
+                    .glassEffect(in: Circle())
                 
                 Text("Summary")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.warmWhite)
+                    .foregroundColor(adaptiveTextColor)
                 
                 Spacer()
-                
-                Image(systemName: summaryExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.warmWhite.opacity(0.6))
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -332,7 +357,7 @@ struct BookDetailView: View {
             // Summary text
             Text(description)
                 .font(.system(size: 15, weight: .regular))
-                .foregroundColor(.warmWhite.opacity(0.85))
+                .foregroundColor(adaptiveTextColor.opacity(0.85))
                 .lineSpacing(8)
                 .lineLimit(summaryExpanded ? nil : 4)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: summaryExpanded)
@@ -352,7 +377,10 @@ struct BookDetailView: View {
                             Image(systemName: "arrow.right")
                                 .font(.system(size: 12))
                         }
-                        .foregroundColor(accentColor)
+                        .foregroundColor(adaptiveAccentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .glassEffect(in: Capsule())
                     }
                 }
             }
@@ -383,7 +411,7 @@ struct BookDetailView: View {
                         Text(section.rawValue)
                             .font(.system(size: 16, weight: .medium))
                     }
-                    .foregroundColor(selectedSection == section ? .warmWhite : .warmWhite.opacity(0.6))
+                    .foregroundColor(selectedSection == section ? adaptiveTextColor : adaptiveSecondaryTextColor)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)
                     .background {
@@ -420,18 +448,30 @@ struct BookDetailView: View {
                 } label: {
                     Image(systemName: section.icon)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(selectedSection == section ? accentColor : .warmWhite.opacity(0.6))
+                        .foregroundColor(selectedSection == section ? adaptiveAccentColor : adaptiveSecondaryTextColor)
                         .frame(width: 44, height: 44)
                         .background {
-                            if selectedSection == section {
-                                Circle()
-                                    .fill(accentColor.opacity(0.15))
-                                    .overlay {
-                                        Circle()
-                                            .strokeBorder(accentColor.opacity(0.3), lineWidth: 1)
-                                    }
-                                    .shadow(color: accentColor.opacity(0.3), radius: 6)
-                                    .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
+                            ZStack {
+                                // Always show background for medium brightness covers
+                                if backgroundLuminance > 0.3 && backgroundLuminance < 0.7 {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.3))
+                                        .overlay {
+                                            Circle()
+                                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                                        }
+                                }
+                                
+                                if selectedSection == section {
+                                    Circle()
+                                        .fill(adaptiveAccentColor.opacity(0.15))
+                                        .overlay {
+                                            Circle()
+                                                .strokeBorder(adaptiveAccentColor.opacity(0.3), lineWidth: 1)
+                                        }
+                                        .shadow(color: adaptiveAccentColor.opacity(0.3), radius: 6)
+                                        .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
+                                }
                             }
                         }
                 }
@@ -693,6 +733,7 @@ struct BookDetailView: View {
                 DispatchQueue.main.async {
                     self.coverImage = uiImage
                     self.extractDominantColor(from: uiImage)
+                    // Note: Accent color extraction is handled by CinematicBookGradient via onAccentColorExtracted callback
                 }
             }
         }.resume()
