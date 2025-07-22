@@ -138,40 +138,16 @@ struct BookDetailView: View {
                     centeredHeaderView
                         .padding(.horizontal, 20)
                     
-                    // Summary card
+                    // Summary section
                     if let description = book.description {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Label("Summary", systemImage: "book.pages")
-                                .font(.headline)
-                                .foregroundColor(textColor.opacity(0.9))
-                            
-                            Text(description)
-                                .font(.body)
-                                .foregroundColor(textColor.opacity(0.8))
-                                .lineSpacing(4)
-                                .lineLimit(summaryExpanded ? nil : 4)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: summaryExpanded)
-                            
-                            // Read more/less button
-                            if description.count > 200 {
-                                Button {
-                                    withAnimation {
-                                        summaryExpanded.toggle()
-                                    }
-                                } label: {
-                                    Text(summaryExpanded ? "Read less" : "Read more")
-                                        .font(.caption)
-                                        .foregroundColor(accentColor)
-                                }
-                            }
-                        }
-                        .padding(20)
-                        .glassEffect(in: RoundedRectangle(cornerRadius: 20))
-                        .padding(.horizontal, 20)  // Card has margin from edges
+                        summarySection(description: description)
+                            .padding(.horizontal, 24)  // THIS IS THE KEY!
+                            .padding(.top, 32)
                     }
                     
                     // Content sections
                     contentView
+                        .padding(.horizontal, 24)
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 100)  // Space for tab bar
@@ -393,6 +369,39 @@ struct BookDetailView: View {
         .animation(.easeInOut(duration: 0.2), value: selectedSection)
     }
     
+    private func summarySection(description: String) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Summary", systemImage: "book.pages")
+                .font(.headline)
+                .foregroundColor(textColor.opacity(0.9))
+            
+            Text(description)
+                .font(.body)
+                .foregroundColor(textColor.opacity(0.8))
+                .lineSpacing(4)
+                .lineLimit(summaryExpanded ? nil : 4)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: summaryExpanded)
+            
+            // Read more/less button
+            if description.count > 200 {
+                Button {
+                    withAnimation {
+                        summaryExpanded.toggle()
+                    }
+                } label: {
+                    Text(summaryExpanded ? "Read less" : "Read more")
+                        .font(.caption)
+                        .foregroundColor(accentColor)
+                }
+            }
+        }
+        .padding(20)
+        .background {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.03))  // Very subtle fill
+        }
+    }
+    
     private var quotesSection: some View {
         VStack(spacing: 16) {
             if bookQuotes.isEmpty {
@@ -401,11 +410,9 @@ struct BookDetailView: View {
                     title: "No quotes yet",
                     subtitle: "Use the command bar below to add a quote"
                 )
-                .padding(.horizontal, 20)
             } else {
                 ForEach(bookQuotes) { quote in
                     BookQuoteCard(quote: quote)
-                        .padding(.horizontal, 20)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -433,11 +440,9 @@ struct BookDetailView: View {
                     title: "No notes yet",
                     subtitle: "Use the command bar below to add a note"
                 )
-                .padding(.horizontal, 20)
             } else {
                 ForEach(bookNotes) { note in
                     BookNoteCard(note: note)
-                        .padding(.horizontal, 20)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -487,7 +492,6 @@ struct BookDetailView: View {
                             // Messages
                             ForEach(thread.messages) { message in
                                 ChatMessageBubble(message: message, accentColor: accentColor, textColor: textColor)
-                                    .padding(.horizontal, 20)
                                     .id(message.id)
                             }
                             
@@ -527,7 +531,6 @@ struct BookDetailView: View {
                     }
                     .disabled(messageText.isEmpty)
                 }
-                .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             } else {
                 // Loading state
