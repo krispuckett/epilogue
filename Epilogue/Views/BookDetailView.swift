@@ -44,6 +44,19 @@ extension Color {
     }
 }
 
+// MARK: - Helper Extensions
+extension View {
+    @ViewBuilder
+    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+    
+}
+
 struct BookDetailView: View {
     let book: Book
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -61,32 +74,12 @@ struct BookDetailView: View {
     // UI States
     @State private var summaryExpanded = false
     @State private var scrollOffset: CGFloat = 0
-    @State private var coverImage: UIImage?
-    @State private var dominantColor: Color = .midnightScholar
-    @State private var secondaryColor: Color = .clear
-    @State private var accentColor: Color = .warmAmber
-    @State private var needsHighContrast: Bool = false
-    @State private var backgroundLuminance: Double = 0.5
+    @State private var textColor: Color = .white
+    @State private var backgroundBrightness: Double = 0.5
+    @State private var accentColor: Color = Color(red: 1.0, green: 0.8, blue: 0.0) // Default yellow/gold
     
-    // Computed properties for adaptive UI colors
-    private var adaptiveTextColor: Color {
-        needsHighContrast ? Color.white : .warmWhite
-    }
-    
-    private var adaptiveSecondaryTextColor: Color {
-        needsHighContrast ? Color.white.opacity(0.8) : .warmWhite.opacity(0.6)
-    }
-    
-    private var adaptiveAccentColor: Color {
-        if needsHighContrast {
-            // For blue/monochromatic backgrounds, use bright white or light blue
-            if backgroundLuminance < 0.4 {
-                return Color(red: 0.7, green: 0.9, blue: 1.0) // Bright light blue
-            } else {
-                return Color.white // Pure white for medium backgrounds
-            }
-        }
-        return accentColor
+    private var secondaryTextColor: Color {
+        textColor.opacity(0.8)
     }
     
     // Edit book states
@@ -131,64 +124,57 @@ struct BookDetailView: View {
         }
     }
     
+    
     var body: some View {
         ZStack {
-            // Cinematic gradient background (Netflix-style)
-            if let coverImage = coverImage {
-                CinematicBookGradient(
-                    bookCoverImage: coverImage,
-                    bookTitle: book.title,
-                    bookAuthor: book.author,
-                    scrollOffset: scrollOffset,
-                    onAccentColorExtracted: { extractedAccent in
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            accentColor = extractedAccent
-                        }
-                    },
-                    onBackgroundAnalyzed: { luminance, needsContrast in
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            backgroundLuminance = luminance
-                            needsHighContrast = needsContrast
-                        }
-                    }
-                )
+            // Simple ambient background
+            AmbientBookView(book: book, scrollOffset: $scrollOffset, textColor: $textColor)
                 .ignoresSafeArea()
-                .transition(.opacity.animation(.easeInOut(duration: 0.8)))
-            } else {
-                // Fallback gradient while loading
-                LinearGradient(
-                    colors: [
-                        dominantColor.opacity(0.4),
-                        secondaryColor.opacity(0.3),
-                        dominantColor.opacity(0.2),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.8), value: dominantColor)
-            }
             
             // Content
             ScrollView {
-                VStack(spacing: 0) {
-                    // Centered header with book info
+                VStack(spacing: 24) {
+                    // Book info section
                     centeredHeaderView
-                        .padding(.top, 20)
+                        .padding(.horizontal, 20)
                     
-                    // Summary section
+                    // Summary card
                     if let description = book.description {
-                        summarySection(description: description)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 32)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Label("Summary", systemImage: "book.pages")
+                                .font(.headline)
+                                .foregroundColor(textColor.opacity(0.9))
+                            
+                            Text(description)
+                                .font(.body)
+                                .foregroundColor(textColor.opacity(0.8))
+                                .lineSpacing(4)
+                                .lineLimit(summaryExpanded ? nil : 4)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: summaryExpanded)
+                            
+                            // Read more/less button
+                            if description.count > 200 {
+                                Button {
+                                    withAnimation {
+                                        summaryExpanded.toggle()
+                                    }
+                                } label: {
+                                    Text(summaryExpanded ? "Read less" : "Read more")
+                                        .font(.caption)
+                                        .foregroundColor(accentColor)
+                                }
+                            }
+                        }
+                        .padding(20)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 20))
+                        .padding(.horizontal, 20)  // Card has margin from edges
                     }
                     
                     // Content sections
                     contentView
-                        .padding(.top, 24)
-                        .padding(.bottom, 100) // Space for tab bar
                 }
+                .padding(.top, 20)
+                .padding(.bottom, 100)  // Space for tab bar
             }
             .background(GeometryReader { geometry in
                 Color.clear.preference(
@@ -211,6 +197,8 @@ struct BookDetailView: View {
                 }
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
+                .accessibilityLabel("Edit book details")
+                .accessibilityHint("Opens book search to change book information")
                 // No background, glassEffect, or overlay!
             }
         }
@@ -226,7 +214,6 @@ struct BookDetailView: View {
             .environmentObject(libraryViewModel)
         }
         .onAppear {
-            loadCoverImage()
             findOrCreateThreadForBook()
         }
     }
@@ -234,22 +221,12 @@ struct BookDetailView: View {
     private var centeredHeaderView: some View {
         VStack(spacing: 16) {
             // Book Cover with 3D effect
-            Group {
-                if let coverImage = coverImage {
-                    Image(uiImage: coverImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 180, height: 270)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
-                } else {
-                    SharedBookCoverView(
-                        coverURL: book.coverImageURL,
-                        width: 180,
-                        height: 270
-                    )
-                }
-            }
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 180,
+                height: 270
+            )
+            .accessibilityLabel("Book cover for \(book.title)")
             .rotation3DEffect(
                 Angle(degrees: 5),
                 axis: (x: 0, y: 1, z: 0),
@@ -257,10 +234,10 @@ struct BookDetailView: View {
             )
             .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset / 1000 : 0))
             
-            // Title
+            // Title - dynamic color with adaptive shadow
             Text(book.title)
                 .font(.system(size: 28, weight: .semibold, design: .serif))
-                .foregroundColor(adaptiveTextColor)
+                .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
             
@@ -272,19 +249,19 @@ struct BookDetailView: View {
                     Text("by \(book.author)")
                         .font(.system(size: 16, weight: .regular, design: .monospaced))
                         .kerning(1.2)
-                        .foregroundColor(adaptiveTextColor.opacity(0.8))
-                } else {
+                        .foregroundColor(textColor.opacity(0.8))
+                        } else {
                     Text("by")
                         .font(.system(size: 14, weight: .regular, design: .monospaced))
                         .kerning(1.2)
-                        .foregroundColor(adaptiveSecondaryTextColor)
-                    
+                        .foregroundColor(textColor.opacity(0.7))
+                            
                     ForEach(authors, id: \.self) { author in
                         Text(author)
                             .font(.system(size: 16, weight: .regular, design: .monospaced))
                             .kerning(1.2)
-                            .foregroundColor(adaptiveTextColor.opacity(0.8))
-                    }
+                            .foregroundColor(textColor.opacity(0.8))
+                                }
                 }
             }
             .multilineTextAlignment(.center)
@@ -307,20 +284,23 @@ struct BookDetailView: View {
                                 Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
                             }
                         }
-                        .tint(adaptiveAccentColor)
+                        .tint(accentColor)
                     }
                 } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: adaptiveAccentColor, interactive: true)
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                 }
+                .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 if let pageCount = book.pageCount {
                     Text("\(book.currentPage) of \(pageCount) pages")
                         .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        .foregroundColor(adaptiveTextColor.opacity(0.7))
+                        .foregroundColor(textColor.opacity(0.7))
+                                .accessibilityLabel("Progress: \(book.currentPage) of \(pageCount) pages")
                 }
                 
                 if let rating = book.userRating {
-                    StatusPill(text: "★ \(rating)", color: adaptiveAccentColor.opacity(0.8))
+                    StatusPill(text: "★ \(rating)", color: accentColor.opacity(0.8))
+                        .accessibilityLabel("Rating: \(rating) stars")
                 }
             }
             .padding(.top, 8)
@@ -331,71 +311,6 @@ struct BookDetailView: View {
         }
     }
     
-    private func summarySection(description: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header with icon
-            HStack {
-                Image(systemName: "text.book.closed")
-                    .font(.system(size: 16))
-                    .foregroundColor(adaptiveAccentColor)
-                    .padding(6)
-                    .glassEffect(in: Circle())
-                
-                Text("Summary")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(adaptiveTextColor)
-                
-                Spacer()
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    summaryExpanded.toggle()
-                }
-            }
-            
-            // Summary text
-            Text(description)
-                .font(.system(size: 15, weight: .regular))
-                .foregroundColor(adaptiveTextColor.opacity(0.85))
-                .lineSpacing(8)
-                .lineLimit(summaryExpanded ? nil : 4)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: summaryExpanded)
-            
-            // Read more/less button
-            if !summaryExpanded && description.count > 200 {
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            summaryExpanded = true
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("Read more")
-                                .font(.system(size: 14, weight: .medium))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundColor(adaptiveAccentColor)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .glassEffect(in: Capsule())
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.warmWhite.opacity(0.03))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color.warmWhite.opacity(0.05), lineWidth: 0.5)
-                }
-        }
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
     
     private var segmentedControl: some View {
         HStack(spacing: 0) {
@@ -411,7 +326,7 @@ struct BookDetailView: View {
                         Text(section.rawValue)
                             .font(.system(size: 16, weight: .medium))
                     }
-                    .foregroundColor(selectedSection == section ? adaptiveTextColor : adaptiveSecondaryTextColor)
+                    .foregroundColor(selectedSection == section ? textColor : secondaryTextColor)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)
                     .background {
@@ -448,33 +363,18 @@ struct BookDetailView: View {
                 } label: {
                     Image(systemName: section.icon)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(selectedSection == section ? adaptiveAccentColor : adaptiveSecondaryTextColor)
+                        .foregroundColor(selectedSection == section ? accentColor : textColor.opacity(0.6))
                         .frame(width: 44, height: 44)
                         .background {
-                            ZStack {
-                                // Always show background for medium brightness covers
-                                if backgroundLuminance > 0.3 && backgroundLuminance < 0.7 {
-                                    Circle()
-                                        .fill(Color.black.opacity(0.3))
-                                        .overlay {
-                                            Circle()
-                                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                                        }
-                                }
-                                
-                                if selectedSection == section {
-                                    Circle()
-                                        .fill(adaptiveAccentColor.opacity(0.15))
-                                        .overlay {
-                                            Circle()
-                                                .strokeBorder(adaptiveAccentColor.opacity(0.3), lineWidth: 1)
-                                        }
-                                        .shadow(color: adaptiveAccentColor.opacity(0.3), radius: 6)
-                                        .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
-                                }
+                            if selectedSection == section {
+                                Circle()
+                                    .fill(accentColor.opacity(0.15))
+                                    .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
                             }
                         }
                 }
+                .accessibilityLabel("\(section.rawValue) section")
+                .accessibilityHint(selectedSection == section ? "Currently selected" : "Tap to select")
             }
         }
     }
@@ -501,10 +401,11 @@ struct BookDetailView: View {
                     title: "No quotes yet",
                     subtitle: "Use the command bar below to add a quote"
                 )
+                .padding(.horizontal, 20)
             } else {
                 ForEach(bookQuotes) { quote in
                     BookQuoteCard(quote: quote)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 20)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -532,10 +433,11 @@ struct BookDetailView: View {
                     title: "No notes yet",
                     subtitle: "Use the command bar below to add a note"
                 )
+                .padding(.horizontal, 20)
             } else {
                 ForEach(bookNotes) { note in
                     BookNoteCard(note: note)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 20)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -571,11 +473,11 @@ struct BookDetailView: View {
                                     
                                     Text("Ask me about this book")
                                         .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(.warmWhite.opacity(0.8))
+                                        .foregroundColor(textColor.opacity(0.8))
                                     
                                     Text("I can help you explore themes, characters, or discuss any aspect of \"\(book.title)\"")
                                         .font(.system(size: 14))
-                                        .foregroundColor(.warmWhite.opacity(0.6))
+                                        .foregroundColor(textColor.opacity(0.6))
                                         .multilineTextAlignment(.center)
                                         .padding(.horizontal, 40)
                                 }
@@ -584,8 +486,8 @@ struct BookDetailView: View {
                             
                             // Messages
                             ForEach(thread.messages) { message in
-                                ChatMessageBubble(message: message, accentColor: accentColor)
-                                    .padding(.horizontal, 24)
+                                ChatMessageBubble(message: message, accentColor: accentColor, textColor: textColor)
+                                    .padding(.horizontal, 20)
                                     .id(message.id)
                             }
                             
@@ -625,7 +527,7 @@ struct BookDetailView: View {
                     }
                     .disabled(messageText.isEmpty)
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             } else {
                 // Loading state
@@ -634,7 +536,7 @@ struct BookDetailView: View {
                         .tint(accentColor)
                     Text("Setting up chat...")
                         .font(.system(size: 14))
-                        .foregroundColor(.warmWhite.opacity(0.6))
+                        .foregroundColor(textColor.opacity(0.6))
                 }
                 .padding(.vertical, 60)
             }
@@ -650,11 +552,11 @@ struct BookDetailView: View {
             VStack(spacing: 8) {
                 Text(title)
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.warmWhite.opacity(0.7))
+                    .foregroundColor(textColor.opacity(0.7))
                 
                 Text(subtitle)
                     .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.warmWhite.opacity(0.5))
+                    .foregroundColor(textColor.opacity(0.5))
                     .multilineTextAlignment(.center)
             }
         }
@@ -719,156 +621,6 @@ struct BookDetailView: View {
     
     // MARK: - Color Extraction
     
-    private func loadCoverImage() {
-        guard let coverURL = book.coverImageURL else { return }
-        
-        // Enhance Google Books image URL for higher resolution
-        let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
-        let httpsURL = enhancedURL.replacingOccurrences(of: "http://", with: "https://")
-        
-        guard let url = URL(string: httpsURL) else { return }
-        
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            if let data = data, let uiImage = UIImage(data: data) {
-                DispatchQueue.main.async {
-                    self.coverImage = uiImage
-                    self.extractDominantColor(from: uiImage)
-                    // Note: Accent color extraction is handled by CinematicBookGradient via onAccentColorExtracted callback
-                }
-            }
-        }.resume()
-    }
-    
-    private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
-        // Google Books image URLs support zoom parameter for higher resolution
-        var enhanced = urlString
-        
-        // Remove existing zoom parameter if present
-        if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
-            let range = NSRange(location: 0, length: enhanced.utf16.count)
-            enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
-        }
-        
-        // Add high quality zoom parameter
-        if enhanced.contains("?") {
-            enhanced += "&zoom=2"
-        } else {
-            enhanced += "?zoom=2"
-        }
-        
-        // Also remove edge curl parameter if present (makes covers look cleaner)
-        enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
-        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
-        
-        return enhanced
-    }
-    
-    private func extractDominantColor(from image: UIImage) {
-        guard let ciImage = CIImage(image: image) else { return }
-        
-        let context = CIContext()
-        let size = CGSize(width: 50, height: 50)
-        
-        // Scale down for performance
-        let scaleFilter = CIFilter.lanczosScaleTransform()
-        scaleFilter.inputImage = ciImage
-        scaleFilter.scale = Float(size.width / ciImage.extent.width)
-        
-        guard let outputImage = scaleFilter.outputImage else { return }
-        
-        // Extract colors
-        let extent = outputImage.extent
-        let bitmap = context.createCGImage(outputImage, from: extent)
-        
-        guard let cgImage = bitmap else { return }
-        
-        let width = cgImage.width
-        let height = cgImage.height
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * width
-        let bitsPerComponent = 8
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        
-        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
-        
-        let bitmapContext = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
-            bitsPerComponent: bitsPerComponent,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )
-        
-        bitmapContext?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        
-        // Collect all colors with their frequencies
-        var colorCounts: [UIColor: Int] = [:]
-        
-        for y in 0..<height {
-            for x in 0..<width {
-                let index = ((width * y) + x) * bytesPerPixel
-                let r = CGFloat(pixelData[index]) / 255.0
-                let g = CGFloat(pixelData[index + 1]) / 255.0
-                let b = CGFloat(pixelData[index + 2]) / 255.0
-                
-                // Quantize colors to reduce variations
-                let quantizedR = round(r * 10) / 10
-                let quantizedG = round(g * 10) / 10
-                let quantizedB = round(b * 10) / 10
-                
-                let color = UIColor(red: quantizedR, green: quantizedG, blue: quantizedB, alpha: 1.0)
-                colorCounts[color, default: 0] += 1
-            }
-        }
-        
-        // Sort colors by frequency and filter out very dark/light colors
-        let sortedColors = colorCounts.sorted { $0.value > $1.value }
-            .compactMap { (color, _) -> (UIColor, CGFloat, CGFloat, CGFloat)? in
-                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
-                color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                
-                // Filter out very dark, very light, or desaturated colors
-                if b > 0.2 && b < 0.95 && s > 0.2 {
-                    return (color, h, s, b)
-                }
-                return nil
-            }
-        
-        // Get primary and secondary colors
-        if let firstColor = sortedColors.first {
-            let (_, h1, s1, b1) = firstColor
-            
-            // Boost saturation for primary color
-            let boostedS1 = min(s1 * 1.5, 1.0)
-            let boostedB1 = min(b1 * 1.3, 0.85)
-            
-            withAnimation(.easeInOut(duration: 0.8)) {
-                dominantColor = Color(hue: Double(h1), saturation: Double(boostedS1), brightness: Double(boostedB1))
-            }
-            
-            // Look for a contrasting secondary color
-            if sortedColors.count > 1 {
-                // Find a color with different hue
-                for i in 1..<min(sortedColors.count, 10) {
-                    let (_, h2, s2, b2) = sortedColors[i]
-                    
-                    let hueDiff = abs(h1 - h2)
-                    if hueDiff > 0.15 || hueDiff < 0.85 {
-                        // Found a contrasting color
-                        let boostedS2 = min(s2 * 1.5, 1.0)
-                        let boostedB2 = min(b2 * 1.3, 0.85)
-                        
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            secondaryColor = Color(hue: Double(h2), saturation: Double(boostedS2), brightness: Double(boostedB2))
-                        }
-                        break
-                    }
-                }
-            }
-        }
-    }
     
 }
 
@@ -881,6 +633,25 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
 }
 
 // MARK: - Supporting Views
+
+struct ActionButton: View {
+    let icon: String
+    let textColor: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundColor(textColor.opacity(0.7))
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(textColor.opacity(0.1))
+                )
+        }
+    }
+}
 
 struct StatusPill: View {
     let text: String
@@ -1109,6 +880,7 @@ struct QuestionCard: View {
 struct ChatMessageBubble: View {
     let message: ThreadedChatMessage
     let accentColor: Color
+    let textColor: Color
     
     var body: some View {
         HStack {
@@ -1129,7 +901,7 @@ struct ChatMessageBubble: View {
                 
                 Text(message.timestamp.formatted(date: .omitted, time: .shortened))
                     .font(.system(size: 11))
-                    .foregroundColor(.warmWhite.opacity(0.5))
+                    .foregroundColor(textColor.opacity(0.5))
                     .padding(.horizontal, 4)
             }
             

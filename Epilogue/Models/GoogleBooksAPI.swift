@@ -12,8 +12,9 @@ struct GoogleBookItem: Codable, Identifiable {
     let volumeInfo: VolumeInfo
     
     var book: Book {
-        // Get the best available image URL
-        var imageURL = volumeInfo.imageLinks?.large 
+        // Get the best available image URL - prefer extraLarge if available
+        var imageURL = volumeInfo.imageLinks?.extraLarge
+            ?? volumeInfo.imageLinks?.large 
             ?? volumeInfo.imageLinks?.medium 
             ?? volumeInfo.imageLinks?.small 
             ?? volumeInfo.imageLinks?.thumbnail
@@ -39,7 +40,7 @@ struct GoogleBookItem: Codable, Identifiable {
     private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
         // Google Books image URLs support zoom parameter for higher resolution
         // Default URLs often have zoom=1 or no zoom parameter
-        // We can request zoom=2 or zoom=3 for higher quality
+        // We can request zoom=3 for highest quality
         
         var enhanced = urlString
         
@@ -49,11 +50,11 @@ struct GoogleBookItem: Codable, Identifiable {
             enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
         }
         
-        // Add high quality zoom parameter
+        // Add high quality zoom parameter and width
         if enhanced.contains("?") {
-            enhanced += "&zoom=2"
+            enhanced += "&zoom=3&w=1080"
         } else {
-            enhanced += "?zoom=2"
+            enhanced += "?zoom=3&w=1080"
         }
         
         // Also remove edge curl parameter if present (makes covers look cleaner)
@@ -86,6 +87,7 @@ struct ImageLinks: Codable {
     let small: String?
     let medium: String?
     let large: String?
+    let extraLarge: String?
 }
 
 struct IndustryIdentifier: Codable {

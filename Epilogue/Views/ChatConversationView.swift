@@ -65,6 +65,43 @@ struct ChatConversationView: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 20) {
+                        // Book cover for book chats
+                        if thread.bookId != nil, let coverURL = effectiveCoverURL,
+                           let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .empty:
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(width: 80, height: 120)
+                                        .overlay {
+                                            ProgressView()
+                                                .tint(.white.opacity(0.5))
+                                        }
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 80, height: 120)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                                case .failure(_):
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
+                                        .frame(width: 80, height: 120)
+                                        .overlay {
+                                            Image(systemName: "book.closed.fill")
+                                                .font(.system(size: 24))
+                                                .foregroundStyle(.white.opacity(0.3))
+                                        }
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                            .padding(.top, 20)
+                            .padding(.bottom, 10)
+                        }
+                        
                         // Thread start indicator - with clear chat on long press
                         VStack(spacing: 4) {
                             Text("Conversation started \(thread.createdDate.formatted(date: .abbreviated, time: .omitted))")

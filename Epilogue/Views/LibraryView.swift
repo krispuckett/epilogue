@@ -16,7 +16,6 @@ struct LibraryView: View {
     @State private var scrollToBookId: UUID? = nil
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
-    @State private var showingAccentColorDebug = false
     
     enum ViewMode {
         case grid, list
@@ -182,17 +181,6 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
             }
-            
-            #if DEBUG
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    showingAccentColorDebug = true
-                } label: {
-                    Image(systemName: "paintpalette")
-                        .foregroundColor(.warmAmber)
-                }
-            }
-            #endif
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
         .sheet(isPresented: $showingCoverPicker) {
@@ -207,10 +195,6 @@ struct LibraryView: View {
                     }
                 )
             }
-        }
-        .sheet(isPresented: $showingAccentColorDebug) {
-            AccentColorDebugView()
-                .environmentObject(viewModel)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {
@@ -325,15 +309,14 @@ struct LibraryListItemWrapper: View {
     let onChangeCover: (Book) -> Void
     
     var body: some View {
-        GeometryReader { geo in
-            NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
-                LibraryBookListItem(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
-                    .overlay(highlightOverlay)
-            }
-            .buttonStyle(PlainButtonStyle())
-            .id(book.localId)
-            .transition(listTransition)
-            .animation(listAnimation, value: viewMode)
+        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+            LibraryBookListItem(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
+                .overlay(highlightOverlay)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .id(book.localId)
+        .transition(listTransition)
+        .animation(listAnimation, value: viewMode)
             .contextMenu {
                 // Same menu items
                 Button {
@@ -383,7 +366,6 @@ struct LibraryListItemWrapper: View {
                     Label("Delete from Library", systemImage: "trash")
                 }
             }
-        }
     }
     
     private var highlightOverlay: some View {
@@ -815,7 +797,7 @@ struct LibraryBookListItem: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 16)
             }
-            .padding(.leading, 12)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
             
             // Actions area

@@ -29,11 +29,6 @@ struct ChatView: View {
                 .navigationDestination(for: ChatThread.self) { thread in
                     ChatConversationView(thread: thread)
                 }
-                .navigationDestination(for: String.self) { destination in
-                    if destination == "gradient-showcase" {
-                        GradientTestView()
-                    }
-                }
         }
         .onAppear {
             // If we have a book to chat about, find or create its thread
