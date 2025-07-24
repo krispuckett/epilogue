@@ -7,11 +7,13 @@ struct NotesView: View {
     @State private var selectedFilter: NoteType? = nil
     @State private var showingAddNote = false
     @State private var noteToEdit: Note? = nil
+    @State private var editingNote: Note? = nil
     @State private var openOptionsNoteId: UUID? = nil
     @State private var highlightedNoteId: UUID? = nil
     @State private var scrollToNoteId: UUID? = nil
     
     @Namespace private var commandPaletteNamespace
+    @Namespace private var noteTransition
     
     // Filtered notes based on filter
     var filteredNotes: [Note] {
@@ -73,6 +75,7 @@ struct NotesView: View {
                                 openOptionsNoteId: $openOptionsNoteId
                             )
                             .environmentObject(notesViewModel)
+                            .matchedTransitionSource(id: note.id, in: noteTransition)
                             .id(note.id) // Add ID for scrolling
                             .overlay(
                                 // Highlight overlay
@@ -144,8 +147,7 @@ struct NotesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
             if let note = notification.object as? Note {
-                noteToEdit = note
-                notesViewModel.isEditingNote = true
+                editingNote = note
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNote"))) { notification in
@@ -160,11 +162,15 @@ struct NotesView: View {
                         highlightedNoteId = nil
                     }
                     // Open the note for editing
-                    noteToEdit = note
-                    notesViewModel.isEditingNote = true
+                    editingNote = note
                 }
             }
         }
+        .sheet(item: $editingNote) { note in
+            NoteEditSheet(note: note)
+                .environmentObject(notesViewModel)
+        }
+        .sensoryFeedback(.impact, trigger: editingNote)
     }
     
     private func formatNoteForEditing(_ note: Note) -> String {

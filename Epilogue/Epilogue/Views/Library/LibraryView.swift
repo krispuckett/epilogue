@@ -219,7 +219,8 @@ struct LibraryGridItem: View {
     var body: some View {
         GeometryReader { geo in
             NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
-                LibraryBookCard(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
+                BookCard(book: book)
+                    .environmentObject(viewModel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .overlay(highlightOverlay)
             }
@@ -1052,6 +1053,13 @@ class LibraryViewModel: ObservableObject {
     func updateBookCover(_ book: Book, newCoverURL: String?) {
         if let index = books.firstIndex(where: { $0.id == book.id }) {
             books[index].coverImageURL = newCoverURL
+            saveBooks()
+        }
+    }
+    
+    func updateBookProgress(_ book: Book, currentPage: Int) {
+        if let index = books.firstIndex(where: { $0.id == book.id }) {
+            books[index].currentPage = currentPage
             saveBooks()
         }
     }

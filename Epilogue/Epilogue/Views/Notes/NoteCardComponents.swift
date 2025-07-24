@@ -70,6 +70,11 @@ struct NoteCard: View {
                 openOptionsNoteId = nil
             }
         }
+        .onTapGesture(count: 2) {
+            // Double tap to edit
+            HapticManager.shared.mediumImpact()
+            NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
+        }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
         .overlay {

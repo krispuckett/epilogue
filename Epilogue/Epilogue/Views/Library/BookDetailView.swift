@@ -136,8 +136,15 @@ struct BookDetailView: View {
     @State private var showingBookSearch = false
     @State private var editedTitle = ""
     @State private var isEditingTitle = false
+    @State private var showingProgressEditor = false
     
     // Computed properties for filtering notes by book
+    private var progressPercentage: Double {
+        guard let total = book.pageCount,
+              total > 0 else { return 0 }
+        return Double(book.currentPage) / Double(total)
+    }
+    
     var bookQuotes: [Note] {
         notesViewModel.notes.filter { note in
             note.type == .quote && (
@@ -206,6 +213,15 @@ struct BookDetailView: View {
                             .padding(.horizontal, 24)
                             .padding(.top, 32)
                             .opacity(colorPalette != nil ? 1 : 0)  // Hide while loading
+                            .animation(.easeIn(duration: 0.3), value: colorPalette != nil)
+                    }
+                    
+                    // Progress section
+                    if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
+                        progressSection
+                            .padding(.horizontal, 24)
+                            .padding(.top, 24)
+                            .opacity(colorPalette != nil ? 1 : 0)
                             .animation(.easeIn(duration: 0.3), value: colorPalette != nil)
                     }
                     
@@ -510,6 +526,101 @@ struct BookDetailView: View {
         .frame(maxWidth: .infinity)  // Fixed width from start
         .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         // NO transition modifier
+    }
+    
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(accentColor)
+                    .frame(width: 28, height: 28)
+                
+                Text("Reading Progress")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(textColor)
+                
+                Spacer()
+                
+                // Edit button
+                Button {
+                    showingProgressEditor = true
+                    HapticManager.shared.lightTap()
+                } label: {
+                    Text("Edit")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(accentColor)
+                }
+            }
+            
+            // Visual progress bar
+            VStack(spacing: 12) {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(textColor.opacity(0.1))
+                            .frame(height: 12)
+                        
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        accentColor.opacity(0.8),
+                                        accentColor
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * progressPercentage, height: 12)
+                            .animation(.spring(response: 0.5), value: progressPercentage)
+                        
+                        // Progress indicator dot
+                        Circle()
+                            .fill(accentColor)
+                            .frame(width: 20, height: 20)
+                            .overlay {
+                                Circle()
+                                    .stroke(textColor.opacity(0.3), lineWidth: 2)
+                            }
+                            .shadow(color: accentColor.opacity(0.4), radius: 4)
+                            .offset(x: max(0, min(geometry.size.width - 20, geometry.size.width * progressPercentage - 10)))
+                            .animation(.spring(response: 0.5), value: progressPercentage)
+                    }
+                }
+                .frame(height: 20)
+                
+                HStack {
+                    Text("Page \(book.currentPage)")
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundColor(textColor)
+                    
+                    Spacer()
+                    
+                    Text("\(Int(progressPercentage * 100))% Complete")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(accentColor)
+                    
+                    Spacer()
+                    
+                    Text("\(book.pageCount ?? 0) pages")
+                        .font(.system(size: 14, design: .monospaced))
+                        .foregroundColor(textColor.opacity(0.7))
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(accentColor.opacity(0.2), lineWidth: 0.5)
+        }
+        .popover(isPresented: $showingProgressEditor) {
+            ProgressPopover(book: book, viewModel: libraryViewModel, accentColor: accentColor)
+                .presentationCompactAdaptation(.popover)
+                .preferredColorScheme(.dark)
+        }
     }
     
     private var quotesSection: some View {
