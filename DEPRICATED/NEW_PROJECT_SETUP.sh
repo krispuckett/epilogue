@@ -1,0 +1,147 @@
+#!/bin/bash
+
+# Epilogue - New Project Setup Script
+# This script lists all the files you need to add to a fresh Xcode project
+
+echo "==================================="
+echo "EPILOGUE - NEW PROJECT SETUP GUIDE"
+echo "==================================="
+echo ""
+echo "1. Create new Xcode project:"
+echo "   - iOS App"
+echo "   - Name: Epilogue"
+echo "   - Team: Your team"
+echo "   - Organization Identifier: com.yourname"
+echo "   - Interface: SwiftUI"
+echo "   - Language: Swift"
+echo "   - Use Core Data: NO"
+echo "   - Include Tests: YES"
+echo ""
+echo "2. Delete the default ContentView.swift that Xcode creates"
+echo ""
+echo "3. Add these files to the project (drag into Xcode):"
+echo ""
+
+# Core App Files
+echo "CORE APP FILES:"
+echo "  □ Epilogue/EpilogueApp.swift"
+echo "  □ Epilogue/ContentView.swift"
+echo "  □ Epilogue/Typography.swift"
+echo ""
+
+# Models
+echo "MODELS (create 'Models' group):"
+echo "  □ Epilogue/Models/ChatThread.swift"
+echo "  □ Epilogue/Models/CommandIntent.swift"
+echo "  □ Epilogue/Models/GoogleBooksAPI.swift"
+echo "  □ Epilogue/Models/LiteraryQuotes.swift"
+echo ""
+
+# Core Systems
+echo "CORE (create 'Core' group with subgroups):"
+echo ""
+echo "  Core/Colors/:"
+echo "  □ Epilogue/Core/Colors/OKLABColorExtractor.swift"
+echo "  □ Epilogue/Core/Colors/DisplayColorScheme.swift"
+echo "  □ Epilogue/Core/Colors/ColorExtractionDiagnostic.swift"
+echo ""
+echo "  Core/Background/:"
+echo "  □ Epilogue/Core/Background/BookCoverBackgroundView.swift"
+echo ""
+
+# Views
+echo "VIEWS (create 'Views' group with subgroups):"
+echo ""
+echo "  Views/Library/:"
+echo "  □ Epilogue/Views/Library/BookDetailView.swift"
+echo "  □ Epilogue/Views/Library/LibraryView.swift"
+echo "  □ Epilogue/Views/Library/BookSearchSheet.swift"
+echo "  □ Epilogue/Views/Library/EditBookSheet.swift"
+echo "  □ Epilogue/Views/Library/SharedBookCoverView.swift"
+echo "  □ Epilogue/Views/Library/BookPickerSheet.swift"
+echo "  □ Epilogue/Views/Library/ReadingProgressIndicator.swift"
+echo "  □ Epilogue/Views/Library/LiteraryLoadingView.swift"
+echo ""
+echo "  Views/Notes/:"
+echo "  □ Epilogue/Views/Notes/NotesView.swift"
+echo "  □ Epilogue/Views/Notes/NoteCardComponents.swift"
+echo "  □ Epilogue/Views/Notes/NoteContextMenu.swift"
+echo ""
+echo "  Views/Chat/:"
+echo "  □ Epilogue/Views/Chat/ChatView.swift"
+echo "  □ Epilogue/Views/Chat/ChatConversationView.swift"
+echo "  □ Epilogue/Views/Chat/ChatThreadListView.swift"
+echo "  □ Epilogue/Views/Chat/ChatInputBar.swift"
+echo "  □ Epilogue/Views/Chat/InteractiveChatInputBar.swift"
+echo ""
+echo "  Views/Components/:"
+echo "  □ Epilogue/Views/Components/UniversalCommandBar.swift"
+echo "  □ Epilogue/Views/Components/LiquidCommandPalette.swift"
+echo "  □ Epilogue/Views/Components/CommandSuggestionsView.swift"
+echo "  □ Epilogue/Views/Components/AmbientBackground.swift"
+echo "  □ Epilogue/Views/Components/MarkdownText.swift"
+echo "  □ Epilogue/Views/Components/ShimmerEffect.swift"
+echo "  □ Epilogue/Views/Components/FeatherIcon.swift"
+echo ""
+
+# Ambient System
+echo "AMBIENT (create 'Ambient' group):"
+echo "  □ Epilogue/Ambient/AmbientBookView.swift"
+echo "  □ Epilogue/Ambient/ColorIntelligenceEngine.swift"
+echo ""
+
+# ViewModels (if they exist)
+echo "VIEWMODELS (check if these exist):"
+echo "  □ Epilogue/ViewModels/LibraryViewModel.swift (if exists)"
+echo "  □ Epilogue/ViewModels/NotesViewModel.swift (if exists)"
+echo ""
+
+# Utilities
+echo "UTILITIES (if they exist):"
+echo "  □ Epilogue/Utilities/HapticManager.swift (if exists)"
+echo "  □ Epilogue/Utilities/ViewExtensions.swift (if exists)"
+echo ""
+
+echo "4. Copy these resources:"
+echo "  □ Epilogue/Assets.xcassets (replace the default one)"
+echo "  □ Epilogue/Info.plist (check for any custom settings)"
+echo ""
+
+echo "5. Add to Info.plist:"
+echo "  - Privacy - Photo Library Usage Description"
+echo "  - App Transport Security Settings (if needed)"
+echo ""
+
+echo "6. Build Settings to check:"
+echo "  - iOS Deployment Target: 17.0 or higher"
+echo "  - Swift Language Version: 5.0"
+echo ""
+
+echo "7. After adding all files:"
+echo "  - Build project (Cmd+B)"
+echo "  - Fix any import issues"
+echo "  - Run on simulator"
+echo ""
+
+# Count files
+echo "==================================="
+echo "FILE COUNT CHECK:"
+cd /Users/kris/Epilogue
+
+# Count Swift files in each directory
+echo ""
+echo "Files in project:"
+echo "  Core: $(find Epilogue/Core -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo "  Views/Library: $(find Epilogue/Views/Library -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo "  Views/Notes: $(find Epilogue/Views/Notes -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo "  Views/Chat: $(find Epilogue/Views/Chat -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo "  Views/Components: $(find Epilogue/Views/Components -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo "  Models: $(find Epilogue/Models -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo "  Ambient: $(find Epilogue/Ambient -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') files"
+echo ""
+echo "  TOTAL: $(find Epilogue -name "*.swift" -not -path "*/Views/_Deprecated/*" -not -path "*/test/*" 2>/dev/null | wc -l | tr -d ' ') Swift files"
+echo ""
+echo "==================================="
+echo "Files in _Deprecated (DO NOT ADD):"
+echo "  $(find Epilogue/Views/_Deprecated -name "*.swift" 2>/dev/null | wc -l | tr -d ' ') deprecated files - SKIP THESE"
+echo "==================================="
