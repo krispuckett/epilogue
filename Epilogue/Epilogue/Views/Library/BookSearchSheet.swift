@@ -199,15 +199,14 @@ struct BookSearchResultRow: View {
                     .frame(width: 44, height: 44)
                     .background {
                         Circle()
-                            .fill(.regularMaterial)
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3))
                             .overlay {
                                 Circle()
-                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.35))
+                                    .fill(.thinMaterial)
                             }
                     }
             }
-            .glassEffect(in: Circle())
-            .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 10)
+            .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), radius: 8, y: 2)
         }
         .padding(16)
         .frame(height: 114) // Match library list item height

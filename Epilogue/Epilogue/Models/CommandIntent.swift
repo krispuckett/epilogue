@@ -235,29 +235,50 @@ struct CommandParser {
     
     private static func isLikelyBookTitle(input: String) -> Bool {
         // Book Title Detection:
-        // - 2-7 words, first letters capitalized
+        // - 1-10 words (more flexible)
         // - Contains "by [Author Name]"
-        // - Doesn't start with lowercase
+        // - Doesn't start with lowercase (unless single word)
         // - Not a question
+        // - Not a common note pattern
         
         let words = input.split(separator: " ")
         let wordCount = words.count
         
-        // Check word count
-        guard wordCount >= 2 && wordCount <= 7 else { return false }
+        // More flexible word count - even single word could be a book title
+        guard wordCount >= 1 && wordCount <= 10 else { return false }
         
         // Check if it's a question
         if input.contains("?") { return false }
         
-        // Check if starts with lowercase
-        if let firstChar = input.first, firstChar.isLowercase { return false }
+        // Single word book titles are common (e.g., "Dune", "1984", "Beloved")
+        if wordCount == 1 {
+            // If it's a single capitalized word, it's likely a book title
+            if let firstChar = input.first, firstChar.isUppercase {
+                return true
+            }
+        }
         
-        // Check for "by Author" pattern
+        // Check if starts with lowercase (for multi-word inputs)
+        if wordCount > 1, let firstChar = input.first, firstChar.isLowercase { 
+            return false 
+        }
+        
+        // Check for "by Author" pattern - strong indicator
         if input.lowercased().contains(" by ") {
             return true
         }
         
-        // Check if most words are capitalized (title case)
+        // For 1-3 word inputs, be more lenient
+        if wordCount <= 3 {
+            // If first word is capitalized, assume it's a book
+            if let firstWord = words.first, 
+               let firstChar = firstWord.first,
+               firstChar.isUppercase {
+                return true
+            }
+        }
+        
+        // For longer inputs, check if most words are capitalized (title case)
         let capitalizedWords = words.filter { word in
             guard let first = word.first else { return false }
             return first.isUppercase || word.count <= 3 // Allow short words like "of", "the"

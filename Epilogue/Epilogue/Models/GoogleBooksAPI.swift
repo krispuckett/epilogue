@@ -228,14 +228,26 @@ class GoogleBooksService: ObservableObject {
             throw APIError.invalidQuery
         }
         
-        // Use simple, reliable search - Google Books API works better with plain text
-        let searchQuery = cleanQuery
+        // Enhanced search query building
+        var searchQuery = cleanQuery
+        
+        // If query contains "by", format it properly for Google Books
+        if cleanQuery.lowercased().contains(" by ") {
+            let parts = cleanQuery.split(separator: " by ", maxSplits: 1, omittingEmptySubsequences: true).map(String.init)
+            if parts.count == 2 {
+                // Use intitle and inauthor for more precise results
+                searchQuery = "intitle:\(parts[0]) inauthor:\(parts[1])"
+            }
+        } else {
+            // For single terms or titles without author, use intitle for better results
+            searchQuery = "intitle:\(cleanQuery)"
+        }
         
         // Build URL with parameters
         var components = URLComponents(string: baseURL)!
         components.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
-            URLQueryItem(name: "maxResults", value: "20"),
+            URLQueryItem(name: "maxResults", value: "40"), // Get more results to filter
             URLQueryItem(name: "orderBy", value: "relevance"),
             URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "langRestrict", value: "en")  // English books
@@ -264,14 +276,14 @@ class GoogleBooksService: ObservableObject {
         let googleResponse = try decoder.decode(GoogleBooksResponse.self, from: data)
         
         // Convert to Book models and filter out books without basic info
-        let books: [Book] = googleResponse.items?.compactMap { item in
+        var books: [Book] = googleResponse.items?.compactMap { item in
             let book = item.book
             // Filter out books without title or author
             guard !book.title.isEmpty, !book.author.isEmpty else { return nil }
             
             // Filter out movie companion books and visual companions
             let titleLower = book.title.lowercased()
-            let unwantedKeywords = ["visual companion", "movie", "film", "motion picture", "official", "art of", "making of"]
+            let unwantedKeywords = ["visual companion", "movie", "film", "motion picture", "official", "art of", "making of", "screenplay", "script"]
             for keyword in unwantedKeywords {
                 if titleLower.contains(keyword) {
                     return nil
@@ -281,8 +293,81 @@ class GoogleBooksService: ObservableObject {
             return book
         } ?? []
         
-        // Trust Google's relevance ranking, just filter out unwanted results
-        return books
+        // Improve ranking based on query match
+        let queryLower = cleanQuery.lowercased()
+        let queryWords = queryLower.split(separator: " ").map(String.init)
+        
+        // Score and sort results
+        books = books.sorted { book1, book2 in
+            let score1 = scoreBook(book1, query: queryLower, queryWords: queryWords)
+            let score2 = scoreBook(book2, query: queryLower, queryWords: queryWords)
+            return score1 > score2
+        }
+        
+        // Take top 20 results after scoring
+        return Array(books.prefix(20))
+    }
+    
+    private func scoreBook(_ book: Book, query: String, queryWords: [String]) -> Int {
+        var score = 0
+        let titleLower = book.title.lowercased()
+        let authorLower = book.author.lowercased()
+        
+        // Exact title match gets highest score
+        if titleLower == query {
+            score += 1000
+        }
+        
+        // Title starts with query
+        if titleLower.hasPrefix(query) {
+            score += 500
+        }
+        
+        // Title contains exact query
+        if titleLower.contains(query) {
+            score += 300
+        }
+        
+        // All query words in title (in order)
+        var lastIndex = titleLower.startIndex
+        var allWordsInOrder = true
+        for word in queryWords {
+            if let range = titleLower.range(of: word, range: lastIndex..<titleLower.endIndex) {
+                lastIndex = range.upperBound
+                score += 50
+            } else {
+                allWordsInOrder = false
+            }
+        }
+        if allWordsInOrder {
+            score += 200
+        }
+        
+        // Author match for "by" queries
+        if query.contains(" by ") {
+            let parts = query.split(separator: " by ", maxSplits: 1).map(String.init)
+            if parts.count == 2 {
+                let authorQuery = parts[1]
+                if authorLower.contains(authorQuery) {
+                    score += 300
+                }
+                if authorLower.hasPrefix(authorQuery) {
+                    score += 100
+                }
+            }
+        }
+        
+        // Penalize overly long titles (often compilations or special editions)
+        if book.title.count > 50 {
+            score -= 50
+        }
+        
+        // Boost popular/classic books (those with more pages tend to be full novels)
+        if let pageCount = book.pageCount, pageCount > 200 {
+            score += 20
+        }
+        
+        return score
     }
 }
 

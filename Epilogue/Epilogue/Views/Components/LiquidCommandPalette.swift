@@ -15,6 +15,10 @@ struct LiquidCommandPalette: View {
     @State private var noteToEdit: Note? = nil
     @State private var showPreview = false
     @State private var previewDelay: DispatchWorkItem?
+    @State private var displayedIntent: CommandIntent = .unknown
+    @State private var iconChangeDelay: DispatchWorkItem?
+    @State private var showToast = false
+    @State private var toastMessage = ""
     
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -200,12 +204,13 @@ struct LiquidCommandPalette: View {
                     
                     // Input field container with glass effect
                     HStack(spacing: 0) {
-                        // Question mark icon
-                        Image(systemName: "questionmark.circle.fill")
+                        // Dynamic icon based on intent
+                        Image(systemName: iconForIntent(displayedIntent))
                             .foregroundStyle(currentGlowColor)
                             .font(.system(size: 20, weight: .medium))
                             .padding(.leading, 12)
                             .padding(.trailing, 8)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayedIntent)
                         
                         // Text field
                         ZStack(alignment: .leading) {
@@ -249,6 +254,19 @@ struct LiquidCommandPalette: View {
                                             detectedIntent = CommandParser.parse(normalizedText, books: libraryViewModel.books, notes: notesViewModel.notes)
                                             updateGlowColor()
                                         }
+                                        
+                                        // Cancel previous icon change delay
+                                        iconChangeDelay?.cancel()
+                                        
+                                        // Update icon with delay to prevent jumpiness
+                                        let workItem = DispatchWorkItem {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                displayedIntent = detectedIntent
+                                            }
+                                        }
+                                        iconChangeDelay = workItem
+                                        // 0.3 second delay before changing icon
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
                                     }
                                     
                                     // Cancel previous preview delay
@@ -326,10 +344,12 @@ struct LiquidCommandPalette: View {
             if let initialContent = initialContent {
                 commandText = initialContent
                 detectedIntent = CommandParser.parse(initialContent, books: libraryViewModel.books, notes: notesViewModel.notes)
+                displayedIntent = detectedIntent // Set immediately on appear
                 updateGlowColor()
             } else {
                 commandText = ""
                 detectedIntent = .unknown
+                displayedIntent = .unknown
                 currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26)
             }
             
@@ -346,6 +366,9 @@ struct LiquidCommandPalette: View {
             // Reset pill states
             pillOpacities = [0, 0, 0, 0]
             pillScales = [0.8, 0.8, 0.8, 0.8]
+            // Cancel any pending icon changes
+            iconChangeDelay?.cancel()
+            previewDelay?.cancel()
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
@@ -358,10 +381,19 @@ struct LiquidCommandPalette: View {
                 onBookSelected: { book in
                     libraryViewModel.addBook(book)
                     HapticManager.shared.success()
-                    dismissPalette()
+                    showSuccessToast(message: "Book added to library", icon: "book.badge.plus.fill", color: Color(red: 0.6, green: 0.4, blue: 0.8))
+                    
+                    // Delay dismissal to show toast
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        dismissPalette()
+                    }
                 }
             )
         }
+        .glassToast(
+            isShowing: $showToast,
+            message: toastMessage
+        )
     }
     
     private func iconForTitle(_ title: String) -> String {
@@ -371,6 +403,25 @@ struct LiquidCommandPalette: View {
         case "Book": return "book"
         case "Search": return "magnifyingglass"
         default: return "circle"
+        }
+    }
+    
+    private func iconForIntent(_ intent: CommandIntent) -> String {
+        switch intent {
+        case .addBook:
+            return "book.badge.plus.fill"
+        case .createNote:
+            return "plus"
+        case .createQuote:
+            return "quote.opening"
+        case .searchLibrary, .searchAll, .searchNotes:
+            return "magnifyingglass"
+        case .existingBook:
+            return "book.fill"
+        case .existingNote:
+            return "note.text"
+        case .unknown:
+            return "questionmark.circle.fill"
         }
     }
     
@@ -402,6 +453,13 @@ struct LiquidCommandPalette: View {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isAnimating = false
+        }
+    }
+    
+    private func showSuccessToast(message: String, icon: String, color: Color) {
+        toastMessage = message
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showToast = true
         }
     }
     
@@ -495,7 +553,12 @@ struct LiquidCommandPalette: View {
         
         notesViewModel.addNote(note)
         HapticManager.shared.success()
-        dismissPalette()
+        showSuccessToast(message: "Note saved", icon: "note.text", color: Color(red: 0.4, green: 0.6, blue: 0.9))
+        
+        // Delay dismissal to show toast
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            dismissPalette()
+        }
     }
     
     private func createQuote(from text: String) {
@@ -542,7 +605,12 @@ struct LiquidCommandPalette: View {
         
         notesViewModel.addNote(quote)
         HapticManager.shared.success()
-        dismissPalette()
+        showSuccessToast(message: "Quote captured", icon: "quote.opening", color: Color(red: 1.0, green: 0.55, blue: 0.26))
+        
+        // Delay dismissal to show toast
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            dismissPalette()
+        }
     }
     
     private func updateNote(from text: String, editingNote: Note, onUpdate: @escaping (Note) -> Void) {

@@ -36,7 +36,8 @@ struct ContentView: View {
                     Label {
                         Text("Library")
                     } icon: {
-                        Image("book-open-icon")
+                        Image("glass-book-open")
+                            .renderingMode(.original)
                     }
                 }
                 .tag(0)
@@ -48,7 +49,8 @@ struct ContentView: View {
                     Label {
                         Text("Notes")
                     } icon: {
-                        Image("box-archive-icon")
+                        Image("glass-feather")
+                            .renderingMode(.original)
                     }
                 }
                 .tag(1)
@@ -58,7 +60,9 @@ struct ContentView: View {
                     Label {
                         Text("Chat")
                     } icon: {
-                        Image("msgs-icon")
+                        Image("glass-msgs")
+                            .renderingMode(.original)
+                            .interpolation(.high)
                     }
                 }
                 .tag(2)
