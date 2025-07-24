@@ -41,7 +41,7 @@ struct GoogleBookItem: Codable, Identifiable {
     private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
         // Google Books image URLs support zoom parameter for higher resolution
         // Default URLs often have zoom=1 or no zoom parameter
-        // We can request zoom=3 for highest quality
+        // We can request zoom=3 for highest quality (Apple Music quality)
         
         var enhanced = urlString
         

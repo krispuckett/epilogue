@@ -412,6 +412,19 @@ public class OKLABColorExtractor {
         return r < 0.7 && g > 0.8 && b > 0.8 && abs(g - b) < 0.1
     }
     
+    // Add this color harmony check
+    private func colorsAreHarmonious(_ color1: UIColor, _ color2: UIColor) -> Bool {
+        var h1: CGFloat = 0, s1: CGFloat = 0, b1: CGFloat = 0
+        var h2: CGFloat = 0, s2: CGFloat = 0, b2: CGFloat = 0
+        
+        color1.getHue(&h1, saturation: &s1, brightness: &b1, alpha: nil)
+        color2.getHue(&h2, saturation: &s2, brightness: &b2, alpha: nil)
+        
+        // Check if hues are within 60 degrees (adjacent colors on color wheel)
+        let hueDiff = abs(h1 - h2)
+        return hueDiff < 0.167 || hueDiff > 0.833 // 60/360 = 0.167
+    }
+    
     private func isBlueOrTeal(_ color: UIColor) -> Bool {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
         color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
@@ -517,11 +530,17 @@ public class OKLABColorExtractor {
             colorDistance(item.color, primary) > 0.2
         }?.color ?? sortedByVibrancy[1].color
         
-        // ACCENT = Third vibrant color that's different from both
-        let accent = sortedByVibrancy.first { item in
+        // ACCENT = Third vibrant color that's different from both AND harmonious with primary
+        var accent = sortedByVibrancy.first { item in
             colorDistance(item.color, primary) > 0.2 && 
             colorDistance(item.color, secondary) > 0.2
         }?.color ?? sortedByVibrancy[2].color
+        
+        // Check if accent color harmonizes with primary
+        if !colorsAreHarmonious(primary, accent) {
+            print("  ⚠️ Accent color not harmonious with primary, using secondary instead")
+            accent = secondary // Use secondary which is already harmonious
+        }
         
         // BACKGROUND = Darkest color (for depth)
         let background = colors.min { c1, c2 in
