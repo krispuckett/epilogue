@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		015D13B02E3353A7002633FE /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13AF2E3353A7002633FE /* WhisperKit */; };
+		015D13B22E3353A7002633FE /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13B12E3353A7002633FE /* whisperkit-cli */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		015D11042E318D5E002633FE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +34,22 @@
 		015D110D2E318D5E002633FE /* EpilogueUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		015D13852E328EA6002633FE /* Exceptions for "Epilogue" folder in "Epilogue" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 015D10F12E318D5D002633FE /* Epilogue */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		015D10F42E318D5D002633FE /* Epilogue */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				015D13852E328EA6002633FE /* Exceptions for "Epilogue" folder in "Epilogue" target */,
+			);
 			path = Epilogue;
 			sourceTree = "<group>";
 		};
@@ -52,6 +70,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				015D13B02E3353A7002633FE /* WhisperKit in Frameworks */,
+				015D13B22E3353A7002633FE /* whisperkit-cli in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,6 +121,7 @@
 			buildPhases = (
 				015D10EE2E318D5D002633FE /* Sources */,
 				015D10EF2E318D5D002633FE /* Frameworks */,
+				015D13812E328E81002633FE /* Resources */,
 			);
 			buildRules = (
 			);
@@ -111,6 +132,8 @@
 			);
 			name = Epilogue;
 			packageProductDependencies = (
+				015D13AF2E3353A7002633FE /* WhisperKit */,
+				015D13B12E3353A7002633FE /* whisperkit-cli */,
 			);
 			productName = Epilogue;
 			productReference = 015D10F22E318D5D002633FE /* Epilogue.app */;
@@ -194,6 +217,9 @@
 			);
 			mainGroup = 015D10E92E318D5D002633FE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 015D10F32E318D5D002633FE /* Products */;
 			projectDirPath = "";
@@ -215,6 +241,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		015D110B2E318D5E002633FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		015D13812E328E81002633FE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -575,6 +608,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		015D13AF2E3353A7002633FE /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+		015D13B12E3353A7002633FE /* whisperkit-cli */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = "whisperkit-cli";
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 015D10EA2E318D5D002633FE /* Project object */;
 }
