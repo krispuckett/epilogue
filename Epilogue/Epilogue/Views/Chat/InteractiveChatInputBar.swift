@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct InteractiveChatInputBar: View {
     @State private var messageText = ""

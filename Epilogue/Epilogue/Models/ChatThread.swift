@@ -13,6 +13,13 @@ class ChatThread {
     var lastMessageDate: Date = Date()
     var createdDate: Date = Date()
     
+    // New properties for ambient sessions
+    var isAmbientSession: Bool = false
+    var capturedItems: Int = 0
+    var sessionDuration: TimeInterval = 0
+    var sessionSummary: String?
+    var isArchived: Bool = false
+    
     init(book: Book? = nil) {
         if let book = book {
             self.bookId = book.localId
@@ -20,6 +27,17 @@ class ChatThread {
             self.bookAuthor = book.author
             self.bookCoverURL = book.coverImageURL
         }
+    }
+    
+    // Convenience initializer for ambient sessions
+    convenience init(ambientSession: AmbientSession, processedData: ProcessedAmbientSession) {
+        self.init(book: ambientSession.book)
+        self.isAmbientSession = true
+        self.capturedItems = processedData.quotes.count + processedData.notes.count + processedData.questions.count
+        self.sessionDuration = ambientSession.duration
+        self.sessionSummary = processedData.summary
+        self.createdDate = ambientSession.startTime
+        self.lastMessageDate = ambientSession.endTime ?? Date()
     }
 }
 

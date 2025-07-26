@@ -320,3 +320,36 @@ struct VoiceRecognitionTestView_Previews: PreviewProvider {
         VoiceRecognitionTestView()
     }
 }
+
+// MARK: - Test Launcher View
+struct VoiceTestLauncherView: View {
+    @State private var selectedTest = 0
+    
+    var body: some View {
+        TabView(selection: $selectedTest) {
+            VoiceRecognitionTestView()
+                .tabItem {
+                    Label("Voice Test", systemImage: "mic.circle")
+                }
+                .tag(0)
+            
+            AmbientReadingView()
+                .tabItem {
+                    Label("Ambient Reading", systemImage: "book.circle")
+                }
+                .tag(1)
+            
+            TranscriptionDebugView()
+                .tabItem {
+                    Label("Debug", systemImage: "ant.circle")
+                }
+                .tag(2)
+            
+            WhisperKitTestView()
+                .tabItem {
+                    Label("Tests", systemImage: "checkmark.circle")
+                }
+                .tag(3)
+        }
+    }
+}

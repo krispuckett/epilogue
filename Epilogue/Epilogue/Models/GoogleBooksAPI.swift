@@ -45,6 +45,9 @@ struct GoogleBookItem: Codable, Identifiable {
         
         var enhanced = urlString
         
+        // IMPORTANT: Convert HTTP to HTTPS for App Transport Security
+        enhanced = enhanced.replacingOccurrences(of: "http://", with: "https://")
+        
         // Remove existing zoom parameter if present
         if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
             let range = NSRange(location: 0, length: enhanced.utf16.count)
@@ -97,7 +100,7 @@ struct IndustryIdentifier: Codable {
 }
 
 // MARK: - Book Model
-struct Book: Identifiable, Codable {
+struct Book: Identifiable, Codable, Equatable {
     let id: String  // Google Books ID
     let localId: UUID  // Local UUID for linking
     let title: String

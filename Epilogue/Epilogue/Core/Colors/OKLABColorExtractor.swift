@@ -597,11 +597,12 @@ public class OKLABColorExtractor {
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
             
             do {
-                try data.write(to: tempURL)
-        // print("💾 Saved extracted image to: \(tempURL.path)")
+                // DEBUG IMAGE SAVING DISABLED
+                // try data.write(to: tempURL)
+                // print("💾 Saved extracted image to: \(tempURL.path)")
                 
                 // Save to Photos for easy inspection
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                // UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
             } catch {
         // print("❌ Failed to save extracted image: \(error)")
             }

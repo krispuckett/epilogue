@@ -4,7 +4,6 @@ import Combine
 import OSLog
 import Accelerate.vecLib.vDSP
 import UIKit
-import WhisperKit
 // Potential iOS 26 imports - uncomment if available
 // import SpeechAnalysis
 // import FoundationModels
@@ -14,6 +13,7 @@ private let logger = Logger(subsystem: "com.epilogue", category: "VoiceRecogniti
 
 @MainActor
 class VoiceRecognitionManager: NSObject, ObservableObject {
+    static let shared = VoiceRecognitionManager()
     // MARK: - Published Properties
     @Published var isListening = false
     @Published var transcribedText = ""
@@ -27,6 +27,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     
     // MARK: - Private Properties
     private var speechRecognizer: SFSpeechRecognizer?
+    private var audioBufferCount = 0
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine = AVAudioEngine()
@@ -37,22 +38,22 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var silenceTimer: Timer?
     private var lastSpeechTime: Date = Date()
     private let silenceThreshold: TimeInterval = 3.0
-    private let voiceActivityThreshold: Float = 0.0005 // Very sensitive - adjust based on device
+    private let voiceActivityThreshold: Float = 0.00005 // Even lower threshold for better sensitivity
     
-    // Wake word detection
-    private let wakeWords = ["epilogue", "hey epilogue", "ok epilogue"]
-    private var isWakeWordDetected = false
-    private var wakeWordCooldown: Date?
+    // Natural reaction detection
+    private var reactionDetectionEnabled = true
+    private var lastReactionTime: Date?
     
     // Audio analysis
     private var amplitudeBuffer: [Float] = []
     private let amplitudeBufferSize = 50
     
-    // Whisper integration
-    private let whisperProcessor = WhisperProcessor()
+    // Advanced pipeline integration
+    private let intelligencePipeline = AmbientIntelligencePipeline()
+    private let whisperProcessor = OptimizedWhisperProcessor()
     private var audioBufferForWhisper: [AVAudioPCMBuffer] = []
     private var whisperProcessingTimer: Timer?
-    private let whisperBufferDuration: TimeInterval = 5.0 // Process every 5 seconds
+    private let whisperBufferDuration: TimeInterval = 2.0 // Process every 2 seconds for better responsiveness
     
     // Debug logging counters
     private var voiceBufferLogCounter = 0
@@ -65,9 +66,13 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     // MARK: - Initialization
+    private var isInitialized = false
+    
     override init() {
         super.init()
         Task {
+            guard !isInitialized else { return }
+            isInitialized = true
             await setupAudioSession()
             await requestPermissions()
         }
@@ -153,30 +158,41 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     
     // MARK: - Start/Stop Listening
     func startAmbientListening() {
-        guard !isListening else { return }
+        guard !isListening else { 
+            logger.warning("Already listening, ignoring startAmbientListening")
+            return 
+        }
         
+        logger.info("🎤 Starting ambient listening...")
         isListening = true
-        recognitionState = .idle
+        recognitionState = .listening  // Always listening when activated
         
         Task {
             // Ensure Whisper model is loaded first
-            if !whisperProcessor.isModelLoaded {
+            if !self.whisperProcessor.isModelLoaded {
                 logger.info("Loading default Whisper model...")
-                let availableModels = whisperProcessor.availableModels
+                let availableModels = self.whisperProcessor.availableModels
                 logger.info("Available Whisper models: \(availableModels.map { $0.displayName }.joined(separator: ", "))")
                 
                 if let defaultModel = availableModels.first(where: { $0.recommendedForDevice }) {
                     logger.info("Loading recommended model: \(defaultModel.displayName)")
                     do {
-                        try await whisperProcessor.loadModel(defaultModel)
+                        try await self.whisperProcessor.loadModel(defaultModel)
                         logger.info("Whisper model loaded successfully")
                     } catch {
                         logger.error("Failed to load Whisper model: \(error)")
                     }
                 } else if let firstModel = availableModels.first {
                     logger.info("No recommended model, loading: \(firstModel.displayName)")
-                    try? await whisperProcessor.loadModel(firstModel)
+                    do {
+                        try await self.whisperProcessor.loadModel(firstModel)
+                        logger.info("Whisper model \(firstModel.displayName) loaded")
+                    } catch {
+                        logger.error("Failed to load first model: \(error)")
+                    }
                 }
+            } else {
+                logger.info("Whisper model already loaded: \(self.whisperProcessor.currentModel)")
             }
             
             await startContinuousRecognition()
@@ -245,6 +261,12 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                 guard let self = self else { return }
                 
+                // Log every 100th buffer to avoid spam
+                self.audioBufferCount += 1
+                if self.audioBufferCount % 100 == 0 {
+                    logger.debug("🎤 Audio buffer #\(self.audioBufferCount), amplitude: \(self.currentAmplitude)")
+                }
+                
                 // Update amplitude for visualization
                 self.updateAmplitude(from: buffer)
                 
@@ -258,6 +280,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                     self.handleVoiceDetected()
                 } else {
                     self.handleSilence()
+                }
+                
+                // Send to advanced pipeline for processing
+                Task {
+                    await self.intelligencePipeline.analyzeAudioStream(buffer)
                 }
                 
                 // Buffer for Whisper whenever we're actively listening (not just when voice detected)
@@ -336,15 +363,58 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
         
         let avgAmplitude = amplitudeBuffer.reduce(0, +) / Float(amplitudeBuffer.count)
-        let hasVoice = avgAmplitude > voiceActivityThreshold
+        
+        // Enhanced VAD: Check for voice-like patterns
+        // 1. Basic energy threshold
+        let hasEnergy = avgAmplitude > voiceActivityThreshold
+        
+        // 2. Zero-crossing rate (helps distinguish voice from noise)
+        let zcr = calculateZeroCrossingRate(channelData: channelData, frameLength: frames)
+        let hasVoiceLikeZCR = zcr > 10 && zcr < 120 // Voice typically has moderate ZCR
+        
+        // 3. Simple spectral analysis - voice has energy in 80-4000Hz range
+        let hasVoiceSpectrum = hasVoiceFrequencyContent(channelData: channelData, frameLength: frames, sampleRate: buffer.format.sampleRate)
+        
+        // Combine all indicators
+        let hasVoice = hasEnergy && (hasVoiceLikeZCR || hasVoiceSpectrum)
         
         // Log every 100th check to avoid spam
         self.vadCheckLogCounter += 1
         if self.vadCheckLogCounter % 100 == 0 {
-            logger.debug("VAD check #\(self.vadCheckLogCounter): amplitude=\(avgAmplitude), threshold=\(self.voiceActivityThreshold), hasVoice=\(hasVoice)")
+            logger.debug("VAD check #\(self.vadCheckLogCounter): amplitude=\(avgAmplitude), ZCR=\(zcr), hasVoice=\(hasVoice)")
         }
         
         return hasVoice
+    }
+    
+    private func calculateZeroCrossingRate(channelData: UnsafeMutablePointer<Float>, frameLength: AVAudioFrameCount) -> Float {
+        var crossings: Float = 0
+        for i in 1..<Int(frameLength) {
+            if (channelData[i] >= 0 && channelData[i-1] < 0) || (channelData[i] < 0 && channelData[i-1] >= 0) {
+                crossings += 1
+            }
+        }
+        return crossings / Float(frameLength) * 100
+    }
+    
+    private func hasVoiceFrequencyContent(channelData: UnsafeMutablePointer<Float>, frameLength: AVAudioFrameCount, sampleRate: Double) -> Bool {
+        // Simple energy-based frequency detection
+        // For a more accurate implementation, we would use FFT
+        // For now, use a heuristic based on sample variance
+        var mean: Float = 0
+        vDSP_meanv(channelData, 1, &mean, vDSP_Length(frameLength))
+        
+        var variance: Float = 0
+        var temp = [Float](repeating: 0, count: Int(frameLength))
+        
+        // Calculate variance as a proxy for frequency content
+        for i in 0..<Int(frameLength) {
+            temp[i] = pow(channelData[i] - mean, 2)
+        }
+        vDSP_meanv(temp, 1, &variance, vDSP_Length(frameLength))
+        
+        // Voice typically has moderate variance (not too low like silence, not too high like noise)
+        return variance > 0.0001 && variance < 0.1
     }
     
     private func updateAmplitude(from buffer: AVAudioPCMBuffer) {
@@ -388,7 +458,6 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             if timeSinceLastSpeech > silenceThreshold * 2 {
                 DispatchQueue.main.async { [weak self] in
                     self?.transcribedText = ""
-                    self?.isWakeWordDetected = false
                 }
             }
         }
@@ -406,76 +475,31 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             logger.debug("Transcription confidence: \(segment.confidence) - '\(segment.substring)'")
         }
         
-        // Check for wake word
-        if !isWakeWordDetected && containsWakeWord(text) {
-            await handleWakeWordDetected()
-        }
-        
-        // Process commands only after wake word
-        if isWakeWordDetected && !text.isEmpty {
-            recognitionState = .processing
-            await processVoiceCommand(text)
-        }
-        
-        // Reset wake word after processing if final
-        if result.isFinal && isWakeWordDetected {
-            resetWakeWordDetection()
+        // Process natural reactions only for substantial text
+        if reactionDetectionEnabled && !text.isEmpty && text.split(separator: " ").count >= 3 {
+            // Only process if we have a complete sentence or if it's been stable for a moment
+            if result.isFinal || (self.confidenceScore > 0.8 && text.hasSuffix(".") || text.hasSuffix("?") || text.hasSuffix("!")) {
+                await processNaturalReaction(text)
+            }
         }
     }
     
-    private func containsWakeWord(_ text: String) -> Bool {
-        let lowercasedText = text.lowercased()
-        
-        // Check cooldown to prevent repeated triggers
-        if let cooldown = wakeWordCooldown,
-           Date().timeIntervalSince(cooldown) < 2.0 {
-            return false
+    private func processNaturalReaction(_ text: String) async {
+        // Cooldown to prevent repeated processing
+        if let lastTime = lastReactionTime,
+           Date().timeIntervalSince(lastTime) < 1.0 {
+            return
         }
         
-        return wakeWords.contains { lowercasedText.contains($0) }
-    }
-    
-    private func handleWakeWordDetected() async {
-        isWakeWordDetected = true
-        wakeWordCooldown = Date()
+        lastReactionTime = Date()
         
-        // Haptic feedback
-        HapticManager.shared.mediumImpact()
+        logger.info("Processing natural reaction: '\(text)'")
         
-        // Clear buffer for command
-        transcribedText = ""
-        recognitionState = .processing
-        
-        logger.info("Wake word detected - ready for command")
-        
-        // Post notification for UI response
-        NotificationCenter.default.post(name: Notification.Name("WakeWordDetected"), object: nil)
-    }
-    
-    private func processVoiceCommand(_ command: String) async {
-        // Remove wake word from command
-        var cleanCommand = command.lowercased()
-        for wakeWord in wakeWords {
-            cleanCommand = cleanCommand.replacingOccurrences(of: wakeWord, with: "").trimmingCharacters(in: .whitespaces)
-        }
-        
-        if !cleanCommand.isEmpty {
-            logger.info("Processing command: '\(cleanCommand)'")
-            
-            // Post command for processing
-            NotificationCenter.default.post(
-                name: Notification.Name("VoiceCommandReceived"),
-                object: cleanCommand
-            )
-        }
-    }
-    
-    private func resetWakeWordDetection() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.isWakeWordDetected = false
-            self?.transcribedText = ""
-            self?.recognitionState = .idle
-        }
+        // Post reaction for AI processing
+        NotificationCenter.default.post(
+            name: Notification.Name("NaturalReactionDetected"),
+            object: text
+        )
     }
     
     // MARK: - Background Handling
@@ -524,11 +548,14 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
         
         audioBufferForWhisper.append(bufferCopy)
-        logger.debug("Added buffer to Whisper queue. Total buffers: \(self.audioBufferForWhisper.count)")
+        // Log only every 10th buffer to reduce spam
+        if audioBufferForWhisper.count % 10 == 0 {
+            logger.debug("Added buffer to Whisper queue. Total buffers: \(self.audioBufferForWhisper.count)")
+        }
         
         // Start the processing timer only if it's not already running
         if whisperProcessingTimer == nil {
-            logger.info("Starting Whisper processing timer (5 seconds)")
+            logger.info("Starting Whisper processing timer (2 seconds)")
             whisperProcessingTimer = Timer.scheduledTimer(withTimeInterval: whisperBufferDuration, repeats: true) { [weak self] _ in
                 logger.info("Whisper processing timer fired")
                 Task {
@@ -552,11 +579,24 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             return 
         }
         
+        logger.info("Combined buffer: \(combinedBuffer.frameLength) frames, format: \(combinedBuffer.format)")
+        
+        // Calculate duration
+        let duration = Double(combinedBuffer.frameLength) / combinedBuffer.format.sampleRate
+        logger.info("Audio duration: \(String(format: "%.2f", duration)) seconds")
+        
         // Clear the buffer
         audioBufferForWhisper.removeAll()
         
+        // Check if we have enough audio (at least 0.5 seconds)
+        guard duration >= 0.5 else {
+            logger.info("Not enough audio for WhisperKit (need at least 0.5 seconds, got \(String(format: "%.2f", duration))s)")
+            isProcessingWhisper = false
+            return
+        }
+        
         // Check if Whisper model is loaded
-        guard whisperProcessor.isModelLoaded else {
+        guard self.whisperProcessor.isModelLoaded else {
             logger.warning("Whisper model not loaded yet")
             isProcessingWhisper = false
             return
@@ -567,27 +607,57 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         do {
             logger.info("Starting Whisper transcription...")
-            let result = try await whisperProcessor.transcribe(audioBuffer: combinedBuffer)
+            let result = try await self.whisperProcessor.transcribe(audioBuffer: combinedBuffer)
             
-            whisperTranscribedText = result.text
-            // Calculate confidence from segments using avgLogprob
-            let avgConfidence = result.segments.isEmpty ? 0.0 : 
-                result.segments.map { exp($0.avgLogprob) }.reduce(0, +) / Float(result.segments.count)
-            whisperConfidence = avgConfidence
-            detectedLanguage = result.language
-            
-            logger.info("Whisper transcription: \(result.text) (confidence: \(avgConfidence), language: \(result.language))")
-            
-            // If wake word was detected and Whisper has better transcription, use it
-            if isWakeWordDetected && !result.text.isEmpty {
+            // Check if Whisper failed and use fallback
+            if result.text == "[BLANK_AUDIO]" || result.text.isEmpty {
+                logger.warning("Whisper returned blank audio, using Apple transcription as fallback")
+                
+                // Use Apple's transcription as fallback if available
+                if !transcribedText.isEmpty {
+                    whisperTranscribedText = "[Fallback] \(transcribedText)"
+                    whisperConfidence = confidenceScore
+                    
+                    NotificationCenter.default.post(
+                        name: Notification.Name("WhisperTranscriptionReady"),
+                        object: transcribedText as NSString
+                    )
+                } else {
+                    whisperTranscribedText = ""
+                    whisperConfidence = 0.0
+                }
+            } else {
+                whisperTranscribedText = result.text
+                // Calculate confidence from segments
+                let avgConfidence: Float
+                if result.segments.isEmpty {
+                    avgConfidence = 0.0
+                } else {
+                    let probabilities = result.segments.map { segment in
+                        return segment.probability
+                    }
+                    let sum = probabilities.reduce(0, +)
+                    avgConfidence = sum / Float(result.segments.count)
+                }
+                whisperConfidence = avgConfidence
+                detectedLanguage = result.language ?? "en"
+                
+                logger.info("Whisper transcription: \(result.text) (confidence: \(avgConfidence), language: \(result.language ?? "unknown"))")
+                
                 // Post notification with Whisper's transcription
                 NotificationCenter.default.post(
                     name: Notification.Name("WhisperTranscriptionReady"),
-                    object: result.text
+                    object: result.text as NSString
                 )
             }
         } catch {
             logger.error("Whisper transcription failed: \(error.localizedDescription)")
+            
+            // Use Apple transcription as fallback on error
+            if !transcribedText.isEmpty {
+                whisperTranscribedText = "[Error fallback] \(transcribedText)"
+                whisperConfidence = confidenceScore * 0.8 // Reduce confidence for fallback
+            }
         }
         
         isProcessingWhisper = false
@@ -604,23 +674,20 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             frameCapacity: AVAudioFrameCount(totalFrames)
         ) else { return nil }
         
-        var currentFrame = 0
+        // CRITICAL: Set frameLength before copying
+        combinedBuffer.frameLength = AVAudioFrameCount(totalFrames)
+        
+        var writePointer = combinedBuffer.floatChannelData![0]
         
         for buffer in buffers {
-            let frameCount = Int(buffer.frameLength)
+            let readPointer = buffer.floatChannelData![0]
+            let frames = Int(buffer.frameLength)
             
-            if let sourceData = buffer.floatChannelData,
-               let destData = combinedBuffer.floatChannelData {
-                for channel in 0..<Int(format.channelCount) {
-                    let destPtr = destData[channel].advanced(by: currentFrame)
-                    memcpy(destPtr, sourceData[channel], frameCount * MemoryLayout<Float>.size)
-                }
-            }
-            
-            currentFrame += frameCount
+            // Copy with explicit frame count
+            memcpy(writePointer, readPointer, frames * MemoryLayout<Float>.size)
+            writePointer = writePointer.advanced(by: frames)
         }
         
-        combinedBuffer.frameLength = AVAudioFrameCount(totalFrames)
         return combinedBuffer
     }
     
@@ -629,6 +696,35 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         whisperConfidence = 0.0
         audioBufferForWhisper.removeAll()
         whisperProcessingTimer?.invalidate()
+    }
+    
+    // MARK: - Testing
+    
+    func testWhisperKit() async {
+        logger.info("Running WhisperKit test...")
+        
+        do {
+            // Ensure model is loaded
+            if !self.whisperProcessor.isModelLoaded {
+                logger.info("Loading Whisper model for test...")
+                if let model = self.whisperProcessor.availableModels.first {
+                    try await self.whisperProcessor.loadModel(model)
+                }
+            }
+            
+            let result = try await self.whisperProcessor.testTranscription()
+            logger.info("WhisperKit test result: '\(result)'")
+            
+            // Update UI
+            await MainActor.run {
+                self.whisperTranscribedText = "Test: \(result)"
+            }
+        } catch {
+            logger.error("WhisperKit test error: \(error)")
+            await MainActor.run {
+                self.whisperTranscribedText = "Test error: \(error.localizedDescription)"
+            }
+        }
     }
 }
 

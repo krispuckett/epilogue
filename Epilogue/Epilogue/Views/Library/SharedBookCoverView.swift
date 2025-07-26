@@ -61,6 +61,8 @@ struct SharedBookCoverView: View {
     }
     
     private func saveImageForDebug(_ image: UIImage, suffix: String) {
+        // DEBUG IMAGE SAVING DISABLED
+        /*
         Task {
             guard let data = image.pngData() else { return }
             let fileName = "DISPLAYED_\(suffix)_\(Date().timeIntervalSince1970).png"
@@ -76,6 +78,7 @@ struct SharedBookCoverView: View {
                 print("❌ Failed to save displayed image: \(error)")
             }
         }
+        */
     }
     
     var body: some View {

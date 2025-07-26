@@ -48,8 +48,9 @@ struct BookCoverGradientView: View {
     private func extractColors() async {
         guard let coverURL = book.coverImageURL else { return }
         
-        // Force high quality image
+        // Force high quality image and HTTPS
         let highQualityURL = coverURL
+            .replacingOccurrences(of: "http://", with: "https://")
             .replacingOccurrences(of: "zoom=1", with: "zoom=3")
             .replacingOccurrences(of: "zoom=2", with: "zoom=3")
         

@@ -72,7 +72,7 @@ struct NoteCard: View {
         }
         .onTapGesture(count: 2) {
             // Double tap to edit
-            HapticManager.shared.mediumImpact()
+            HapticManager.shared.mediumTap()
             NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
         }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)

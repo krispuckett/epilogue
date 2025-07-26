@@ -6,6 +6,8 @@ struct ContentView: View {
     @StateObject private var notesViewModel = NotesViewModel()
     @State private var showCommandPalette = false
     @State private var selectedDetent: PresentationDetent = .height(300)
+    @State private var showVoiceTest = false
+    @State private var showWhisperModels = false
     @Namespace private var animation
     
     init() {
@@ -70,6 +72,10 @@ struct ContentView: View {
             .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
             .environmentObject(libraryViewModel)
             .environmentObject(notesViewModel)
+            .onChange(of: selectedTab) { oldValue, newValue in
+                // Haptic feedback on tab change
+                HapticManager.shared.selectionChanged()
+            }
             .safeAreaInset(edge: .bottom) {
                 // Quick Add button positioned right above tab bar
                 if selectedTab != 2 && !showCommandPalette && !notesViewModel.isEditingNote {
@@ -123,6 +129,53 @@ struct ContentView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandPalette)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
         .preferredColorScheme(.dark)
+        // Voice Test Button (temporary for testing) - HIDDEN
+        /*
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: 12) {
+                // Whisper Model Manager Button
+                Button {
+                    showWhisperModels = true
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .glassEffect(in: Circle())
+                }
+                
+                // Voice Test Button
+                Button {
+                    showVoiceTest = true
+                } label: {
+                    Image(systemName: "mic.badge.xmark")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .glassEffect(in: Circle())
+                }
+            }
+            .padding(.top, 60)
+            .padding(.trailing, 20)
+        }
+        .sheet(isPresented: $showVoiceTest) {
+            VoiceTestLauncherView()
+        }
+        .sheet(isPresented: $showWhisperModels) {
+            NavigationStack {
+                TranscriptionDebugView()
+                    .navigationTitle("Transcription Debug")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                showWhisperModels = false
+                            }
+                        }
+                    }
+            }
+        }
+        */
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if notification.object is Book {
                 selectedTab = 0  // Switch to library tab
@@ -134,6 +187,13 @@ struct ContentView: View {
                 selectedTab = 1  // Switch to notes tab
                 // NotesView will handle the scrolling and editing
             }
+        }
+        .onAppear {
+            // Clean expired cache entries on app launch
+            ResponseCache.shared.cleanExpiredEntries()
+            
+            // Prepare haptic generators
+            HapticManager.shared.prepareAll()
         }
     }
 }

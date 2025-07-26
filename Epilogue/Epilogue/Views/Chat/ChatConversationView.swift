@@ -119,7 +119,7 @@ struct ChatConversationView: View {
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
                         .onLongPressGesture(minimumDuration: 1.5, maximumDistance: .infinity) {
-                            HapticManager.shared.mediumImpact()
+                            HapticManager.shared.mediumTap()
                             showingClearConfirmation = true
                         } onPressingChanged: { _ in
                             // Empty to prevent visual feedback
@@ -261,8 +261,8 @@ struct ChatConversationView: View {
                     )
                 }
                 
-                // Get response from Perplexity
-                let response = try await PerplexityService.staticChat(
+                // Get response from Perplexity (with caching)
+                let response = try await PerplexityService.cachedChat(
                     message: userMessage.content,
                     bookContext: bookContext
                 )

@@ -95,6 +95,9 @@ struct BookPickerRow: View {
         enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
         enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
         
+        // IMPORTANT: Convert HTTP to HTTPS for App Transport Security
+        enhanced = enhanced.replacingOccurrences(of: "http://", with: "https://")
+        
         return enhanced
     }
     

@@ -630,7 +630,7 @@ struct UniversalCommandBar: View {
     // MARK: - Actions
     
     private func expand() {
-        HapticManager.shared.mediumImpact()
+        HapticManager.shared.mediumTap()
         withAnimation {
             isExpanded = true
         }
@@ -1131,7 +1131,7 @@ struct TabBarItem<IconView: View>: View {
     
     var body: some View {
         Button(action: {
-            HapticManager.shared.selection()
+            HapticManager.shared.selectionChanged()
             action()
         }) {
             VStack(spacing: 4) {

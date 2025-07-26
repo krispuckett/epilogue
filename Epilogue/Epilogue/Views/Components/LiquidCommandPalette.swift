@@ -466,7 +466,7 @@ struct LiquidCommandPalette: View {
     private func executeCommand() {
         guard detectedIntent != .unknown else { return }
         
-        HapticManager.shared.mediumImpact()
+        HapticManager.shared.mediumTap()
         
         // Handle editing mode
         if let editingNote = editingNote, let onUpdate = onUpdate {

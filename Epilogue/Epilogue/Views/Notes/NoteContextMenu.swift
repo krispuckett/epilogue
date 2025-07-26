@@ -151,7 +151,7 @@ struct NoteContextMenu: View {
     }
     
     private func shareAsImage() {
-        HapticManager.shared.mediumImpact()
+        HapticManager.shared.mediumTap()
         // Create shareable image view
         let shareView = ShareableQuoteView(note: note)
         let renderer = ImageRenderer(content: shareView)

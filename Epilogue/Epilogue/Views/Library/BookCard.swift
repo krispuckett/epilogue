@@ -33,7 +33,7 @@ struct BookCard: View {
         }
         .onLongPressGesture(minimumDuration: 0.5) {
             showingProgress = true
-            HapticManager.shared.mediumImpact()
+            HapticManager.shared.mediumTap()
         }
         .popover(isPresented: $showingProgress) {
             ProgressPopover(book: book, viewModel: viewModel)

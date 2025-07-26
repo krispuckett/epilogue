@@ -3,27 +3,26 @@ import SwiftUI
 struct ChatInputBar: View {
     let onStartGeneralChat: () -> Void
     let onSelectBook: () -> Void
+    let onStartAmbient: () -> Void
     @FocusState private var isFocused: Bool
-    @State private var showSuggestions = false
+    @State private var showCommandPalette = false
+    @State private var isAmbientActive = false
+    @Namespace private var commandPaletteNamespace
+    @EnvironmentObject var notesViewModel: NotesViewModel
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
     
     var body: some View {
         VStack(spacing: 8) {
-            // Quick suggestions pills when plus button is tapped
-            if showSuggestions {
-                ChatSuggestionPills()
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 4)
-            }
-            
             HStack(spacing: 8) {
-                // Plus button (left side)
+                // Ambient orb button (left side)
+                AmbientOrbButton(isActive: $isAmbientActive, onTap: onStartAmbient)
+                
+                // Command palette button
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        showSuggestions.toggle()
-                    }
+                    showCommandPalette = true
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(width: 36, height: 36)
                         .glassEffect(.regular.tint(Color.white.opacity(0.1)), in: Circle())
@@ -76,7 +75,15 @@ struct ChatInputBar: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSuggestions)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandPalette)
+        .sheet(isPresented: $showCommandPalette) {
+            LiquidCommandPalette(
+                isPresented: $showCommandPalette,
+                animationNamespace: commandPaletteNamespace
+            )
+            .environmentObject(notesViewModel)
+            .environmentObject(libraryViewModel)
+        }
     }
 }
 

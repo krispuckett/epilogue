@@ -4,12 +4,20 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 
 struct ChatThreadListView: View {
-    @Query private var threads: [ChatThread]
+    @Query(filter: #Predicate<ChatThread> { thread in
+        thread.isArchived == false
+    }) private var threads: [ChatThread]
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @State private var showingDeleteConfirmation = false
     @State private var threadToDelete: ChatThread?
     @State private var showingBookPicker = false
+    @State private var isAmbientModeActive = false
+    @State private var ambientSelectedBook: Book?
+    @State private var ambientSession: AmbientSession?
+    @State private var isSelectionMode = false
+    @State private var selectedThreads: Set<ChatThread> = []
+    @State private var showingBulkDeleteConfirmation = false
     @Binding var navigationPath: NavigationPath
     
     var body: some View {
@@ -20,21 +28,74 @@ struct ChatThreadListView: View {
             // Content layer
             contentView
         }
-        .navigationTitle("Epilogue")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Chat")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if !threads.isEmpty {
+                    Button(isSelectionMode ? "Done" : "Select") {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isSelectionMode.toggle()
+                            if !isSelectionMode {
+                                selectedThreads.removeAll()
+                            }
+                        }
+                        HapticManager.shared.lightTap()
+                    }
+                }
+            }
+            
+            if isSelectionMode && !selectedThreads.isEmpty {
+                ToolbarItem(placement: .bottomBar) {
+                    HStack {
+                        Button {
+                            HapticManager.shared.lightTap()
+                            archiveSelectedThreads()
+                        } label: {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                        
+                        Spacer()
+                        
+                        Button(role: .destructive) {
+                            HapticManager.shared.lightTap()
+                            showingBulkDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+            }
         }
         .safeAreaInset(edge: .bottom) {
             ChatInputBar(
                 onStartGeneralChat: {
-                    // Don't auto-navigate, just focus the input
+                    let generalThread = threads.first { $0.bookId == nil } ?? ChatThread()
+                    if !threads.contains(where: { $0.bookId == nil }) {
+                        modelContext.insert(generalThread)
+                        try? modelContext.save()
+                    }
+                    navigationPath.append(generalThread)
                 },
                 onSelectBook: {
                     showingBookPicker = true
+                },
+                onStartAmbient: {
+                    isAmbientModeActive = true
                 }
             )
-            .padding([.horizontal], 16)
-            .padding([.bottom], 8)
+            .environmentObject(libraryViewModel)
+        }
+        .fullScreenCover(isPresented: $isAmbientModeActive, onDismiss: {
+            // Clean up when dismissed
+            ambientSelectedBook = nil
+            ambientSession = nil
+        }) {
+            AmbientChatOverlay(
+                isActive: $isAmbientModeActive,
+                selectedBook: $ambientSelectedBook,
+                session: $ambientSession
+            )
         }
         .sheet(isPresented: $showingBookPicker) {
             BookPickerSheet(
@@ -54,6 +115,14 @@ struct ChatThreadListView: View {
         } message: {
             Text("This action cannot be undone.")
         }
+        .alert("Delete \(selectedThreads.count) conversations?", isPresented: $showingBulkDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteSelectedThreads()
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
     }
     
     // MARK: - Background View (ALWAYS visible)
@@ -65,7 +134,7 @@ struct ChatThreadListView: View {
         
         // Show literary background when no book threads
         if bookThreads.isEmpty {
-            MetalLiteraryView()
+            AdvancedOrganicGradientView()
                 .ignoresSafeArea()
                 .transition(.opacity.animation(.easeInOut(duration: 0.5)))
         }
@@ -104,14 +173,44 @@ struct ChatThreadListView: View {
                 VStack(spacing: 16) {
                     // General chat (if has messages)
                     if let general = generalThread, !general.messages.isEmpty {
-                        NavigationLink(value: general) {
-                            GeneralChatCard(
+                        if isSelectionMode {
+                            SwipeableGeneralChatCard(
                                 messageCount: general.messages.count,
-                                lastMessage: general.messages.last
+                                lastMessage: general.messages.last,
+                                isSelected: selectedThreads.contains(general),
+                                isSelectionMode: isSelectionMode,
+                                onDelete: {
+                                    threadToDelete = general
+                                    showingDeleteConfirmation = true
+                                },
+                                onArchive: {
+                                    archiveThread(general)
+                                },
+                                onToggleSelection: {
+                                    toggleThreadSelection(general)
+                                }
                             )
+                            .padding(.horizontal)
+                        } else {
+                            NavigationLink(value: general) {
+                                SwipeableGeneralChatCard(
+                                    messageCount: general.messages.count,
+                                    lastMessage: general.messages.last,
+                                    isSelected: false,
+                                    isSelectionMode: false,
+                                    onDelete: {
+                                        threadToDelete = general
+                                        showingDeleteConfirmation = true
+                                    },
+                                    onArchive: {
+                                        archiveThread(general)
+                                    },
+                                    onToggleSelection: {}
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal)
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal)
                     }
                     
                     // Book discussions
@@ -123,18 +222,44 @@ struct ChatThreadListView: View {
                                 .padding(.horizontal)
                             
                             ForEach(bookThreads) { thread in
-                                NavigationLink(value: thread) {
-                                    BookChatCard(
+                                if isSelectionMode {
+                                    SwipeableChatCard(
                                         thread: thread,
+                                        isSelected: selectedThreads.contains(thread),
+                                        isSelectionMode: isSelectionMode,
                                         onDelete: {
                                             threadToDelete = thread
                                             showingDeleteConfirmation = true
+                                        },
+                                        onArchive: {
+                                            archiveThread(thread)
+                                        },
+                                        onToggleSelection: {
+                                            toggleThreadSelection(thread)
                                         }
                                     )
                                     .environmentObject(libraryViewModel)
+                                    .padding(.horizontal)
+                                } else {
+                                    NavigationLink(value: thread) {
+                                        SwipeableChatCard(
+                                            thread: thread,
+                                            isSelected: false,
+                                            isSelectionMode: false,
+                                            onDelete: {
+                                                threadToDelete = thread
+                                                showingDeleteConfirmation = true
+                                            },
+                                            onArchive: {
+                                                archiveThread(thread)
+                                            },
+                                            onToggleSelection: {}
+                                        )
+                                        .environmentObject(libraryViewModel)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.horizontal)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal)
                             }
                         }
                     }
@@ -176,6 +301,42 @@ struct ChatThreadListView: View {
         modelContext.delete(thread)
         try? modelContext.save()
         threadToDelete = nil
+    }
+    
+    private func toggleThreadSelection(_ thread: ChatThread) {
+        if selectedThreads.contains(thread) {
+            selectedThreads.remove(thread)
+        } else {
+            selectedThreads.insert(thread)
+        }
+    }
+    
+    private func archiveThread(_ thread: ChatThread) {
+        // TODO: Implement archive functionality
+        // For now, just mark as archived
+        thread.isArchived = true
+        try? modelContext.save()
+        HapticManager.shared.success()
+    }
+    
+    private func archiveSelectedThreads() {
+        for thread in selectedThreads {
+            thread.isArchived = true
+        }
+        try? modelContext.save()
+        selectedThreads.removeAll()
+        isSelectionMode = false
+        HapticManager.shared.success()
+    }
+    
+    private func deleteSelectedThreads() {
+        for thread in selectedThreads {
+            modelContext.delete(thread)
+        }
+        try? modelContext.save()
+        selectedThreads.removeAll()
+        isSelectionMode = false
+        HapticManager.shared.success()
     }
 }
 
@@ -248,6 +409,13 @@ struct BookChatCard: View {
     let onDelete: () -> Void
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     
+    private var formattedDuration: String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.minute, .second]
+        formatter.unitsStyle = .abbreviated
+        return formatter.string(from: thread.sessionDuration) ?? "0s"
+    }
+    
     // Try to get cover URL from thread or find matching book in library
     private var effectiveCoverURL: String? {
         if let url = thread.bookCoverURL {
@@ -297,20 +465,38 @@ struct BookChatCard: View {
                 }
                 
                 HStack {
-                    if let lastMessage = thread.messages.last {
-                        Image(systemName: lastMessage.isUser ? "person.fill" : "sparkles")
+                    if thread.isAmbientSession {
+                        // Ambient session info
+                        Image(systemName: "waveform.bubble")
                             .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.orange.opacity(0.6))
                         
-                        Text(lastMessage.content)
+                        Text("\(thread.capturedItems) items • \(formattedDuration)")
                             .font(.system(size: 12))
                             .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        Text(thread.lastMessageDate.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.3))
+                    } else {
+                        // Regular chat info
+                        if let lastMessage = thread.messages.last {
+                            Image(systemName: lastMessage.isUser ? "person.fill" : "sparkles")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.4))
+                            
+                            Text(lastMessage.content)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .lineLimit(1)
+                        }
+                        
+                        Text(thread.lastMessageDate.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.3))
                     }
-                    
-                    Text(thread.lastMessageDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.3))
                 }
             }
             

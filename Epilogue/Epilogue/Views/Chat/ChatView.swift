@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 // MARK: - Chat Message Model (for legacy compatibility)
 struct ChatMessage: Identifiable {
