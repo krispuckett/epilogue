@@ -1,0 +1,9 @@
+// Config.xcconfig.template
+// Copy this file to Config.xcconfig and add your actual API key
+// NEVER commit Config.xcconfig to version control!
+
+// Your Perplexity API Key (get from https://www.perplexity.ai/settings/api)
+PERPLEXITY_API_KEY = pplx-YOUR-ACTUAL-KEY-HERE
+
+// Example:
+// PERPLEXITY_API_KEY = pplx-1234567890abcdef...
