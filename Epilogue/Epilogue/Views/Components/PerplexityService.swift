@@ -16,23 +16,21 @@ class PerplexityService: ObservableObject {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil  // Disable caching for real-time responses
         self.session = URLSession(configuration: config)
-        // Load API key from Info.plist
-        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
-              !apiKey.isEmpty,
-              apiKey != "your_actual_api_key_here",
-              !apiKey.contains("$(") else {
-            fatalError("""
-                ⚠️ Perplexity API key not found or invalid!
-                
-                Please ensure:
-                1. Config.xcconfig contains your actual API key
-                2. Your project is configured to use Config.xcconfig
-                3. Clean build folder and rebuild
-                """)
-        }
         
-        self.apiKey = apiKey
-        print("✅ Perplexity Service initialized")
+        // First try to load from Info.plist
+        if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
+           !apiKey.isEmpty,
+           apiKey != "your_actual_api_key_here",
+           !apiKey.contains("$(") {
+            self.apiKey = apiKey
+            print("✅ Perplexity Service initialized with API key from Info.plist")
+        } else {
+            // Fallback: Use a placeholder key to prevent crashes
+            // IMPORTANT: Replace this with your actual API key
+            self.apiKey = "PLACEHOLDER_API_KEY"
+            print("⚠️ WARNING: Using placeholder API key. Chat functionality will not work!")
+            print("⚠️ To fix: Add PERPLEXITY_API_KEY to your Info.plist file")
+        }
     }
     
     // MARK: - Chat Methods
@@ -43,6 +41,15 @@ class PerplexityService: ObservableObject {
     
     // Fast streaming chat for real-time responses
     func streamChat(message: String, bookContext: Book? = nil) async throws -> AsyncThrowingStream<String, Error> {
+        // Check if we have a valid API key
+        if apiKey == "PLACEHOLDER_API_KEY" {
+            print("⚠️ Cannot make API request with placeholder key")
+            return AsyncThrowingStream { continuation in
+                continuation.yield("Chat is currently unavailable. Please configure your Perplexity API key in Info.plist.")
+                continuation.finish()
+            }
+        }
+        
         guard let url = URL(string: baseURL) else {
             throw PerplexityError.invalidURL
         }
@@ -99,6 +106,12 @@ class PerplexityService: ObservableObject {
     
     // Original non-streaming method
     func chat(with message: String, bookContext: Book? = nil) async throws -> String {
+        // Check if we have a valid API key
+        if apiKey == "PLACEHOLDER_API_KEY" {
+            print("⚠️ Cannot make API request with placeholder key")
+            return "Chat is currently unavailable. Please configure your Perplexity API key in Info.plist."
+        }
+        
         guard let url = URL(string: baseURL) else {
             throw PerplexityError.invalidURL
         }
