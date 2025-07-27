@@ -51,7 +51,7 @@ enum CognitivePattern: String, CaseIterable {
 }
 
 // MARK: - Pattern Match Result
-struct PatternMatch {
+struct PatternMatch: Equatable {
     let pattern: CognitivePattern
     let confidence: Float
     let matchedIndicators: [String]
@@ -231,7 +231,7 @@ class CognitivePatternRecognizer: ObservableObject {
                 }
             }
             
-            return startIndex...questionMark
+            return startIndex..<text.index(after: questionMark)
         }
         
         return nil
