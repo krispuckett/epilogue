@@ -301,12 +301,8 @@ struct AmbientChatOverlay: View {
             )
             
             VStack {
-                // Minimal header with close button and privacy indicator
+                // Minimal header with close button only
                 HStack {
-                    // Privacy indicator
-                    PrivacyIndicator(isListening: voiceManager.isListening, isRecording: isRecording)
-                        .frame(maxWidth: 200)
-                    
                     Spacer()
                     
                     Button {

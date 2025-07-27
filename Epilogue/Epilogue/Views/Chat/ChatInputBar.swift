@@ -6,74 +6,107 @@ struct ChatInputBar: View {
     let onStartAmbient: () -> Void
     @FocusState private var isFocused: Bool
     @State private var showCommandPalette = false
+    @State private var showNavigationMenu = false
+    @State private var selectedBook: Book?
     @State private var isAmbientActive = false
     @Namespace private var commandPaletteNamespace
     @EnvironmentObject var notesViewModel: NotesViewModel
     @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                // Command palette button
-                Button {
-                    showCommandPalette = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(width: 36, height: 36)
-                        .glassEffect(.regular.tint(Color.white.opacity(0.1)), in: Circle())
-                }
-                
-                // Tappable input area container with glass effect
-                Button {
-                    onStartGeneralChat()
-                } label: {
-                    HStack(spacing: 0) {
-                        // Question mark icon
-                        Image(systemName: "questionmark.circle.fill")
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                            .font(.system(size: 20, weight: .medium))
-                            .padding(.leading, 12)
-                            .padding(.trailing, 8)
-                        
-                        // Placeholder text
-                        Text("Ask your books anything...")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        // Animated waveform icon inside the input field
-                        Button(action: onStartAmbient) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 22, weight: .medium))
-                                .foregroundStyle(.orange)
-                                .symbolEffect(.variableColor.iterative, options: .repeating)
+        // Raycast-style input bar
+        HStack(spacing: 12) {
+            // Book selector button (left side) - 20x30pt thumbnail
+            Button {
+                onSelectBook()
+            } label: {
+                if let book = selectedBook, let coverURL = book.coverImageURL {
+                    SharedBookCoverView(coverURL: coverURL, width: 20, height: 30)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                } else {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3))
+                        .frame(width: 20, height: 30)
+                        .overlay {
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
                         }
-                        .padding(.trailing, 12)
-                    }
-                    .frame(minHeight: 36)
-                    .glassEffect(.regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15)), in: RoundedRectangle(cornerRadius: 18))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                        Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.5
-                            )
-                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            
+            // Main input field (center) - expandable
+            Button {
+                onStartGeneralChat()
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Ask your books anything...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            
+            // Navigation button (glass-book-open icon)
+            Button {
+                showNavigationMenu = true
+            } label: {
+                Image("glass-book-open")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            
+            // Waveform button (right side)
+            Button {
+                onStartAmbient()
+            } label: {
+                Image(systemName: "waveform")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.orange)
+                    .symbolEffect(.variableColor.iterative, options: .repeating)
+            }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandPalette)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(height: 60)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 30))
+        .overlay {
+            RoundedRectangle(cornerRadius: 30)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.2),
+                            Color.white.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        }
+        .shadow(color: .black.opacity(0.1), radius: 20, y: 8)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 20)
+        .confirmationDialog("Navigate to", isPresented: $showNavigationMenu) {
+            Button {
+                navigateToLibrary()
+            } label: {
+                Label("Library", image: "glass-book-open")
+            }
+            
+            Button {
+                navigateToNotes()
+            } label: {
+                Label("Notes", image: "glass-feather")
+            }
+            
+            Button("Cancel", role: .cancel) { }
+        }
         .sheet(isPresented: $showCommandPalette) {
             LiquidCommandPalette(
                 isPresented: $showCommandPalette,
@@ -82,6 +115,16 @@ struct ChatInputBar: View {
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)
         }
+    }
+    
+    private func navigateToLibrary() {
+        // Navigate to library tab
+        NotificationCenter.default.post(name: Notification.Name("NavigateToTab"), object: 0)
+    }
+    
+    private func navigateToNotes() {
+        // Navigate to notes tab
+        NotificationCenter.default.post(name: Notification.Name("NavigateToTab"), object: 1)
     }
 }
 

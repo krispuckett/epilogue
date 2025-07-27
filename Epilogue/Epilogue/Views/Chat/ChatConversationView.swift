@@ -56,9 +56,15 @@ struct ChatConversationView: View {
         ZStack {
             // Background based on chat type
             if thread.bookId != nil {
-                // Book chat - simple dark background
-                Color.midnightScholar
-                    .ignoresSafeArea()
+                // Book chat - book-specific gradient background
+                BookCentricBackground(
+                    bookCoverURL: effectiveCoverURL,
+                    bookTitle: thread.bookTitle,
+                    bookAuthor: thread.bookAuthor,
+                    showBookCover: thread.messages.isEmpty,
+                    animationPhase: $animationPhase
+                )
+                .ignoresSafeArea()
             } else {
                 // General discussion background
                 AmbientBackground(animationPhase: $animationPhase, orbPositions: $orbPositions)
@@ -581,5 +587,165 @@ struct ThreadSmartSuggestions: View {
             }
         }
         .frame(height: 40)
+    }
+}
+
+// MARK: - Book-Centric Background
+struct BookCentricBackground: View {
+    let bookCoverURL: String?
+    let bookTitle: String?
+    let bookAuthor: String?
+    let showBookCover: Bool
+    @Binding var animationPhase: Double
+    @State private var colorPalette: ColorPalette?
+    @State private var gradientPhase: CGFloat = 0
+    
+    var body: some View {
+        ZStack {
+            // Base dark background
+            Color.black
+                .ignoresSafeArea()
+            
+            // Book-specific gradient
+            if let palette = colorPalette {
+                ZStack {
+                    // Top gradient
+                    LinearGradient(
+                        stops: [
+                            .init(color: enhanceColor(palette.primary), location: 0.0),
+                            .init(color: enhanceColor(palette.secondary), location: 0.2),
+                            .init(color: enhanceColor(palette.accent).opacity(0.6), location: 0.4),
+                            .init(color: Color.clear, location: 0.7)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                    .blur(radius: 50)
+                    .scaleEffect(y: 0.8 + gradientPhase * 0.3)
+                    .offset(y: -150 + gradientPhase * 40)
+                    
+                    // Bottom gradient (mirrored)
+                    LinearGradient(
+                        stops: [
+                            .init(color: enhanceColor(palette.accent), location: 0.0),
+                            .init(color: enhanceColor(palette.secondary), location: 0.2),
+                            .init(color: enhanceColor(palette.primary).opacity(0.6), location: 0.4),
+                            .init(color: Color.clear, location: 0.7)
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                    .ignoresSafeArea()
+                    .blur(radius: 50)
+                    .scaleEffect(y: 0.8 + gradientPhase * 0.3)
+                    .offset(y: 150 - gradientPhase * 40)
+                }
+            } else {
+                // Default amber gradient while loading
+                EnhancedAmberGradient(phase: gradientPhase, audioLevel: 0, isListening: false)
+            }
+            
+            // Book cover in center (only when no messages)
+            if showBookCover {
+                VStack(spacing: 20) {
+                    Spacer()
+                    
+                    if let coverURL = bookCoverURL {
+                        SharedBookCoverView(coverURL: coverURL, width: 120, height: 168)
+                            .shadow(color: .black.opacity(0.4), radius: 20, y: 10)
+                            .opacity(showBookCover ? 1.0 : 0.0)
+                            .scaleEffect(showBookCover ? 1.0 : 0.8)
+                            .animation(.easeInOut(duration: 0.8), value: showBookCover)
+                    }
+                    
+                    // Book title and author
+                    VStack(spacing: 8) {
+                        if let title = bookTitle {
+                            Text(title)
+                                .font(.system(size: 24, weight: .medium, design: .serif))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(3)
+                        }
+                        
+                        if let author = bookAuthor {
+                            Text(author)
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .opacity(showBookCover ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 0.8).delay(0.2), value: showBookCover)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 40)
+            }
+            
+            // Subtle overlay for readability
+            Color.black.opacity(0.1)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+        .onAppear {
+            startGradientAnimation()
+            if let coverURL = bookCoverURL {
+                Task {
+                    await extractBookColors(coverURL)
+                }
+            }
+        }
+        .onChange(of: bookCoverURL) { _, newURL in
+            if let newURL = newURL {
+                Task {
+                    await extractBookColors(newURL)
+                }
+            } else {
+                colorPalette = nil
+            }
+        }
+    }
+    
+    private func startGradientAnimation() {
+        withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+            gradientPhase = 1
+        }
+    }
+    
+    private func extractBookColors(_ coverURL: String) async {
+        let highQualityURL = coverURL
+            .replacingOccurrences(of: "http://", with: "https://")
+            .replacingOccurrences(of: "zoom=1", with: "zoom=3")
+        
+        guard let url = URL(string: highQualityURL),
+              let data = try? await URLSession.shared.data(from: url).0,
+              let image = UIImage(data: data) else { return }
+        
+        let extractor = OKLABColorExtractor()
+        if let extractedPalette = try? await extractor.extractPalette(from: image, imageSource: "BookCover") {
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 1.2)) {
+                    self.colorPalette = extractedPalette
+                }
+            }
+        }
+    }
+    
+    private func enhanceColor(_ color: Color) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Boost vibrancy for background
+        saturation = min(saturation * 1.6, 1.0)
+        brightness = max(brightness, 0.5)
+        
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
 }

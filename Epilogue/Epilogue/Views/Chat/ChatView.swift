@@ -53,6 +53,14 @@ struct ChatView: View {
     }
 }
 
+// MARK: - Chat View Wrapper (hides tab bar)
+struct ChatViewWrapper: View {
+    var body: some View {
+        ChatView()
+            .toolbar(.hidden, for: .tabBar)
+    }
+}
+
 // MARK: - Preview
 #Preview {
     ChatView()

@@ -56,7 +56,7 @@ struct ContentView: View {
                 }
                 .tag(1)
                 
-                ChatView()
+                ChatViewWrapper()
                 .tabItem {
                     Label {
                         Text("Chat")
@@ -164,6 +164,11 @@ struct ContentView: View {
             if notification.object is Note {
                 selectedTab = 1  // Switch to notes tab
                 // NotesView will handle the scrolling and editing
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToTab"))) { notification in
+            if let tabIndex = notification.object as? Int {
+                selectedTab = tabIndex
             }
         }
         .onAppear {
