@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import Combine
 
 private let logger = Logger(subsystem: "com.epilogue", category: "CognitivePatterns")
 
@@ -92,6 +93,9 @@ struct SessionCognitiveAnalysis {
 @MainActor
 class CognitivePatternRecognizer: ObservableObject {
     static let shared = CognitivePatternRecognizer()
+    
+    @Published var currentPatterns: [PatternMatch] = []
+    @Published var isAnalyzing = false
     
     private init() {}
     
