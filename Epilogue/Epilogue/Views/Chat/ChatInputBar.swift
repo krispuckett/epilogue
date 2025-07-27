@@ -9,6 +9,7 @@ struct ChatInputBar: View {
     @State private var showNavigationMenu = false
     @State private var selectedBook: Book?
     @State private var isAmbientActive = false
+    @State private var isProcessing = false
     @Namespace private var commandPaletteNamespace
     @EnvironmentObject var notesViewModel: NotesViewModel
     @EnvironmentObject var libraryViewModel: LibraryViewModel
@@ -36,18 +37,22 @@ struct ChatInputBar: View {
                 }
             }
             
-            // Main input field (center) - expandable
-            Button {
-                onStartGeneralChat()
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Ask your books anything...")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            // Main input field (center) - expandable with AI shimmer
+            AIEnhancedInputField(
+                placeholder: "Ask your books anything...",
+                isProcessing: isProcessing,
+                shimmerColors: [
+                    Color(red: 1.0, green: 0.55, blue: 0.26),
+                    Color(red: 1.0, green: 0.7, blue: 0.4),
+                    Color(red: 1.0, green: 0.8, blue: 0.6)
+                ]
+            ) {
+                // Simulate processing for demo
+                isProcessing = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    isProcessing = false
+                    onStartGeneralChat()
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
             
             // Navigation button (glass-book-open icon)
@@ -61,14 +66,9 @@ struct ChatInputBar: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
             
-            // Waveform button (right side)
-            Button {
+            // Waveform button (right side) with hero transition
+            WaveformHeroButton {
                 onStartAmbient()
-            } label: {
-                Image(systemName: "waveform")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.orange)
-                    .symbolEffect(.variableColor.iterative, options: .repeating)
             }
         }
         .padding(.horizontal, 20)
