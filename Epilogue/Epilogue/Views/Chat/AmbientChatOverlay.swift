@@ -69,15 +69,20 @@ struct ClaudeInspiredGradient: View {
                 .ignoresSafeArea()
             
             if let palette = colorPalette, book != nil {
-                // Book-specific gradient when listening
-                BookListeningGradient(palette: palette, phase: phase, audioLevel: audioLevel, isListening: isListening)
+                // Book-specific gradient when we have colors
+                BookSpecificGradient(palette: palette, phase: phase, audioLevel: audioLevel, isListening: isListening)
             } else {
-                // Default amber gradient - enhanced with radial curves
+                // Default enhanced amber gradient with motion
                 EnhancedAmberGradient(phase: phase, audioLevel: audioLevel, isListening: isListening)
             }
         }
         .onAppear {
             startWaveAnimation()
+            if let book = book {
+                Task {
+                    await extractBookColors(book)
+                }
+            }
         }
         .onChange(of: book) { _, newBook in
             if let newBook = newBook {
@@ -91,52 +96,82 @@ struct ClaudeInspiredGradient: View {
     }
     
     private func startWaveAnimation() {
-        // Base animation speed modulated by audio
-        let baseDuration: Double = isListening && audioLevel > 0.1 ? 1.5 : 2.5
-        let speedMultiplier = 1.0 - Double(audioLevel * 0.5) // Faster when louder
-        
-        withAnimation(.easeInOut(duration: baseDuration * speedMultiplier).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
             phase = 1
         }
     }
     
     private func extractBookColors(_ book: Book) async {
-        guard let coverURL = book.coverImageURL else { 
-            print("No cover URL for book: \(book.title)")
-            return 
-        }
+        guard let coverURL = book.coverImageURL else { return }
         
-        // Force high quality image and HTTPS
         let highQualityURL = coverURL
             .replacingOccurrences(of: "http://", with: "https://")
             .replacingOccurrences(of: "zoom=1", with: "zoom=3")
-            .replacingOccurrences(of: "zoom=2", with: "zoom=3")
-        
-        print("Extracting colors from: \(highQualityURL)")
         
         guard let url = URL(string: highQualityURL),
               let data = try? await URLSession.shared.data(from: url).0,
-              let image = UIImage(data: data) else { 
-            print("Failed to load image from URL")
-            return 
-        }
+              let image = UIImage(data: data) else { return }
         
         let extractor = OKLABColorExtractor()
         if let extractedPalette = try? await extractor.extractPalette(from: image, imageSource: "BookCover") {
-            print("Successfully extracted palette")
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.8)) {
                     self.colorPalette = extractedPalette
                 }
             }
-        } else {
-            print("Failed to extract palette")
         }
     }
 }
 
-// Book-specific gradient with breathing animation - matching BookCoverBackgroundView exactly
-struct BookListeningGradient: View {
+// Enhanced amber gradient - simple mirrored version
+struct EnhancedAmberGradient: View {
+    let phase: CGFloat
+    let audioLevel: Float
+    let isListening: Bool
+    
+    var body: some View {
+        ZStack {
+            // Base black layer
+            Color.black
+                .ignoresSafeArea()
+            
+            // Top gradient
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 1.0, green: 0.35, blue: 0.1), location: 0.0),
+                    .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.15),
+                    .init(color: Color(red: 1.0, green: 0.7, blue: 0.4).opacity(0.5), location: 0.3),
+                    .init(color: Color.clear, location: 0.6)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .blur(radius: 40)
+            .scaleEffect(y: 0.6 + phase * 0.2)
+            .offset(y: -100 + phase * 30)
+            
+            // Bottom gradient (mirrored)
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 1.0, green: 0.35, blue: 0.1), location: 0.0),
+                    .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.15),
+                    .init(color: Color(red: 1.0, green: 0.7, blue: 0.4).opacity(0.5), location: 0.3),
+                    .init(color: Color.clear, location: 0.6)
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .ignoresSafeArea()
+            .blur(radius: 40)
+            .scaleEffect(y: 0.6 + phase * 0.2)
+            .offset(y: 100 - phase * 30)
+        }
+    }
+}
+
+// Book-specific gradient with mirrored animation
+struct BookSpecificGradient: View {
     let palette: ColorPalette
     let phase: CGFloat
     let audioLevel: Float
@@ -144,66 +179,44 @@ struct BookListeningGradient: View {
     
     var body: some View {
         ZStack {
-            // Pure black base
-            Color.black.ignoresSafeArea()
+            // Base black layer
+            Color.black
+                .ignoresSafeArea()
             
-            // Top gradient - exact copy from BookCoverBackgroundView
+            // Top gradient with book colors
             LinearGradient(
                 stops: [
                     .init(color: enhanceColor(palette.primary), location: 0.0),
-                    .init(color: enhanceColor(palette.primary).opacity(0.85), location: 0.10),
-                    .init(color: enhanceColor(palette.secondary).opacity(0.7), location: 0.20),
-                    .init(color: enhanceColor(palette.accent).opacity(0.5), location: 0.32),
-                    .init(color: enhanceColor(palette.background).opacity(0.3), location: 0.45),
-                    .init(color: Color.black.opacity(0.5), location: 0.58),
-                    .init(color: Color.black, location: 0.70)
+                    .init(color: enhanceColor(palette.secondary), location: 0.15),
+                    .init(color: enhanceColor(palette.accent).opacity(0.5), location: 0.3),
+                    .init(color: Color.clear, location: 0.6)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            .blur(radius: 45 * (1 - CGFloat(audioLevel * 0.2))) // Less blur when speaking
-            .scaleEffect(y: 0.7 + CGFloat(audioLevel * 0.2)) // Expand with voice
-            .offset(y: -200 + phase * 50 + CGFloat(audioLevel * 40)) // Voice pushes gradient
-            .scaleEffect(x: 1 + phase * 0.1 + CGFloat(audioLevel * 0.15)) // Horizontal expansion with voice
+            .blur(radius: 40)
+            .scaleEffect(y: 0.6 + phase * 0.2)
+            .offset(y: -100 + phase * 30)
             
-            // Bottom gradient - mirrored version
+            // Bottom gradient (mirrored)
             LinearGradient(
                 stops: [
                     .init(color: enhanceColor(palette.accent), location: 0.0),
-                    .init(color: enhanceColor(palette.accent).opacity(0.85), location: 0.10),
-                    .init(color: enhanceColor(palette.secondary).opacity(0.7), location: 0.20),
-                    .init(color: enhanceColor(palette.primary).opacity(0.5), location: 0.32),
-                    .init(color: enhanceColor(palette.background).opacity(0.3), location: 0.45),
-                    .init(color: Color.black.opacity(0.5), location: 0.58),
-                    .init(color: Color.black, location: 0.70)
+                    .init(color: enhanceColor(palette.secondary), location: 0.15),
+                    .init(color: enhanceColor(palette.primary).opacity(0.5), location: 0.3),
+                    .init(color: Color.clear, location: 0.6)
                 ],
                 startPoint: .bottom,
                 endPoint: .top
             )
             .ignoresSafeArea()
-            .blur(radius: 45 * (1 - CGFloat(audioLevel * 0.2))) // Less blur when speaking
-            .scaleEffect(y: 0.7 + CGFloat(audioLevel * 0.2)) // Expand with voice
-            .offset(y: 200 - phase * 50 - CGFloat(audioLevel * 40)) // Voice pushes gradient
-            .scaleEffect(x: 1 + phase * 0.1 + CGFloat(audioLevel * 0.15)) // Horizontal expansion with voice
-            
-            // Very subtle noise texture overlay for depth
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.05 + Double(audioLevel * 0.1))
-                .ignoresSafeArea()
-                .blendMode(.plusLighter)
-            
-            // Voice ripple effect from bottom  
-            if isListening && audioLevel > 0.1 {
-                ForEach(0..<3) { ripple in
-                    rippleView(for: ripple, with: palette)
-                }
-            }
+            .blur(radius: 40)
+            .scaleEffect(y: 0.6 + phase * 0.2)
+            .offset(y: 100 - phase * 30)
         }
     }
     
-    // Copy the enhance color function from BookCoverBackgroundView
     private func enhanceColor(_ color: Color) -> Color {
         let uiColor = UIColor(color)
         var hue: CGFloat = 0
@@ -213,218 +226,14 @@ struct BookListeningGradient: View {
         
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         
-        // Boost vibrancy significantly for Apple Music effect
-        saturation = min(saturation * 1.6, 1.0)
-        brightness = max(brightness, 0.5) // Ensure minimum brightness
+        // Boost vibrancy
+        saturation = min(saturation * 1.4, 1.0)
+        brightness = max(brightness, 0.4)
         
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
-    
-    @ViewBuilder
-    private func rippleView(for index: Int, with palette: ColorPalette) -> some View {
-        let opacity = Double(1 - index) * 0.4 * Double(audioLevel)
-        let size = 150 + CGFloat(index) * 200 * CGFloat(audioLevel)
-        let blurAmount = CGFloat(index) * 3
-        let delay = Double(index) * 0.15
-        
-        Circle()
-            .stroke(enhanceColor(palette.accent).opacity(opacity), lineWidth: 3)
-            .frame(width: size, height: size)
-            .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height)
-            .blur(radius: blurAmount)
-            .animation(.easeOut(duration: 1.8).delay(delay), value: audioLevel)
-    }
 }
 
-// Enhanced amber gradient with smoother radial curves
-struct EnhancedAmberGradient: View {
-    let phase: CGFloat
-    let audioLevel: Float
-    let isListening: Bool
-    
-    var body: some View {
-        ZStack {
-            // Base gradients with phase animation
-            ForEach(0..<3) { index in
-                topGradientLayer(index: index)
-            }
-            
-            // Mirrored bottom
-            ForEach(0..<3) { index in
-                bottomGradientLayer(index: index)
-            }
-            
-            // Top radial curve overlay
-            RadialGradient(
-                colors: [
-                    Color.orange.opacity(0.4),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 0,
-                endRadius: UIScreen.main.bounds.height * 0.5
-            )
-            .ignoresSafeArea()
-            .opacity(0.6)
-            
-            // Bottom radial curve overlay - pulses with voice
-            RadialGradient(
-                colors: [
-                    Color.orange.opacity(0.3 + Double(audioLevel * 0.5)),
-                    Color.clear
-                ],
-                center: .bottom,
-                startRadius: 0,
-                endRadius: UIScreen.main.bounds.height * 0.5 * (1 + CGFloat(audioLevel * 0.3))
-            )
-            .ignoresSafeArea()
-            .opacity(0.5 + Double(audioLevel * 0.3))
-            
-            // Subtle center glow - breathes with voice
-            RadialGradient(
-                colors: [
-                    Color.orange.opacity(0.1 + Double(audioLevel * 0.2)),
-                    Color.clear
-                ],
-                center: .center,
-                startRadius: 50 * (1 - CGFloat(audioLevel * 0.2)),
-                endRadius: 200 * (1 + CGFloat(audioLevel * 0.3))
-            )
-            .blur(radius: 20 * (1 - CGFloat(audioLevel * 0.3)))
-            .opacity(0.5 + Double(audioLevel * 0.2))
-            
-            // Voice ripple effect from bottom
-            if isListening && audioLevel > 0.1 {
-                ForEach(0..<3) { ripple in
-                    amberRippleView(for: ripple)
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func amberRippleView(for index: Int) -> some View {
-        let opacity = Double(1 - index) * 0.3 * Double(audioLevel)
-        let size = 100 + CGFloat(index) * 150 * CGFloat(audioLevel)
-        let blurAmount = CGFloat(index) * 2
-        let delay = Double(index) * 0.1
-        
-        Circle()
-            .stroke(Color.orange.opacity(opacity), lineWidth: 2)
-            .frame(width: size, height: size)
-            .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height)
-            .blur(radius: blurAmount)
-            .animation(.easeOut(duration: 1.5).delay(delay), value: audioLevel)
-    }
-    
-    @ViewBuilder
-    private func topGradientLayer(index: Int) -> some View {
-        let baseOpacity = 0.3 + Double(index) * 0.1
-        let midOpacity = 0.5 + Double(index) * 0.1
-        
-        LinearGradient(
-            colors: [
-                Color.clear,
-                Color.orange.opacity(baseOpacity),
-                Color.orange.opacity(midOpacity),
-                Color.orange.opacity(baseOpacity),
-                Color.clear
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .modifier(GradientAnimationModifier(
-            phase: phase,
-            audioLevel: audioLevel,
-            index: index,
-            isTop: true
-        ))
-    }
-    
-    @ViewBuilder
-    private func bottomGradientLayer(index: Int) -> some View {
-        let baseOpacity = 0.3 + Double(index) * 0.1
-        let midOpacity = 0.5 + Double(index) * 0.1
-        
-        LinearGradient(
-            colors: [
-                Color.clear,
-                Color.orange.opacity(baseOpacity),
-                Color.orange.opacity(midOpacity),
-                Color.orange.opacity(baseOpacity),
-                Color.clear
-            ],
-            startPoint: .bottom,
-            endPoint: .top
-        )
-        .modifier(GradientAnimationModifier(
-            phase: phase,
-            audioLevel: audioLevel,
-            index: index,
-            isTop: false
-        ))
-    }
-}
-
-// Helper modifier to simplify gradient animations
-struct GradientAnimationModifier: ViewModifier {
-    let phase: CGFloat
-    let audioLevel: Float
-    let index: Int
-    let isTop: Bool
-    
-    func body(content: Content) -> some View {
-        // Break down calculations into simpler parts
-        let phaseScale = phase * 0.1
-        let audioScale = CGFloat(audioLevel) * 0.3
-        let yScale = 0.5 + phaseScale + audioScale
-        
-        let phaseXScale = phase * 0.15
-        let audioXScale = CGFloat(audioLevel) * 0.2
-        let xScale = 1 + phaseXScale + audioXScale
-        
-        // Calculate y offset components separately
-        let baseOffset: CGFloat = isTop ? -200 : 200
-        let phaseOffset = phase * 80
-        let indexOffset = CGFloat(index) * 30
-        let audioOffset = CGFloat(audioLevel) * 50
-        
-        let yOffset: CGFloat
-        if isTop {
-            yOffset = baseOffset + phaseOffset + indexOffset + audioOffset
-        } else {
-            yOffset = baseOffset - phaseOffset - indexOffset - audioOffset
-        }
-        
-        // Simplify other calculations
-        let audioFactor = Float(1 - audioLevel * 0.3)
-        let blurRadius = CGFloat(index * 5) * CGFloat(audioFactor)
-        
-        let indexOpacity = Double(index) * 0.15
-        let audioOpacity = Double(audioLevel) * 0.3
-        let opacity = 0.6 - indexOpacity + audioOpacity
-        
-        // Rotation calculations
-        let phaseRotation = Double(phase * 5)
-        let indexRotation = Double(index) * 2
-        let audioRotation = Double(audioLevel) * 10
-        
-        let rotation: Double
-        if isTop {
-            rotation = phaseRotation - indexRotation + audioRotation
-        } else {
-            rotation = -phaseRotation + indexRotation - audioRotation
-        }
-        
-        return content
-            .scaleEffect(y: yScale)
-            .scaleEffect(x: xScale)
-            .offset(y: yOffset)
-            .blur(radius: blurRadius)
-            .opacity(opacity)
-            .rotationEffect(.degrees(rotation))
-    }
-}
 
 // MARK: - Minimal Book Selection
 struct MinimalBookSelection: View {
@@ -470,30 +279,40 @@ struct AmbientChatOverlay: View {
     @State private var pulseAnimation = false
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var pipeline = AmbientIntelligencePipeline()
-    @StateObject private var audioMonitor = AudioLevelMonitor()
+    @State private var audioLevel: Float = 0
+    @State private var isRecording = false
     @State private var showProcessingView = false
     @State private var showingSummary = false
     @State private var processedSession: ProcessedAmbientSession?
     @State private var showingBookPicker = false
     @Environment(\.modelContext) private var modelContext
+    @State private var detectedPatterns: [PatternMatch] = []
+    @State private var showPatternVisualizer = false
+    @StateObject private var autoStopManager = AutoStopManager.shared
+    @State private var showAutoStopWarning = false
     
     var body: some View {
         ZStack {
             // Claude-inspired gradient background
             ClaudeInspiredGradient(
                 book: selectedBook,
-                audioLevel: $audioMonitor.audioLevel,
-                isListening: $audioMonitor.isRecording
+                audioLevel: $audioLevel,
+                isListening: $isRecording
             )
             
             VStack {
-                // Minimal header with close button
+                // Minimal header with close button and privacy indicator
                 HStack {
+                    // Privacy indicator
+                    PrivacyIndicator(isListening: voiceManager.isListening, isRecording: isRecording)
+                        .frame(maxWidth: 200)
+                    
                     Spacer()
                     
                     Button {
                         // Simple direct close without processing
                         voiceManager.stopListening()
+                        autoStopManager.stopMonitoring()
                         isActive = false
                     } label: {
                         Image(systemName: "xmark")
@@ -513,23 +332,41 @@ struct AmbientChatOverlay: View {
                 if selectedBook == nil {
                     // Book selection
                     MinimalBookSelection(selectedBook: $selectedBook)
-                } else {
-                    // Listening indicator (no pulsing animation)
-                    ZStack {
-                        // Static outer ring
-                        Circle()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            .frame(width: 100, height: 100)
+                } else if let book = selectedBook {
+                    // Show book cover instead of listening indicator
+                    VStack(spacing: 16) {
+                        if let coverURL = book.coverImageURL {
+                            SharedBookCoverView(coverURL: coverURL, width: 80, height: 112)
+                                .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+                        } else {
+                            // Fallback if no cover
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white.opacity(0.1))
+                                .frame(width: 80, height: 112)
+                                .overlay(
+                                    Image(systemName: "book.fill")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.white.opacity(0.3))
+                                )
+                        }
                         
-                        // Center orb
-                        Circle()
-                            .fill(Color.white.opacity(0.9))
-                            .frame(width: 44, height: 44)
-                            .overlay(
-                                Image(systemName: voiceManager.isListening ? "waveform" : "mic.fill")
-                                    .font(.system(size: 22, weight: .medium))
-                                    .foregroundColor(.black)
-                            )
+                        // Small listening indicator below book
+                        if voiceManager.isListening {
+                            VStack(spacing: 4) {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .symbolEffect(.variableColor.iterative, options: .repeating)
+                                
+                                // Show pattern indicator if detected
+                                if let latestPattern = detectedPatterns.last {
+                                    Text(latestPattern.pattern.rawValue)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color(hexString: latestPattern.pattern.color))
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -594,6 +431,32 @@ struct AmbientChatOverlay: View {
                 ProcessingOverlay(session: session)
                     .transition(.opacity)
             }
+            
+            // Pattern visualizer overlay
+            if showPatternVisualizer && !detectedPatterns.isEmpty {
+                CognitivePatternVisualizer(patterns: detectedPatterns)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+            
+            // Auto-stop warning
+            if showAutoStopWarning {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                
+                AutoStopWarningView(
+                    timeRemaining: autoStopManager.timeRemaining,
+                    onDismiss: {
+                        stopSession()
+                    },
+                    onExtend: {
+                        autoStopManager.maxDuration += 300 // Add 5 minutes
+                        showAutoStopWarning = false
+                    }
+                )
+                .transition(.scale.combined(with: .opacity))
+            }
         }
         .onAppear {
             if selectedBook != nil {
@@ -610,6 +473,23 @@ struct AmbientChatOverlay: View {
             if !newValue.isEmpty && newValue != oldValue {
                 print("[AmbientChat] New transcription: \(newValue)")
                 session?.rawTranscriptions.append(newValue)
+                
+                // Detect cognitive patterns in real-time
+                let patterns = CognitivePatternRecognizer.shared.recognizePatterns(in: newValue)
+                if !patterns.isEmpty {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        detectedPatterns.append(contentsOf: patterns)
+                        showPatternVisualizer = true
+                    }
+                    
+                    // Hide visualizer after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation {
+                            showPatternVisualizer = false
+                        }
+                    }
+                }
+                
                 // Reset transcribed text to capture continuous speech
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     voiceManager.transcribedText = ""
@@ -633,6 +513,23 @@ struct AmbientChatOverlay: View {
         }
         .sheet(isPresented: $showingBookPicker) {
             BookPickerSheet(onBookSelected: handleBookPickerSelection)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .autoStopTriggered)) { notification in
+            if let reason = notification.object as? String {
+                print("[AmbientChat] Auto-stop triggered: \(reason)")
+                stopSession()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .autoStopWarning)) { _ in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showAutoStopWarning = true
+            }
+        }
+        .onChange(of: voiceManager.currentAmplitude) { _, amplitude in
+            // Reset silence timer when voice detected
+            if amplitude > 0.01 {
+                autoStopManager.resetSilenceTimer()
+            }
         }
     }
     
@@ -681,20 +578,28 @@ struct AmbientChatOverlay: View {
         
         // Start listening
         voiceManager.startAmbientListening()
+        isRecording = true
         
-        // Start audio monitoring for visual feedback
-        audioMonitor.startMonitoring()
+        // Start auto-stop monitoring
+        autoStopManager.startMonitoring()
+        
+        // Haptic feedback
+        HapticManager.shared.mediumTap()
     }
     
     private func stopSession() {
         // Stop listening
         voiceManager.stopListening()
+        isRecording = false
         
-        // Stop audio monitoring
-        audioMonitor.stopMonitoring()
+        // Stop auto-stop monitoring
+        autoStopManager.stopMonitoring()
         
         // Mark session end time
         session?.endTime = Date()
+        
+        // Haptic feedback
+        HapticManager.shared.success()
         
         // Show processing view
         withAnimation {
@@ -777,12 +682,19 @@ struct AmbientChatOverlay: View {
         var notes: [ExtractedNote] = []
         var questions: [ExtractedQuestion] = []
         
-        // Process each transcription segment
+        // Analyze cognitive patterns
+        let cognitiveAnalysis = CognitivePatternRecognizer.shared.analyzeSessionPatterns(session.rawTranscriptions)
+        
+        // Process each transcription segment with cognitive pattern recognition
         for (index, transcription) in session.rawTranscriptions.enumerated() {
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             
             print("[AmbientChat] Processing segment \(index): \(trimmed)")
+            
+            // Get cognitive patterns for this segment
+            let patterns = CognitivePatternRecognizer.shared.recognizePatterns(in: trimmed)
+            let primaryPattern = patterns.first?.pattern
             
             // Look for quotes (multiple patterns)
             var foundQuote = false
@@ -845,18 +757,29 @@ struct AmbientChatOverlay: View {
             
             // Everything else becomes a note (reflection/insight)
             if !foundQuote && !foundQuestion {
-                // Determine note type based on content
+                // Determine note type based on cognitive pattern
                 let noteType: ExtractedNote.NoteType
-                if trimmed.lowercased().contains("reminds me") || 
-                   trimmed.lowercased().contains("similar to") ||
-                   trimmed.lowercased().contains("connects to") {
+                
+                switch primaryPattern {
+                case .connecting:
                     noteType = .connection
-                } else if trimmed.lowercased().contains("realize") ||
-                          trimmed.lowercased().contains("understand") ||
-                          trimmed.lowercased().contains("insight") {
+                case .analyzing, .synthesizing, .evaluating:
                     noteType = .insight
-                } else {
+                case .reflecting, .creating, nil:
                     noteType = .reflection
+                default:
+                    // Use content-based detection as fallback
+                    if trimmed.lowercased().contains("reminds me") || 
+                       trimmed.lowercased().contains("similar to") ||
+                       trimmed.lowercased().contains("connects to") {
+                        noteType = .connection
+                    } else if trimmed.lowercased().contains("realize") ||
+                              trimmed.lowercased().contains("understand") ||
+                              trimmed.lowercased().contains("insight") {
+                        noteType = .insight
+                    } else {
+                        noteType = .reflection
+                    }
                 }
                 
                 notes.append(ExtractedNote(
@@ -869,8 +792,8 @@ struct AmbientChatOverlay: View {
         
         print("[AmbientChat] Extracted: \(quotes.count) quotes, \(notes.count) notes, \(questions.count) questions")
         
-        // Generate summary
-        let summary = generateSessionSummary(session: session, quotes: quotes, notes: notes, questions: questions)
+        // Generate summary with cognitive analysis
+        let summary = generateSessionSummary(session: session, quotes: quotes, notes: notes, questions: questions, cognitiveAnalysis: cognitiveAnalysis)
         
         return ProcessedAmbientSession(
             quotes: quotes,
@@ -881,14 +804,15 @@ struct AmbientChatOverlay: View {
         )
     }
     
-    private func generateSessionSummary(session: AmbientSession, quotes: [ExtractedQuote], notes: [ExtractedNote], questions: [ExtractedQuestion]) -> String {
+    private func generateSessionSummary(session: AmbientSession, quotes: [ExtractedQuote], notes: [ExtractedNote], questions: [ExtractedQuestion], cognitiveAnalysis: SessionCognitiveAnalysis) -> String {
         var summary = "Reading session"
         
         if let book = session.book {
             summary += " with \(book.title)"
         }
         
-        summary += ". Captured \(quotes.count) quotes, \(notes.count) notes, and \(questions.count) questions."
+        summary += ". Captured \(quotes.count) quotes, \(notes.count) notes, and \(questions.count) questions. "
+        summary += cognitiveAnalysis.summary
         
         return summary
     }

@@ -1,7 +1,5 @@
 import SwiftUI
 import SwiftData
-import CoreImage
-import CoreImage.CIFilterBuiltins
 
 struct ChatThreadListView: View {
     @Query(filter: #Predicate<ChatThread> { thread in
@@ -132,11 +130,14 @@ struct ChatThreadListView: View {
         Color(red: 0.11, green: 0.105, blue: 0.102)
             .ignoresSafeArea()
         
-        // Show literary background when no book threads
+        // Show enhanced ambient background when no book threads
         if bookThreads.isEmpty {
-            AdvancedOrganicGradientView()
-                .ignoresSafeArea()
-                .transition(.opacity.animation(.easeInOut(duration: 0.5)))
+            AmbientChatBackground(
+                audioLevel: .constant(0),
+                isListening: .constant(false)
+            )
+            .ignoresSafeArea()
+            .transition(.opacity.animation(.easeInOut(duration: 0.5)))
         }
         
         // Subtle vignette overlay

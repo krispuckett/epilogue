@@ -14,9 +14,6 @@ struct ChatInputBar: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                // Ambient orb button (left side)
-                AmbientOrbButton(isActive: $isAmbientActive, onTap: onStartAmbient)
-                
                 // Command palette button
                 Button {
                     showCommandPalette = true
@@ -46,11 +43,12 @@ struct ChatInputBar: View {
                             .foregroundStyle(.white.opacity(0.5))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        // Persistent book icon inside the input field
-                        Button(action: onSelectBook) {
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        // Animated waveform icon inside the input field
+                        Button(action: onStartAmbient) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundStyle(.orange)
+                                .symbolEffect(.variableColor.iterative, options: .repeating)
                         }
                         .padding(.trailing, 12)
                     }

@@ -206,7 +206,7 @@ struct ResponseCard: View {
             HStack {
                 Image(systemName: iconForAction(response.action))
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(hex: response.reaction.type.color))
+                    .foregroundStyle(Color(hexString: response.reaction.type.color))
                 
                 Text(response.reaction.type.description)
                     .font(.system(size: 14, weight: .medium))
@@ -245,7 +245,7 @@ struct ResponseCard: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(.regularMaterial)
-                .shadow(color: Color(hex: response.reaction.type.color).opacity(0.3), radius: 20)
+                .shadow(color: Color(hexString: response.reaction.type.color).opacity(0.3), radius: 20)
         )
     }
     
@@ -279,15 +279,15 @@ struct VisualEffectLayer: View {
             ZStack {
                 switch hint.animation {
                 case .pulse:
-                    PulseEffect(color: Color(hex: hint.color), intensity: hint.intensity)
+                    PulseEffect(color: Color(hexString: hint.color), intensity: hint.intensity)
                 case .ripple:
-                    RippleEffect(color: Color(hex: hint.color), intensity: hint.intensity)
+                    RippleEffect(color: Color(hexString: hint.color), intensity: hint.intensity)
                 case .sparkle:
-                    SparkleEffect(color: Color(hex: hint.color), intensity: hint.intensity)
+                    SparkleEffect(color: Color(hexString: hint.color), intensity: hint.intensity)
                 case .glow:
-                    GlowEffect(color: Color(hex: hint.color), intensity: hint.intensity)
+                    GlowEffect(color: Color(hexString: hint.color), intensity: hint.intensity)
                 case .swirl:
-                    SwirlEffect(color: Color(hex: hint.color), intensity: hint.intensity)
+                    SwirlEffect(color: Color(hexString: hint.color), intensity: hint.intensity)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

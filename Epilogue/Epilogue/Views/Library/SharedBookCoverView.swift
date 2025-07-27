@@ -22,6 +22,7 @@ struct SharedBookCoverView: View {
     let height: CGFloat
     @State private var isImageLoaded = false
     @State private var displayedImage: UIImage?
+    @State private var lowResLoaded = false
     
     // Callback to notify when image is loaded
     var onImageLoaded: ((UIImage) -> Void)?
@@ -34,23 +35,23 @@ struct SharedBookCoverView: View {
         print("📚 SharedBookCoverView init - URL: \(coverURL ?? "nil"), dimensions: \(width)x\(height)")
     }
     
-    // Simplified URL enhancement
-    private var imageURL: URL? {
+    // Low resolution URL for fast loading
+    private var lowResURL: URL? {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
-        
-        // Quick enhancement without regex
-        var enhanced = coverURL.replacingOccurrences(of: "http://", with: "https://")
-        
-        // Log to verify zoom parameter
-        if enhanced.contains("zoom=1") {
-            print("⚠️ WARNING: URL still has zoom=1: \(enhanced)")
-        } else if enhanced.contains("zoom=3") {
-            print("✅ URL correctly has zoom=3: \(enhanced)")
-        } else {
-            print("⚠️ URL has no zoom parameter: \(enhanced)")
-        }
-        
-        print("🔗 Final URL: \(enhanced)")
+        let enhanced = coverURL
+            .replacingOccurrences(of: "http://", with: "https://")
+            .replacingOccurrences(of: "zoom=3", with: "zoom=1")
+            .replacingOccurrences(of: "zoom=2", with: "zoom=1")
+        return URL(string: enhanced)
+    }
+    
+    // High resolution URL for quality
+    private var highResURL: URL? {
+        guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
+        let enhanced = coverURL
+            .replacingOccurrences(of: "http://", with: "https://")
+            .replacingOccurrences(of: "zoom=1", with: "zoom=3")
+            .replacingOccurrences(of: "zoom=2", with: "zoom=3")
         return URL(string: enhanced)
     }
     
@@ -87,8 +88,26 @@ struct SharedBookCoverView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
             
-            if let url = imageURL {
-                AsyncImage(url: url, scale: 2) { phase in
+            // Load low-res first for fast display
+            if !lowResLoaded, let lowUrl = lowResURL {
+                AsyncImage(url: lowUrl) { phase in
+                    if case .success(let image) = phase {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: width, height: height)
+                            .clipped()
+                            .onAppear {
+                                lowResLoaded = true
+                            }
+                    }
+                }
+                .opacity(lowResLoaded && isImageLoaded ? 0 : 1)
+            }
+            
+            // Load high-res on top
+            if let url = highResURL {
+                AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
                         // Minimal loading state

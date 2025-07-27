@@ -6,9 +6,8 @@ struct ContentView: View {
     @StateObject private var notesViewModel = NotesViewModel()
     @State private var showCommandPalette = false
     @State private var selectedDetent: PresentationDetent = .height(300)
-    @State private var showVoiceTest = false
-    @State private var showWhisperModels = false
     @Namespace private var animation
+    @State private var showPrivacySettings = false
     
     init() {
         print("🏠 DEBUG: ContentView init")
@@ -72,6 +71,20 @@ struct ContentView: View {
             .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
             .environmentObject(libraryViewModel)
             .environmentObject(notesViewModel)
+            .toolbar {
+                // Privacy settings button (only on Library tab)
+                if selectedTab == 0 {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showPrivacySettings = true
+                        } label: {
+                            Image(systemName: "lock.shield")
+                                .font(.system(size: 18))
+                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        }
+                    }
+                }
+            }
             .onChange(of: selectedTab) { oldValue, newValue in
                 // Haptic feedback on tab change
                 HapticManager.shared.selectionChanged()
@@ -129,53 +142,18 @@ struct ContentView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandPalette)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
         .preferredColorScheme(.dark)
-        // Voice Test Button (temporary for testing) - HIDDEN
-        /*
-        .overlay(alignment: .topTrailing) {
-            HStack(spacing: 12) {
-                // Whisper Model Manager Button
-                Button {
-                    showWhisperModels = true
-                } label: {
-                    Image(systemName: "arrow.down.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                        .padding(12)
-                        .glassEffect(in: Circle())
-                }
-                
-                // Voice Test Button
-                Button {
-                    showVoiceTest = true
-                } label: {
-                    Image(systemName: "mic.badge.xmark")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                        .padding(12)
-                        .glassEffect(in: Circle())
-                }
-            }
-            .padding(.top, 60)
-            .padding(.trailing, 20)
-        }
-        .sheet(isPresented: $showVoiceTest) {
-            VoiceTestLauncherView()
-        }
-        .sheet(isPresented: $showWhisperModels) {
-            NavigationStack {
-                TranscriptionDebugView()
-                    .navigationTitle("Transcription Debug")
-                    .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPrivacySettings) {
+            NavigationView {
+                PrivacySettingsView()
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("Done") {
-                                showWhisperModels = false
+                                showPrivacySettings = false
                             }
                         }
                     }
             }
         }
-        */
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if notification.object is Book {
                 selectedTab = 0  // Switch to library tab
@@ -189,11 +167,14 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // Clean expired cache entries on app launch
-            ResponseCache.shared.cleanExpiredEntries()
+            // Defer cache cleaning to background after launch
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                ResponseCache.shared.cleanExpiredEntries()
+            }
             
-            // Prepare haptic generators
-            HapticManager.shared.prepareAll()
+            // Prepare only essential haptic generators
+            HapticManager.shared.lightTap() // Prepare the most used one
         }
     }
 }

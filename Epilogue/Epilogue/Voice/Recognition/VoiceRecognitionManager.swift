@@ -70,12 +70,17 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        Task {
-            guard !isInitialized else { return }
-            isInitialized = true
-            await setupAudioSession()
-            await requestPermissions()
-        }
+        // Don't initialize anything here - wait for first use
+        logger.info("VoiceRecognitionManager created - deferring initialization")
+    }
+    
+    // Lazy initialization when first needed
+    private func ensureInitialized() async {
+        guard !isInitialized else { return }
+        isInitialized = true
+        logger.info("Initializing voice recognition on first use...")
+        await setupAudioSession()
+        await requestPermissions()
     }
     
     // MARK: - Setup Methods
@@ -168,6 +173,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         recognitionState = .listening  // Always listening when activated
         
         Task {
+            // Ensure initialized before starting
+            await ensureInitialized()
             // Ensure Whisper model is loaded first
             if !self.whisperProcessor.isModelLoaded {
                 logger.info("Loading default Whisper model...")

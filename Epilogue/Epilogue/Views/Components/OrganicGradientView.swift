@@ -227,17 +227,3 @@ struct NoiseLayer: View {
     }
 }
 
-// MARK: - Combined Advanced Gradient View
-struct AdvancedOrganicGradientView: View {
-    var body: some View {
-        ZStack {
-            // Base gradient animation
-            OrganicGradientView()
-            
-            // Perlin noise overlay
-            PerlinNoiseEffectView()
-                .blendMode(.overlay)
-                .opacity(0.3)
-        }
-    }
-}

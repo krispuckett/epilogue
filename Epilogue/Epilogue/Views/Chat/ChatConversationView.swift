@@ -24,6 +24,9 @@ struct ChatConversationView: View {
     ]
     
     @State private var showingClearConfirmation = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var isVoiceModeActive = false
+    @State private var voiceTranscript = ""
     
     // Computed property for the accent color to use
     private var accentColor: Color {
@@ -65,42 +68,11 @@ struct ChatConversationView: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Book cover for book chats
-                        if thread.bookId != nil, let coverURL = effectiveCoverURL,
-                           let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .empty:
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.gray.opacity(0.2))
-                                        .frame(width: 80, height: 120)
-                                        .overlay {
-                                            ProgressView()
-                                                .tint(.white.opacity(0.5))
-                                        }
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 80, height: 120)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-                                case .failure(_):
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                                        .frame(width: 80, height: 120)
-                                        .overlay {
-                                            Image(systemName: "book.closed.fill")
-                                                .font(.system(size: 24))
-                                                .foregroundStyle(.white.opacity(0.3))
-                                        }
-                                @unknown default:
-                                    EmptyView()
-                                }
-                            }
-                            .padding(.top, 20)
-                            .padding(.bottom, 10)
-                        }
+                        // Spacer for collapsed header
+                        Color.clear
+                            .frame(height: scrollOffset < 50 ? 350 : 110)
+                            .modifier(ScrollOffsetModifier(offset: $scrollOffset))
+                        
                         
                         // Thread start indicator - with clear chat on long press
                         VStack(spacing: 4) {
@@ -154,6 +126,19 @@ struct ChatConversationView: View {
                         scrollProxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
+                .coordinateSpace(name: "scroll")
+            }
+            
+            // Collapsed navigation header overlay
+            VStack {
+                CollapsedNavigationHeader(
+                    title: thread.bookTitle ?? "General Discussion",
+                    subtitle: thread.bookAuthor,
+                    coverURL: effectiveCoverURL,
+                    scrollOffset: $scrollOffset
+                )
+                
+                Spacer()
             }
             
         }
@@ -163,25 +148,24 @@ struct ChatConversationView: View {
                 thread: thread,
                 isInputFocused: $isInputFocused,
                 onSend: sendMessage,
+                onVoiceMode: { isVoiceModeActive = true },
                 accentColor: thread.bookId != nil ? accentColor : Color(red: 1.0, green: 0.55, blue: 0.26)
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .navigationTitle(thread.bookTitle ?? "General Discussion")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(role: .destructive) {
-                        showingClearConfirmation = true
-                    } label: {
-                        Label("Clear Chat", systemImage: "trash")
+        .navigationBarHidden(true)
+        .overlay {
+            if isVoiceModeActive {
+                VoiceModeOverlay(
+                    isActive: $isVoiceModeActive,
+                    transcript: $voiceTranscript,
+                    thread: thread,
+                    onSendTranscript: { transcript in
+                        messageText = transcript
+                        sendMessage()
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.white)
-                }
+                )
             }
         }
         .alert("Clear all messages?", isPresented: $showingClearConfirmation) {
@@ -422,6 +406,7 @@ struct ThreadInputField: View {
     let thread: ChatThread
     @FocusState.Binding var isInputFocused: Bool
     let onSend: () -> Void
+    let onVoiceMode: () -> Void
     let accentColor: Color
     
     @State private var showSuggestions = false
@@ -490,6 +475,14 @@ struct ThreadInputField: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
+                    
+                    // Voice mode button inside input field
+                    Button(action: onVoiceMode) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .symbolEffect(.variableColor.iterative, options: .repeating)
+                    }
                     .padding(.trailing, 12)
                 }
                 .frame(minHeight: 36)
