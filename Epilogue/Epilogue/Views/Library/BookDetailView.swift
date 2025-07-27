@@ -161,20 +161,10 @@ struct BookDetailView: View {
     var body: some View {
         ZStack {
             // Dynamic background - MUST be first/bottom layer
-            if let scheme = displayScheme {
-                BookCoverBackgroundView(displayScheme: scheme)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            } else if let palette = colorPalette {
-                // Temporary: show something while display scheme initializes
-                BookCoverBackgroundView(colorPalette: palette)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            } else {
-                // Fallback while colors load
-                Color.black
-                    .ignoresSafeArea()
-            }
+            // Use new gradient system with book
+            BookCoverBackgroundView(book: book)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             
             // Content - always visible but colors update
             ScrollView {

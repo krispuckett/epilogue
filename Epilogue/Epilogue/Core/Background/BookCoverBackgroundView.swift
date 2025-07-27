@@ -4,77 +4,85 @@ import SwiftUI
 struct BookCoverBackgroundView: View {
     let colorPalette: ColorPalette?
     let displayScheme: DisplayColorScheme?
+    let book: Book?
+    @State private var appleMusicPalette: AppleMusicColorPalette?
     
     // Convenience initializers
     init(colorPalette: ColorPalette) {
         self.colorPalette = colorPalette
         self.displayScheme = nil
+        self.book = nil
     }
     
     init(displayScheme: DisplayColorScheme) {
         self.colorPalette = nil
         self.displayScheme = displayScheme
+        self.book = nil
     }
     
-    private var primaryColor: Color {
-        if let scheme = displayScheme {
-            return enhanceColor(scheme.gradientColors.first ?? .black)
-        }
-        return enhanceColor(colorPalette?.primary ?? .black)
-    }
-    
-    private var secondaryColor: Color {
-        if let scheme = displayScheme {
-            return enhanceColor(scheme.gradientColors[safe: 1] ?? .gray)
-        }
-        return enhanceColor(colorPalette?.secondary ?? .gray)
-    }
-    
-    private var accentColor: Color {
-        if let scheme = displayScheme {
-            return enhanceColor(scheme.gradientColors.last ?? .black)
-        }
-        return enhanceColor(colorPalette?.accent ?? .black)
-    }
-    
-    private var backgroundColor: Color {
-        if let scheme = displayScheme {
-            return enhanceColor(scheme.gradientColors[safe: 2] ?? .black)
-        }
-        return enhanceColor(colorPalette?.background ?? .black)
+    init(book: Book) {
+        self.colorPalette = nil
+        self.displayScheme = nil
+        self.book = book
     }
     
     var body: some View {
-        ZStack {
-            // Pure black base
-            Color.black.ignoresSafeArea()
-            
-            // Claude-style smooth linear gradient with Apple Music vibrancy
-            LinearGradient(
-                stops: [
-                    // Vibrant colors at top - exactly like Claude voice UI
-                    .init(color: primaryColor, location: 0.0),
-                    .init(color: primaryColor.opacity(0.85), location: 0.10),
-                    .init(color: secondaryColor.opacity(0.7), location: 0.20),
-                    .init(color: accentColor.opacity(0.5), location: 0.32),
-                    .init(color: backgroundColor.opacity(0.3), location: 0.45),
-                    .init(color: Color.black.opacity(0.5), location: 0.58),
-                    // Complete fade to black
-                    .init(color: Color.black, location: 0.70)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .blur(radius: 45) // More atmospheric blur for softer effect
-            
-            // Very subtle noise texture overlay for depth
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.05)
-                .ignoresSafeArea()
-                .blendMode(.plusLighter)
+        if let book = book {
+            // Use new BookCoverGradientView for books
+            BookCoverGradientView(book: book)
+        } else {
+            // Fallback to existing implementation
+            ZStack {
+                // Pure black base
+                Color.black.ignoresSafeArea()
+                
+                // Claude-style smooth linear gradient
+                if let palette = appleMusicPalette ?? convertToAppleMusicPalette() {
+                    LinearGradient(
+                        stops: [
+                            // Vibrant colors at top
+                            .init(color: palette.primary, location: 0.0),
+                            .init(color: palette.primary.opacity(0.85), location: 0.08),
+                            .init(color: palette.secondary.opacity(0.7), location: 0.15),
+                            .init(color: palette.detail.opacity(0.5), location: 0.25),
+                            .init(color: palette.background.opacity(0.3), location: 0.35),
+                            .init(color: Color.black.opacity(0.5), location: 0.45),
+                            .init(color: Color.black, location: 0.65)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                    .blur(radius: 45)
+                    
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.03)
+                        .ignoresSafeArea()
+                        .blendMode(.plusLighter)
+                }
+            }
         }
+    }
+    
+    // Convert existing palettes to AppleMusicColorPalette
+    private func convertToAppleMusicPalette() -> AppleMusicColorPalette? {
+        if let palette = colorPalette {
+            return AppleMusicColorPalette(
+                background: enhanceColor(palette.background),
+                primary: enhanceColor(palette.primary),
+                secondary: enhanceColor(palette.secondary),
+                detail: enhanceColor(palette.accent)
+            )
+        } else if let scheme = displayScheme, scheme.gradientColors.count >= 3 {
+            return AppleMusicColorPalette(
+                background: enhanceColor(scheme.gradientColors[safe: 3] ?? .black),
+                primary: enhanceColor(scheme.gradientColors[safe: 0] ?? .black),
+                secondary: enhanceColor(scheme.gradientColors[safe: 1] ?? .gray),
+                detail: enhanceColor(scheme.gradientColors[safe: 2] ?? .black)
+            )
+        }
+        return nil
     }
     
     // Make colors vibrant like Apple Music
