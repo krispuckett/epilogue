@@ -6,88 +6,104 @@ struct ChatCommandPalette: View {
     @Binding var commandText: String
     
     @State private var searchText = ""
-    @State private var selectedIndex = 0
-    @State private var isAnimatingIn = false
     @State private var dragOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
     
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @Environment(\.colorScheme) var colorScheme
     
-    // Chat-specific commands
-    enum ChatCommand: String, CaseIterable {
-        case summarize = "summarize"
-        case export = "export"
-        case search = "search"
+    // Book-focused commands
+    struct Command {
+        let icon: String
+        let title: String
+        let description: String?
+        let action: CommandAction
         
-        var icon: String {
-            switch self {
-            case .summarize: return "doc.text.magnifyingglass"
-            case .export: return "square.and.arrow.up"
-            case .search: return "magnifyingglass"
-            }
+        enum CommandAction {
+            case switchBook
+            case viewQuotes
+            case viewNotes
+            case askAI
+            case clearContext
         }
-        
-        var title: String {
-            switch self {
-            case .summarize: return "Summarize Conversation"
-            case .export: return "Export Chat"
-            case .search: return "Search Messages"
-            }
-        }
-        
-        var subtitle: String {
-            switch self {
-            case .summarize: return "Get an AI summary of this chat"
-            case .export: return "Save conversation as markdown"
-            case .search: return "Find messages in this chat"
-            }
-        }
-        
     }
     
-    private var filteredCommands: [ChatCommand] {
+    let bookCommands = [
+        Command(
+            icon: "books.vertical",
+            title: "Switch Book",
+            description: "Change which book you're discussing",
+            action: .switchBook
+        ),
+        Command(
+            icon: "quote.opening",
+            title: "View Quotes",
+            description: "See quotes from this book",
+            action: .viewQuotes
+        ),
+        Command(
+            icon: "note.text",
+            title: "View Notes",
+            description: "See your notes from this book",
+            action: .viewNotes
+        ),
+        Command(
+            icon: "sparkles",
+            title: "Ask AI",
+            description: "Get insights about this passage",
+            action: .askAI
+        ),
+        Command(
+            icon: "xmark.circle",
+            title: "Clear Book Context",
+            description: nil,
+            action: .clearContext
+        )
+    ]
+    
+    private var filteredCommands: [Command] {
         if searchText.isEmpty {
-            return ChatCommand.allCases
+            return bookCommands
         }
-        return ChatCommand.allCases.filter { command in
+        return bookCommands.filter { command in
             command.title.localizedCaseInsensitiveContains(searchText) ||
-            command.rawValue.localizedCaseInsensitiveContains(searchText)
+            (command.description?.localizedCaseInsensitiveContains(searchText) ?? false)
         }
     }
     
     private var filteredBooks: [Book] {
-        if !searchText.isEmpty && searchText.first != "/" {
-            return libraryViewModel.books.filter { book in
-                book.title.localizedCaseInsensitiveContains(searchText) ||
-                book.author.localizedCaseInsensitiveContains(searchText)
-            }
+        if searchText.isEmpty || searchText.first == "/" {
+            return []
         }
-        return []
+        return libraryViewModel.books.filter { book in
+            book.title.localizedCaseInsensitiveContains(searchText) ||
+            book.author.localizedCaseInsensitiveContains(searchText)
+        }
     }
     
     var body: some View {
         VStack(spacing: 0) {
             // Drag indicator
-            RoundedRectangle(cornerRadius: 2.5)
-                .fill(.white.opacity(0.3))
+            Capsule()
+                .fill(Color.white.opacity(0.2))
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
             
-            // Search field with iOS-native styling
+            // Search bar
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.5))
                 
-                TextField("Search commands or books", text: $searchText)
+                TextField("Search commands or books...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 15))
                     .foregroundStyle(.white)
                     .focused($isFocused)
+                    .submitLabel(.go)
                     .onSubmit {
-                        handleSelection()
+                        handleSubmit()
                     }
                 
                 if !searchText.isEmpty {
@@ -95,83 +111,99 @@ struct ChatCommandPalette: View {
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white.opacity(0.5))
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .background(.white.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            
-            Divider()
-                .foregroundStyle(.white.opacity(0.1))
+            .padding(.horizontal, 16)
             
             // Results
             ScrollView {
                 VStack(spacing: 0) {
-                    // Commands section
+                    // Commands
                     if !filteredCommands.isEmpty {
-                        if !filteredBooks.isEmpty {
-                            sectionHeader("Commands")
-                        }
-                        
-                        ForEach(Array(filteredCommands.enumerated()), id: \.element) { index, command in
-                            commandRow(command: command, isSelected: selectedIndex == index)
+                        ForEach(Array(filteredCommands.enumerated()), id: \.offset) { index, command in
+                            commandRow(command: command)
                                 .onTapGesture {
                                     handleCommandSelection(command)
                                 }
+                            
+                            if index < filteredCommands.count - 1 || !filteredBooks.isEmpty {
+                                Divider()
+                                    .foregroundStyle(.white.opacity(0.08))
+                                    .padding(.leading, 60)
+                            }
                         }
                     }
                     
-                    // Books section
+                    // Books
                     if !filteredBooks.isEmpty {
-                        sectionHeader("Books")
-                            .padding(.top, filteredCommands.isEmpty ? 0 : 8)
+                        if !filteredCommands.isEmpty {
+                            // Section separator
+                            HStack {
+                                Text("BOOKS")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.4))
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                        }
                         
                         ForEach(Array(filteredBooks.enumerated()), id: \.element.id) { index, book in
-                            bookRow(book: book, isSelected: selectedIndex == filteredCommands.count + index)
+                            bookRow(book: book)
                                 .onTapGesture {
                                     handleBookSelection(book)
                                 }
+                            
+                            if index < filteredBooks.count - 1 {
+                                Divider()
+                                    .foregroundStyle(.white.opacity(0.08))
+                                    .padding(.leading, 60)
+                            }
                         }
                     }
                     
                     // Empty state
                     if filteredCommands.isEmpty && filteredBooks.isEmpty && !searchText.isEmpty {
-                        emptyStateView
+                        VStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.3))
+                            Text("No results found")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.top, 16)
             }
-            .frame(maxHeight: 320)
+            .frame(maxHeight: 400)
         }
-        .frame(maxWidth: 420)
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
-        .shadow(color: .black.opacity(0.25), radius: 16, y: 8)
-        .scaleEffect(isAnimatingIn ? 1 : 0.95)
-        .opacity(isAnimatingIn ? 1 : 0)
         .offset(y: dragOffset)
         .gesture(
             DragGesture()
                 .onChanged { value in
-                    // Only allow downward drag
                     if value.translation.height > 0 {
                         dragOffset = value.translation.height
                     }
                 }
                 .onEnded { value in
                     if value.translation.height > 50 {
-                        // Dismiss if dragged far enough
                         dismiss()
                     } else {
-                        // Snap back to position
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             dragOffset = 0
                         }
@@ -180,220 +212,122 @@ struct ChatCommandPalette: View {
         )
         .onAppear {
             isFocused = true
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                isAnimatingIn = true
-            }
-            
-            // Process initial command text
-            if commandText.hasPrefix("/") {
-                searchText = String(commandText.dropFirst())
-            }
-        }
-        .onDisappear {
-            commandText = ""
-        }
-        .onKeyPress(.upArrow) {
-            moveSelection(-1)
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            moveSelection(1)
-            return .handled
-        }
-        .onKeyPress(.return) {
-            handleSelection()
-            return .handled
-        }
-        .onKeyPress(.escape) {
-            dismiss()
-            return .handled
         }
     }
     
     // MARK: - Command Row
     
-    private func commandRow(command: ChatCommand, isSelected: Bool) -> some View {
-        HStack(spacing: 12) {
-            // Icon with circular background like Menu style
+    private func commandRow(command: Command) -> some View {
+        HStack(spacing: 16) {
+            // Icon
             Image(systemName: command.icon)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(isSelected ? .white : .white.opacity(0.8))
-                .frame(width: 28, height: 28)
+                .font(.system(size: 20))
+                .foregroundStyle(.white.opacity(0.8))
+                .frame(width: 32, height: 32)
                 .background(
                     Circle()
-                        .fill(.white.opacity(isSelected ? 0.15 : 0.1))
+                        .fill(.white.opacity(0.08))
                 )
             
+            // Text
             VStack(alignment: .leading, spacing: 2) {
                 Text(command.title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(isSelected ? .white : .white.opacity(0.9))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
                 
-                Text(command.subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? .white.opacity(0.7) : .white.opacity(0.5))
+                if let description = command.description {
+                    Text(description)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             }
             
             Spacer()
-            
-            // Selection checkmark like native iOS menus
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.white.opacity(0.08))
-                    .padding(.horizontal, 12)
-            }
-        }
     }
     
     // MARK: - Book Row
     
-    private func bookRow(book: Book, isSelected: Bool) -> some View {
-        HStack(spacing: 12) {
-            if let coverURL = book.coverImageURL {
-                SharedBookCoverView(coverURL: coverURL, width: 30, height: 44)
-                    .cornerRadius(3)
-                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-            } else {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(.white.opacity(0.08))
-                    .frame(width: 30, height: 44)
-                    .overlay {
-                        Image(systemName: "book.closed")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-            }
+    private func bookRow(book: Book) -> some View {
+        HStack(spacing: 16) {
+            // Book cover
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 32,
+                height: 44
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
             
+            // Book info
             VStack(alignment: .leading, spacing: 2) {
                 Text(book.title)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isSelected ? .white : .white.opacity(0.9))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 
                 Text(book.author)
-                    .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? .white.opacity(0.7) : .white.opacity(0.5))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
             }
             
             Spacer()
-            
-            if book.localId == selectedBook?.localId {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.5))
-            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.white.opacity(0.08))
-                    .padding(.horizontal, 12)
-            }
-        }
-    }
-    
-    // MARK: - Section Header
-    
-    private func sectionHeader(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-                .textCase(.uppercase)
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 4)
-    }
-    
-    // MARK: - Empty State
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 24))
-                .foregroundStyle(.white.opacity(0.3))
-            
-            Text("No results for \"\(searchText)\"")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
     }
     
     // MARK: - Actions
     
-    private func handleSelection() {
+    private func handleSubmit() {
         let totalItems = filteredCommands.count + filteredBooks.count
         guard totalItems > 0 else { return }
         
-        if selectedIndex < filteredCommands.count {
-            handleCommandSelection(filteredCommands[selectedIndex])
-        } else {
-            let bookIndex = selectedIndex - filteredCommands.count
-            if bookIndex < filteredBooks.count {
-                handleBookSelection(filteredBooks[bookIndex])
+        // If only one result, select it
+        if totalItems == 1 {
+            if let command = filteredCommands.first {
+                handleCommandSelection(command)
+            } else if let book = filteredBooks.first {
+                handleBookSelection(book)
             }
         }
     }
     
-    private func handleCommandSelection(_ command: ChatCommand) {
+    private func handleCommandSelection(_ command: Command) {
         HapticManager.shared.lightTap()
         
-        switch command {
-        case .summarize:
-            // Trigger summarization (future feature)
-            commandText = "Summarize this conversation"
+        switch command.action {
+        case .switchBook:
+            // Show book list
+            searchText = ""
+        case .viewQuotes:
+            commandText = "/quotes"
             dismiss()
-        case .export:
-            // Trigger export (future feature)
-            commandText = "Export chat to markdown"
+        case .viewNotes:
+            commandText = "/notes"
             dismiss()
-        case .search:
-            // Open search (future feature)
-            commandText = "Search: "
+        case .askAI:
+            commandText = "/ask "
+            dismiss()
+        case .clearContext:
+            selectedBook = nil
             dismiss()
         }
     }
     
     private func handleBookSelection(_ book: Book) {
         HapticManager.shared.lightTap()
-        print("📚 ChatCommandPalette: Selected book \(book.title)")
         selectedBook = book
         dismiss()
     }
     
-    private func moveSelection(_ direction: Int) {
-        let totalItems = filteredCommands.count + filteredBooks.count
-        guard totalItems > 0 else { return }
-        
-        selectedIndex = (selectedIndex + direction + totalItems) % totalItems
-        HapticManager.shared.selectionChanged()
-    }
-    
     private func dismiss() {
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-            isAnimatingIn = false
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            isPresented = false
-        }
+        isPresented = false
     }
 }
 
@@ -403,12 +337,16 @@ struct ChatCommandPalette: View {
     ZStack {
         Color.black.ignoresSafeArea()
         
-        ChatCommandPalette(
-            isPresented: .constant(true),
-            selectedBook: .constant(nil),
-            commandText: .constant("/")
-        )
-        .environmentObject(LibraryViewModel())
-        .padding()
+        VStack {
+            Spacer()
+            
+            ChatCommandPalette(
+                isPresented: .constant(true),
+                selectedBook: .constant(nil),
+                commandText: .constant("")
+            )
+            .environmentObject(LibraryViewModel())
+            .padding()
+        }
     }
 }

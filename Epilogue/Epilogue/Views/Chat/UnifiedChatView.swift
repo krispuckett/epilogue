@@ -86,30 +86,13 @@ struct UnifiedChatView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             } icon: {
-                                // Small book cover if available
-                                if let coverURL = book.coverImageURL,
-                                   let url = URL(string: coverURL) {
-                                    AsyncImage(url: url) { image in
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 30, height: 40)
-                                            .cornerRadius(4)
-                                    } placeholder: {
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(Color.gray.opacity(0.2))
-                                            .frame(width: 30, height: 40)
-                                    }
-                                } else {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.gray.opacity(0.2))
-                                        .frame(width: 30, height: 40)
-                                        .overlay {
-                                            Image(systemName: "book.closed")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                }
+                                // Use SharedBookCoverView for consistency
+                                SharedBookCoverView(
+                                    coverURL: book.coverImageURL,
+                                    width: 30,
+                                    height: 40
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
                             }
                         }
                     }
