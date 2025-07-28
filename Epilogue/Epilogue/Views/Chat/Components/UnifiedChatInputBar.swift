@@ -147,8 +147,6 @@ struct UnifiedChatInputBar: View {
             // Trigger existing command palette
             if text == "/" {
                 showingCommandPalette = true
-                // Clear the slash from input
-                messageText = ""
                 showCommandHint = false
                 activeCommand = nil
             }

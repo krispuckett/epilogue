@@ -115,13 +115,24 @@ struct UnifiedChatView: View {
                 coverImage = nil
             }
         }
-        .sheet(isPresented: $showingCommandPalette) {
-            CommandPaletteView(
-                isPresented: $showingCommandPalette,
-                selectedBook: $currentBookContext
-            )
-            .environmentObject(libraryViewModel)
+        .overlay(alignment: .bottom) {
+            if showingCommandPalette {
+                ChatCommandPalette(
+                    isPresented: $showingCommandPalette,
+                    selectedBook: $currentBookContext,
+                    commandText: $messageText
+                )
+                .environmentObject(libraryViewModel)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 100) // Above input bar
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
+                .zIndex(100)
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
         .sheet(isPresented: $showingSummary) {
             // Show session complete overlay
             if let session = currentSession, let processed = session.processedData {
