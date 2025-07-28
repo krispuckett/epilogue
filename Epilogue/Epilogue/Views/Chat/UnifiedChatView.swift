@@ -17,10 +17,28 @@ struct UnifiedChatView: View {
     @State private var showingCommandPalette = false
     @FocusState private var isInputFocused: Bool
     
+    // Ambient/Whisper state
+    @StateObject private var voiceManager = VoiceRecognitionManager.shared
+    @StateObject private var pipeline = AmbientIntelligencePipeline()
+    @State private var isRecording = false
+    @State private var audioLevel: Float = 0
+    @State private var currentSession: AmbientSession?
+    @State private var showingSummary = false
+    @State private var liveTranscription: String = ""
+    
     var body: some View {
         ZStack {
-            // REUSE THE EXACT SAME GRADIENT SYSTEM FROM BookDetailView
-            if let book = currentBookContext {
+            // Gradient system with ambient recording support
+            if isRecording {
+                // Use the breathing gradient during recording
+                ClaudeInspiredGradient(
+                    book: currentBookContext,
+                    audioLevel: $audioLevel,
+                    isListening: $isRecording
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            } else if let book = currentBookContext {
                 // Use the same BookAtmosphericGradientView with extracted colors
                 BookAtmosphericGradientView(colorPalette: colorPalette ?? generatePlaceholderPalette(for: book))
                     .ignoresSafeArea()
@@ -64,13 +82,23 @@ struct UnifiedChatView: View {
                 
                 Spacer()
                 
+                // Live transcription preview during recording
+                if isRecording && !liveTranscription.isEmpty {
+                    LiveTranscriptionView(transcription: liveTranscription)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                
                 // Chat input bar
                 UnifiedChatInputBar(
                     messageText: $messageText,
                     showingCommandPalette: $showingCommandPalette,
                     isInputFocused: $isInputFocused,
                     currentBook: currentBookContext,
-                    onSend: sendMessage
+                    onSend: sendMessage,
+                    isRecording: $isRecording,
+                    onMicrophoneTap: handleMicrophoneTap
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -93,6 +121,29 @@ struct UnifiedChatView: View {
                 selectedBook: $currentBookContext
             )
             .environmentObject(libraryViewModel)
+        }
+        .sheet(isPresented: $showingSummary) {
+            // Show session complete overlay
+            if let session = currentSession, let processed = session.processedData {
+                SessionCompleteView(
+                    session: processed,
+                    onDismiss: {
+                        showingSummary = false
+                        // Add session summary as system message
+                        addSessionSummaryMessage(processed)
+                    }
+                )
+            }
+        }
+        .onReceive(voiceManager.$transcribedText) { text in
+            // Update live transcription
+            if isRecording && !text.isEmpty {
+                liveTranscription = text
+            }
+        }
+        .onReceive(voiceManager.$currentAmplitude) { level in
+            // Update audio level for gradient animation
+            audioLevel = level
         }
     }
     
@@ -218,6 +269,115 @@ struct UnifiedChatView: View {
         // TODO: Send to AI service and get response
     }
     
+    // MARK: - Ambient Session Handling
+    
+    private func handleMicrophoneTap() {
+        if isRecording {
+            endAmbientSession()
+        } else {
+            startAmbientSession()
+        }
+    }
+    
+    private func startAmbientSession() {
+        // Create new session
+        currentSession = AmbientSession(
+            startTime: Date(),
+            book: currentBookContext
+        )
+        
+        // Start listening
+        voiceManager.startAmbientListening()
+        isRecording = true
+        liveTranscription = ""
+        
+        // Add temporary transcription message
+        let transcriptionMessage = UnifiedChatMessage(
+            content: "[Transcribing]",
+            isUser: true,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        messages.append(transcriptionMessage)
+        
+        // Haptic feedback
+        HapticManager.shared.mediumTap()
+    }
+    
+    private func endAmbientSession() {
+        guard var session = currentSession else { return }
+        
+        // Stop listening
+        voiceManager.stopListening()
+        isRecording = false
+        
+        // Update session with final transcription
+        session.endTime = Date()
+        session.rawTranscriptions = [liveTranscription]
+        
+        // Process through intent detection
+        Task {
+            // For now, create a mock processed session
+            // TODO: Integrate with actual pipeline processing
+            let processed = ProcessedAmbientSession(
+                quotes: [],
+                notes: [],
+                questions: [],
+                summary: "Session recorded for \(session.duration) seconds",
+                duration: session.duration
+            )
+            session.processedData = processed
+            currentSession = session
+            
+            // Show summary
+            await MainActor.run {
+                showingSummary = true
+                
+                // Remove temporary transcription message and add final
+                if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
+                    messages[lastIndex] = UnifiedChatMessage(
+                        content: liveTranscription,
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                }
+                
+                liveTranscription = ""
+            }
+        }
+        
+        HapticManager.shared.lightTap()
+    }
+    
+    private func addSessionSummaryMessage(_ processed: ProcessedAmbientSession) {
+        let summaryContent = """
+        📝 Session Complete (\(processed.formattedDuration))
+        
+        **Quotes:** \(processed.quotes.count)
+        **Notes:** \(processed.notes.count)  
+        **Questions:** \(processed.questions.count)
+        
+        \(processed.summary)
+        """
+        
+        let summaryMessage = UnifiedChatMessage(
+            content: summaryContent,
+            isUser: false,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        
+        messages.append(summaryMessage)
+        
+        // Scroll to bottom
+        if let lastMessage = messages.last {
+            withAnimation {
+                scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+            }
+        }
+    }
+    
     // MARK: - Color Extraction (Reused from BookDetailView)
     
     private func extractColorsForBook(_ book: Book) async {
@@ -283,6 +443,72 @@ struct UnifiedChatMessage: Identifiable {
     let bookContext: Book?
 }
 
+
+// MARK: - Live Transcription View
+
+struct LiveTranscriptionView: View {
+    let transcription: String
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "waveform")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.red)
+                .scaleEffect(isAnimating ? 1.2 : 1.0)
+                .opacity(isAnimating ? 0.8 : 1.0)
+                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
+            
+            Text(transcription)
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(.red.opacity(0.3), lineWidth: 1)
+        }
+        .onAppear {
+            isAnimating = true
+        }
+    }
+}
+
+// MARK: - Session Complete View
+
+struct SessionCompleteView: View {
+    let session: ProcessedAmbientSession
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        NavigationView {
+            SessionSummaryView(
+                session: session,
+                onDismiss: {
+                    // Dismiss is handled by binding
+                },
+                onViewDetails: {
+                    // TODO: Navigate to details view
+                }
+            )
+                .navigationTitle("Session Complete")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            onDismiss()
+                        }
+                    }
+                }
+        }
+    }
+}
 
 // MARK: - Ambient Chat Gradient (Fallback)
 

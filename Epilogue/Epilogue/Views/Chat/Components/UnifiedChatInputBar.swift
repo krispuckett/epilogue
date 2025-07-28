@@ -13,8 +13,9 @@ struct UnifiedChatInputBar: View {
     @State private var activeCommand: CommandType? = nil
     @State private var showCommandHint = false
     
-    // Microphone state (WhisperManager will be implemented later)
-    @State private var isRecording = false
+    // Microphone state
+    @Binding var isRecording: Bool
+    let onMicrophoneTap: () -> Void
     
     enum CommandType {
         case slash      // Book switcher
@@ -84,9 +85,7 @@ struct UnifiedChatInputBar: View {
                 HStack(spacing: 8) {
                     // Microphone button
                     Button {
-                        // TODO: Integrate with WhisperManager when implemented
-                        isRecording.toggle()
-                        HapticManager.shared.lightTap()
+                        onMicrophoneTap()
                     } label: {
                         Image(systemName: isRecording ? "mic.fill" : "mic")
                             .font(.system(size: 18))
@@ -184,13 +183,17 @@ extension UnifiedChatInputBar {
         messageText: Binding<String>,
         showingCommandPalette: Binding<Bool>,
         isInputFocused: FocusState<Bool>.Binding,
-        onSend: @escaping () -> Void
+        isRecording: Binding<Bool>,
+        onSend: @escaping () -> Void,
+        onMicrophoneTap: @escaping () -> Void
     ) {
         self._messageText = messageText
         self._showingCommandPalette = showingCommandPalette
         self._isInputFocused = isInputFocused
+        self._isRecording = isRecording
         self.currentBook = nil
         self.onSend = onSend
+        self.onMicrophoneTap = onMicrophoneTap
     }
 }
 
@@ -208,7 +211,9 @@ extension UnifiedChatInputBar {
                 showingCommandPalette: .constant(false),
                 isInputFocused: FocusState<Bool>().projectedValue,
                 currentBook: nil,
-                onSend: {}
+                onSend: {},
+                isRecording: .constant(false),
+                onMicrophoneTap: {}
             )
             .padding()
         }
