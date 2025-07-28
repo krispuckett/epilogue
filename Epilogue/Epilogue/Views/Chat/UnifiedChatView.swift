@@ -515,17 +515,32 @@ struct LiveTranscriptionView: View {
 struct AmbientChatGradientView: View {
     var body: some View {
         ZStack {
+            // Deep black base
             Color.black
             
-            // Subtle amber gradient for empty state
+            // Warm sunset glow gradient for empty state
             LinearGradient(
                 stops: [
-                    .init(color: Color.warmAmber.opacity(0.15), location: 0.0),
-                    .init(color: Color.warmAmber.opacity(0.08), location: 0.3),
-                    .init(color: Color.clear, location: 0.5)
+                    .init(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), location: 0.0),
+                    .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.25), location: 0.2),
+                    .init(color: Color.warmAmber.opacity(0.15), location: 0.4),
+                    .init(color: Color.orange.opacity(0.08), location: 0.6),
+                    .init(color: Color.clear, location: 0.8)
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            // Additional radial glow for warmth
+            RadialGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color(red: 1.0, green: 0.6, blue: 0.3).opacity(0.3), location: 0.0),
+                    .init(color: Color(red: 1.0, green: 0.5, blue: 0.25).opacity(0.15), location: 0.3),
+                    .init(color: Color.clear, location: 0.7)
+                ]),
+                center: .topTrailing,
+                startRadius: 50,
+                endRadius: 400
             )
         }
     }
