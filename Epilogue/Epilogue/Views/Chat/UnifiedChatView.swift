@@ -23,7 +23,6 @@ struct UnifiedChatView: View {
     @State private var isRecording = false
     @State private var audioLevel: Float = 0
     @State private var currentSession: AmbientSession?
-    @State private var showingSummary = false
     @State private var liveTranscription: String = ""
     
     var body: some View {
@@ -139,19 +138,6 @@ struct UnifiedChatView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
-        .sheet(isPresented: $showingSummary) {
-            // Show session complete overlay
-            if let session = currentSession, let processed = session.processedData {
-                SessionCompleteView(
-                    session: processed,
-                    onDismiss: {
-                        showingSummary = false
-                        // Add session summary as system message
-                        addSessionSummaryMessage(processed)
-                    }
-                )
-            }
-        }
         .onReceive(voiceManager.$transcribedText) { text in
             // Update live transcription
             if isRecording && !text.isEmpty {
@@ -265,64 +251,159 @@ struct UnifiedChatView: View {
         
         // Process through intent detection
         Task {
-            // For now, create a mock processed session
-            // TODO: Integrate with actual pipeline processing
-            let processed = ProcessedAmbientSession(
-                quotes: [],
-                notes: [],
-                questions: [],
-                summary: "Session recorded for \(session.duration) seconds",
-                duration: session.duration
-            )
+            // Process the transcription to extract quotes, notes, and questions
+            let processed = await processTranscription(liveTranscription)
             session.processedData = processed
             currentSession = session
             
-            // Show summary
             await MainActor.run {
-                showingSummary = true
-                
-                // Remove temporary transcription message and add final
+                // Remove temporary transcription message
                 if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
-                    messages[lastIndex] = UnifiedChatMessage(
+                    messages.remove(at: lastIndex)
+                }
+                
+                // Add extracted items as individual messages
+                var addedCount = 0
+                
+                // Add quotes
+                for quote in processed.quotes {
+                    messages.append(UnifiedChatMessage(
+                        content: "📖 \"\(quote.text)\"",
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    ))
+                    addedCount += 1
+                }
+                
+                // Add notes
+                for note in processed.notes {
+                    messages.append(UnifiedChatMessage(
+                        content: "📝 \(note.text)",
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    ))
+                    addedCount += 1
+                }
+                
+                // Add questions
+                for question in processed.questions {
+                    messages.append(UnifiedChatMessage(
+                        content: "❓ \(question.text)",
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    ))
+                    addedCount += 1
+                }
+                
+                // Show confirmation toast or inline message
+                if addedCount > 0 {
+                    let summary = buildSessionSummary(processed)
+                    messages.append(UnifiedChatMessage(
+                        content: summary,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    ))
+                } else if !liveTranscription.isEmpty {
+                    // If no structured content was extracted, add the raw transcription
+                    messages.append(UnifiedChatMessage(
                         content: liveTranscription,
                         isUser: true,
                         timestamp: Date(),
                         bookContext: currentBookContext
-                    )
+                    ))
                 }
                 
                 liveTranscription = ""
+                
+                // Scroll to bottom to show new messages
+                if let lastMessage = messages.last {
+                    withAnimation {
+                        scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
             }
         }
         
         HapticManager.shared.lightTap()
     }
     
-    private func addSessionSummaryMessage(_ processed: ProcessedAmbientSession) {
-        let summaryContent = """
-        📝 Session Complete (\(processed.formattedDuration))
+    // MARK: - Transcription Processing
+    
+    private func processTranscription(_ transcription: String) async -> ProcessedAmbientSession {
+        // Mock processing - in production, this would use NLP to extract quotes, notes, and questions
+        var quotes: [ExtractedQuote] = []
+        var notes: [ExtractedNote] = []
+        var questions: [ExtractedQuestion] = []
         
-        **Quotes:** \(processed.quotes.count)
-        **Notes:** \(processed.notes.count)  
-        **Questions:** \(processed.questions.count)
-        
-        \(processed.summary)
-        """
-        
-        let summaryMessage = UnifiedChatMessage(
-            content: summaryContent,
-            isUser: false,
-            timestamp: Date(),
-            bookContext: currentBookContext
-        )
-        
-        messages.append(summaryMessage)
-        
-        // Scroll to bottom
-        if let lastMessage = messages.last {
-            withAnimation {
-                scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+        // Simple pattern matching for now
+        let lines = transcription.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+            
+            // Detect quotes (lines with quotation marks)
+            if trimmed.contains("\"") || trimmed.contains("\u{201C}") || trimmed.contains("\u{201D}") {
+                let cleanedQuote = trimmed
+                    .replacingOccurrences(of: "\"", with: "")
+                    .replacingOccurrences(of: "\u{201C}", with: "")
+                    .replacingOccurrences(of: "\u{201D}", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleanedQuote.isEmpty {
+                    quotes.append(ExtractedQuote(
+                        text: cleanedQuote,
+                        context: nil,
+                        timestamp: Date()
+                    ))
+                }
             }
+            // Detect questions (lines ending with ?)
+            else if trimmed.hasSuffix("?") {
+                questions.append(ExtractedQuestion(
+                    text: trimmed,
+                    context: nil,
+                    timestamp: Date()
+                ))
+            }
+            // Everything else is a note
+            else {
+                notes.append(ExtractedNote(
+                    text: trimmed,
+                    type: .reflection,
+                    timestamp: Date()
+                ))
+            }
+        }
+        
+        return ProcessedAmbientSession(
+            quotes: quotes,
+            notes: notes,
+            questions: questions,
+            summary: "",
+            duration: currentSession?.duration ?? 0
+        )
+    }
+    
+    private func buildSessionSummary(_ processed: ProcessedAmbientSession) -> String {
+        var parts: [String] = []
+        
+        if processed.quotes.count > 0 {
+            parts.append("\(processed.quotes.count) quote\(processed.quotes.count == 1 ? "" : "s")")
+        }
+        if processed.notes.count > 0 {
+            parts.append("\(processed.notes.count) note\(processed.notes.count == 1 ? "" : "s")")
+        }
+        if processed.questions.count > 0 {
+            parts.append("\(processed.questions.count) question\(processed.questions.count == 1 ? "" : "s")")
+        }
+        
+        if parts.isEmpty {
+            return "✓ Session recorded"
+        } else {
+            return "✓ Added " + parts.joined(separator: " and ")
         }
     }
     
@@ -428,35 +509,6 @@ struct LiveTranscriptionView: View {
     }
 }
 
-// MARK: - Session Complete View
-
-struct SessionCompleteView: View {
-    let session: ProcessedAmbientSession
-    let onDismiss: () -> Void
-    
-    var body: some View {
-        NavigationView {
-            SessionSummaryView(
-                session: session,
-                onDismiss: {
-                    // Dismiss is handled by binding
-                },
-                onViewDetails: {
-                    // TODO: Navigate to details view
-                }
-            )
-                .navigationTitle("Session Complete")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            onDismiss()
-                        }
-                    }
-                }
-        }
-    }
-}
 
 // MARK: - Ambient Chat Gradient (Fallback)
 
