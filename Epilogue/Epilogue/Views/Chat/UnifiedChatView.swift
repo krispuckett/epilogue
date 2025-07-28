@@ -273,6 +273,9 @@ struct UnifiedChatView: View {
         // Add to messages
         messages.append(userMessage)
         
+        // Store message text before clearing
+        let userInput = messageText
+        
         // Clear input
         messageText = ""
         
@@ -285,8 +288,67 @@ struct UnifiedChatView: View {
         
         // Send to AI service and get response
         Task {
-            // Placeholder for AI integration
-            // Will be implemented when PerplexityService is configured
+            await getAIResponse(for: userInput)
+        }
+    }
+    
+    private func getAIResponse(for userInput: String) async {
+        // Use AICompanionService for flexibility between providers
+        let aiService = AICompanionService.shared
+        
+        // Check if service is configured
+        guard aiService.isConfigured() else {
+            await MainActor.run {
+                let configMessage = UnifiedChatMessage(
+                    content: "Please configure your AI service. Add your Perplexity API key to Info.plist.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: currentBookContext
+                )
+                messages.append(configMessage)
+            }
+            return
+        }
+        
+        do {
+            // Get response from AI with conversation context
+            let response = try await aiService.processMessage(
+                userInput,
+                bookContext: currentBookContext,
+                conversationHistory: messages
+            )
+            
+            // Add AI response to messages
+            await MainActor.run {
+                let aiMessage = UnifiedChatMessage(
+                    content: response,
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: currentBookContext
+                )
+                messages.append(aiMessage)
+                
+                // Scroll to bottom to show new message
+                if let lastMessage = messages.last {
+                    withAnimation {
+                        scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+        } catch {
+            // Handle error by showing error message
+            await MainActor.run {
+                let errorMessage = UnifiedChatMessage(
+                    content: "Sorry, I couldn't process your message. \(error.localizedDescription)",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: currentBookContext
+                )
+                messages.append(errorMessage)
+                
+                // Log error for debugging
+                print("❌ Chat AI Error: \(error)")
+            }
         }
     }
     
@@ -580,6 +642,11 @@ struct UnifiedChatMessage: Identifiable {
     let isUser: Bool
     let timestamp: Date
     let bookContext: Book?
+    
+    enum Role {
+        case user
+        case assistant
+    }
 }
 
 
