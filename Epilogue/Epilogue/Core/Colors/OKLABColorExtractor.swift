@@ -594,7 +594,9 @@ public class OKLABColorExtractor {
             let primary = brightPeaks.first?.color ?? sortedPeaks[safe: 0]?.color ?? UIColor.orange
             let secondary = sortedPeaks[safe: 1]?.color ?? primary
             let accent = sortedPeaks[safe: 2]?.color ?? secondary
-            let background = sortedPeaks.last?.color ?? UIColor.black
+            
+            // For dark covers, background should always be very dark
+            let background = UIColor.black
             
             print("🎯 Dark Cover Role Assignment:")
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
@@ -611,7 +613,38 @@ public class OKLABColorExtractor {
             let primary = sortedPeaks[safe: 0]?.color ?? UIColor.orange
             let secondary = sortedPeaks[safe: 1]?.color ?? primary
             let accent = sortedPeaks[safe: 2]?.color ?? secondary
-            let background = sortedPeaks.last?.color ?? primary
+            
+            // Smart background selection
+            let background: UIColor
+            if let darkestPeak = sortedPeaks.last {
+                // Check if the "background" candidate is actually dark
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                darkestPeak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                
+                if b < 0.3 {
+                    // Use it if actually dark
+                    background = darkestPeak.color
+                    print("  Using darkest color as background: \(colorDescription(darkestPeak.color)) (brightness: \(String(format: "%.2f", b)))")
+                } else {
+                    // Otherwise, try to find a dark color in the peaks
+                    if let darkColor = sortedPeaks.first(where: { peak in
+                        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                        peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                        return b < 0.3
+                    }) {
+                        background = darkColor.color
+                        print("  Found dark color for background: \(colorDescription(darkColor.color)) (brightness: \(String(format: "%.2f", b)))")
+                    } else {
+                        // Default to dark gray if no dark colors found
+                        background = UIColor(white: 0.1, alpha: 1)
+                        print("  No dark colors found, using default dark gray for background")
+                    }
+                }
+            } else {
+                // Fallback to dark gray
+                background = UIColor(white: 0.1, alpha: 1)
+                print("  No peaks available, using default dark gray for background")
+            }
             
             print("🎯 Normal Cover Role Assignment (Pure Frequency):")
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
