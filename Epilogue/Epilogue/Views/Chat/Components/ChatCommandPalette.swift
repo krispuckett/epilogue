@@ -8,6 +8,7 @@ struct ChatCommandPalette: View {
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @State private var isAnimatingIn = false
+    @State private var dragOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
     
     @EnvironmentObject var libraryViewModel: LibraryViewModel
@@ -75,6 +76,13 @@ struct ChatCommandPalette: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Drag indicator
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(.white.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+            
             // Search field with iOS-native styling
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
@@ -148,7 +156,6 @@ struct ChatCommandPalette: View {
             }
             .frame(maxHeight: 320)
         }
-        .padding(.top, 8)
         .frame(maxWidth: 420)
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .overlay {
@@ -158,6 +165,27 @@ struct ChatCommandPalette: View {
         .shadow(color: .black.opacity(0.25), radius: 16, y: 8)
         .scaleEffect(isAnimatingIn ? 1 : 0.95)
         .opacity(isAnimatingIn ? 1 : 0)
+        .offset(y: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // Only allow downward drag
+                    if value.translation.height > 0 {
+                        dragOffset = value.translation.height
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.height > 50 {
+                        // Dismiss if dragged far enough
+                        dismiss()
+                    } else {
+                        // Snap back to position
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
         .onAppear {
             isFocused = true
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -356,6 +384,7 @@ struct ChatCommandPalette: View {
     
     private func handleBookSelection(_ book: Book) {
         HapticManager.shared.lightTap()
+        print("📚 ChatCommandPalette: Selected book \(book.title)")
         selectedBook = book
         dismiss()
     }

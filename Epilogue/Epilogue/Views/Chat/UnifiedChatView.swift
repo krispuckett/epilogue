@@ -28,26 +28,38 @@ struct UnifiedChatView: View {
     var body: some View {
         ZStack {
             // Gradient system with ambient recording support
-            if isRecording {
-                // Use the breathing gradient during recording
-                ClaudeInspiredGradient(
-                    book: currentBookContext,
-                    audioLevel: $audioLevel,
-                    isListening: $isRecording
-                )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-            } else if let book = currentBookContext {
-                // Use the same BookAtmosphericGradientView with extracted colors
-                BookAtmosphericGradientView(colorPalette: colorPalette ?? generatePlaceholderPalette(for: book))
+            Group {
+                if isRecording {
+                    // Use the breathing gradient during recording
+                    ClaudeInspiredGradient(
+                        book: currentBookContext,
+                        audioLevel: $audioLevel,
+                        isListening: $isRecording
+                    )
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-                    .id(book.localId) // Force view recreation when book changes
-            } else {
-                // Use existing ambient gradient for empty state
-                AmbientChatGradientView()
-                    .ignoresSafeArea()
+                    .transition(.opacity)
+                } else if let book = currentBookContext {
+                    // Use the same BookAtmosphericGradientView with extracted colors
+                    let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                    BookAtmosphericGradientView(colorPalette: palette)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                        .id(book.localId) // Simplify ID to just book ID
+                        .onAppear {
+                            print("🎨 BookAtmosphericGradientView appeared for: \(book.title)")
+                            print("🎨 Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
+                        }
+                } else {
+                    // Use existing ambient gradient for empty state
+                    AmbientChatGradientView()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
+            .animation(.easeInOut(duration: 0.5), value: isRecording)
             
             // Chat UI overlay
             VStack(spacing: 0) {
@@ -109,19 +121,37 @@ struct UnifiedChatView: View {
                 .padding(.bottom, 16)
             }
         }
+        // Remove animation modifiers from here since they're on the Group now
         .onChange(of: currentBookContext) { oldBook, newBook in
+            print("📚 Book context changed from \(oldBook?.title ?? "none") to \(newBook?.title ?? "none")")
+            print("📚 New book ID: \(newBook?.localId.uuidString ?? "none")")
+            print("📚 Cover URL: \(newBook?.coverImageURL ?? "none")")
+            
             // Extract colors when book context changes
             if let book = newBook {
+                print("🎨 Extracting colors for: \(book.title)")
+                // Don't clear palette immediately - let the transition handle it
                 Task {
                     await extractColorsForBook(book)
                 }
             } else {
-                colorPalette = nil
-                coverImage = nil
+                print("🎨 Clearing color palette")
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    colorPalette = nil
+                    coverImage = nil
+                }
             }
         }
         .overlay(alignment: .bottom) {
             if showingCommandPalette {
+                // Tap outside backdrop
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingCommandPalette = false
+                    }
+                    .ignoresSafeArea()
+                
                 ChatCommandPalette(
                     isPresented: $showingCommandPalette,
                     selectedBook: $currentBookContext,
@@ -413,8 +443,11 @@ struct UnifiedChatView: View {
         // Check cache first
         let bookID = book.localId.uuidString
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+            print("🎨 Found cached palette for: \(book.title)")
             await MainActor.run {
-                self.colorPalette = cachedPalette
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    self.colorPalette = cachedPalette
+                }
             }
             return
         }
@@ -422,12 +455,18 @@ struct UnifiedChatView: View {
         // Extract colors if not cached
         guard let coverURLString = book.coverImageURL,
               let coverURL = URL(string: coverURLString) else {
+            print("🎨 No cover URL for book: \(book.title)")
             return
         }
         
+        print("🎨 Starting color extraction from: \(coverURLString)")
+        
         do {
             let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-            guard let uiImage = UIImage(data: imageData) else { return }
+            guard let uiImage = UIImage(data: imageData) else { 
+                print("🎨 Failed to create UIImage from data")
+                return 
+            }
             
             self.coverImage = uiImage
             
@@ -435,8 +474,11 @@ struct UnifiedChatView: View {
             let extractor = OKLABColorExtractor()
             let palette = try await extractor.extractPalette(from: uiImage, imageSource: book.title)
             
+            print("🎨 Extracted new palette for: \(book.title)")
             await MainActor.run {
-                self.colorPalette = palette
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    self.colorPalette = palette
+                }
             }
             
             // Cache the result
@@ -543,6 +585,7 @@ struct AmbientChatGradientView: View {
                 endRadius: 400
             )
         }
+        .ignoresSafeArea()
     }
 }
 

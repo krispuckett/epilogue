@@ -195,6 +195,7 @@ struct BookSpecificGradient: View {
     var body: some View {
         // Use the exact same gradient as BookDetailView
         BookCoverBackgroundView(colorPalette: palette)
+            .ignoresSafeArea()
             // Add animation by scaling and moving the entire gradient
             .scaleEffect(y: 0.8 + phase * 0.1)
             .offset(y: -50 + phase * 20)
@@ -266,6 +267,7 @@ struct AmbientChatOverlay: View {
                 audioLevel: $audioLevel,
                 isListening: $isRecording
             )
+            .ignoresSafeArea()
             
             VStack {
                 // Minimal header with close button only
