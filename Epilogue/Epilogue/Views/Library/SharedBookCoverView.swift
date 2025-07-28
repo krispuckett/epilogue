@@ -41,9 +41,9 @@ struct SharedBookCoverView: View {
     let coverURL: String?
     let width: CGFloat
     let height: CGFloat
-    @State private var isImageLoaded = false
-    @State private var displayedImage: UIImage?
-    @State private var lowResLoaded = false
+    @State private var lowQualityImage: UIImage?
+    @State private var highQualityImage: UIImage?
+    @State private var isLoadingStarted = false
     
     // Callback to notify when image is loaded
     var onImageLoaded: ((UIImage) -> Void)?
@@ -56,37 +56,6 @@ struct SharedBookCoverView: View {
         print("📚 SharedBookCoverView init - URL: \(coverURL ?? "nil"), dimensions: \(width)x\(height)")
     }
     
-    // Low resolution URL for fast loading
-    private var lowResURL: URL? {
-        guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
-        let enhanced = coverURL
-            .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "&zoom=3", with: "")
-            .replacingOccurrences(of: "&zoom=2", with: "")
-            .replacingOccurrences(of: "&zoom=1", with: "")
-            .replacingOccurrences(of: "?zoom=3", with: "?")
-            .replacingOccurrences(of: "?zoom=2", with: "?")
-            .replacingOccurrences(of: "?zoom=1", with: "?")
-        return URL(string: enhanced)
-    }
-    
-    // High resolution URL for quality - REMOVED zoom to get full cover
-    private var highResURL: URL? {
-        guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
-        let enhanced = coverURL
-            .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "&zoom=5", with: "")
-            .replacingOccurrences(of: "&zoom=4", with: "")
-            .replacingOccurrences(of: "&zoom=3", with: "")
-            .replacingOccurrences(of: "&zoom=2", with: "")
-            .replacingOccurrences(of: "&zoom=1", with: "")
-            .replacingOccurrences(of: "zoom=5", with: "")
-            .replacingOccurrences(of: "zoom=4", with: "")
-            .replacingOccurrences(of: "zoom=3", with: "")
-            .replacingOccurrences(of: "zoom=2", with: "")
-            .replacingOccurrences(of: "zoom=1", with: "")
-        return URL(string: enhanced)
-    }
     
     private func calculateChecksum(for image: UIImage) -> String {
         guard let data = image.pngData() else { return "no-data" }
@@ -121,110 +90,48 @@ struct SharedBookCoverView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
                 .onAppear {
-                    // Check for cached image immediately with enhanced URL
-                    let enhancedURL = coverURL?
-                        .replacingOccurrences(of: "http://", with: "https://")
-                        .replacingOccurrences(of: "&zoom=5", with: "")
-                        .replacingOccurrences(of: "&zoom=4", with: "")
-                        .replacingOccurrences(of: "&zoom=3", with: "")
-                        .replacingOccurrences(of: "&zoom=2", with: "")
-                        .replacingOccurrences(of: "&zoom=1", with: "")
-                        .replacingOccurrences(of: "zoom=5", with: "")
-                        .replacingOccurrences(of: "zoom=4", with: "")
-                        .replacingOccurrences(of: "zoom=3", with: "")
-                        .replacingOccurrences(of: "zoom=2", with: "")
-                        .replacingOccurrences(of: "zoom=1", with: "") ?? ""
+                    // Start progressive loading only once
+                    guard !isLoadingStarted else { return }
+                    isLoadingStarted = true
                     
-                    if let cachedImage = DisplayedImageStore.shared.getImage(for: enhancedURL) {
-                        print("📦 Found cached image on appear for: \(enhancedURL)")
-                        print("📐 Cached image size: \(cachedImage.size)")
-                        onImageLoaded?(cachedImage)
-                    }
-                }
-            
-            // Load low-res first for fast display
-            if !lowResLoaded, let lowUrl = lowResURL {
-                AsyncImage(url: lowUrl) { phase in
-                    if case .success(let image) = phase {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: width, height: height)
-                            .clipped()
-                            .onAppear {
-                                lowResLoaded = true
+                    SharedBookCoverManager.shared.loadProgressiveImage(
+                        from: coverURL,
+                        onLowQualityLoaded: { image in
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                lowQualityImage = image
                             }
-                    }
-                }
-                .opacity(lowResLoaded && isImageLoaded ? 0 : 1)
-            }
-            
-            // Load high-res on top
-            if let url = highResURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        // Minimal loading state
-                        if !isImageLoaded {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                                .tint(.white.opacity(0.5))
+                            // Only notify if high quality hasn't loaded yet
+                            if highQualityImage == nil {
+                                onImageLoaded?(image)
+                            }
+                        },
+                        onHighQualityLoaded: { image in
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                highQualityImage = image
+                            }
+                            onImageLoaded?(image)
+                            
+                            // Store in legacy cache for compatibility
+                            if let url = coverURL {
+                                DisplayedImageStore.shared.store(image: image, for: url)
+                            }
                         }
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: width, height: height)
-                            .clipped()
-                            .onAppear {
-                                isImageLoaded = true
-                                
-                                // Convert SwiftUI Image to UIImage
-                                Task {
-                                    if let uiImage = await convertToUIImage(image: image) {
-                                        let checksum = calculateChecksum(for: uiImage)
-                                        print("✅ DISPLAYED Image loaded - Checksum: \(checksum)")
-                                        print("   URL: \(url.absoluteString)")
-                                        print("   Size: \(uiImage.size)")
-                                        
-                                        // Store the image with enhanced URL for consistency
-                                        displayedImage = uiImage
-                                        let enhancedURL = coverURL?
-                                            .replacingOccurrences(of: "http://", with: "https://")
-                                            .replacingOccurrences(of: "&zoom=5", with: "")
-                                            .replacingOccurrences(of: "&zoom=4", with: "")
-                                            .replacingOccurrences(of: "&zoom=3", with: "")
-                                            .replacingOccurrences(of: "&zoom=2", with: "")
-                                            .replacingOccurrences(of: "&zoom=1", with: "")
-                                            .replacingOccurrences(of: "zoom=5", with: "")
-                                            .replacingOccurrences(of: "zoom=4", with: "")
-                                            .replacingOccurrences(of: "zoom=3", with: "")
-                                            .replacingOccurrences(of: "zoom=2", with: "")
-                                            .replacingOccurrences(of: "zoom=1", with: "") ?? ""
-                                        DisplayedImageStore.shared.store(image: uiImage, for: enhancedURL)
-                                        
-                                        // Save for debugging
-                                        let bookName = coverURL?.components(separatedBy: "/").last ?? "unknown"
-                                        saveImageForDebug(uiImage, suffix: bookName)
-                                        
-                                        // Notify callback
-                                        onImageLoaded?(uiImage)
-                                    }
-                                }
-                            }
-                    case .failure(let error):
-                        // Simple failure state
-                        Image(systemName: "book.closed.fill")
-                            .font(.system(size: min(width, height) * 0.25))
-                            .foregroundStyle(.white.opacity(0.2))
-                            .onAppear {
-                                print("❌ Failed to load image from URL: \(url)")
-                                print("   Error: \(error)")
-                            }
-                    @unknown default:
-                        EmptyView()
-                    }
+                    )
                 }
+            
+            // Display the best available image
+            if let image = highQualityImage ?? lowQualityImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .transition(.opacity)
+            } else if coverURL != nil {
+                // Loading state
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .tint(.white.opacity(0.5))
             } else {
                 // No cover URL
                 Image(systemName: "book.closed.fill")
@@ -235,17 +142,5 @@ struct SharedBookCoverView: View {
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-    }
-    
-    @MainActor
-    private func convertToUIImage(image: Image) async -> UIImage? {
-        let controller = UIHostingController(rootView: image)
-        controller.view.frame = CGRect(x: 0, y: 0, width: width, height: height)
-        controller.view.backgroundColor = .clear
-        
-        let renderer = UIGraphicsImageRenderer(size: controller.view.frame.size)
-        return renderer.image { _ in
-            controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
-        }
     }
 }

@@ -22,8 +22,9 @@ struct ImprovedColorExtraction {
         // Try OKLAB first since it handles dark covers better
         print("🔍 Trying OKLAB extractor (primary method)...")
         let extractor = OKLABColorExtractor()
-        if let palette = try? await extractor.extractPalette(from: processedImage, imageSource: bookTitle) {
-            print("✅ OKLAB extraction succeeded")
+        if let cgImage = processedImage.cgImage {
+            let palette = await extractor.extractPalette(from: cgImage, imageSource: bookTitle)
+            print("✅ OKLAB extraction completed")
             return palette
         }
         
@@ -62,7 +63,8 @@ struct ImprovedColorExtraction {
             print("📸 Saving ENHANCED image for \(bookTitle)")
             UIImageWriteToSavedPhotosAlbum(enhancedImage, nil, nil, nil)
             
-            if let enhancedPalette = try? await extractor.extractPalette(from: enhancedImage, imageSource: bookTitle) {
+            if let cgImage = enhancedImage.cgImage {
+                let enhancedPalette = await extractor.extractPalette(from: cgImage, imageSource: bookTitle)
                 print("✅ Enhanced image extraction succeeded")
                 return enhancedPalette
             }

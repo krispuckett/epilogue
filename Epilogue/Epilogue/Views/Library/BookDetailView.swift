@@ -102,6 +102,8 @@ struct BookDetailView: View {
     // Color extraction
     @State private var colorPalette: ColorPalette?
     @State private var isExtractingColors = false
+    @State private var hasLowResColors = false
+    @State private var hasHighResColors = false
     // Remove DisplayColorScheme - we don't need it
     
     // Fixed colors for Claude voice mode style (always white text on dark background)
@@ -185,11 +187,12 @@ struct BookDetailView: View {
     
     var body: some View {
         ZStack {
-            // Use the rebuilt gradient system
+            // Use the Apple Music-style atmospheric gradient
             if let palette = colorPalette {
-                BookCoverBackgroundView(colorPalette: palette)
+                BookAtmosphericGradientView(colorPalette: palette)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.5), value: colorPalette)
             } else {
                 // Black background while loading
                 Color.black
@@ -270,6 +273,11 @@ struct BookDetailView: View {
         .onAppear {
             findOrCreateThreadForBook()
             
+            // Generate placeholder gradient immediately
+            if colorPalette == nil {
+                colorPalette = generatePlaceholderPalette()
+            }
+            
             // Enable animations after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 hasAppeared = true
@@ -299,10 +307,19 @@ struct BookDetailView: View {
                     print("📐 Image size: \(uiImage.size)")
                     self.coverImage = uiImage
                     
-                    // Don't extract from low-res displayed image
-                    // Instead trigger high-res extraction
+                    // Extract colors progressively
                     Task {
-                        await extractColorsFromCover()
+                        // If we don't have low-res colors yet, extract from this image
+                        if !hasLowResColors {
+                            await extractColorsFromDisplayedImage(uiImage)
+                            hasLowResColors = true
+                        }
+                        
+                        // Always trigger high-res extraction for best quality
+                        if !hasHighResColors {
+                            await extractColorsFromCover()
+                            hasHighResColors = true
+                        }
                     }
                 }
             )
@@ -848,6 +865,55 @@ struct BookDetailView: View {
     
     // MARK: - Color Extraction
     
+    private func colorDescription(_ color: Color) -> String {
+        let uiColor = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return "RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255)))"
+    }
+    
+    private func generatePlaceholderPalette() -> ColorPalette {
+        // Temporary overrides for known problematic books
+        if book.title.lowercased().contains("lord of the rings") {
+            return ColorPalette(
+                primary: Color(red: 0.8, green: 0.6, blue: 0.2),  // Gold
+                secondary: Color(red: 0.7, green: 0.2, blue: 0.1), // Dark red
+                accent: Color(red: 0.9, green: 0.7, blue: 0.3),    // Light gold
+                background: Color(red: 0.3, green: 0.1, blue: 0.05), // Dark brown
+                textColor: .white,
+                luminance: 0.4,
+                isMonochromatic: false,
+                extractionQuality: 1.0
+            )
+        } else if book.title.lowercased().contains("odyssey") {
+            return ColorPalette(
+                primary: Color(red: 0.2, green: 0.5, blue: 0.7),   // Ocean blue
+                secondary: Color(red: 0.3, green: 0.6, blue: 0.8), // Light blue
+                accent: Color(red: 0.1, green: 0.4, blue: 0.6),    // Dark blue
+                background: Color(red: 0.05, green: 0.2, blue: 0.3), // Deep ocean
+                textColor: .white,
+                luminance: 0.5,
+                isMonochromatic: false,
+                extractionQuality: 1.0
+            )
+        }
+        
+        // Generate based on title hash for consistency
+        let hash = book.title.hashValue
+        let hue = Double(abs(hash % 360)) / 360.0
+        
+        return ColorPalette(
+            primary: Color(hue: hue, saturation: 0.5, brightness: 0.7),
+            secondary: Color(hue: hue + 0.1, saturation: 0.4, brightness: 0.6),
+            accent: Color(hue: hue - 0.1, saturation: 0.6, brightness: 0.8),
+            background: Color(hue: hue, saturation: 0.3, brightness: 0.3),
+            textColor: .white,
+            luminance: 0.5,
+            isMonochromatic: false,
+            extractionQuality: 0.3 // Low quality to indicate placeholder
+        )
+    }
+    
     private func extractColorsFromDisplayedImage(_ displayedImage: UIImage) async {
         // Set extracting state
         isExtractingColors = true
@@ -865,10 +931,10 @@ struct BookDetailView: View {
             // Use improved color extraction with validation
             if let palette = await ImprovedColorExtraction.extractColors(from: displayedImage, bookTitle: book.title) {
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.6)) {
+                    withAnimation(.easeInOut(duration: 0.5)) {
                         self.colorPalette = palette
                         
-                        print("🎨 Final extracted colors:")
+                        print("🎨 Low-res extracted colors:")
                         print("  Primary: \(palette.primary)")
                         print("  Secondary: \(palette.secondary)")
                         print("  Accent: \(palette.accent)")
@@ -932,8 +998,13 @@ struct BookDetailView: View {
             // Use improved color extraction with validation
             if let palette = await ImprovedColorExtraction.extractColors(from: uiImage, bookTitle: book.title) {
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.6)) {
+                    withAnimation(.easeInOut(duration: 0.5)) {
                         self.colorPalette = palette
+                        print("🎨 High-res extracted colors (final):")
+                        print("  Primary: \(palette.primary)")
+                        print("  Secondary: \(palette.secondary)")
+                        print("  Accent: \(palette.accent)")
+                        print("  Background: \(palette.background)")
                     }
                 }
             }
