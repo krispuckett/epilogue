@@ -53,10 +53,16 @@ struct UnifiedChatView: View {
             // Chat UI overlay
             VStack(spacing: 0) {
                 // Book context indicator (like Perplexity's model selector)
-                bookContextPill
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                BookContextPill(
+                    book: currentBookContext,
+                    onTap: {
+                        showingCommandPalette = true
+                        messageText = "/"
+                    }
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
                 
                 // Messages area
                 ScrollViewReader { proxy in
@@ -158,75 +164,6 @@ struct UnifiedChatView: View {
         }
     }
     
-    // MARK: - Book Context Pill
-    
-    private var bookContextPill: some View {
-        HStack(spacing: 12) {
-            if let book = currentBookContext {
-                // Book context active
-                HStack(spacing: 8) {
-                    // Mini book cover
-                    if let coverURL = book.coverImageURL {
-                        SharedBookCoverView(
-                            coverURL: coverURL,
-                            width: 24,
-                            height: 36
-                        )
-                        .cornerRadius(3)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(book.title)
-                            .font(.system(size: 14, weight: .medium))
-                            .lineLimit(1)
-                        
-                        Text(book.author)
-                            .font(.system(size: 11))
-                            .opacity(0.7)
-                            .lineLimit(1)
-                    }
-                    
-                    Spacer()
-                    
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            currentBookContext = nil
-                        }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: 350)
-                .glassEffect(.regular) // Using .regular as specified
-                .clipShape(Capsule())
-            } else {
-                // No book context - show selector
-                Button {
-                    showingCommandPalette = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "books.vertical")
-                            .font(.system(size: 14))
-                        
-                        Text("Select a book")
-                            .font(.system(size: 14, weight: .medium))
-                        
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect(.regular)
-                    .clipShape(Capsule())
-                }
-            }
-        }
-    }
     
     // MARK: - Empty State
     
