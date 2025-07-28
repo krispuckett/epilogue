@@ -99,6 +99,14 @@ struct BookDetailView: View {
     @State private var coverImage: UIImage? = nil
     @State private var hasAppeared = false
     
+    // Dynamic gradient opacity based on scroll
+    private var gradientOpacity: Double {
+        // Gradient fades from 100% to 20% over 200pt of scroll
+        let fadeDistance: CGFloat = 200
+        let opacity = 1.0 - (Double(max(0, -scrollOffset)) / Double(fadeDistance))
+        return max(0.2, min(1.0, opacity))
+    }
+    
     // Color extraction
     @State private var colorPalette: ColorPalette?
     @State private var isExtractingColors = false
@@ -187,10 +195,12 @@ struct BookDetailView: View {
     
     var body: some View {
         ZStack {
-            // Use the Apple Music-style atmospheric gradient
+            // Use the Apple Music-style atmospheric gradient with dynamic opacity
             BookAtmosphericGradientView(colorPalette: colorPalette ?? generatePlaceholderPalette())
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
+                .opacity(gradientOpacity) // Fades on scroll
+                .animation(.easeOut(duration: 0.2), value: gradientOpacity)
                 .id(book.id) // Force view recreation when book changes
             
             // Content - always visible but colors update
