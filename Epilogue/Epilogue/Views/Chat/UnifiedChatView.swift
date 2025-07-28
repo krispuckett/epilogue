@@ -12,6 +12,11 @@ struct UnifiedChatView: View {
     @State private var colorPalette: ColorPalette?
     @State private var coverImage: UIImage?
     
+    // Input state
+    @State private var messageText = ""
+    @State private var showingCommandPalette = false
+    @FocusState private var isInputFocused: Bool
+    
     var body: some View {
         ZStack {
             // REUSE THE EXACT SAME GRADIENT SYSTEM FROM BookDetailView
@@ -20,7 +25,7 @@ struct UnifiedChatView: View {
                 BookAtmosphericGradientView(colorPalette: colorPalette ?? generatePlaceholderPalette(for: book))
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-                    .id(book.id) // Force view recreation when book changes
+                    .id(book.localId) // Force view recreation when book changes
             } else {
                 // Use existing ambient gradient for empty state
                 AmbientChatGradientView()
@@ -59,8 +64,16 @@ struct UnifiedChatView: View {
                 
                 Spacer()
                 
-                // Input area placeholder
-                inputAreaPlaceholder
+                // Chat input bar
+                UnifiedChatInputBar(
+                    messageText: $messageText,
+                    showingCommandPalette: $showingCommandPalette,
+                    isInputFocused: $isInputFocused,
+                    currentBook: currentBookContext,
+                    onSend: sendMessage
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
         }
         .onChange(of: currentBookContext) { oldBook, newBook in
@@ -73,6 +86,13 @@ struct UnifiedChatView: View {
                 colorPalette = nil
                 coverImage = nil
             }
+        }
+        .sheet(isPresented: $showingCommandPalette) {
+            CommandPaletteView(
+                isPresented: $showingCommandPalette,
+                selectedBook: $currentBookContext
+            )
+            .environmentObject(libraryViewModel)
         }
     }
     
@@ -124,7 +144,7 @@ struct UnifiedChatView: View {
             } else {
                 // No book context - show selector
                 Button {
-                    // TODO: Show book picker
+                    showingCommandPalette = true
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "books.vertical")
@@ -154,7 +174,7 @@ struct UnifiedChatView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.white.opacity(0.3))
             
-            Text(currentBookContext != nil ? "Start a conversation about \(currentBookContext!.title)" : "Start a new conversation")
+            Text(currentBookContext != nil ? "Start a conversation about \(currentBookContext?.title ?? "")" : "Start a new conversation")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
@@ -169,27 +189,40 @@ struct UnifiedChatView: View {
         .padding(.horizontal, 40)
     }
     
-    // MARK: - Input Area Placeholder
+    // MARK: - Message Handling
     
-    private var inputAreaPlaceholder: some View {
-        HStack {
-            Text("Message placeholder...")
-                .foregroundStyle(.white.opacity(0.4))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .glassEffect(.regular)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+    private func sendMessage() {
+        guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        // Create user message
+        let userMessage = UnifiedChatMessage(
+            content: messageText,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        
+        // Add to messages
+        messages.append(userMessage)
+        
+        // Clear input
+        messageText = ""
+        
+        // Scroll to bottom
+        if let lastMessage = messages.last {
+            withAnimation {
+                scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        
+        // TODO: Send to AI service and get response
     }
     
     // MARK: - Color Extraction (Reused from BookDetailView)
     
     private func extractColorsForBook(_ book: Book) async {
         // Check cache first
-        let bookID = book.id ?? book.title
+        let bookID = book.localId.uuidString
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
@@ -285,7 +318,7 @@ struct MessageBubbleView: View {
                 
                 // Book context indicator if different from current
                 if let messageBook = message.bookContext,
-                   messageBook.id != book?.id {
+                   messageBook.localId != book?.localId {
                     HStack(spacing: 4) {
                         Image(systemName: "book.closed")
                             .font(.system(size: 10))
