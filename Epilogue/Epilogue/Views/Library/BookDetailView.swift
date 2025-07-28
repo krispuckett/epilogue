@@ -188,16 +188,10 @@ struct BookDetailView: View {
     var body: some View {
         ZStack {
             // Use the Apple Music-style atmospheric gradient
-            if let palette = colorPalette {
-                BookAtmosphericGradientView(colorPalette: palette)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .animation(.easeInOut(duration: 0.5), value: colorPalette)
-            } else {
-                // Black background while loading
-                Color.black
-                    .ignoresSafeArea()
-            }
+            BookAtmosphericGradientView(colorPalette: colorPalette ?? generatePlaceholderPalette())
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .id(book.id) // Force view recreation when book changes
             
             // Content - always visible but colors update
             ScrollView {
@@ -211,8 +205,6 @@ struct BookDetailView: View {
                         summarySection(description: description)
                             .padding(.horizontal, 24)
                             .padding(.top, 32)
-                            .opacity(colorPalette != nil ? 1 : 0)  // Hide while loading
-                            .animation(.easeIn(duration: 0.3), value: colorPalette != nil)
                     }
                     
                     // Progress section
@@ -220,8 +212,6 @@ struct BookDetailView: View {
                         progressSection
                             .padding(.horizontal, 24)
                             .padding(.top, 24)
-                            .opacity(colorPalette != nil ? 1 : 0)
-                            .animation(.easeIn(duration: 0.3), value: colorPalette != nil)
                     }
                     
                     // Content sections
@@ -241,8 +231,6 @@ struct BookDetailView: View {
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 scrollOffset = value
             }
-            .opacity(colorPalette != nil ? 1.0 : 0.7)
-            .animation(.easeInOut(duration: 0.3), value: colorPalette != nil)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -279,10 +267,7 @@ struct BookDetailView: View {
                 print("🧹 CLEARED COLOR CACHE - FORCING FRESH EXTRACTION")
             }
             
-            // Generate placeholder gradient immediately
-            if colorPalette == nil {
-                colorPalette = generatePlaceholderPalette()
-            }
+            // Placeholder is now generated inline in the gradient view
             
             // Enable animations after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -292,11 +277,6 @@ struct BookDetailView: View {
         .onChange(of: coverImage) { _ in
             // Don't reset color palette when cover changes
             // The color extraction will handle updates automatically
-        }
-        .onChange(of: colorPalette) { palette in
-            if palette != nil {
-                HapticManager.shared.lightTap()
-            }
         }
     }
     
