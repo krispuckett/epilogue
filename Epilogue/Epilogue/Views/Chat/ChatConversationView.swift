@@ -4,6 +4,8 @@ import Combine
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
+// DEPRECATED: This view is replaced by UnifiedChatView
+// Keeping temporarily for reference during migration
 struct ChatConversationView: View {
     let thread: ChatThread
     @Environment(\.modelContext) private var modelContext

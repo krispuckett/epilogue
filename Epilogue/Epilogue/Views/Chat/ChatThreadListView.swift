@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 
+// DEPRECATED: This view is replaced by UnifiedChatView
+// Keeping temporarily for reference during migration
 struct ChatThreadListView: View {
     @Query(filter: #Predicate<ChatThread> { thread in
         thread.isArchived == false
