@@ -51,15 +51,6 @@ struct ChatCommandPalette: View {
             }
         }
         
-        var shortcut: String {
-            switch self {
-            case .switchBook: return "⌘B"
-            case .clearContext: return "⌘⇧X"
-            case .summarize: return "⌘S"
-            case .export: return "⌘E"
-            case .search: return "⌘F"
-            }
-        }
     }
     
     private var filteredCommands: [ChatCommand] {
@@ -84,15 +75,15 @@ struct ChatCommandPalette: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Search field
-            HStack(spacing: 12) {
-                Image(systemName: "command")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+            // Search field with iOS-native styling
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
                 
-                TextField("Type a command or book name...", text: $searchText)
+                TextField("Search commands or books", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16))
+                    .font(.system(size: 15))
                     .foregroundStyle(.white)
                     .focused($isFocused)
                     .onSubmit {
@@ -104,15 +95,16 @@ struct ChatCommandPalette: View {
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white.opacity(0.3))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .glassEffect(.regular, in: .rect(cornerRadius: 0))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             
             Divider()
                 .foregroundStyle(.white.opacity(0.1))
@@ -154,15 +146,16 @@ struct ChatCommandPalette: View {
                 }
                 .padding(.vertical, 8)
             }
-            .frame(maxHeight: 400)
+            .frame(maxHeight: 320)
         }
-        .frame(maxWidth: 500)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .padding(.top, 8)
+        .frame(maxWidth: 420)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         }
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+        .shadow(color: .black.opacity(0.25), radius: 16, y: 8)
         .scaleEffect(isAnimatingIn ? 1 : 0.95)
         .opacity(isAnimatingIn ? 1 : 0)
         .onAppear {
@@ -201,10 +194,15 @@ struct ChatCommandPalette: View {
     
     private func commandRow(command: ChatCommand, isSelected: Bool) -> some View {
         HStack(spacing: 12) {
+            // Icon with circular background like Menu style
             Image(systemName: command.icon)
-                .font(.system(size: 18))
-                .foregroundStyle(isSelected ? .white : .white.opacity(0.7))
-                .frame(width: 24)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(isSelected ? .white : .white.opacity(0.8))
+                .frame(width: 28, height: 28)
+                .background(
+                    Circle()
+                        .fill(.white.opacity(isSelected ? 0.15 : 0.1))
+                )
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(command.title)
@@ -212,30 +210,27 @@ struct ChatCommandPalette: View {
                     .foregroundStyle(isSelected ? .white : .white.opacity(0.9))
                 
                 Text(command.subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .white.opacity(0.6))
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? .white.opacity(0.7) : .white.opacity(0.5))
             }
             
             Spacer()
             
-            Text(command.shortcut)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(isSelected ? .white.opacity(0.8) : .white.opacity(0.4))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(.white.opacity(isSelected ? 0.3 : 0.2), lineWidth: 0.5)
-                }
+            // Selection checkmark like native iOS menus
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .contentShape(Rectangle())
         .background {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.white.opacity(0.1))
-                    .padding(.horizontal, 8)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.white.opacity(0.08))
+                    .padding(.horizontal, 12)
             }
         }
     }
@@ -245,28 +240,29 @@ struct ChatCommandPalette: View {
     private func bookRow(book: Book, isSelected: Bool) -> some View {
         HStack(spacing: 12) {
             if let coverURL = book.coverImageURL {
-                SharedBookCoverView(coverURL: coverURL, width: 32, height: 48)
-                    .cornerRadius(4)
+                SharedBookCoverView(coverURL: coverURL, width: 30, height: 44)
+                    .cornerRadius(3)
+                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
             } else {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.1))
-                    .frame(width: 32, height: 48)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(.white.opacity(0.08))
+                    .frame(width: 30, height: 44)
                     .overlay {
                         Image(systemName: "book.closed")
-                            .font(.system(size: 14))
+                            .font(.system(size: 12))
                             .foregroundStyle(.white.opacity(0.4))
                     }
             }
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(book.title)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(isSelected ? .white : .white.opacity(0.9))
                     .lineLimit(1)
                 
                 Text(book.author)
-                    .font(.system(size: 13))
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .white.opacity(0.6))
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? .white.opacity(0.7) : .white.opacity(0.5))
                     .lineLimit(1)
             }
             
@@ -274,18 +270,18 @@ struct ChatCommandPalette: View {
             
             if book.localId == selectedBook?.localId {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.green)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .background {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.white.opacity(0.1))
-                    .padding(.horizontal, 8)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.white.opacity(0.08))
+                    .padding(.horizontal, 12)
             }
         }
     }
