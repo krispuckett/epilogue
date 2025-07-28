@@ -8,11 +8,14 @@ struct BookContextPill: View {
     @State private var isAnimatingIn = false
     @Environment(\.colorScheme) var colorScheme
     
-    // Reading progress from book model
+    // Reading progress calculated from book model
     private var readingProgress: Double? {
-        // Return actual reading progress if available
-        if let book = book, book.readingProgress > 0 {
-            return book.readingProgress
+        // Calculate reading progress from currentPage and pageCount
+        if let book = book, 
+           let pageCount = book.pageCount, 
+           pageCount > 0,
+           book.currentPage > 0 {
+            return Double(book.currentPage) / Double(pageCount)
         }
         return nil
     }
