@@ -49,7 +49,7 @@ struct UnifiedChatView: View {
                                     .padding(.top, 100)
                             } else {
                                 ForEach(messages) { message in
-                                    MessageBubbleView(message: message, book: currentBookContext)
+                                    ChatMessageView(message: message, currentBookContext: currentBookContext)
                                         .id(message.id)
                                 }
                             }
@@ -283,60 +283,6 @@ struct UnifiedChatMessage: Identifiable {
     let bookContext: Book?
 }
 
-// MARK: - Message Bubble View
-
-struct MessageBubbleView: View {
-    let message: UnifiedChatMessage
-    let book: Book?
-    
-    var body: some View {
-        HStack {
-            if message.isUser {
-                Spacer()
-            }
-            
-            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        Group {
-                            if message.isUser {
-                                // User messages with glass effect
-                                RoundedRectangle(cornerRadius: 18)
-                                    .fill(.clear)
-                                    .glassEffect(.regular)
-                            } else {
-                                // AI messages with subtle background
-                                RoundedRectangle(cornerRadius: 18)
-                                    .fill(.white.opacity(0.1))
-                            }
-                        }
-                    )
-                
-                // Book context indicator if different from current
-                if let messageBook = message.bookContext,
-                   messageBook.localId != book?.localId {
-                    HStack(spacing: 4) {
-                        Image(systemName: "book.closed")
-                            .font(.system(size: 10))
-                        Text(messageBook.title)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(.white.opacity(0.5))
-                }
-            }
-            .frame(maxWidth: 280, alignment: message.isUser ? .trailing : .leading)
-            
-            if !message.isUser {
-                Spacer()
-            }
-        }
-    }
-}
 
 // MARK: - Ambient Chat Gradient (Fallback)
 
