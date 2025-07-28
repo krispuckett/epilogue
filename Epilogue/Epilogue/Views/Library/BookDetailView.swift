@@ -324,6 +324,9 @@ struct BookDetailView: View {
                 }
             )
             .accessibilityLabel("Book cover for \(book.title)")
+            #if DEBUG
+            .colorExtractionDebug(book: book, coverImage: coverImage)
+            #endif
             .rotation3DEffect(
                 Angle(degrees: 5),
                 axis: (x: 0, y: 1, z: 0),
@@ -915,6 +918,17 @@ struct BookDetailView: View {
     }
     
     private func extractColorsFromDisplayedImage(_ displayedImage: UIImage) async {
+        // Check cache first
+        let bookID = book.id ?? book.isbn ?? book.title
+        if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.colorPalette = cachedPalette
+                }
+            }
+            return
+        }
+        
         // Set extracting state
         isExtractingColors = true
         
@@ -941,6 +955,9 @@ struct BookDetailView: View {
                         print("  Background: \(palette.background)")
                     }
                 }
+                
+                // Cache the result
+                await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
             } else {
                 print("❌ Color extraction returned nil")
             }
@@ -952,6 +969,17 @@ struct BookDetailView: View {
     }
     
     private func extractColorsFromCover() async {
+        // Check cache first
+        let bookID = book.id ?? book.isbn ?? book.title
+        if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.colorPalette = cachedPalette
+                }
+            }
+            return
+        }
+        
         // Set extracting state
         isExtractingColors = true
         
@@ -1007,6 +1035,9 @@ struct BookDetailView: View {
                         print("  Background: \(palette.background)")
                     }
                 }
+                
+                // Cache the result outside of MainActor.run
+                await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
             }
             
             // Debug print moved inside MainActor block above

@@ -336,8 +336,8 @@ public class OKLABColorExtractor {
             selectedColors.append(selectedColors.last ?? UIColor.black)
         }
         
-        // Assign roles based on characteristics
-        let roles = assignColorRoles(selectedColors, isDarkCover: isDarkCover)
+        // Assign roles based on the sorted order (frequency)
+        let roles = assignColorRolesDirectly(filteredPeaks, isDarkCover: isDarkCover)
         
         print("\n✅ Final ColorCube Palette:")
         print("  Primary: \(colorDescription(roles.primary))")
@@ -579,34 +579,49 @@ public class OKLABColorExtractor {
         }
     }
     
-    // Assign roles based on color characteristics
-    private func assignColorRoles(_ colors: [UIColor], isDarkCover: Bool) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
-        // For dark covers, prioritize bright/saturated colors
-        let sortedColors = colors.sorted { color1, color2 in
-            var h1: CGFloat = 0, s1: CGFloat = 0, b1: CGFloat = 0
-            var h2: CGFloat = 0, s2: CGFloat = 0, b2: CGFloat = 0
-            color1.getHue(&h1, saturation: &s1, brightness: &b1, alpha: nil)
-            color2.getHue(&h2, saturation: &s2, brightness: &b2, alpha: nil)
-            
-            if isDarkCover {
-                // On dark covers, bright saturated colors are most important
-                let score1 = s1 * b1
-                let score2 = s2 * b2
-                return score1 > score2
-            } else {
-                // On normal covers, balance saturation and frequency
-                return s1 > s2
+    // Assign roles based on the already-sorted peaks (by frequency)
+    private func assignColorRolesDirectly(_ sortedPeaks: [(color: UIColor, count: Int, distinctiveness: Double)], isDarkCover: Bool) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
+        
+        if isDarkCover {
+            // For dark covers, prefer bright/saturated colors for primary
+            let brightPeaks = sortedPeaks.filter { peak in
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                return b > 0.5 || s > 0.6  // Bright or saturated
             }
+            
+            let primary = brightPeaks.first?.color ?? sortedPeaks[safe: 0]?.color ?? UIColor.orange
+            let secondary = sortedPeaks[safe: 1]?.color ?? primary
+            let accent = sortedPeaks[safe: 2]?.color ?? secondary
+            let background = sortedPeaks.last?.color ?? UIColor.black
+            
+            print("🎯 Dark Cover Role Assignment:")
+            print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
+            print("  Bright peaks: \(brightPeaks.prefix(3).map { colorDescription($0.color) })")
+            print("  Assigned roles:")
+            print("    Primary: \(colorDescription(primary))")
+            print("    Secondary: \(colorDescription(secondary))")
+            print("    Accent: \(colorDescription(accent))")
+            print("    Background: \(colorDescription(background))")
+            
+            return (primary, secondary, accent, background)
+        } else {
+            // For normal covers, just use frequency order directly
+            let primary = sortedPeaks[safe: 0]?.color ?? UIColor.orange
+            let secondary = sortedPeaks[safe: 1]?.color ?? primary
+            let accent = sortedPeaks[safe: 2]?.color ?? secondary
+            let background = sortedPeaks.last?.color ?? primary
+            
+            print("🎯 Normal Cover Role Assignment (Pure Frequency):")
+            print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
+            print("  Assigned roles:")
+            print("    Primary: \(colorDescription(primary))")
+            print("    Secondary: \(colorDescription(secondary))")
+            print("    Accent: \(colorDescription(accent))")
+            print("    Background: \(colorDescription(background))")
+            
+            return (primary, secondary, accent, background)
         }
-        
-        let primary = sortedColors[0]
-        let secondary = sortedColors.count > 1 ? sortedColors[1] : primary
-        let accent = sortedColors.count > 2 ? sortedColors[2] : secondary
-        
-        // Background is darkest color
-        let background = colors.min { luminance(of: $0) < luminance(of: $1) } ?? UIColor.black
-        
-        return (primary, secondary, accent, background)
     }
     
     
@@ -701,3 +716,4 @@ extension OKLABColorExtractor {
         }
     }
 }
+
