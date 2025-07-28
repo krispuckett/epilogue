@@ -273,6 +273,12 @@ struct BookDetailView: View {
         .onAppear {
             findOrCreateThreadForBook()
             
+            // TEMPORARY: Clear cache to test new color extraction
+            Task {
+                await BookColorPaletteCache.shared.clearCache()
+                print("🧹 CLEARED COLOR CACHE - FORCING FRESH EXTRACTION")
+            }
+            
             // Generate placeholder gradient immediately
             if colorPalette == nil {
                 colorPalette = generatePlaceholderPalette()

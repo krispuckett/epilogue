@@ -121,6 +121,7 @@ public class OKLABColorExtractor {
         let bytesPerRow = cgImage.bytesPerRow
         
         print("\n🎨 ColorCube Extraction for \(imageSource)")
+        print("  🚀 FRESH EXTRACTION STARTING (not from cache)")
         print("  Processing size: \(width)x\(height) = \(width * height) pixels")
         if originalSize.width > CGFloat(width) {
             print("  Original size: \(Int(originalSize.width))x\(Int(originalSize.height))")
