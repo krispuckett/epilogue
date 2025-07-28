@@ -966,26 +966,23 @@ class LibraryViewModel: ObservableObject {
             if let url = books[index].coverImageURL {
                 var updatedURL = url
                 
-                // Replace zoom=1 with zoom=3
-                if updatedURL.contains("zoom=1") {
-                    updatedURL = updatedURL.replacingOccurrences(of: "zoom=1", with: "zoom=3")
+                // REMOVE all zoom parameters to get full covers
+                if updatedURL.contains("zoom=") {
+                    // Remove any existing zoom parameter
+                    if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+                        let range = NSRange(location: 0, length: updatedURL.utf16.count)
+                        updatedURL = regex.stringByReplacingMatches(in: updatedURL, options: [], range: range, withTemplate: "")
+                    }
+                    
+                    // Also remove zoom at start of query string
+                    updatedURL = updatedURL.replacingOccurrences(of: "?zoom=1&", with: "?")
+                    updatedURL = updatedURL.replacingOccurrences(of: "?zoom=2&", with: "?")
+                    updatedURL = updatedURL.replacingOccurrences(of: "?zoom=3&", with: "?")
+                    updatedURL = updatedURL.replacingOccurrences(of: "?zoom=4&", with: "?")
+                    updatedURL = updatedURL.replacingOccurrences(of: "?zoom=5&", with: "?")
+                    
                     hasUpdates = true
-                    print("📚 Updated book cover URL for '\(books[index].title)': zoom=1 → zoom=3")
-                }
-                
-                // Replace zoom=2 with zoom=3
-                if updatedURL.contains("zoom=2") {
-                    updatedURL = updatedURL.replacingOccurrences(of: "zoom=2", with: "zoom=3")
-                    hasUpdates = true
-                    print("📚 Updated book cover URL for '\(books[index].title)': zoom=2 → zoom=3")
-                }
-                
-                // Add zoom=3 if no zoom parameter exists (for Google Books URLs)
-                if updatedURL.contains("books.google.com") && 
-                   !updatedURL.contains("zoom=") {
-                    updatedURL += updatedURL.contains("?") ? "&zoom=3" : "?zoom=3"
-                    hasUpdates = true
-                    print("📚 Added zoom=3 to book cover URL for '\(books[index].title)'")
+                    print("📚 Removed zoom parameter from '\(books[index].title)' for full cover")
                 }
                 
                 // Remove edge=curl if present

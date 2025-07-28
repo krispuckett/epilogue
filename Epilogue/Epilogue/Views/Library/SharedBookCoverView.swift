@@ -14,6 +14,27 @@ class DisplayedImageStore {
     func getImage(for url: String) -> UIImage? {
         return displayedImages[url]
     }
+    
+    // Clear all caches
+    static func clearAllCaches() {
+        print("🧹 Clearing all image caches...")
+        shared.displayedImages.removeAll()
+        URLCache.shared.removeAllCachedResponses()
+        
+        // Also clear AsyncImage cache
+        URLSession.shared.configuration.urlCache?.removeAllCachedResponses()
+        
+        print("✅ All image caches cleared")
+    }
+    
+    // Debug method to list all cached URLs
+    func debugPrintCache() {
+        print("📋 Cached images:")
+        for (url, image) in displayedImages {
+            print("  - URL: \(url)")
+            print("    Size: \(image.size)")
+        }
+    }
 }
 
 struct SharedBookCoverView: View {
@@ -40,18 +61,30 @@ struct SharedBookCoverView: View {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         let enhanced = coverURL
             .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "zoom=3", with: "zoom=1")
-            .replacingOccurrences(of: "zoom=2", with: "zoom=1")
+            .replacingOccurrences(of: "&zoom=3", with: "")
+            .replacingOccurrences(of: "&zoom=2", with: "")
+            .replacingOccurrences(of: "&zoom=1", with: "")
+            .replacingOccurrences(of: "?zoom=3", with: "?")
+            .replacingOccurrences(of: "?zoom=2", with: "?")
+            .replacingOccurrences(of: "?zoom=1", with: "?")
         return URL(string: enhanced)
     }
     
-    // High resolution URL for quality
+    // High resolution URL for quality - REMOVED zoom to get full cover
     private var highResURL: URL? {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         let enhanced = coverURL
             .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "zoom=1", with: "zoom=3")
-            .replacingOccurrences(of: "zoom=2", with: "zoom=3")
+            .replacingOccurrences(of: "&zoom=5", with: "")
+            .replacingOccurrences(of: "&zoom=4", with: "")
+            .replacingOccurrences(of: "&zoom=3", with: "")
+            .replacingOccurrences(of: "&zoom=2", with: "")
+            .replacingOccurrences(of: "&zoom=1", with: "")
+            .replacingOccurrences(of: "zoom=5", with: "")
+            .replacingOccurrences(of: "zoom=4", with: "")
+            .replacingOccurrences(of: "zoom=3", with: "")
+            .replacingOccurrences(of: "zoom=2", with: "")
+            .replacingOccurrences(of: "zoom=1", with: "")
         return URL(string: enhanced)
     }
     
@@ -87,6 +120,27 @@ struct SharedBookCoverView: View {
             // Lightweight placeholder
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
+                .onAppear {
+                    // Check for cached image immediately with enhanced URL
+                    let enhancedURL = coverURL?
+                        .replacingOccurrences(of: "http://", with: "https://")
+                        .replacingOccurrences(of: "&zoom=5", with: "")
+                        .replacingOccurrences(of: "&zoom=4", with: "")
+                        .replacingOccurrences(of: "&zoom=3", with: "")
+                        .replacingOccurrences(of: "&zoom=2", with: "")
+                        .replacingOccurrences(of: "&zoom=1", with: "")
+                        .replacingOccurrences(of: "zoom=5", with: "")
+                        .replacingOccurrences(of: "zoom=4", with: "")
+                        .replacingOccurrences(of: "zoom=3", with: "")
+                        .replacingOccurrences(of: "zoom=2", with: "")
+                        .replacingOccurrences(of: "zoom=1", with: "") ?? ""
+                    
+                    if let cachedImage = DisplayedImageStore.shared.getImage(for: enhancedURL) {
+                        print("📦 Found cached image on appear for: \(enhancedURL)")
+                        print("📐 Cached image size: \(cachedImage.size)")
+                        onImageLoaded?(cachedImage)
+                    }
+                }
             
             // Load low-res first for fast display
             if !lowResLoaded, let lowUrl = lowResURL {
@@ -133,9 +187,21 @@ struct SharedBookCoverView: View {
                                         print("   URL: \(url.absoluteString)")
                                         print("   Size: \(uiImage.size)")
                                         
-                                        // Store the image
+                                        // Store the image with enhanced URL for consistency
                                         displayedImage = uiImage
-                                        DisplayedImageStore.shared.store(image: uiImage, for: coverURL ?? "")
+                                        let enhancedURL = coverURL?
+                                            .replacingOccurrences(of: "http://", with: "https://")
+                                            .replacingOccurrences(of: "&zoom=5", with: "")
+                                            .replacingOccurrences(of: "&zoom=4", with: "")
+                                            .replacingOccurrences(of: "&zoom=3", with: "")
+                                            .replacingOccurrences(of: "&zoom=2", with: "")
+                                            .replacingOccurrences(of: "&zoom=1", with: "")
+                                            .replacingOccurrences(of: "zoom=5", with: "")
+                                            .replacingOccurrences(of: "zoom=4", with: "")
+                                            .replacingOccurrences(of: "zoom=3", with: "")
+                                            .replacingOccurrences(of: "zoom=2", with: "")
+                                            .replacingOccurrences(of: "zoom=1", with: "") ?? ""
+                                        DisplayedImageStore.shared.store(image: uiImage, for: enhancedURL)
                                         
                                         // Save for debugging
                                         let bookName = coverURL?.components(separatedBy: "/").last ?? "unknown"

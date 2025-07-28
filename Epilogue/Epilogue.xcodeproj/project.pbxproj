@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		015807FE2E3601C0006DC492 /* UIImageColors in Frameworks */ = {isa = PBXBuildFile; productRef = 015807FD2E3601C0006DC492 /* UIImageColors */; };
 		015D13B02E3353A7002633FE /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13AF2E3353A7002633FE /* WhisperKit */; };
 		015D13B22E3353A7002633FE /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13B12E3353A7002633FE /* whisperkit-cli */; };
 /* End PBXBuildFile section */
@@ -70,6 +71,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				015807FE2E3601C0006DC492 /* UIImageColors in Frameworks */,
 				015D13B02E3353A7002633FE /* WhisperKit in Frameworks */,
 				015D13B22E3353A7002633FE /* whisperkit-cli in Frameworks */,
 			);
@@ -134,6 +136,7 @@
 			packageProductDependencies = (
 				015D13AF2E3353A7002633FE /* WhisperKit */,
 				015D13B12E3353A7002633FE /* whisperkit-cli */,
+				015807FD2E3601C0006DC492 /* UIImageColors */,
 			);
 			productName = Epilogue;
 			productReference = 015D10F22E318D5D002633FE /* Epilogue.app */;
@@ -219,6 +222,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */,
+				015807FC2E3601C0006DC492 /* XCRemoteSwiftPackageReference "UIImageColors" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 015D10F32E318D5D002633FE /* Products */;
@@ -610,6 +614,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		015807FC2E3601C0006DC492 /* XCRemoteSwiftPackageReference "UIImageColors" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jathu/UIImageColors";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.2.0;
+			};
+		};
 		015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
@@ -621,6 +633,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		015807FD2E3601C0006DC492 /* UIImageColors */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 015807FC2E3601C0006DC492 /* XCRemoteSwiftPackageReference "UIImageColors" */;
+			productName = UIImageColors;
+		};
 		015D13AF2E3353A7002633FE /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 015D13AE2E33510A002633FE /* XCRemoteSwiftPackageReference "WhisperKit" */;

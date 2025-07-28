@@ -717,7 +717,16 @@ struct BookCentricBackground: View {
     private func extractBookColors(_ coverURL: String) async {
         let highQualityURL = coverURL
             .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "zoom=1", with: "zoom=3")
+            .replacingOccurrences(of: "&zoom=5", with: "")
+            .replacingOccurrences(of: "&zoom=4", with: "")
+            .replacingOccurrences(of: "&zoom=3", with: "")
+            .replacingOccurrences(of: "&zoom=2", with: "")
+            .replacingOccurrences(of: "&zoom=1", with: "")
+            .replacingOccurrences(of: "zoom=5", with: "")
+            .replacingOccurrences(of: "zoom=4", with: "")
+            .replacingOccurrences(of: "zoom=3", with: "")
+            .replacingOccurrences(of: "zoom=2", with: "")
+            .replacingOccurrences(of: "zoom=1", with: "")
         
         guard let url = URL(string: highQualityURL),
               let data = try? await URLSession.shared.data(from: url).0,

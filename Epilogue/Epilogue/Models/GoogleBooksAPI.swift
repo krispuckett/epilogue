@@ -39,26 +39,32 @@ struct GoogleBookItem: Codable, Identifiable {
     }
     
     private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
-        // Google Books image URLs support zoom parameter for higher resolution
-        // Default URLs often have zoom=1 or no zoom parameter
-        // We can request zoom=3 for highest quality (Apple Music quality)
+        // FIXED: Remove zoom parameter entirely to get full cover
+        // zoom=3 was causing cropped images showing only part of the cover
         
         var enhanced = urlString
         
         // IMPORTANT: Convert HTTP to HTTPS for App Transport Security
         enhanced = enhanced.replacingOccurrences(of: "http://", with: "https://")
         
-        // Remove existing zoom parameter if present
+        // Remove ALL zoom parameters if present
         if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
             let range = NSRange(location: 0, length: enhanced.utf16.count)
             enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
         }
         
-        // Add high quality zoom parameter and width
+        // Remove zoom parameter at start of query string too
+        enhanced = enhanced.replacingOccurrences(of: "?zoom=1&", with: "?")
+        enhanced = enhanced.replacingOccurrences(of: "?zoom=2&", with: "?")
+        enhanced = enhanced.replacingOccurrences(of: "?zoom=3&", with: "?")
+        enhanced = enhanced.replacingOccurrences(of: "?zoom=4&", with: "?")
+        enhanced = enhanced.replacingOccurrences(of: "?zoom=5&", with: "?")
+        
+        // Add width parameter only (NO ZOOM!)
         if enhanced.contains("?") {
-            enhanced += "&zoom=3&w=1080"
+            enhanced += "&w=1080&source=gbs_api"
         } else {
-            enhanced += "?zoom=3&w=1080"
+            enhanced += "?w=1080&source=gbs_api"
         }
         
         // Also remove edge curl parameter if present (makes covers look cleaner)

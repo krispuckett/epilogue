@@ -84,11 +84,11 @@ struct BookPickerRow: View {
             enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
         }
         
-        // Add high quality zoom parameter
+        // Add width parameter only (NO ZOOM)
         if enhanced.contains("?") {
-            enhanced += "&zoom=2"
+            enhanced += "&w=1080"
         } else {
-            enhanced += "?zoom=2"
+            enhanced += "?w=1080"
         }
         
         // Also remove edge curl parameter if present (makes covers look cleaner)

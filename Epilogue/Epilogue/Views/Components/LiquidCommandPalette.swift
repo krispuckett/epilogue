@@ -711,7 +711,7 @@ struct BookPreviewCard: View {
                 // Enhance the URL for better quality
                 let enhancedURL = coverURL
                     .replacingOccurrences(of: "http://", with: "https://")
-                    .appending(coverURL.contains("?") ? "&zoom=2" : "?zoom=2")
+                    .appending(coverURL.contains("?") ? "&w=1080" : "?w=1080")
                 
                 if let url = URL(string: enhancedURL) {
                     AsyncImage(url: url) { image in

@@ -30,6 +30,9 @@ struct EpilogueApp: App {
     
     @MainActor
     private func setupModelContainer() async {
+        // Clear image caches on app launch (temporary for debugging)
+        DisplayedImageStore.clearAllCaches()
+        
         let schema = Schema([
             ChatThread.self,
             ThreadedChatMessage.self,

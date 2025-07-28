@@ -3,6 +3,7 @@ import SwiftData
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import Photos
+import UIImageColors
 
 // MARK: - Models
 struct BookQuestion: Identifiable {
@@ -39,6 +40,30 @@ extension Color {
     static let midnightScholar = Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
     static let warmWhite = Color(red: 0.98, green: 0.97, blue: 0.96) // #FAF8F5
     static let warmAmber = Color(red: 1.0, green: 0.549, blue: 0.259) // #FF8C42
+    
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
 }
 
 // MARK: - Helper Extensions
@@ -77,7 +102,7 @@ struct BookDetailView: View {
     // Color extraction
     @State private var colorPalette: ColorPalette?
     @State private var isExtractingColors = false
-    @State private var displayScheme: DisplayColorScheme?
+    // Remove DisplayColorScheme - we don't need it
     
     // Fixed colors for Claude voice mode style (always white text on dark background)
     private var textColor: Color {
@@ -160,11 +185,16 @@ struct BookDetailView: View {
     
     var body: some View {
         ZStack {
-            // Dynamic background - MUST be first/bottom layer
-            // Use new gradient system with book
-            BookCoverBackgroundView(book: book)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+            // Use the rebuilt gradient system
+            if let palette = colorPalette {
+                BookCoverBackgroundView(colorPalette: palette)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            } else {
+                // Black background while loading
+                Color.black
+                    .ignoresSafeArea()
+            }
             
             // Content - always visible but colors update
             ScrollView {
@@ -266,11 +296,13 @@ struct BookDetailView: View {
                 onImageLoaded: { uiImage in
                     // Store the actual displayed image
                     print("🖼️ BookDetailView: Received displayed image")
+                    print("📐 Image size: \(uiImage.size)")
                     self.coverImage = uiImage
                     
-                    // Extract colors from the SAME image that's displayed
+                    // Don't extract from low-res displayed image
+                    // Instead trigger high-res extraction
                     Task {
-                        await extractColorsFromDisplayedImage(uiImage)
+                        await extractColorsFromCover()
                     }
                 }
             )
@@ -822,26 +854,32 @@ struct BookDetailView: View {
         
         print("🎨 Extracting colors from DISPLAYED image for: \(book.title)")
         print("📐 Displayed image size: \(displayedImage.size)")
+        print("🔍 This is the EXACT SAME IMAGE shown in the UI")
+        
+        // Verify this is a full cover, not cropped
+        if displayedImage.size.width < 100 || displayedImage.size.height < 100 {
+            print("⚠️ WARNING: Displayed image is too small, may be cropped!")
+        }
         
         do {
-            // Extract colors using OKLAB from the displayed image
-            let extractor = OKLABColorExtractor()
-            let palette = try await extractor.extractPalette(from: displayedImage, imageSource: book.title)
-            
-            // Store the palette and create display scheme
-            withAnimation(.easeInOut(duration: 0.5)) {
-                self.colorPalette = palette
-                self.displayScheme = DisplayColorScheme(from: palette)
+            // Use improved color extraction with validation
+            if let palette = await ImprovedColorExtraction.extractColors(from: displayedImage, bookTitle: book.title) {
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        self.colorPalette = palette
+                        
+                        print("🎨 Final extracted colors:")
+                        print("  Primary: \(palette.primary)")
+                        print("  Secondary: \(palette.secondary)")
+                        print("  Accent: \(palette.accent)")
+                        print("  Background: \(palette.background)")
+                    }
+                }
+            } else {
+                print("❌ Color extraction returned nil")
             }
-            
-            // Debug print
-            print("🎨 Extracted colors from displayed image:")
-            print("  Primary: \(palette.primary.description)")
-            print("  Secondary: \(palette.secondary.description)")
-            print("  Accent: \(palette.accent.description)")
-            print("  Background: \(palette.background.description)")
         } catch {
-            print("❌ Failed to extract colors from displayed image: \(error)")
+            print("❌ Error in color extraction: \(error)")
         }
         
         isExtractingColors = false
@@ -860,8 +898,19 @@ struct BookDetailView: View {
             return
         }
         
-        // Convert HTTP to HTTPS for security
-        let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
+        // Convert HTTP to HTTPS for security and REMOVE zoom to get full cover
+        let secureURLString = coverURLString
+            .replacingOccurrences(of: "http://", with: "https://")
+            .replacingOccurrences(of: "&zoom=5", with: "")
+            .replacingOccurrences(of: "&zoom=4", with: "")
+            .replacingOccurrences(of: "&zoom=3", with: "")
+            .replacingOccurrences(of: "&zoom=2", with: "")
+            .replacingOccurrences(of: "&zoom=1", with: "")
+            .replacingOccurrences(of: "zoom=5", with: "")
+            .replacingOccurrences(of: "zoom=4", with: "")
+            .replacingOccurrences(of: "zoom=3", with: "")
+            .replacingOccurrences(of: "zoom=2", with: "")
+            .replacingOccurrences(of: "zoom=1", with: "")
         guard let coverURL = URL(string: secureURLString) else {
             print("❌ Invalid cover URL")
             isExtractingColors = false
@@ -880,26 +929,16 @@ struct BookDetailView: View {
             // Store the cover image
             self.coverImage = uiImage
             
-            // Extract colors using OKLAB
-            let extractor = OKLABColorExtractor()
-            let palette = try await extractor.extractPalette(from: uiImage)
-            
-            // Store the palette and create display scheme
-            withAnimation(.easeInOut(duration: 0.5)) {
-                self.colorPalette = palette
-                self.displayScheme = DisplayColorScheme(from: palette)
+            // Use improved color extraction with validation
+            if let palette = await ImprovedColorExtraction.extractColors(from: uiImage, bookTitle: book.title) {
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        self.colorPalette = palette
+                    }
+                }
             }
             
-            // Debug print
-            print("🎨 Extracted colors from \(book.title):")
-            print("  Primary: \(palette.primary.description)")
-            print("  Secondary: \(palette.secondary.description)")
-            print("  Accent: \(palette.accent.description)")
-            print("  Background: \(palette.background.description)")
-            print("  Text Color: \(palette.textColor.description)")
-            print("  Luminance: \(String(format: "%.2f", palette.luminance))")
-            print("  Monochromatic: \(palette.isMonochromatic)")
-            print("  Quality: \(String(format: "%.2f%%", palette.extractionQuality * 100))")
+            // Debug print moved inside MainActor block above
             
         } catch {
             print("❌ Failed to extract colors: \(error.localizedDescription)")
@@ -934,7 +973,18 @@ struct BookDetailView: View {
             await diagnostic.runDiagnostic(on: coverImage, bookTitle: book.title)
         } else if let coverURLString = book.coverImageURL {
             // Download the image if we don't have it
-            let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
+            let secureURLString = coverURLString
+                .replacingOccurrences(of: "http://", with: "https://")
+                .replacingOccurrences(of: "&zoom=5", with: "")
+                .replacingOccurrences(of: "&zoom=4", with: "")
+                .replacingOccurrences(of: "&zoom=3", with: "")
+                .replacingOccurrences(of: "&zoom=2", with: "")
+                .replacingOccurrences(of: "&zoom=1", with: "")
+                .replacingOccurrences(of: "zoom=5", with: "")
+                .replacingOccurrences(of: "zoom=4", with: "")
+                .replacingOccurrences(of: "zoom=3", with: "")
+                .replacingOccurrences(of: "zoom=2", with: "")
+                .replacingOccurrences(of: "zoom=1", with: "")
             guard let coverURL = URL(string: secureURLString) else {
                 print("❌ Invalid cover URL for diagnostic")
                 return
@@ -1239,7 +1289,7 @@ struct BookNoteCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hexString: "FAF8F5"))
+                .fill(Color(hex: "FAF8F5"))
                 .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         )
     }
@@ -1300,7 +1350,7 @@ struct QuestionCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hexString: "FAF8F5"))
+                .fill(Color(hex: "FAF8F5"))
                 .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         )
         .onTapGesture {
@@ -1328,7 +1378,7 @@ struct ChatMessageBubble: View {
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 18)
-                            .fill(message.isUser ? accentColor : Color(hexString: "FAF8F5"))
+                            .fill(message.isUser ? accentColor : Color(hex: "FAF8F5"))
                     )
                 
                 Text(message.timestamp.formatted(date: .omitted, time: .shortened))

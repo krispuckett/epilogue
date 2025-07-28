@@ -147,20 +147,24 @@ struct AmbientBookView: View {
         // Convert HTTP to HTTPS and enhance quality
         var httpsURLString = urlString.replacingOccurrences(of: "http://", with: "https://")
         
-        // Enhance Google Books image quality
+        // Enhance Google Books image quality - NO ZOOM to get full covers
         if httpsURLString.contains("books.google.com") {
             httpsURLString = httpsURLString.replacingOccurrences(of: "&edge=curl", with: "")
-            httpsURLString = httpsURLString.replacingOccurrences(of: "&zoom=1", with: "&zoom=3")
-            httpsURLString = httpsURLString.replacingOccurrences(of: "&zoom=2", with: "&zoom=3")
             
-            // Add zoom=3 if no zoom parameter exists
-            if !httpsURLString.contains("&zoom=") && !httpsURLString.contains("?zoom=") {
-                httpsURLString += httpsURLString.contains("?") ? "&zoom=3" : "?zoom=3"
+            // Remove ALL zoom parameters
+            if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
+                let range = NSRange(location: 0, length: httpsURLString.utf16.count)
+                httpsURLString = regex.stringByReplacingMatches(in: httpsURLString, options: [], range: range, withTemplate: "")
             }
+            httpsURLString = httpsURLString.replacingOccurrences(of: "?zoom=1&", with: "?")
+            httpsURLString = httpsURLString.replacingOccurrences(of: "?zoom=2&", with: "?")
+            httpsURLString = httpsURLString.replacingOccurrences(of: "?zoom=3&", with: "?")
+            httpsURLString = httpsURLString.replacingOccurrences(of: "?zoom=4&", with: "?")
+            httpsURLString = httpsURLString.replacingOccurrences(of: "?zoom=5&", with: "?")
             
             // Add width parameter for high quality
             if !httpsURLString.contains("&w=") {
-                httpsURLString += "&w=1080"
+                httpsURLString += httpsURLString.contains("?") ? "&w=1080" : "?w=1080"
             }
         }
         

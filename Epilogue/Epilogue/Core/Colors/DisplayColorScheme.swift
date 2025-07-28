@@ -63,26 +63,8 @@ class DisplayColorScheme {
     }
     
     private func generateGradientColors(from palette: ColorPalette) -> [Color] {
-        let baseColors = [palette.primary, palette.secondary, palette.accent, palette.background]
-        
-        return baseColors.map { color in
-            let luminance = luminance(of: color)
-            
-            // Intelligent color adjustment based on luminance
-            if luminance > 0.7 {
-                // Already bright - keep mostly as is
-                return color.mixed(with: Color.white, by: 0.1)
-            } else if luminance > 0.5 {
-                // Medium bright - lighten a bit
-                return color.mixed(with: Color.white, by: 0.3)
-            } else if luminance > 0.3 {
-                // Medium dark - significantly lighten
-                return color.mixed(with: Color.white, by: 0.5)
-            } else {
-                // Very dark - heavily lighten
-                return color.mixed(with: Color.white, by: 0.7)
-            }
-        }
+        // KEEP THE EXTRACTED COLORS AS-IS! Don't wash them out!
+        return [palette.primary, palette.secondary, palette.accent, palette.background]
     }
     
     // MARK: - Luminance Calculations
@@ -188,21 +170,11 @@ class DisplayColorScheme {
             #if DEBUG
             print("🚨 Forcing high contrast fallback")
             #endif
-            if averageGradientLuminance > 0.5 {
-                // Force very light gradient
-                gradientColors = [
-                    Color.white,
-                    extractedPalette.accent.mixed(with: Color.white, by: 0.9),
-                    Color(white: 0.95)
-                ]
-            } else {
-                // Force very dark gradient
-                gradientColors = [
-                    Color.black,
-                    extractedPalette.accent.mixed(with: Color.black, by: 0.9),
-                    Color(white: 0.05)
-                ]
-            }
+            // Don't force white/black gradients - keep the extracted colors!
+            // Text contrast should be handled by text color, not by washing out the gradient
+            #if DEBUG
+            print("⚠️ Keeping original colors despite contrast - text color handles readability")
+            #endif
             
             // Final recalculation
             averageGradientLuminance = calculateAverageLuminance(of: gradientColors)

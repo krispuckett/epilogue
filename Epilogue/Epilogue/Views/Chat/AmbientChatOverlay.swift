@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIImageColors
 
 // MARK: - Ambient Session Model
 struct AmbientSession: Identifiable {
@@ -106,19 +107,33 @@ struct ClaudeInspiredGradient: View {
         
         let highQualityURL = coverURL
             .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "zoom=1", with: "zoom=3")
+            .replacingOccurrences(of: "&zoom=5", with: "")
+            .replacingOccurrences(of: "&zoom=4", with: "")
+            .replacingOccurrences(of: "&zoom=3", with: "")
+            .replacingOccurrences(of: "&zoom=2", with: "")
+            .replacingOccurrences(of: "&zoom=1", with: "")
+            .replacingOccurrences(of: "zoom=5", with: "")
+            .replacingOccurrences(of: "zoom=4", with: "")
+            .replacingOccurrences(of: "zoom=3", with: "")
+            .replacingOccurrences(of: "zoom=2", with: "")
+            .replacingOccurrences(of: "zoom=1", with: "")
         
         guard let url = URL(string: highQualityURL),
               let data = try? await URLSession.shared.data(from: url).0,
               let image = UIImage(data: data) else { return }
         
-        let extractor = OKLABColorExtractor()
-        if let extractedPalette = try? await extractor.extractPalette(from: image, imageSource: "BookCover") {
+        print("🎨 AmbientChat: Extracting colors for \(book.title)")
+        
+        // Use improved color extraction with OKLAB as primary
+        if let palette = await ImprovedColorExtraction.extractColors(from: image, bookTitle: book.title) {
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.8)) {
-                    self.colorPalette = extractedPalette
+                    self.colorPalette = palette
+                    print("✅ AmbientChat: Color extraction successful")
                 }
             }
+        } else {
+            print("❌ AmbientChat: Color extraction failed for \(book.title)")
         }
     }
 }
@@ -170,7 +185,7 @@ struct EnhancedAmberGradient: View {
     }
 }
 
-// Book-specific gradient with mirrored animation
+// Book-specific gradient using the rebuilt system
 struct BookSpecificGradient: View {
     let palette: ColorPalette
     let phase: CGFloat
@@ -178,59 +193,11 @@ struct BookSpecificGradient: View {
     let isListening: Bool
     
     var body: some View {
-        ZStack {
-            // Base black layer
-            Color.black
-                .ignoresSafeArea()
-            
-            // Top gradient with book colors
-            LinearGradient(
-                stops: [
-                    .init(color: enhanceColor(palette.primary), location: 0.0),
-                    .init(color: enhanceColor(palette.secondary), location: 0.15),
-                    .init(color: enhanceColor(palette.accent).opacity(0.5), location: 0.3),
-                    .init(color: Color.clear, location: 0.6)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .blur(radius: 40)
-            .scaleEffect(y: 0.6 + phase * 0.2)
-            .offset(y: -100 + phase * 30)
-            
-            // Bottom gradient (mirrored)
-            LinearGradient(
-                stops: [
-                    .init(color: enhanceColor(palette.accent), location: 0.0),
-                    .init(color: enhanceColor(palette.secondary), location: 0.15),
-                    .init(color: enhanceColor(palette.primary).opacity(0.5), location: 0.3),
-                    .init(color: Color.clear, location: 0.6)
-                ],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-            .ignoresSafeArea()
-            .blur(radius: 40)
-            .scaleEffect(y: 0.6 + phase * 0.2)
-            .offset(y: 100 - phase * 30)
-        }
-    }
-    
-    private func enhanceColor(_ color: Color) -> Color {
-        let uiColor = UIColor(color)
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        // Boost vibrancy
-        saturation = min(saturation * 1.4, 1.0)
-        brightness = max(brightness, 0.4)
-        
-        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
+        // Use the exact same gradient as BookDetailView
+        BookCoverBackgroundView(colorPalette: palette)
+            // Add animation by scaling and moving the entire gradient
+            .scaleEffect(y: 0.8 + phase * 0.1)
+            .offset(y: -50 + phase * 20)
     }
 }
 

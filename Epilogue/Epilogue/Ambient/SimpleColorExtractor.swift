@@ -21,10 +21,11 @@ struct SimpleColorExtractor {
         let height = cgImage.height
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * width
+        // CRITICAL: Use bytesPerRow from the image, not calculated!
+        let bytesPerRow = cgImage.bytesPerRow
         let bitsPerComponent = 8
         
-        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        var pixelData = [UInt8](repeating: 0, count: bytesPerRow * height)
         
         guard let context = CGContext(
             data: &pixelData,
@@ -52,7 +53,11 @@ struct SimpleColorExtractor {
         
         for y in stride(from: 0, to: height, by: 3) { // Sample more pixels
             for x in stride(from: 0, to: width, by: 3) {
-                let index = (y * width + x) * bytesPerPixel
+                // CRITICAL FIX: Use bytesPerRow, not width * bytesPerPixel
+                let index = (y * bytesPerRow) + (x * bytesPerPixel)
+                
+                // Check bounds
+                guard index + 3 < pixelData.count else { continue }
                 
                 let r = Double(pixelData[index]) / 255.0
                 let g = Double(pixelData[index + 1]) / 255.0

@@ -43,6 +43,13 @@ public class OKLABColorExtractor {
         // Save for debugging
         saveImageForDebug(image, suffix: "EXTRACTED_\(imageSource)")
         
+        // Check image size to detect cropped covers
+        if image.size.width < 100 || image.size.height < 100 {
+            print("⚠️ WARNING: Image too small (\(image.size.width)x\(image.size.height)), likely cropped!")
+            print("   This may be caused by zoom parameter in the URL")
+            print("   Consider using zoom=1 or removing zoom parameter entirely")
+        }
+        
         // 1. SAMPLE EVERY PIXEL (with smart downsampling)
         let targetSize = CGSize(width: 100, height: 100)  // Small enough to process every pixel
         guard let resized = await image.resized(to: targetSize) else {
@@ -59,12 +66,13 @@ public class OKLABColorExtractor {
         let width = cgImage.width
         let height = cgImage.height
         let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * width
+        // CRITICAL: Use bytesPerRow from the image, not calculated!
+        let bytesPerRow = cgImage.bytesPerRow
         let bitsPerComponent = 8
         
         // print("📐 Processing image: \(width)x\(height) pixels")
         
-        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        var pixelData = [UInt8](repeating: 0, count: bytesPerRow * height)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         
         guard let context = CGContext(
@@ -83,6 +91,44 @@ public class OKLABColorExtractor {
         // Draw the image into our context
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
         
+        // DEBUG: Check what we actually drew
+        print("\n🔍 PIXEL DEBUG for \(imageSource):")
+        print("  Image size: \(width)x\(height)")
+        print("  BytesPerRow: \(bytesPerRow) (calculated: \(width * bytesPerPixel))")
+        
+        // Check center pixel and corners
+        let testPoints = [
+            (x: width/2, y: height/2, label: "CENTER"),
+            (x: 10, y: 10, label: "TOP-LEFT"),
+            (x: width-10, y: 10, label: "TOP-RIGHT"),
+            (x: 10, y: height-10, label: "BOTTOM-LEFT"),
+            (x: width-10, y: height-10, label: "BOTTOM-RIGHT"),
+            (x: width/4, y: height/2, label: "LEFT-CENTER"),
+            (x: width*3/4, y: height/2, label: "RIGHT-CENTER")
+        ]
+        
+        for point in testPoints {
+            let offset = (point.y * bytesPerRow) + (point.x * bytesPerPixel)
+            if offset + 3 < pixelData.count {
+                let r = pixelData[offset]
+                let g = pixelData[offset + 1]
+                let b = pixelData[offset + 2]
+                let a = pixelData[offset + 3]
+                
+                // Convert to hex for easier reading
+                let hex = String(format: "#%02X%02X%02X", r, g, b)
+                
+                // Calculate hue
+                let rf = CGFloat(r) / 255.0
+                let gf = CGFloat(g) / 255.0
+                let bf = CGFloat(b) / 255.0
+                var hue: CGFloat = 0, sat: CGFloat = 0, bri: CGFloat = 0
+                UIColor(red: rf, green: gf, blue: bf, alpha: 1).getHue(&hue, saturation: &sat, brightness: &bri, alpha: nil)
+                
+                print("  \(point.label) (\(point.x),\(point.y)): RGB(\(r),\(g),\(b)) \(hex) H:\(Int(hue*360))° S:\(String(format: "%.2f", sat)) B:\(String(format: "%.2f", bri))")
+            }
+        }
+        
         // 3. BUILD COLOR HISTOGRAM (no averaging!)
         var colorHistogram: [UIColor: Int] = [:]
         var totalPixelsProcessed = 0
@@ -92,7 +138,11 @@ public class OKLABColorExtractor {
         
         for y in 0..<height {
             for x in 0..<width {
-                let offset = ((width * y) + x) * bytesPerPixel
+                // CRITICAL FIX: Use bytesPerRow, not width * bytesPerPixel
+                let offset = (y * bytesPerRow) + (x * bytesPerPixel)
+                
+                // Check bounds
+                guard offset + 3 < pixelData.count else { continue }
                 let r = pixelData[offset]
                 let g = pixelData[offset + 1]
                 let b = pixelData[offset + 2]
@@ -123,10 +173,10 @@ public class OKLABColorExtractor {
                     continue
                 }
                 
-                // Skip black pixels more aggressively
-                // Black borders from low-quality images have RGB values all < 30
+                // Skip pure black pixels
+                // But be careful not to skip very dark colors (dark reds, browns)
                 let totalBrightness = Int(r) + Int(g) + Int(b)
-                if totalBrightness < 30 {  // This is essentially black
+                if totalBrightness < 15 {  // Only skip if VERY close to black
                     skippedBlack += 1
                     continue
                 }
@@ -137,30 +187,45 @@ public class OKLABColorExtractor {
                     continue
                 }
                 
-                // 5. COLOR QUANTIZATION (group similar colors more aggressively)
-                // Round to nearest 0.2 for better color variety
-                let quantizedR = round(rf * 5) / 5
-                let quantizedG = round(gf * 5) / 5
-                let quantizedB = round(bf * 5) / 5
+                // 5. COLOR QUANTIZATION (group similar colors)
+                // Round to nearest 0.1 (10 levels per channel) for finer distinction
+                let quantizedR = round(rf * 10) / 10
+                let quantizedG = round(gf * 10) / 10
+                let quantizedB = round(bf * 10) / 10
                 
                 let color = UIColor(red: quantizedR, green: quantizedG, blue: quantizedB, alpha: 1.0)
                 colorHistogram[color, default: 0] += 1
             }
         }
         
-        // print("\n📊 Pixel Processing Summary:")
-        // print("  Total pixels: \(totalPixelsProcessed)")
-        // print("  Skipped white: \(skippedWhite)")
-        // print("  Skipped black: \(skippedBlack)")
-        // print("  Skipped transparent: \(skippedTransparent)")
-        // print("  Colors found: \(colorHistogram.count)")
+        print("\n📊 Pixel Processing Summary:")
+        print("  Total pixels: \(totalPixelsProcessed)")
+        print("  Skipped white: \(skippedWhite)")
+        print("  Skipped black: \(skippedBlack)")
+        print("  Skipped transparent: \(skippedTransparent)")
+        print("  Colors found: \(colorHistogram.count)")
+        
+        // DEBUG: Show top 10 colors found
+        print("\n🎨 Top 10 colors by frequency:")
+        let sortedColors = colorHistogram.sorted { $0.value > $1.value }.prefix(10)
+        for (index, (color, count)) in sortedColors.enumerated() {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+            color.getRed(&r, green: &g, blue: &b, alpha: nil)
+            
+            let hex = String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
+            
+            var hue: CGFloat = 0, sat: CGFloat = 0, bri: CGFloat = 0
+            color.getHue(&hue, saturation: &sat, brightness: &bri, alpha: nil)
+            
+            print("  \(index+1). \(hex) (H:\(Int(hue*360))° S:\(String(format: "%.2f", sat)) B:\(String(format: "%.2f", bri))) - \(count) pixels")
+        }
         
         // Quality detection
         let blackPercentage = Double(skippedBlack) * 100.0 / Double(totalPixelsProcessed)
         if blackPercentage > 70 {
-        // print("  ⚠️ WARNING: \(String(format: "%.1f", blackPercentage))% of image is black!")
-        // print("  This suggests a low-quality image with black borders.")
-        // print("  Consider using a higher zoom parameter.")
+            print("  ⚠️ WARNING: \(String(format: "%.1f", blackPercentage))% of image is black!")
+            print("  This suggests a low-quality image with black borders.")
+            print("  Consider using a higher zoom parameter.")
         }
         
         // 6. INTELLIGENT COLOR SELECTION - Special handling for dark covers
@@ -179,6 +244,7 @@ public class OKLABColorExtractor {
         
         // For dark covers (like Lord of the Rings), find vibrant accent colors
         var significantColors: [(key: UIColor, value: Int)] = []
+        var minColorThreshold = 1
         
         if averageBrightness < 80 || blackPercentage > 50 {  // More lenient threshold
             print("  📚 Dark cover detected - searching for accent colors...")
@@ -194,8 +260,8 @@ public class OKLABColorExtractor {
                 let brightness = maxC
                 let vibrancy = saturation * brightness  // Combined metric
                 
-                // BE MORE AGGRESSIVE - keep ANY color with ANY saturation or brightness
-                if saturation > 0.1 || brightness > 0.2 || (r != g || g != b) {
+                // BE VERY AGGRESSIVE - keep ANY color that isn't pure gray
+                if saturation > 0.05 || brightness > 0.15 || (r != g || g != b) {
                     return (color, count, vibrancy, saturation)
                 }
                 return nil
@@ -225,7 +291,7 @@ public class OKLABColorExtractor {
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
                 let hueAngle = h * 360
-                return hueAngle >= 30 && hueAngle <= 70 && s > 0.3
+                return hueAngle >= 30 && hueAngle <= 70 && s > 0.2  // Lower threshold for dark golds
             }
             
             // Look for red colors (Lord of the Rings text)
@@ -233,7 +299,7 @@ public class OKLABColorExtractor {
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
                 let hueAngle = h * 360
-                return (hueAngle >= 340 || hueAngle <= 20) && s > 0.3
+                return (hueAngle >= 340 || hueAngle <= 20) && s > 0.2  // Lower threshold for dark reds
             }
             
             // Prioritize special colors
@@ -259,30 +325,36 @@ public class OKLABColorExtractor {
             // Normal processing for non-dark covers
             let sortedColors = colorHistogram.sorted { $0.value > $1.value }
             
-            // Calculate minimum threshold (1% of non-black pixels)
+            // Calculate minimum threshold (0.5% of non-black pixels) to catch more accent colors
             let validPixelCount = totalPixelsProcessed - skippedBlack - skippedWhite - skippedTransparent
-            let minColorThreshold = max(1, Int(Double(validPixelCount) * 0.01))
+            minColorThreshold = max(1, Int(Double(validPixelCount) * 0.005))
             
             // Filter out colors that appear too infrequently
             significantColors = sortedColors.filter { $0.value >= minColorThreshold }
         }
         
-        // print("\n🎨 Color Analysis:")
-        // print("  Unique colors found: \(sortedColors.count)")
-        // print("  Significant colors (>1% of pixels): \(significantColors.count)")
-        // print("  Minimum pixel threshold: \(minColorThreshold)")
+        print("\n🎨 Color Analysis:")
+        print("  Unique colors found: \(colorHistogram.count)")
+        print("  Significant colors (>1% of pixels): \(significantColors.count)")
+        print("  Minimum pixel threshold: \(minColorThreshold)")
         
         // Debug: Print top colors
         if significantColors.isEmpty {
-        // print("  ⚠️ NO SIGNIFICANT COLORS FOUND! All colors were below threshold.")
-        // print("  This suggests the image is mostly black/white or very low quality.")
+            print("  ⚠️ NO SIGNIFICANT COLORS FOUND! All colors were below threshold.")
+            print("  This suggests the image is mostly black/white or very low quality.")
         } else {
-        // print("\n  Top 5 significant colors by frequency:")
+            print("\n  Top 5 significant colors by frequency:")
             for (index, (color, count)) in significantColors.prefix(5).enumerated() {
                 var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
                 color.getRed(&r, green: &g, blue: &b, alpha: nil)
                 let percentage = Double(count) * 100.0 / Double(totalPixelsProcessed - skippedWhite - skippedBlack - skippedTransparent)
-        // print("    \(index + 1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - \(count) pixels (\(String(format: "%.1f", percentage))%)")
+                
+                // Also show hex and hue
+                let hex = String(format: "#%02X%02X%02X", Int(r*255), Int(g*255), Int(b*255))
+                var hue: CGFloat = 0, sat: CGFloat = 0, bri: CGFloat = 0
+                color.getHue(&hue, saturation: &sat, brightness: &bri, alpha: nil)
+                
+                print("    \(index + 1). \(hex) RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) H:\(Int(hue*360))° - \(count) pixels (\(String(format: "%.1f", percentage))%)")
             }
         }
         
@@ -296,16 +368,27 @@ public class OKLABColorExtractor {
     
     private func buildIntelligentPalette(from significantColors: [(key: UIColor, value: Int)], totalPixels: Int) -> ColorPalette {
         if significantColors.isEmpty {
-        // print("\n❌ No significant colors extracted - using fallback palette")
+            print("\n❌ No significant colors extracted - using fallback palette")
             return createFallbackPalette()
         }
         
         // UNIVERSAL COLOR VARIETY ALGORITHM
         var selectedColors: [UIColor] = []
+        var colorPixelCounts: [UIColor: Int] = [:]  // Track pixel counts for role assignment
         let minColorDistance: CGFloat = 0.25 // Minimum 25% difference
         
         // Select colors with guaranteed variety
         for (candidateColor, count) in significantColors {
+            // Skip very low saturation colors (grays) unless they're significant
+            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+            candidateColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+            
+            // Skip grays unless they represent > 10% of the image
+            if s < 0.15 && Double(count) / Double(totalPixels) < 0.1 {
+                print("  ✗ Too gray: \(colorDescription(candidateColor)) - S:\(String(format: "%.2f", s))")
+                continue
+            }
+            
             // Check if sufficiently different from all selected colors
             let isDifferentEnough = selectedColors.allSatisfy { existingColor in
                 colorDistance(candidateColor, existingColor) > minColorDistance
@@ -313,47 +396,56 @@ public class OKLABColorExtractor {
             
             if isDifferentEnough {
                 selectedColors.append(candidateColor)
-        // print("  ✓ Selected: \(colorDescription(candidateColor)) - \(count) pixels")
+                colorPixelCounts[candidateColor] = count  // Store pixel count
+                print("  ✓ Selected: \(colorDescription(candidateColor)) - \(count) pixels")
             } else {
-        // print("  ✗ Too similar: \(colorDescription(candidateColor))")
+                print("  ✗ Too similar: \(colorDescription(candidateColor))")
             }
             
             if selectedColors.count == 4 { break }
         }
         
         // If not enough variety, generate using color theory
-        // print("\n🎨 Found \(selectedColors.count) distinct colors, need 4")
+        print("\n🎨 Found \(selectedColors.count) distinct colors, need 4")
+        
+        // For monochromatic images, generate variations rather than complements
+        let isMonochromatic = selectedColors.count <= 2 || areColorsMonochromatic(selectedColors)
         
         while selectedColors.count < 4 && !selectedColors.isEmpty {
-            if let lastColor = selectedColors.last {
-                let generated = generateHarmonicColor(from: lastColor, avoiding: selectedColors)
+            if let baseColor = selectedColors.first {
+                let generated = isMonochromatic 
+                    ? generateMonochromaticVariation(from: baseColor, index: selectedColors.count)
+                    : generateHarmonicColor(from: baseColor, avoiding: selectedColors)
                 selectedColors.append(generated)
-        // print("  + Generated: \(colorDescription(generated))")
+                colorPixelCounts[generated] = 1  // Minimal count for generated colors
+                print("  + Generated: \(colorDescription(generated))")
             }
         }
         
         // Ensure we have exactly 4 colors
         while selectedColors.count < 4 {
-            selectedColors.append(UIColor.systemGray)
+            let gray = UIColor.systemGray
+            selectedColors.append(gray)
+            colorPixelCounts[gray] = 1
         }
         
-        // Assign roles based on characteristics
-        let palette = assignRoles(to: selectedColors)
+        // Assign roles based on characteristics AND pixel count
+        let roles = assignRoles(to: selectedColors, colorPixelCounts: colorPixelCounts)
         
-        // print("\n🎨 Universal Palette Created:")
-        // print("  Primary: \(colorDescription(palette.primary))")
-        // print("  Secondary: \(colorDescription(palette.secondary))")
-        // print("  Accent: \(colorDescription(palette.accent))")
-        // print("  Background: \(colorDescription(palette.background))")
+        print("\n🎨 Universal Palette Created:")
+        print("  Primary: \(colorDescription(roles.primary))")
+        print("  Secondary: \(colorDescription(roles.secondary))")
+        print("  Accent: \(colorDescription(roles.accent))")
+        print("  Background: \(colorDescription(roles.background))")
         
         return ColorPalette(
-            primary: Color(palette.primary),
-            secondary: Color(palette.secondary),
-            accent: Color(palette.accent),
-            background: Color(palette.background),
+            primary: Color(roles.primary),
+            secondary: Color(roles.secondary),
+            accent: Color(roles.accent),
+            background: Color(roles.background),
             // Text color will be calculated by DisplayColorScheme based on actual gradient
-            textColor: luminance(of: palette.primary) > 0.5 ? .black : .white,
-            luminance: luminance(of: palette.primary),
+            textColor: luminance(of: roles.primary) > 0.5 ? .black : .white,
+            luminance: luminance(of: roles.primary),
             isMonochromatic: selectedColors.count <= 2,
             extractionQuality: Double(selectedColors.count) / 4.0
         )
@@ -412,19 +504,6 @@ public class OKLABColorExtractor {
         return r < 0.7 && g > 0.8 && b > 0.8 && abs(g - b) < 0.1
     }
     
-    // Add this color harmony check
-    private func colorsAreHarmonious(_ color1: UIColor, _ color2: UIColor) -> Bool {
-        var h1: CGFloat = 0, s1: CGFloat = 0, b1: CGFloat = 0
-        var h2: CGFloat = 0, s2: CGFloat = 0, b2: CGFloat = 0
-        
-        color1.getHue(&h1, saturation: &s1, brightness: &b1, alpha: nil)
-        color2.getHue(&h2, saturation: &s2, brightness: &b2, alpha: nil)
-        
-        // Check if hues are within 60 degrees (adjacent colors on color wheel)
-        let hueDiff = abs(h1 - h2)
-        return hueDiff < 0.167 || hueDiff > 0.833 // 60/360 = 0.167
-    }
-    
     private func isBlueOrTeal(_ color: UIColor) -> Bool {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
         color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
@@ -459,6 +538,58 @@ public class OKLABColorExtractor {
     
     // MARK: - Universal Color Harmony
     
+    private func areColorsMonochromatic(_ colors: [UIColor]) -> Bool {
+        guard colors.count >= 2 else { return true }
+        
+        var hues: [CGFloat] = []
+        for color in colors {
+            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+            color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+            // Only consider colors with some saturation
+            if s > 0.1 {
+                hues.append(h)
+            }
+        }
+        
+        // If we have less than 2 saturated colors, it's monochromatic
+        if hues.count < 2 { return true }
+        
+        // Check if all hues are within 0.1 range (36 degrees)
+        let minHue = hues.min() ?? 0
+        let maxHue = hues.max() ?? 0
+        
+        // Handle hue wrap-around (red at 0/1)
+        if maxHue - minHue > 0.5 {
+            // Check if colors are clustered around red (0/1)
+            let wrappedHues = hues.map { $0 > 0.5 ? $0 - 1.0 : $0 }
+            let wrappedMin = wrappedHues.min() ?? 0
+            let wrappedMax = wrappedHues.max() ?? 0
+            return wrappedMax - wrappedMin < 0.1
+        }
+        
+        return maxHue - minHue < 0.1
+    }
+    
+    private func generateMonochromaticVariation(from baseColor: UIColor, index: Int) -> UIColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+        baseColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+        
+        switch index {
+        case 1:
+            // Lighter version
+            return UIColor(hue: h, saturation: max(0, s * 0.5), brightness: min(1.0, b * 1.3), alpha: 1.0)
+        case 2:
+            // Darker version
+            return UIColor(hue: h, saturation: min(1.0, s * 1.2), brightness: b * 0.6, alpha: 1.0)
+        case 3:
+            // Much darker for background
+            return UIColor(hue: h, saturation: min(1.0, s * 1.5), brightness: b * 0.3, alpha: 1.0)
+        default:
+            // Fallback: gray
+            return UIColor(white: b * 0.5, alpha: 1.0)
+        }
+    }
+    
     private func generateHarmonicColor(from baseColor: UIColor, avoiding existingColors: [UIColor]) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
         baseColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
@@ -474,7 +605,7 @@ public class OKLABColorExtractor {
             ("Split Comp 2", 0.583, 0.95)     // 150° counter-clockwise
         ]
         
-        for (strategyName, hueShift, satMult) in strategies {
+        for (_, hueShift, satMult) in strategies {
             let newHue = (h + hueShift).truncatingRemainder(dividingBy: 1.0)
             let newSat = min(1.0, s * satMult)
             let newBright = b // Keep similar brightness
@@ -496,50 +627,96 @@ public class OKLABColorExtractor {
         return UIColor(hue: h, saturation: s * 0.3, brightness: min(1.0, b * 1.2), alpha: 1.0)
     }
     
-    private func assignRoles(to colors: [UIColor]) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
+    private func assignRoles(to colors: [UIColor], colorPixelCounts: [UIColor: Int]) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
         guard colors.count >= 4 else {
             return (colors[0], colors[0], colors[0], UIColor.systemGray6)
         }
         
-        // ALWAYS prioritize vibrancy for PRIMARY position (top of gradient)
-        // This ensures the most vibrant color is always at the TOP where it's most visible
+        // PRIORITIZE COLOR RICHNESS weighted by pixel count
+        // Deep golds and reds are better than bright yellows
         
-        // Calculate vibrancy (saturation * brightness) for all colors
-        let colorsWithVibrancy = colors.map { color -> (color: UIColor, vibrancy: CGFloat, saturation: CGFloat, brightness: CGFloat) in
+        // Calculate weighted score for all colors
+        let colorsWithScores = colors.map { color -> (color: UIColor, richness: CGFloat, score: Double, hue: CGFloat, saturation: CGFloat, brightness: CGFloat) in
             var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
             color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-            let vibrancy = s * b  // Combined metric
-            return (color, vibrancy, s, b)
+            let hueAngle = h * 360
+            
+            // Calculate richness score
+            var richness = s * b  // Base vibrancy
+            
+            // BOOST deep golds (30-45°) and pure reds (0-20°, 340-360°)
+            if (hueAngle >= 30 && hueAngle <= 45) {
+                richness *= 1.5  // Deep gold bonus
+            } else if (hueAngle >= 0 && hueAngle <= 20) || (hueAngle >= 340 && hueAngle <= 360) {
+                richness *= 1.8  // Red bonus (higher priority)
+            } else if (hueAngle >= 45 && hueAngle <= 60) {
+                richness *= 0.7  // Penalize bright yellows
+            } else if (hueAngle >= 90 && hueAngle <= 150) {
+                richness *= 0.3  // Heavily penalize pure greens
+            } else if (hueAngle >= 180 && hueAngle <= 210) {
+                richness *= 1.1  // Slight boost for cyan (Odyssey)
+            } else if (hueAngle >= 220 && hueAngle <= 260) {
+                richness *= 1.2  // Boost for blues
+            }
+            
+            // Weight by pixel count (logarithmic to prevent overwhelming dominance)
+            let pixelCount = Double(colorPixelCounts[color] ?? 1)
+            let score = Double(richness) * log(pixelCount + 1)
+            
+            return (color, richness, score, h, s, b)
         }
         
-        // Sort by vibrancy to put MOST VIBRANT color as PRIMARY
-        let sortedByVibrancy = colorsWithVibrancy.sorted { $0.vibrancy > $1.vibrancy }
+        // Sort by weighted score
+        let sortedByScore = colorsWithScores.sorted { $0.score > $1.score }
         
-        print("  🎨 Role Assignment (by vibrancy):")
-        for (index, (color, vibrancy, sat, bright)) in sortedByVibrancy.enumerated() {
+        print("  🎨 Role Assignment (by weighted score):")
+        for (index, (color, richness, score, hue, sat, bright)) in sortedByScore.enumerated() {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
             color.getRed(&r, green: &g, blue: &b, alpha: nil)
-            print("    \(index + 1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - Vibrancy: \(String(format: "%.2f", vibrancy)) (S: \(String(format: "%.2f", sat)), B: \(String(format: "%.2f", bright)))")
+            let hueAngle = Int(hue * 360)
+            let pixelCount = colorPixelCounts[color] ?? 1
+            print("    \(index + 1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) H:\(hueAngle)°")
+            print("       Richness: \(String(format: "%.2f", richness)), Pixels: \(pixelCount), Score: \(String(format: "%.2f", score))")
         }
         
-        // PRIMARY = Most vibrant color (goes at TOP of gradient)
-        let primary = sortedByVibrancy[0].color
+        // PRIMARY = Top ranked by weighted score (considers both richness and frequency)
+        let primary = sortedByScore[0].color
         
-        // SECONDARY = Second most vibrant color that's different from primary
-        let secondary = sortedByVibrancy.first { item in
-            colorDistance(item.color, primary) > 0.2
-        }?.color ?? sortedByVibrancy[1].color
+        // SECONDARY = Find a complementary color, preferring different hue ranges
+        let secondary = sortedByScore.first { item in
+            let hueDiff = abs(item.hue - sortedByScore[0].hue)
+            let normalizedDiff = min(hueDiff, 1.0 - hueDiff)  // Handle hue wrap-around
+            return normalizedDiff > 0.1 && colorDistance(item.color, primary) > 0.2
+        }?.color ?? sortedByScore[1].color
         
-        // ACCENT = Third vibrant color that's different from both AND harmonious with primary
-        var accent = sortedByVibrancy.first { item in
-            colorDistance(item.color, primary) > 0.2 && 
-            colorDistance(item.color, secondary) > 0.2
-        }?.color ?? sortedByVibrancy[2].color
+        // ACCENT = Look for a red if primary is gold, or vice versa
+        let primaryHue = sortedByScore[0].hue * 360
+        let accent: UIColor
         
-        // Check if accent color harmonizes with primary
-        if !colorsAreHarmonious(primary, accent) {
-            print("  ⚠️ Accent color not harmonious with primary, using secondary instead")
-            accent = secondary // Use secondary which is already harmonious
+        if primaryHue >= 30 && primaryHue <= 60 {
+            // Primary is gold/yellow, look for red accent
+            accent = sortedByScore.first { item in
+                let hueAngle = item.hue * 360
+                return (hueAngle >= 0 && hueAngle <= 20) || (hueAngle >= 340 && hueAngle <= 360)
+            }?.color ?? sortedByScore.first { item in
+                colorDistance(item.color, primary) > 0.2 && 
+                colorDistance(item.color, secondary) > 0.2
+            }?.color ?? sortedByScore[2].color
+        } else if (primaryHue >= 0 && primaryHue <= 20) || (primaryHue >= 340 && primaryHue <= 360) {
+            // Primary is red, look for gold accent
+            accent = sortedByScore.first { item in
+                let hueAngle = item.hue * 360
+                return hueAngle >= 30 && hueAngle <= 45
+            }?.color ?? sortedByScore.first { item in
+                colorDistance(item.color, primary) > 0.2 && 
+                colorDistance(item.color, secondary) > 0.2
+            }?.color ?? sortedByScore[2].color
+        } else {
+            // Default: pick a different color
+            accent = sortedByScore.first { item in
+                colorDistance(item.color, primary) > 0.2 && 
+                colorDistance(item.color, secondary) > 0.2
+            }?.color ?? sortedByScore[2].color
         }
         
         // BACKGROUND = Darkest color (for depth)
@@ -597,12 +774,11 @@ public class OKLABColorExtractor {
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
             
             do {
-                // DEBUG IMAGE SAVING DISABLED
-                // try data.write(to: tempURL)
-                // print("💾 Saved extracted image to: \(tempURL.path)")
+                try data.write(to: tempURL)
+        // print("💾 Saved extracted image to: \(tempURL.path)")
                 
                 // Save to Photos for easy inspection
-                // UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
             } catch {
         // print("❌ Failed to save extracted image: \(error)")
             }
