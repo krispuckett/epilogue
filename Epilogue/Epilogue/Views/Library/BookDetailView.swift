@@ -887,19 +887,17 @@ struct BookDetailView: View {
             )
         }
         
-        // Generate based on title hash for consistency
-        let hash = book.title.hashValue
-        let hue = Double(abs(hash % 360)) / 360.0
-        
+        // Use a subtle, neutral warm gradient as placeholder
+        // This won't be jarring when it transitions to the real colors
         return ColorPalette(
-            primary: Color(hue: hue, saturation: 0.5, brightness: 0.7),
-            secondary: Color(hue: hue + 0.1, saturation: 0.4, brightness: 0.6),
-            accent: Color(hue: hue - 0.1, saturation: 0.6, brightness: 0.8),
-            background: Color(hue: hue, saturation: 0.3, brightness: 0.3),
+            primary: Color(white: 0.3),      // Dark gray
+            secondary: Color(white: 0.25),   // Slightly darker gray
+            accent: Color.warmAmber.opacity(0.3), // Very subtle amber accent
+            background: Color(white: 0.1),   // Very dark gray
             textColor: .white,
-            luminance: 0.5,
-            isMonochromatic: false,
-            extractionQuality: 0.3 // Low quality to indicate placeholder
+            luminance: 0.3,
+            isMonochromatic: true,
+            extractionQuality: 0.1 // Low quality to indicate placeholder
         )
     }
     
@@ -908,9 +906,7 @@ struct BookDetailView: View {
         let bookID = book.id ?? book.isbn ?? book.title
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.colorPalette = cachedPalette
-                }
+                self.colorPalette = cachedPalette
             }
             return
         }
@@ -931,15 +927,13 @@ struct BookDetailView: View {
             // Use improved color extraction with validation
             if let palette = await ImprovedColorExtraction.extractColors(from: displayedImage, bookTitle: book.title) {
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        self.colorPalette = palette
-                        
-                        print("🎨 Low-res extracted colors:")
-                        print("  Primary: \(palette.primary)")
-                        print("  Secondary: \(palette.secondary)")
-                        print("  Accent: \(palette.accent)")
-                        print("  Background: \(palette.background)")
-                    }
+                    self.colorPalette = palette
+                    
+                    print("🎨 Low-res extracted colors:")
+                    print("  Primary: \(palette.primary)")
+                    print("  Secondary: \(palette.secondary)")
+                    print("  Accent: \(palette.accent)")
+                    print("  Background: \(palette.background)")
                 }
                 
                 // Cache the result
@@ -959,9 +953,7 @@ struct BookDetailView: View {
         let bookID = book.id ?? book.isbn ?? book.title
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.colorPalette = cachedPalette
-                }
+                self.colorPalette = cachedPalette
             }
             return
         }
@@ -1012,14 +1004,12 @@ struct BookDetailView: View {
             // Use improved color extraction with validation
             if let palette = await ImprovedColorExtraction.extractColors(from: uiImage, bookTitle: book.title) {
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        self.colorPalette = palette
-                        print("🎨 High-res extracted colors (final):")
-                        print("  Primary: \(palette.primary)")
-                        print("  Secondary: \(palette.secondary)")
-                        print("  Accent: \(palette.accent)")
-                        print("  Background: \(palette.background)")
-                    }
+                    self.colorPalette = palette
+                    print("🎨 High-res extracted colors (final):")
+                    print("  Primary: \(palette.primary)")
+                    print("  Secondary: \(palette.secondary)")
+                    print("  Accent: \(palette.accent)")
+                    print("  Background: \(palette.background)")
                 }
                 
                 // Cache the result outside of MainActor.run
