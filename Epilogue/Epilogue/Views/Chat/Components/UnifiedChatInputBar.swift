@@ -9,35 +9,9 @@ struct UnifiedChatInputBar: View {
     let currentBook: Book?
     let onSend: () -> Void
     
-    // Command detection
-    @State private var activeCommand: CommandType? = nil
-    @State private var showCommandHint = false
-    
     // Microphone state
     @Binding var isRecording: Bool
     let onMicrophoneTap: () -> Void
-    
-    enum CommandType {
-        case slash      // Book switcher
-        case at         // Quotes/notes
-        case question   // Quick actions
-        
-        var hint: String {
-            switch self {
-            case .slash: return "Switch book context"
-            case .at: return "Browse quotes & notes"
-            case .question: return "Quick actions"
-            }
-        }
-        
-        var icon: String {
-            switch self {
-            case .slash: return "books.vertical"
-            case .at: return "quote.opening"
-            case .question: return "questionmark.circle"
-            }
-        }
-    }
     
     private var placeholderText: String {
         if let book = currentBook {
@@ -48,27 +22,47 @@ struct UnifiedChatInputBar: View {
     }
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Command hint overlay
-            if showCommandHint, let command = activeCommand {
-                commandHintView(for: command)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            
-            // Main input bar
-            HStack(spacing: 12) {
-                // Command icon
-                Image(systemName: "command.circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white.opacity(0.6))
+        HStack(spacing: 12) {
+                // Library navigation button
+                Button {
+                    // Navigate to library tab
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToTab"), object: 0)
+                    HapticManager.shared.lightTap()
+                } label: {
+                    // Try custom image first, fallback to system icon
+                    if let _ = UIImage(named: "glass-book-open") {
+                        Image("glass-book-open")
+                            .renderingMode(.original)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 22, height: 22)
+                    } else {
+                        Image(systemName: "books.vertical")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .glassEffect(.regular, in: .circle)
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+                }
+                
+                // Main input bar - matching command palette style
+                HStack(spacing: 10) {
+                // Command icon - matching search icon style
+                Image(systemName: "command")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
                     .onTapGesture {
                         showingCommandPalette = true
                     }
                 
-                // Text input
+                // Text input - matching command palette
                 TextField(placeholderText, text: $messageText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16))
+                    .font(.system(size: 15))
                     .foregroundStyle(.white)
                     .focused($isInputFocused)
                     .submitLabel(.send)
@@ -76,9 +70,6 @@ struct UnifiedChatInputBar: View {
                         if !messageText.isEmpty {
                             onSend()
                         }
-                    }
-                    .onChange(of: messageText) { _, newValue in
-                        handleCommandDetection(newValue)
                     }
                 
                 // Action buttons
@@ -88,8 +79,8 @@ struct UnifiedChatInputBar: View {
                         onMicrophoneTap()
                     } label: {
                         Image(systemName: isRecording ? "mic.fill" : "mic")
-                            .font(.system(size: 18))
-                            .foregroundStyle(isRecording ? .red : .white.opacity(0.6))
+                            .font(.system(size: 16))
+                            .foregroundStyle(isRecording ? .red : .white.opacity(0.5))
                             .animation(.easeInOut(duration: 0.2), value: isRecording)
                     }
                     .buttonStyle(.plain)
@@ -98,78 +89,20 @@ struct UnifiedChatInputBar: View {
                     if !messageText.isEmpty {
                         Button(action: onSend) {
                             Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.white)
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.9))
                         }
                         .buttonStyle(.plain)
                         .transition(.scale.combined(with: .opacity))
                     }
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandHint)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
-    }
-    
-    // MARK: - Command Hint View
-    
-    private func commandHintView(for command: CommandType) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: command.icon)
-                .font(.system(size: 14))
-            
-            Text(command.hint)
-                .font(.system(size: 14, weight: .medium))
-            
-            Spacer()
-            
-            Text("Press Enter")
-                .font(.system(size: 12))
-                .opacity(0.6)
-        }
-        .foregroundStyle(.white.opacity(0.8))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
-    }
-    
-    // MARK: - Command Detection
-    
-    private func handleCommandDetection(_ text: String) {
-        // Check for commands at the start of the text
-        if text.hasPrefix("/") {
-            activeCommand = .slash
-            showCommandHint = true
-            
-            // Trigger existing command palette
-            if text == "/" {
-                showingCommandPalette = true
-                showCommandHint = false
-                activeCommand = nil
-            }
-        } else if text.hasPrefix("@") {
-            activeCommand = .at
-            showCommandHint = true
-            
-            // TODO: Show quotes/notes picker
-            if text == "@" {
-                // Will be implemented with quotes/notes view
-            }
-        } else if text.hasPrefix("?") {
-            activeCommand = .question
-            showCommandHint = true
-            
-            // TODO: Show quick actions
-            if text == "?" {
-                // Will be implemented with quick actions menu
-            }
-        } else {
-            showCommandHint = false
-            activeCommand = nil
-        }
     }
 }
 

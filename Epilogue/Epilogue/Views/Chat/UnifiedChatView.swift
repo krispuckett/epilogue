@@ -26,6 +26,7 @@ struct UnifiedChatView: View {
     @State private var liveTranscription: String = ""
     
     var body: some View {
+        let _ = print("🎨 UnifiedChatView body called, currentBookContext: \(currentBookContext?.title ?? "none")")
         ZStack {
             // Gradient system with ambient recording support
             Group {
@@ -50,6 +51,11 @@ struct UnifiedChatView: View {
                         .onAppear {
                             print("🎨 BookAtmosphericGradientView appeared for: \(book.title)")
                             print("🎨 Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
+                            if let cp = colorPalette {
+                                print("🎨 Primary: \(cp.primary)")
+                                print("🎨 Secondary: \(cp.secondary)")
+                                print("🎨 Accent: \(cp.accent)")
+                            }
                         }
                 } else {
                     // Use existing ambient gradient for empty state
@@ -63,14 +69,69 @@ struct UnifiedChatView: View {
             
             // Chat UI overlay
             VStack(spacing: 0) {
-                // Book context indicator (like Perplexity's model selector)
-                BookContextPill(
-                    book: currentBookContext,
-                    onTap: {
-                        showingCommandPalette = true
-                        messageText = "/"
+                // Book context indicator with native dropdown menu
+                Menu {
+                    // Show user's books
+                    ForEach(libraryViewModel.books) { book in
+                        Button {
+                            currentBookContext = book
+                            HapticManager.shared.lightTap()
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading) {
+                                    Text(book.title)
+                                        .font(.body)
+                                    Text(book.author)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                // Small book cover if available
+                                if let coverURL = book.coverImageURL,
+                                   let url = URL(string: coverURL) {
+                                    AsyncImage(url: url) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 30, height: 40)
+                                            .cornerRadius(4)
+                                    } placeholder: {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(width: 30, height: 40)
+                                    }
+                                } else {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(width: 30, height: 40)
+                                        .overlay {
+                                            Image(systemName: "book.closed")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                }
+                            }
+                        }
                     }
-                )
+                    
+                    if !libraryViewModel.books.isEmpty {
+                        Divider()
+                    }
+                    
+                    // Clear selection option
+                    Button {
+                        currentBookContext = nil
+                        HapticManager.shared.lightTap()
+                    } label: {
+                        Label("Clear Selection", systemImage: "xmark.circle")
+                    }
+                } label: {
+                    BookContextPill(
+                        book: currentBookContext,
+                        onTap: {} // Empty since Menu handles the tap
+                    )
+                }
+                .menuStyle(.automatic) // Use iOS default menu style
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
@@ -119,6 +180,15 @@ struct UnifiedChatView: View {
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
+            }
+        }
+        .onAppear {
+            // Extract colors for initial book context if present
+            if let book = currentBookContext {
+                print("🎨 onAppear: Found initial book context: \(book.title)")
+                Task {
+                    await extractColorsForBook(book)
+                }
             }
         }
         // Remove animation modifiers from here since they're on the Group now
@@ -230,7 +300,11 @@ struct UnifiedChatView: View {
             }
         }
         
-        // TODO: Send to AI service and get response
+        // Send to AI service and get response
+        Task {
+            // Placeholder for AI integration
+            // Will be implemented when PerplexityService is configured
+        }
     }
     
     // MARK: - Ambient Session Handling
@@ -442,8 +516,10 @@ struct UnifiedChatView: View {
     private func extractColorsForBook(_ book: Book) async {
         // Check cache first
         let bookID = book.localId.uuidString
+        print("🎨 Checking cache for book ID: \(bookID)")
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             print("🎨 Found cached palette for: \(book.title)")
+            print("🎨 Cached colors - Primary: \(cachedPalette.primary), Secondary: \(cachedPalette.secondary)")
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     self.colorPalette = cachedPalette
@@ -451,15 +527,22 @@ struct UnifiedChatView: View {
             }
             return
         }
+        print("🎨 No cached palette found, will extract colors")
         
         // Extract colors if not cached
-        guard let coverURLString = book.coverImageURL,
-              let coverURL = URL(string: coverURLString) else {
+        guard let coverURLString = book.coverImageURL else {
             print("🎨 No cover URL for book: \(book.title)")
             return
         }
         
-        print("🎨 Starting color extraction from: \(coverURLString)")
+        // Convert HTTP to HTTPS for ATS compliance
+        let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
+        guard let coverURL = URL(string: secureURLString) else {
+            print("🎨 Invalid cover URL for book: \(book.title)")
+            return
+        }
+        
+        print("🎨 Starting color extraction from: \(secureURLString)")
         
         do {
             let (imageData, _) = try await URLSession.shared.data(from: coverURL)
@@ -475,9 +558,11 @@ struct UnifiedChatView: View {
             let palette = try await extractor.extractPalette(from: uiImage, imageSource: book.title)
             
             print("🎨 Extracted new palette for: \(book.title)")
+            print("🎨 Extracted colors - Primary: \(palette.primary), Secondary: \(palette.secondary), Accent: \(palette.accent)")
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     self.colorPalette = palette
+                    print("🎨 Palette assigned to colorPalette state")
                 }
             }
             
@@ -490,15 +575,15 @@ struct UnifiedChatView: View {
     }
     
     private func generatePlaceholderPalette(for book: Book) -> ColorPalette {
-        // Same neutral placeholder as BookDetailView
+        // Use warm amber gradient as placeholder until colors are extracted
         return ColorPalette(
-            primary: Color(white: 0.3),
-            secondary: Color(white: 0.25),
-            accent: Color.warmAmber.opacity(0.3),
+            primary: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8),     // Warm amber
+            secondary: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.6),   // Deeper orange
+            accent: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.5),    // Light amber
             background: Color(white: 0.1),
             textColor: .white,
             luminance: 0.3,
-            isMonochromatic: true,
+            isMonochromatic: false,
             extractionQuality: 0.1
         )
     }

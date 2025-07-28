@@ -8,11 +8,11 @@ struct BookContextPill: View {
     @State private var isAnimatingIn = false
     @Environment(\.colorScheme) var colorScheme
     
-    // Reading progress (mock for now - integrate with actual progress tracking)
+    // Reading progress from book model
     private var readingProgress: Double? {
-        // TODO: Get actual reading progress from book model
-        if book != nil {
-            return 0.45 // Mock 45% progress
+        // Return actual reading progress if available
+        if let book = book, book.readingProgress > 0 {
+            return book.readingProgress
         }
         return nil
     }
@@ -112,7 +112,7 @@ struct BookContextPill: View {
             }
         }
         .onLongPressGesture(minimumDuration: 0.5) {
-            // TODO: Show book discussion history
+            // Long press to show book info/history (future feature)
             HapticManager.shared.mediumTap()
         } onPressingChanged: { pressing in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

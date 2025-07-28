@@ -315,8 +315,7 @@ struct ChatThreadListView: View {
     }
     
     private func archiveThread(_ thread: ChatThread) {
-        // TODO: Implement archive functionality
-        // For now, just mark as archived
+        // Archive thread
         thread.isArchived = true
         try? modelContext.save()
         HapticManager.shared.success()

@@ -16,16 +16,12 @@ struct ChatCommandPalette: View {
     
     // Chat-specific commands
     enum ChatCommand: String, CaseIterable {
-        case switchBook = "switch"
-        case clearContext = "clear"
         case summarize = "summarize"
         case export = "export"
         case search = "search"
         
         var icon: String {
             switch self {
-            case .switchBook: return "books.vertical"
-            case .clearContext: return "xmark.circle"
             case .summarize: return "doc.text.magnifyingglass"
             case .export: return "square.and.arrow.up"
             case .search: return "magnifyingglass"
@@ -34,8 +30,6 @@ struct ChatCommandPalette: View {
         
         var title: String {
             switch self {
-            case .switchBook: return "Switch Book Context"
-            case .clearContext: return "Clear Context"
             case .summarize: return "Summarize Conversation"
             case .export: return "Export Chat"
             case .search: return "Search Messages"
@@ -44,8 +38,6 @@ struct ChatCommandPalette: View {
         
         var subtitle: String {
             switch self {
-            case .switchBook: return "Change the book you're discussing"
-            case .clearContext: return "Remove current book association"
             case .summarize: return "Get an AI summary of this chat"
             case .export: return "Save conversation as markdown"
             case .search: return "Find messages in this chat"
@@ -364,20 +356,17 @@ struct ChatCommandPalette: View {
         HapticManager.shared.lightTap()
         
         switch command {
-        case .switchBook:
-            // Show book picker
-            searchText = ""
-        case .clearContext:
-            selectedBook = nil
-            dismiss()
         case .summarize:
-            // TODO: Trigger summarization
+            // Trigger summarization (future feature)
+            commandText = "Summarize this conversation"
             dismiss()
         case .export:
-            // TODO: Trigger export
+            // Trigger export (future feature)
+            commandText = "Export chat to markdown"
             dismiss()
         case .search:
-            // TODO: Open search
+            // Open search (future feature)
+            commandText = "Search: "
             dismiss()
         }
     }
