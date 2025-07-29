@@ -170,8 +170,9 @@ struct SwiftDataNotesView: View {
     @ViewBuilder
     private func highlightOverlay(for note: Note) -> some View {
         RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
-            .opacity(navigationCoordinator.highlightedNoteID == note.id ? 1 : 0)
+            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 1.5)
+            .opacity(navigationCoordinator.highlightedNoteID == note.id ? 0.8 : 0)
+            .blur(radius: 0.5)
             .animation(.easeInOut(duration: 0.3), value: navigationCoordinator.highlightedNoteID)
     }
     
@@ -292,7 +293,7 @@ struct SwiftDataNoteContextMenu: View {
     @ViewBuilder
     private func popoverMenu(in geometry: GeometryProxy) -> some View {
         menuContent()
-            .frame(width: 260)
+            .frame(width: 200)
             .glassEffect(in: RoundedRectangle(cornerRadius: 24))
             .overlay(menuBorder)
             .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
@@ -318,7 +319,7 @@ struct SwiftDataNoteContextMenu: View {
     
     private func calculatePosition(in geometry: GeometryProxy) -> CGPoint {
         let menuHeight: CGFloat = note.type == .quote ? 220 : 180
-        let menuWidth: CGFloat = 260
+        let menuWidth: CGFloat = 200
         let padding: CGFloat = 8
         
         var x = sourceRect.midX
@@ -344,14 +345,11 @@ struct SwiftDataNoteContextMenu: View {
         VStack(spacing: 0) {
             if note.type == .quote {
                 shareButton
-                menuDivider
             }
             
             copyButton
-            menuDivider
             
             editButton
-            menuDivider
             
             deleteButton
         }
@@ -405,11 +403,6 @@ struct SwiftDataNoteContextMenu: View {
                 }
             }
         )
-    }
-    
-    private var menuDivider: some View {
-        Divider()
-            .background(Color.white.opacity(0.15))
     }
     
     private func dismissMenu() {
@@ -483,10 +476,6 @@ private struct ContextMenuButton: View {
                     .font(.system(size: 17, weight: .regular))
                 
                 Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .medium))
-                    .opacity(0.3)
             }
             .foregroundStyle(isDestructive ? Color.red : .white)
             .padding(.horizontal, 20)

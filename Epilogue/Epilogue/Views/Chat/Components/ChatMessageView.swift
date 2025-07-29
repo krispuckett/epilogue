@@ -89,7 +89,16 @@ struct ChatMessageView: View {
                         object: note
                     )
                 }
-                .frame(maxWidth: 300)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.75)
+            case .noteWithContext(let note, let context):
+                NoteWithContextBubble(note: note, context: context) {
+                    // Navigation will be handled by parent view
+                    NotificationCenter.default.post(
+                        name: .navigateToNote,
+                        object: note
+                    )
+                }
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.75)
             case .quote(let quote):
                 MiniQuoteCard(quote: quote) {
                     // Navigation will be handled by parent view
@@ -98,7 +107,7 @@ struct ChatMessageView: View {
                         object: quote
                     )
                 }
-                .frame(maxWidth: 300)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.75)
             default:
                 aiMessageContent
             }
@@ -116,7 +125,7 @@ struct ChatMessageView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .frame(maxWidth: geometry.size.width * 0.7, alignment: .trailing)
+                    .frame(maxWidth: geometry.size.width * 0.75, alignment: .trailing)
                     .glassEffect(in: .rect(cornerRadius: 20))
                     .overlay(alignment: .topTrailing) {
                         // Subtle border
@@ -140,7 +149,7 @@ struct ChatMessageView: View {
     
     private var intrinsicHeight: CGFloat {
         let text = message.content as NSString
-        let maxWidth = UIScreen.main.bounds.width * 0.7 - 32 // 70% minus padding
+        let maxWidth = UIScreen.main.bounds.width * 0.75 - 32 // 75% minus padding
         let boundingRect = text.boundingRect(
             with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -164,7 +173,6 @@ struct ChatMessageView: View {
             MarkdownText(text: message.content, isUserMessage: false)
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.9))
-                .frame(maxWidth: 300, alignment: .leading)
         }
         .padding(.horizontal, 4) // Minimal padding for clean look
     }
@@ -449,5 +457,42 @@ extension UnifiedChatMessage {
             )
         }
         .padding()
+    }
+}
+
+// MARK: - Note With Context Bubble
+
+struct NoteWithContextBubble: View {
+    let note: CapturedNote
+    let context: String
+    let onTap: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // User's thought as a note card
+            MiniNoteCard(note: note, onTap: onTap)
+            
+            // Optional context in smaller, subdued style
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.5))
+                
+                Text(context)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+        }
     }
 }

@@ -139,6 +139,26 @@ struct ContentView: View {
                 }
             }
         }
+        .onChange(of: selectedTab) { oldValue, newValue in
+            // Haptic feedback on tab change
+            HapticManager.shared.selectionChanged()
+            
+            // Sync with navigation coordinator
+            switch newValue {
+            case 0: navigationCoordinator.selectedTab = .library
+            case 1: navigationCoordinator.selectedTab = .notes
+            case 2: navigationCoordinator.selectedTab = .chat
+            default: break
+            }
+        }
+        .onChange(of: navigationCoordinator.selectedTab) { oldValue, newValue in
+            // Sync from navigation coordinator
+            switch newValue {
+            case .library: selectedTab = 0
+            case .notes: selectedTab = 1
+            case .chat: selectedTab = 2
+            }
+        }
         
         // Command palette overlay
         .overlay {

@@ -83,39 +83,45 @@ struct SharedBookCoverView: View {
         */
     }
     
+    private func loadImage() {
+        guard !isLoadingStarted, let urlString = coverURL else { return }
+        isLoadingStarted = true
+        
+        SharedBookCoverManager.shared.loadProgressiveImage(
+            from: urlString,
+            onLowQualityLoaded: { image in
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.lowQualityImage = image
+                }
+                if self.highQualityImage == nil {
+                    self.onImageLoaded?(image)
+                }
+            },
+            onHighQualityLoaded: { image in
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.highQualityImage = image
+                }
+                self.onImageLoaded?(image)
+                
+                DisplayedImageStore.shared.store(image: image, for: urlString)
+            }
+        )
+    }
+    
     var body: some View {
         ZStack {
             // Lightweight placeholder
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
                 .onAppear {
-                    // Start progressive loading only once
-                    guard !isLoadingStarted else { return }
-                    isLoadingStarted = true
-                    
-                    SharedBookCoverManager.shared.loadProgressiveImage(
-                        from: coverURL,
-                        onLowQualityLoaded: { image in
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                lowQualityImage = image
-                            }
-                            // Only notify if high quality hasn't loaded yet
-                            if highQualityImage == nil {
-                                onImageLoaded?(image)
-                            }
-                        },
-                        onHighQualityLoaded: { image in
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                highQualityImage = image
-                            }
-                            onImageLoaded?(image)
-                            
-                            // Store in legacy cache for compatibility
-                            if let url = coverURL {
-                                DisplayedImageStore.shared.store(image: image, for: url)
-                            }
-                        }
-                    )
+                    loadImage()
+                }
+                .onChange(of: coverURL) { _, _ in
+                    // Reset state and reload when URL changes
+                    lowQualityImage = nil
+                    highQualityImage = nil
+                    isLoadingStarted = false
+                    loadImage()
                 }
             
             // Display the best available image

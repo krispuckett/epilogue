@@ -52,8 +52,9 @@ struct UnifiedChatView: View {
     }
     
     var body: some View {
-        // Root gradient with proper ignoresSafeArea
-        Group {
+        ZStack {
+            // 1. Gradient background (exactly like LibraryView)
+            Group {
             if isRecording, let book = currentBookContext {
                 // Use the breathing gradient during recording with book context
                 ClaudeInspiredGradient(
@@ -108,11 +109,8 @@ struct UnifiedChatView: View {
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }
-        }
-        .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
-        .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
-        .overlay {
-            // Messages area with proper safe area insets
+            
+            // 2. ScrollView as direct child of ZStack (exactly like LibraryView)
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -132,59 +130,60 @@ struct UnifiedChatView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16) // Top padding for content
-                    .padding(.bottom, 16) // Bottom padding for content
+                    .padding(.bottom, 100) // Extra bottom padding to account for tab bar
                 }
                 .onAppear {
                     scrollProxy = proxy
                 }
-                // iOS 26 safe area blur for header
-                .safeAreaInset(edge: .top) {
-                    BookContextMenuView(
-                        currentBook: $currentBookContext,
-                        books: libraryViewModel.books,
-                        showingBookPicker: $showingBookPicker
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                }
-                // iOS 26 safe area blur for footer
-                .safeAreaInset(edge: .bottom) {
-                    VStack(spacing: 0) {
-                        // Live transcription preview during recording
-                        if isRecording && !liveTranscription.isEmpty {
-                            LiveTranscriptionView(
-                                transcription: liveTranscription, 
-                                adaptiveUIColor: adaptiveUIColor,
-                                onCancel: {
-                                    // Cancel the transcription
-                                    voiceManager.stopListening()
-                                    isRecording = false
-                                    liveTranscription = ""
-                                    HapticManager.shared.lightTap()
-                                }
-                            )
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 8)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-                        
-                        // Chat input bar
-                        UnifiedChatInputBar(
-                            messageText: $messageText,
-                            showingCommandPalette: $showingCommandPalette,
-                            isInputFocused: $isInputFocused,
-                            currentBook: currentBookContext,
-                            onSend: sendMessage,
-                            isRecording: $isRecording,
-                            onMicrophoneTap: handleMicrophoneTap,
-                            colorPalette: colorPalette
+            }
+            // 3. Use safeAreaInset for header and input (exactly like LibraryView)
+            .safeAreaInset(edge: .top) {
+                BookContextMenuView(
+                    currentBook: $currentBookContext,
+                    books: libraryViewModel.books,
+                    showingBookPicker: $showingBookPicker
+                )
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+            }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 0) {
+                    // Live transcription preview during recording
+                    if isRecording && !liveTranscription.isEmpty {
+                        LiveTranscriptionView(
+                            transcription: liveTranscription, 
+                            adaptiveUIColor: adaptiveUIColor,
+                            onCancel: {
+                                // Cancel the transcription
+                                voiceManager.stopListening()
+                                isRecording = false
+                                liveTranscription = ""
+                                HapticManager.shared.lightTap()
+                            }
                         )
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    
+                    // Chat input bar
+                    UnifiedChatInputBar(
+                        messageText: $messageText,
+                        showingCommandPalette: $showingCommandPalette,
+                        isInputFocused: $isInputFocused,
+                        currentBook: currentBookContext,
+                        onSend: sendMessage,
+                        isRecording: $isRecording,
+                        onMicrophoneTap: handleMicrophoneTap,
+                        colorPalette: colorPalette
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
                 }
             }
         }
+        .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
+        .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
         .onAppear {
             // Extract colors for initial book context if present
             if let book = currentBookContext {
@@ -280,6 +279,10 @@ struct UnifiedChatView: View {
             // Update audio level for gradient animation
             audioLevel = level
         }
+        } // End of ZStack
+        // Hide navigation bar but keep blur working
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
     }
     
     
@@ -701,14 +704,27 @@ struct UnifiedChatView: View {
                     // Insert into SwiftData
                     modelContext.insert(noteModel)
                     
-                    // Add to messages with note type
-                    messages.append(UnifiedChatMessage(
-                        content: note.text,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext,
-                        messageType: .note(noteModel)
-                    ))
+                    // Check if we should provide context for this reflection
+                    if shouldProvideContext(for: note.text),
+                       let context = generateContextualInfo(for: note.text, book: currentBookContext) {
+                        // Add note with context
+                        messages.append(UnifiedChatMessage(
+                            content: note.text,
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: currentBookContext,
+                            messageType: .noteWithContext(noteModel, context: context)
+                        ))
+                    } else {
+                        // Add regular note
+                        messages.append(UnifiedChatMessage(
+                            content: note.text,
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: currentBookContext,
+                            messageType: .note(noteModel)
+                        ))
+                    }
                 }
                 
                 // Save the context after inserting all items
@@ -910,9 +926,44 @@ struct UnifiedChatView: View {
                 }
             }
             
-            // Improved QUESTION detection
+            // Check for REFLECTIONS first (these should become notes, not questions)
+            var isReflection = false
+            if !isQuote {
+                let reflectionPatterns = [
+                    "i love",
+                    "i think",
+                    "i feel",
+                    "i believe",
+                    "i wonder if",  // Rhetorical wondering, not a direct question
+                    "i wonder about",
+                    "i'm thinking",
+                    "it's interesting that",
+                    "this reminds me",
+                    "this makes me think",
+                    "i find it",
+                    "reminds me of",
+                    "makes me wonder",
+                    "i appreciate",
+                    "i notice",
+                    "i'm struck by",
+                    "it occurs to me",
+                    "i'm reminded of",
+                    "this connects to",
+                    "i'm fascinated by"
+                ]
+                
+                for pattern in reflectionPatterns {
+                    if lowercased.contains(pattern) {
+                        print("   Detected as REFLECTION/NOTE")
+                        isReflection = true
+                        break
+                    }
+                }
+            }
+            
+            // Improved QUESTION detection (only if not a reflection)
             var isQuestion = false
-            if !isQuote && (trimmed.hasSuffix("?") ||
+            if !isQuote && !isReflection && (trimmed.hasSuffix("?") ||
                 lowercased.starts(with: "why ") ||
                 lowercased.starts(with: "how ") ||
                 lowercased.starts(with: "what ") ||
@@ -928,8 +979,6 @@ struct UnifiedChatView: View {
                 lowercased.starts(with: "are these") ||
                 lowercased.starts(with: "do you") ||
                 lowercased.starts(with: "does this") ||
-                lowercased.contains("i wonder") ||
-                lowercased.contains("i'm curious") ||
                 lowercased.contains("what does this mean") ||
                 lowercased.contains("what does that mean") ||
                 lowercased.contains("can you explain") ||
@@ -946,7 +995,7 @@ struct UnifiedChatView: View {
                 ))
             }
             
-            // Improved NOTE detection
+            // NOTE detection (including reflections)
             if !isQuote && !isQuestion {
                 // Check for explicit note indicators
                 var noteType: ExtractedNote.NoteType = .reflection
@@ -1042,6 +1091,56 @@ struct UnifiedChatView: View {
         
         // If no quotes found, return empty
         return ""
+    }
+    
+    // MARK: - Smart Context Generation for Reflections
+    
+    private func shouldProvideContext(for thought: String) -> Bool {
+        // Only provide context if the thought references something specific
+        let contextTriggers = [
+            "this", "that", "it", "the idea of", "concept", "theme",
+            "character", "protagonist", "antagonist", "hero",
+            "journey", "symbolism", "metaphor", "allegory",
+            "monomyth", "archetype", "motif"
+        ]
+        
+        let lowercased = thought.lowercased()
+        return contextTriggers.contains { trigger in
+            lowercased.contains(trigger)
+        }
+    }
+    
+    private func generateContextualInfo(for thought: String, book: Book?) -> String? {
+        let lowercased = thought.lowercased()
+        
+        // Check for specific concepts mentioned
+        if lowercased.contains("monomyth") || lowercased.contains("hero's journey") {
+            return "The Hero's Journey: Joseph Campbell's narrative pattern found in myths worldwide"
+        }
+        
+        if lowercased.contains("archetype") {
+            return "Archetypes: Universal character types that appear across cultures and stories"
+        }
+        
+        if lowercased.contains("ring") && book?.title.contains("Lord of the Rings") == true {
+            return "The One Ring: Symbol of power and corruption in Tolkien's Middle-earth"
+        }
+        
+        if lowercased.contains("green light") && book?.title.contains("Gatsby") == true {
+            return "The green light: Symbol of hope and the American Dream in Fitzgerald's novel"
+        }
+        
+        // More generic contextual hints based on keywords
+        if lowercased.contains("symbolism") {
+            return "Literary device where objects or actions represent ideas beyond their literal meaning"
+        }
+        
+        if lowercased.contains("foreshadowing") {
+            return "Literary technique: hints or clues about events that will occur later in the story"
+        }
+        
+        // Return nil if no specific context is relevant
+        return nil
     }
     
     // MARK: - Color Extraction (Reused from BookDetailView)
@@ -1140,6 +1239,7 @@ struct UnifiedChatMessage: Identifiable {
     enum MessageType {
         case text
         case note(CapturedNote)
+        case noteWithContext(CapturedNote, context: String)
         case quote(CapturedQuote)
         case system
         case contextSwitch
@@ -1264,13 +1364,56 @@ struct BookContextMenuView: View {
     @Binding var showingBookPicker: Bool
     
     var body: some View {
-        BookContextPill(
-            book: currentBook,
-            onTap: {
+        HStack(spacing: 12) {
+            // Book cover OUTSIDE the Menu
+            if let book = currentBook {
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 24,
+                    height: 36
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+            }
+            
+            // Simplified pill button (no images inside Menu)
+            Button {
                 showingBookPicker = true
                 HapticManager.shared.lightTap()
+            } label: {
+                HStack(spacing: 8) {
+                    if let book = currentBook {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(book.title)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .lineLimit(1)
+                            
+                            Text(book.author ?? "")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .lineLimit(1)
+                        }
+                    } else {
+                        Image(systemName: "books.vertical")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                        
+                        Text("Select a book")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 16))
             }
-        )
+            .buttonStyle(.plain)
+        }
     }
 }
 

@@ -199,6 +199,7 @@ struct ChatBookPickerSheet: View {
     private func handleBookSelection(_ book: Book) {
         HapticManager.shared.lightTap()
         selectedBook = book
+        isPresented = false
         dismiss()
     }
 }

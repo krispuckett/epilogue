@@ -62,8 +62,9 @@ struct NotesView: View {
     @ViewBuilder
     private func highlightOverlay(for note: Note) -> some View {
         RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
-            .opacity(highlightedNoteId == note.id ? 1 : 0)
+            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 1.5)
+            .opacity(highlightedNoteId == note.id ? 0.8 : 0)
+            .blur(radius: 0.5)
             .animation(.easeInOut(duration: 0.3), value: highlightedNoteId)
     }
     
