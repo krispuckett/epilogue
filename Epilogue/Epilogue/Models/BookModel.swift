@@ -25,14 +25,14 @@ final class BookModel {
     var dateAdded: Date
     
     // Relationships
-    @Relationship(deleteRule: .cascade, inverse: \Note.book)
-    var notes: [Note]?
+    @Relationship(deleteRule: .cascade, inverse: \CapturedNote.book)
+    var notes: [CapturedNote]?
     
-    @Relationship(deleteRule: .cascade, inverse: \Quote.book)
-    var quotes: [Quote]?
+    @Relationship(deleteRule: .cascade, inverse: \CapturedQuote.book)
+    var quotes: [CapturedQuote]?
     
-    @Relationship(deleteRule: .cascade, inverse: \Question.book)
-    var questions: [Question]?
+    @Relationship(deleteRule: .cascade, inverse: \CapturedQuestion.book)
+    var questions: [CapturedQuestion]?
     
     init(
         id: String,

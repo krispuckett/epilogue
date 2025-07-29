@@ -9,9 +9,9 @@ struct SwiftDataNotesView: View {
     @EnvironmentObject private var libraryViewModel: LibraryViewModel
     
     // Queries
-    @Query(sort: \Note.timestamp, order: .reverse) private var notes: [Note]
-    @Query(sort: \Quote.timestamp, order: .reverse) private var quotes: [Quote]
-    @Query(sort: \Question.timestamp, order: .reverse) private var questions: [Question]
+    @Query(sort: \CapturedNote.timestamp, order: .reverse) private var notes: [CapturedNote]
+    @Query(sort: \CapturedQuote.timestamp, order: .reverse) private var quotes: [CapturedQuote]
+    @Query(sort: \CapturedQuestion.timestamp, order: .reverse) private var questions: [CapturedQuestion]
     
     @State private var selectedFilter: ContentFilter = .all
     @State private var selectedBook: Book?
@@ -76,9 +76,9 @@ struct SwiftDataNotesView: View {
     }
     
     enum ContentType {
-        case note(Note)
-        case quote(Quote)
-        case question(Question)
+        case note(CapturedNote)
+        case quote(CapturedQuote)
+        case question(CapturedQuestion)
     }
     
     var body: some View {
@@ -300,7 +300,7 @@ struct SwiftDataNotesView: View {
 // MARK: - Question Card
 
 struct QuestionCard: View {
-    let question: Question
+    let question: CapturedQuestion
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

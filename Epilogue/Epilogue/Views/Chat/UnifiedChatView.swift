@@ -486,7 +486,7 @@ struct UnifiedChatView: View {
                 // Add quotes
                 for quote in processed.quotes {
                     // Create and save Quote to SwiftData
-                    let quoteModel = Quote(
+                    let quoteModel = CapturedQuote(
                         text: quote.text,
                         book: bookModel,
                         timestamp: quote.timestamp,
@@ -509,7 +509,7 @@ struct UnifiedChatView: View {
                 // Add notes
                 for note in processed.notes {
                     // Create and save Note to SwiftData
-                    let noteModel = Note(
+                    let noteModel = CapturedNote(
                         content: note.text,
                         book: bookModel,
                         timestamp: note.timestamp,
@@ -967,8 +967,8 @@ struct UnifiedChatMessage: Identifiable {
     
     enum MessageType {
         case text
-        case note(Note)
-        case quote(Quote)
+        case note(CapturedNote)
+        case quote(CapturedQuote)
         case system
         case contextSwitch
         case transcribing

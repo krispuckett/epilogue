@@ -43,14 +43,14 @@ class NavigationCoordinator: ObservableObject {
     
     // MARK: - Navigation Methods
     
-    func navigateToNote(_ note: Note) {
+    func navigateToNote(_ note: CapturedNote) {
         print("[NavigationCoordinator] Navigating to note: \(note.id)")
         highlightedNoteID = note.id
         selectedTab = .notes
         shouldNavigateToNotes = true
     }
     
-    func navigateToQuote(_ quote: Quote) {
+    func navigateToQuote(_ quote: CapturedQuote) {
         print("[NavigationCoordinator] Navigating to quote: \(quote.id)")
         highlightedQuoteID = quote.id
         selectedTab = .notes
@@ -85,7 +85,7 @@ class NavigationCoordinator: ObservableObject {
     private func setupNotificationObservers() {
         // Navigate to note
         NotificationCenter.default.publisher(for: .navigateToNote)
-            .compactMap { $0.object as? Note }
+            .compactMap { $0.object as? CapturedNote }
             .sink { [weak self] note in
                 self?.navigateToNote(note)
             }
@@ -93,7 +93,7 @@ class NavigationCoordinator: ObservableObject {
         
         // Navigate to quote
         NotificationCenter.default.publisher(for: .navigateToQuote)
-            .compactMap { $0.object as? Quote }
+            .compactMap { $0.object as? CapturedQuote }
             .sink { [weak self] quote in
                 self?.navigateToQuote(quote)
             }

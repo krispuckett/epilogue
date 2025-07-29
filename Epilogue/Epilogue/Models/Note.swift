@@ -4,7 +4,7 @@ import SwiftData
 // MARK: - Note Model
 
 @Model
-final class Note {
+final class CapturedNote {
     var id: UUID
     var content: String
     var timestamp: Date
@@ -39,7 +39,7 @@ final class Note {
 // MARK: - Quote Model
 
 @Model
-final class Quote {
+final class CapturedQuote {
     var id: UUID
     var text: String
     var author: String?
@@ -77,7 +77,7 @@ final class Quote {
 // MARK: - Question Model
 
 @Model
-final class Question {
+final class CapturedQuestion {
     var id: UUID
     var content: String
     var timestamp: Date

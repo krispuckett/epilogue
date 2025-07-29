@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Mini Note Card for Chat
 
 struct MiniNoteCard: View {
-    let note: Note
+    let note: CapturedNote
     let onTap: () -> Void
     
     var body: some View {
@@ -72,7 +72,7 @@ struct MiniNoteCard: View {
 // MARK: - Mini Quote Card for Chat
 
 struct MiniQuoteCard: View {
-    let quote: Quote
+    let quote: CapturedQuote
     let onTap: () -> Void
     
     var body: some View {
@@ -140,7 +140,7 @@ struct MiniQuoteCard: View {
         VStack(spacing: 16) {
             // Mock Note
             MiniNoteCard(
-                note: Note(
+                note: CapturedNote(
                     content: "This is an interesting observation about the protagonist's character development throughout the chapter. The way they handle conflict has evolved significantly.",
                     book: BookModel(
                         id: "1",
@@ -155,7 +155,7 @@ struct MiniQuoteCard: View {
             
             // Mock Quote
             MiniQuoteCard(
-                quote: Quote(
+                quote: CapturedQuote(
                     text: "So we beat on, boats against the current, borne back ceaselessly into the past.",
                     book: BookModel(
                         id: "1",
