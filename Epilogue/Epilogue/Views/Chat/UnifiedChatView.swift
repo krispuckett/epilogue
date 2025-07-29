@@ -1080,15 +1080,13 @@ struct BookContextMenuView: View {
     @State private var showingBookPicker = false
     
     var body: some View {
-        Button {
-            showingBookPicker = true
-            HapticManager.shared.lightTap()
-        } label: {
-            BookContextPill(
-                book: currentBook,
-                onTap: {}
-            )
-        }
+        BookContextPill(
+            book: currentBook,
+            onTap: {
+                showingBookPicker = true
+                HapticManager.shared.lightTap()
+            }
+        )
         .sheet(isPresented: $showingBookPicker) {
             ChatBookPickerSheet(
                 selectedBook: $currentBook,
