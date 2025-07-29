@@ -152,9 +152,6 @@ struct ChatBookPickerSheet: View {
         .onAppear {
             isFocused = true
         }
-        .presentationBackground(.clear)
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.hidden)
     }
     
     // MARK: - Book Row

@@ -137,7 +137,7 @@ struct QuoteCard: View {
             .padding(.top, 20)
             
             // Attribution section
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
                 // Thin horizontal rule with gradient
                 LinearGradient(
                     gradient: Gradient(stops: [
@@ -149,7 +149,7 @@ struct QuoteCard: View {
                     endPoint: .trailing
                 )
                 .frame(height: 0.5)
-                .padding(.top, 20)
+                .padding(.top, 28)
                 
                 // Attribution text - reordered: Author -> Source -> Page
                 VStack(alignment: .leading, spacing: 6) {

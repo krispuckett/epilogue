@@ -30,6 +30,7 @@ struct UnifiedChatView: View {
     // Input state
     @State private var messageText = ""
     @State private var showingCommandPalette = false
+    @State private var showingBookPicker = false
     @FocusState private var isInputFocused: Bool
     
     // Ambient/Whisper state
@@ -140,7 +141,8 @@ struct UnifiedChatView: View {
                 .safeAreaInset(edge: .top) {
                     BookContextMenuView(
                         currentBook: $currentBookContext,
-                        books: libraryViewModel.books
+                        books: libraryViewModel.books,
+                        showingBookPicker: $showingBookPicker
                     )
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
@@ -233,6 +235,31 @@ struct UnifiedChatView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
+        .overlay(alignment: .bottom) {
+            if showingBookPicker {
+                // Tap outside backdrop
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingBookPicker = false
+                    }
+                    .ignoresSafeArea()
+                
+                ChatBookPickerSheet(
+                    selectedBook: $currentBookContext,
+                    isPresented: $showingBookPicker,
+                    books: libraryViewModel.books
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 120) // Above input bar with safe area
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
+                .zIndex(100)
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookPicker)
         .onReceive(voiceManager.$transcribedText) { text in
             // Update live transcription
             if isRecording && !text.isEmpty {
@@ -1077,7 +1104,7 @@ struct AmbientChatGradientView: View {
 struct BookContextMenuView: View {
     @Binding var currentBook: Book?
     let books: [Book]
-    @State private var showingBookPicker = false
+    @Binding var showingBookPicker: Bool
     
     var body: some View {
         BookContextPill(
@@ -1087,13 +1114,6 @@ struct BookContextMenuView: View {
                 HapticManager.shared.lightTap()
             }
         )
-        .sheet(isPresented: $showingBookPicker) {
-            ChatBookPickerSheet(
-                selectedBook: $currentBook,
-                isPresented: $showingBookPicker,
-                books: books
-            )
-        }
     }
 }
 
