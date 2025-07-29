@@ -135,12 +135,12 @@ struct ChatBookPickerSheet: View {
         .gesture(
             DragGesture()
                 .onChanged { value in
-                    if value.translation.height > 0 {
+                    if value.translation.height < 0 {
                         dragOffset = value.translation.height
                     }
                 }
                 .onEnded { value in
-                    if value.translation.height > 50 {
+                    if value.translation.height < -50 {
                         dismiss()
                     } else {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

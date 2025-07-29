@@ -235,7 +235,7 @@ struct UnifiedChatView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: .top) {
             if showingBookPicker {
                 // Tap outside backdrop
                 Color.clear
@@ -251,10 +251,10 @@ struct UnifiedChatView: View {
                     books: libraryViewModel.books
                 )
                 .padding(.horizontal, 16)
-                .padding(.bottom, 120) // Above input bar with safe area
+                .padding(.top, 100) // Below header with safe area
                 .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
                 ))
                 .zIndex(100)
             }
