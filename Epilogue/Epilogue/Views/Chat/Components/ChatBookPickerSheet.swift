@@ -5,6 +5,8 @@ struct ChatBookPickerSheet: View {
     @Binding var isPresented: Bool
     let books: [Book]
     @State private var searchText = ""
+    @State private var dragOffset: CGFloat = 0
+    @FocusState private var isFocused: Bool
     @Environment(\.dismiss) private var dismiss
     
     // Filtered books based on search
@@ -21,153 +23,186 @@ struct ChatBookPickerSheet: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Drag indicator
+            Capsule()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+            
             // Search bar
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.5))
                 
                 TextField("Search books...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16))
+                    .font(.system(size: 15))
                     .foregroundStyle(.white)
+                    .focused($isFocused)
+                    .submitLabel(.go)
                 
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white.opacity(0.5))
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.vertical, 12)
+            .background(.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 16)
             
-            Divider()
-                .background(Color.white.opacity(0.1))
-            
-            // Book list
+            // Results
             ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(filteredBooks) { book in
-                        BookRowItem(
-                            book: book,
-                            isSelected: selectedBook?.id == book.id
-                        ) {
-                            selectedBook = book
-                            dismiss()
-                            HapticManager.shared.lightTap()
+                VStack(spacing: 0) {
+                    // Books
+                    ForEach(Array(filteredBooks.enumerated()), id: \.element.id) { index, book in
+                        bookRow(book: book)
+                            .onTapGesture {
+                                handleBookSelection(book)
+                            }
+                        
+                        if index < filteredBooks.count - 1 || selectedBook != nil {
+                            Divider()
+                                .foregroundStyle(.white.opacity(0.08))
+                                .padding(.leading, 60)
                         }
                     }
                     
                     // Clear selection option
                     if selectedBook != nil {
-                        Divider()
-                            .background(Color.white.opacity(0.1))
-                            .padding(.vertical, 8)
-                        
                         Button {
                             selectedBook = nil
                             dismiss()
                             HapticManager.shared.lightTap()
                         } label: {
                             HStack(spacing: 16) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.white.opacity(0.08))
-                                        .frame(width: 40, height: 40)
-                                    
-                                    Image(systemName: "xmark.circle")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                }
+                                // Icon
+                                Image(systemName: "xmark.circle")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                    .frame(width: 32, height: 32)
+                                    .background(
+                                        Circle()
+                                            .fill(.white.opacity(0.08))
+                                    )
                                 
+                                // Text
                                 Text("Clear Book Selection")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(.white)
                                 
                                 Spacer()
                             }
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
-                }
-                .padding(.vertical, 12)
-            }
-        }
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.7)
-        .presentationBackground(.ultraThinMaterial)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-}
-
-// MARK: - Book Row Item
-
-struct BookRowItem: View {
-    let book: Book
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button {
-            onTap()
-        } label: {
-            HStack(spacing: 16) {
-                // Book cover
-                AsyncImage(url: URL(string: book.coverImageURL ?? "")) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 40, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    case .failure(_), .empty:
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 40, height: 56)
-                            .overlay {
-                                Image(systemName: "book.closed.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(.white.opacity(0.3))
-                            }
-                    @unknown default:
-                        EmptyView()
+                    
+                    // Empty state
+                    if filteredBooks.isEmpty && !searchText.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.3))
+                            Text("No books found")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     }
                 }
-                
-                // Book info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(book.title)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
-                    
-                    Text(book.author)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-                
-                // Selection indicator
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                }
+                .padding(.top, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
+            .frame(maxHeight: 400)
         }
-        .buttonStyle(.plain)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+        }
+        .offset(y: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if value.translation.height > 0 {
+                        dragOffset = value.translation.height
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.height > 50 {
+                        dismiss()
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
+        .onAppear {
+            isFocused = true
+        }
+        .presentationBackground(.clear)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+    }
+    
+    // MARK: - Book Row
+    
+    private func bookRow(book: Book) -> some View {
+        HStack(spacing: 16) {
+            // Book cover
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 32,
+                height: 44
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+            
+            // Book info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(book.title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                Text(book.author)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            // Selection indicator
+            if selectedBook?.id == book.id {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+    
+    // MARK: - Actions
+    
+    private func handleBookSelection(_ book: Book) {
+        HapticManager.shared.lightTap()
+        selectedBook = book
+        dismiss()
     }
 }
 
