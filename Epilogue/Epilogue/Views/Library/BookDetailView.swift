@@ -89,6 +89,7 @@ struct BookDetailView: View {
     // Chat integration
     @Query private var threads: [ChatThread]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @State private var bookThread: ChatThread?
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
@@ -101,10 +102,9 @@ struct BookDetailView: View {
     
     // Dynamic gradient opacity based on scroll
     private var gradientOpacity: Double {
-        // Gradient fades from 100% to 20% over 200pt of scroll
-        let fadeDistance: CGFloat = 200
-        let opacity = 1.0 - (Double(max(0, -scrollOffset)) / Double(fadeDistance))
-        return max(0.2, min(1.0, opacity))
+        // Fixed calculation - no more crazy values
+        let opacity = 1.0 - (min(scrollOffset, 200) / 200)
+        return max(0.2, opacity)
     }
     
     // Color extraction
@@ -204,11 +204,23 @@ struct BookDetailView: View {
                 .id(book.id) // Force view recreation when book changes
             
             // Content - always visible but colors update
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Book info section
-                    centeredHeaderView
-                        .padding(.top, 20)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Scroll detector with FIXED calculation
+                        GeometryReader { geo in
+                            Color.clear
+                                .onChange(of: geo.frame(in: .global).minY) { oldValue, newValue in
+                                    // Simple, reliable calculation
+                                    let offset = -newValue + 150  // Adjust based on header height
+                                    scrollOffset = max(0, offset)
+                                }
+                        }
+                        .frame(height: 0)
+                        
+                        // Book info section
+                        centeredHeaderView
+                            .padding(.top, 20)
                     
                     // Summary section wrapped in padding container
                     if let description = book.description {
@@ -229,32 +241,21 @@ struct BookDetailView: View {
                         .padding(.horizontal, 24)
                         .padding(.top, 24)
                         .padding(.bottom, 100) // Space for tab bar
+                    }
                 }
-            }
-            .background(GeometryReader { geometry in
-                Color.clear.preference(
-                    key: ScrollOffsetPreferenceKey.self,
-                    value: geometry.frame(in: .named("scroll")).minY
-                )
-            })
-            .coordinateSpace(name: "scroll")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = value
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.automatic, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Edit Book") {
                     editedTitle = book.title
                     showingBookSearch = true
                     HapticManager.shared.lightTap()
                 }
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
-                .accessibilityLabel("Edit book details")
-                .accessibilityHint("Opens book search to change book information")
-                // No background, glassEffect, or overlay!
+                .foregroundStyle(.primary)
             }
         }
         .sheet(isPresented: $showingBookSearch) {
@@ -331,7 +332,6 @@ struct BookDetailView: View {
             .task(id: book.localId) {
                 // Color extraction now happens when image loads in SharedBookCoverView
             }
-            .scaleEffect(1 + (scrollOffset > 0 ? scrollOffset / 1000 : 0))
             
             // Title - dynamic color with adaptive shadow
             Text(book.title)
@@ -1194,12 +1194,6 @@ struct BookDetailView: View {
 }
 
 // MARK: - Scroll Offset Preference Key
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
 
 // MARK: - Supporting Views
 

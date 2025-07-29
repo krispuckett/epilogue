@@ -16,5 +16,7 @@
 	<string>Epilogue uses your microphone for voice commands and dictation to quickly add books, notes, and quotes.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Epilogue uses speech recognition to understand your voice commands for hands-free library management.</string>
+	<key>PERPLEXITY_API_KEY</key>
+	<string>$(PERPLEXITY_API_KEY)</string>
 </dict>
 </plist>

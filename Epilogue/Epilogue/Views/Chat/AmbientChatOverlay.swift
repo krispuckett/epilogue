@@ -32,29 +32,7 @@ struct ProcessedAmbientSession {
     }
 }
 
-struct ExtractedQuote {
-    let text: String
-    let context: String?
-    let timestamp: Date
-}
-
-struct ExtractedNote {
-    let text: String
-    let type: NoteType
-    let timestamp: Date
-    
-    enum NoteType {
-        case reflection
-        case insight
-        case connection
-    }
-}
-
-struct ExtractedQuestion {
-    let text: String
-    let context: String?
-    let timestamp: Date
-}
+// ExtractedQuote, ExtractedNote, and ExtractedQuestion are now in AmbientSessionModels.swift
 
 // MARK: - Claude-Inspired Gradient Background
 struct ClaudeInspiredGradient: View {
@@ -258,6 +236,7 @@ struct AmbientChatOverlay: View {
     @State private var showPatternVisualizer = false
     @StateObject private var autoStopManager = AutoStopManager.shared
     @State private var showAutoStopWarning = false
+    @State private var realtimeQuestions: [String] = []  // Track questions already processed in real-time
     
     var body: some View {
         ZStack {
@@ -455,6 +434,14 @@ struct AmbientChatOverlay: View {
                     }
                 }
                 
+                // Process questions in real-time
+                if isQuestion(newValue) && !realtimeQuestions.contains(newValue) {
+                    realtimeQuestions.append(newValue)
+                    Task {
+                        await processQuestionInRealtime(newValue)
+                    }
+                }
+                
                 // Reset transcribed text to capture continuous speech
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     voiceManager.transcribedText = ""
@@ -590,15 +577,15 @@ struct AmbientChatOverlay: View {
             let processed = await processAmbientSession(session)
             
             // Save to SwiftData - find existing thread or create new one
-            await MainActor.run {
-                // Query for existing thread for this book
-                let bookId = session.book?.localId
-                let descriptor = FetchDescriptor<ChatThread>(
-                    predicate: bookId != nil ? #Predicate<ChatThread> { thread in
-                        thread.bookId == bookId
-                    } : nil
-                )
-                
+            let bookId = session.book?.localId
+            let descriptor = FetchDescriptor<ChatThread>(
+                predicate: bookId != nil ? #Predicate<ChatThread> { thread in
+                    thread.bookId == bookId
+                } : nil
+            )
+            
+            // Create or update thread on main actor
+            let chatThread = await MainActor.run {
                 let existingThreads = try? modelContext.fetch(descriptor)
                 let chatThread: ChatThread
                 
@@ -625,6 +612,86 @@ struct AmbientChatOverlay: View {
                     modelContext.insert(chatThread)
                 }
                 
+                return chatThread
+            }
+            
+            // Add quotes as messages in the chat thread
+            for quote in processed.quotes {
+                await MainActor.run {
+                    let quoteMessage = ThreadedChatMessage(
+                        content: "\u{201C}\(quote.text)\u{201D}",
+                        isUser: true,
+                        timestamp: quote.timestamp,
+                        bookTitle: session.book?.title,
+                        bookAuthor: session.book?.author
+                    )
+                    chatThread.messages.append(quoteMessage)
+                }
+            }
+            
+            // Add notes as messages in the chat thread
+            for note in processed.notes {
+                await MainActor.run {
+                    let notePrefix = note.type == .insight ? "💡 " : 
+                                   note.type == .connection ? "🔗 " : "💭 "
+                    let noteMessage = ThreadedChatMessage(
+                        content: notePrefix + note.text,
+                        isUser: true,
+                        timestamp: note.timestamp,
+                        bookTitle: session.book?.title,
+                        bookAuthor: session.book?.author
+                    )
+                    chatThread.messages.append(noteMessage)
+                }
+            }
+            
+            // Process questions with AI outside of MainActor.run
+            for question in processed.questions {
+                // Add user's question to chat on main actor
+                await MainActor.run {
+                    let questionMessage = ThreadedChatMessage(
+                        content: question.text,
+                        isUser: true,
+                        timestamp: question.timestamp
+                    )
+                    chatThread.messages.append(questionMessage)
+                }
+                
+                // Get AI response to the question (outside MainActor)
+                do {
+                    let aiService = AICompanionService.shared
+                    let answer = try await aiService.processMessage(
+                        question.text,
+                        bookContext: session.book,
+                        conversationHistory: []  // Empty history for now, as questions are processed independently
+                    )
+                    
+                    // Add AI's answer to chat on main actor
+                    await MainActor.run {
+                        let answerMessage = ThreadedChatMessage(
+                            content: answer,
+                            isUser: false,
+                            timestamp: Date()
+                        )
+                        chatThread.messages.append(answerMessage)
+                    }
+                    
+                } catch {
+                    print("[AmbientChat] Failed to get AI response: \(error)")
+                    // Add error message if AI fails on main actor
+                    await MainActor.run {
+                        let errorMessage = ThreadedChatMessage(
+                            content: "I couldn't process that question right now. Please try asking again.",
+                            isUser: false,
+                            timestamp: Date()
+                        )
+                        chatThread.messages.append(errorMessage)
+                    }
+                }
+            }
+            
+            // Final save and show summary on main actor
+            await MainActor.run {
                 try? modelContext.save()
                 
                 // Show summary
@@ -816,6 +883,94 @@ struct AmbientChatOverlay: View {
             
             // Clear current session transcriptions for new book
             self.session?.rawTranscriptions.removeAll()
+        }
+    }
+    
+    // MARK: - Real-time Question Processing
+    
+    private func isQuestion(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercased = trimmed.lowercased()
+        
+        return trimmed.contains("?") ||
+               lowercased.starts(with: "why") ||
+               lowercased.starts(with: "how") ||
+               lowercased.starts(with: "what") ||
+               lowercased.starts(with: "when") ||
+               lowercased.starts(with: "where") ||
+               lowercased.starts(with: "who") ||
+               lowercased.contains("i wonder") ||
+               lowercased.contains("i'm curious") ||
+               lowercased.contains("i'm unsure")
+    }
+    
+    private func processQuestionInRealtime(_ question: String) async {
+        // Get the current book context from the view
+        guard let book = selectedBook else { return }
+        
+        do {
+            // Find or create chat thread for this book
+            let bookId = book.localId
+            let descriptor = FetchDescriptor<ChatThread>(
+                predicate: #Predicate<ChatThread> { thread in
+                    thread.bookId == bookId
+                }
+            )
+            
+            // Create or find thread on main actor
+            let existingThreads = try? await MainActor.run {
+                try? modelContext.fetch(descriptor)
+            }
+            
+            let chatThread: ChatThread = await MainActor.run {
+                if let existingThread = existingThreads?.first {
+                    return existingThread
+                } else {
+                    // Create new thread for this book
+                    let newThread = ChatThread(book: book)
+                    newThread.isAmbientSession = true
+                    modelContext.insert(newThread)
+                    return newThread
+                }
+            }
+            
+            // Add user's question to chat
+            await MainActor.run {
+                let questionMessage = ThreadedChatMessage(
+                    content: question,
+                    isUser: true,
+                    timestamp: Date()
+                )
+                chatThread.messages.append(questionMessage)
+                chatThread.lastMessageDate = Date()
+                try? modelContext.save()
+            }
+            
+            // Get AI response asynchronously
+            let aiService = AICompanionService.shared
+            let answer = try await aiService.processMessage(
+                question,
+                bookContext: book,
+                conversationHistory: []
+            )
+            
+            // Add answer on main actor
+            await MainActor.run {
+                let answerMessage = ThreadedChatMessage(
+                    content: answer,
+                    isUser: false,
+                    timestamp: Date()
+                )
+                chatThread.messages.append(answerMessage)
+                chatThread.lastMessageDate = Date()
+                try? modelContext.save()
+                
+                // Haptic feedback for response
+                HapticManager.shared.lightTap()
+            }
+            
+        } catch {
+            print("[AmbientChat] Real-time question processing failed: \(error)")
         }
     }
 }

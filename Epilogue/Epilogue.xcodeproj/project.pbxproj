@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		015807FE2E3601C0006DC492 /* UIImageColors in Frameworks */ = {isa = PBXBuildFile; productRef = 015807FD2E3601C0006DC492 /* UIImageColors */; };
+		015808272E383E72006DC492 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 015808262E383E72006DC492 /* Config.xcconfig */; };
 		015D13B02E3353A7002633FE /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13AF2E3353A7002633FE /* WhisperKit */; };
 		015D13B22E3353A7002633FE /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13B12E3353A7002633FE /* whisperkit-cli */; };
 /* End PBXBuildFile section */
@@ -30,6 +31,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		015808262E383E72006DC492 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		015D10F22E318D5D002633FE /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		015D11032E318D5E002633FE /* EpilogueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		015D110D2E318D5E002633FE /* EpilogueUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -101,6 +103,7 @@
 				015D11062E318D5E002633FE /* EpilogueTests */,
 				015D11102E318D5E002633FE /* EpilogueUITests */,
 				015D10F32E318D5D002633FE /* Products */,
+				015808262E383E72006DC492 /* Config.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -255,6 +258,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				015808272E383E72006DC492 /* Config.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -368,6 +372,7 @@
 		};
 		015D11192E318D5E002633FE /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 015808262E383E72006DC492 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -433,6 +438,7 @@
 		};
 		015D111A2E318D5E002633FE /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 015808262E383E72006DC492 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
