@@ -26,11 +26,10 @@ struct MiniNoteCard: View {
                         .foregroundStyle(.white.opacity(0.4))
                 }
                 
-                // Content preview (2 lines max)
+                // Content
                 Text(note.content)
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.9))
-                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
                 // Book context if available
@@ -43,7 +42,6 @@ struct MiniNoteCard: View {
                         Text(book.title)
                             .font(.system(size: 11))
                             .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
                         
                         if let pageNumber = note.pageNumber {
                             Text("• p.\(pageNumber)")
@@ -85,11 +83,10 @@ struct MiniQuoteCard: View {
                     .frame(height: 12)
                     .offset(y: 4)
                 
-                // Quote preview (truncated)
+                // Quote text
                 Text(quote.text)
                     .font(.custom("Georgia", size: 14))
                     .foregroundStyle(.white.opacity(0.9))
-                    .lineLimit(3)
                     .multilineTextAlignment(.leading)
                 
                 // Attribution
@@ -103,7 +100,6 @@ struct MiniQuoteCard: View {
                             Text(book.title)
                                 .font(.system(size: 11))
                                 .foregroundStyle(.white.opacity(0.4))
-                                .lineLimit(1)
                             
                             if let pageNumber = quote.pageNumber {
                                 Text("• p.\(pageNumber)")

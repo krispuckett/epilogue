@@ -11,6 +11,8 @@ struct NotesView: View {
     @State private var openOptionsNoteId: UUID? = nil
     @State private var highlightedNoteId: UUID? = nil
     @State private var scrollToNoteId: UUID? = nil
+    @State private var contextMenuNote: Note? = nil
+    @State private var contextMenuSourceRect: CGRect = .zero
     
     @Namespace private var commandPaletteNamespace
     @Namespace private var noteTransition
@@ -24,6 +26,45 @@ struct NotesView: View {
         }
         
         return filtered.sorted { $0.dateCreated > $1.dateCreated }
+    }
+    
+    // Helper function to create note card view
+    @ViewBuilder
+    private func noteCardView(for note: Note) -> some View {
+        NoteCard(
+            note: note,
+            isSelectionMode: false,
+            isSelected: false,
+            onSelectionToggle: { },
+            openOptionsNoteId: $openOptionsNoteId,
+            onContextMenuRequest: { note, rect in
+                contextMenuNote = note
+                contextMenuSourceRect = rect
+            }
+        )
+        .environmentObject(notesViewModel)
+        .matchedTransitionSource(id: note.id, in: noteTransition)
+        .id(note.id)
+        .overlay(highlightOverlay(for: note))
+        .transition(.asymmetric(
+            insertion: .scale(scale: 0.95).combined(with: .opacity),
+            removal: .scale(scale: 0.95).combined(with: .opacity)
+        ))
+        .onTapGesture(count: 2) {
+            // Direct test - bypass the callback chain
+            HapticManager.shared.mediumTap()
+            contextMenuNote = note
+            contextMenuSourceRect = CGRect(x: UIScreen.main.bounds.width/2, y: UIScreen.main.bounds.height/2, width: 100, height: 100)
+        }
+    }
+    
+    // Helper function for highlight overlay
+    @ViewBuilder
+    private func highlightOverlay(for note: Note) -> some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+            .opacity(highlightedNoteId == note.id ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: highlightedNoteId)
     }
     
     var body: some View {
@@ -67,27 +108,7 @@ struct NotesView: View {
                     // Notes grid
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
                         ForEach(filteredNotes) { note in
-                            NoteCard(
-                                note: note,
-                                isSelectionMode: false,
-                                isSelected: false,
-                                onSelectionToggle: { },
-                                openOptionsNoteId: $openOptionsNoteId
-                            )
-                            .environmentObject(notesViewModel)
-                            .matchedTransitionSource(id: note.id, in: noteTransition)
-                            .id(note.id) // Add ID for scrolling
-                            .overlay(
-                                // Highlight overlay
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
-                                    .opacity(highlightedNoteId == note.id ? 1 : 0)
-                                    .animation(.easeInOut(duration: 0.3), value: highlightedNoteId)
-                            )
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.95).combined(with: .opacity),
-                                removal: .scale(scale: 0.95).combined(with: .opacity)
-                            ))
+                            noteCardView(for: note)
                         }
                     }
                     .padding(.horizontal)
@@ -107,6 +128,26 @@ struct NotesView: View {
                 }
             }
         } // End ScrollViewReader
+        
+        // Context menu overlay
+        if let contextMenuNote = contextMenuNote {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    self.contextMenuNote = nil
+                }
+            
+            NoteContextMenu(
+                note: contextMenuNote,
+                sourceRect: contextMenuSourceRect,
+                isPresented: Binding(
+                    get: { self.contextMenuNote != nil },
+                    set: { if !$0 { self.contextMenuNote = nil } }
+                )
+            )
+            .environmentObject(notesViewModel)
+            .zIndex(1000)
+        }
         }
         .navigationTitle("Notes")
         .navigationBarTitleDisplayMode(.large)

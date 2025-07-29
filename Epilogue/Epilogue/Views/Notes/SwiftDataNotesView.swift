@@ -7,78 +7,201 @@ struct SwiftDataNotesView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @EnvironmentObject private var libraryViewModel: LibraryViewModel
+    @EnvironmentObject private var notesViewModel: NotesViewModel
     
     // Queries
     @Query(sort: \CapturedNote.timestamp, order: .reverse) private var notes: [CapturedNote]
     @Query(sort: \CapturedQuote.timestamp, order: .reverse) private var quotes: [CapturedQuote]
     @Query(sort: \CapturedQuestion.timestamp, order: .reverse) private var questions: [CapturedQuestion]
     
-    @State private var selectedFilter: ContentFilter = .all
-    @State private var selectedBook: Book?
     @State private var searchText = ""
-    
-    enum ContentFilter: String, CaseIterable {
-        case all = "All"
-        case notes = "Notes"
-        case quotes = "Quotes"
-        case questions = "Questions"
-        
-        var icon: String {
-            switch self {
-            case .all: return "square.stack.3d.up"
-            case .notes: return "note.text"
-            case .quotes: return "quote.bubble"
-            case .questions: return "questionmark.circle"
-            }
-        }
-    }
+    @State private var openOptionsNoteId: UUID? = nil
+    @State private var contextMenuNote: Note? = nil
+    @State private var contextMenuSourceRect: CGRect = .zero
+    @State private var editingNote: Note? = nil
     
     // Computed properties for filtered content
-    private var filteredItems: [(id: String, type: ContentType, timestamp: Date)] {
-        var items: [(id: String, type: ContentType, timestamp: Date)] = []
+    private var allNotes: [Note] {
+        var items: [Note] = []
         
-        switch selectedFilter {
-        case .all:
-            items += notes.map { (id: $0.id.uuidString, type: ContentType.note($0), timestamp: $0.timestamp) }
-            items += quotes.map { (id: $0.id.uuidString, type: ContentType.quote($0), timestamp: $0.timestamp) }
-            items += questions.map { (id: $0.id.uuidString, type: ContentType.question($0), timestamp: $0.timestamp) }
-        case .notes:
-            items = notes.map { (id: $0.id.uuidString, type: ContentType.note($0), timestamp: $0.timestamp) }
-        case .quotes:
-            items = quotes.map { (id: $0.id.uuidString, type: ContentType.quote($0), timestamp: $0.timestamp) }
-        case .questions:
-            items = questions.map { (id: $0.id.uuidString, type: ContentType.question($0), timestamp: $0.timestamp) }
-        }
+        // Convert all SwiftData models to Note type
+        items += notes.map { $0.toNote() }
+        items += quotes.map { $0.toNote() }
         
-        // Filter by book if selected
-        if let selectedBook = selectedBook {
-            items = items.filter { item in
-                switch item.type {
-                case .note(let note): return note.bookLocalId == selectedBook.localId.uuidString
-                case .quote(let quote): return quote.bookLocalId == selectedBook.localId.uuidString
-                case .question(let question): return question.bookLocalId == selectedBook.localId.uuidString
-                }
-            }
+        print("📚 SwiftDataNotesView - Notes count: \(notes.count), Quotes count: \(quotes.count)")
+        if !quotes.isEmpty {
+            print("   First quote: \(quotes[0].text.prefix(50))...")
         }
         
         // Filter by search text
         if !searchText.isEmpty {
-            items = items.filter { item in
-                switch item.type {
-                case .note(let note): return note.content.localizedCaseInsensitiveContains(searchText)
-                case .quote(let quote): return quote.text.localizedCaseInsensitiveContains(searchText)
-                case .question(let question): return question.content.localizedCaseInsensitiveContains(searchText)
-                }
+            items = items.filter { note in
+                note.content.localizedCaseInsensitiveContains(searchText) ||
+                (note.bookTitle?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                (note.author?.localizedCaseInsensitiveContains(searchText) ?? false)
             }
         }
         
-        return items.sorted { $0.timestamp > $1.timestamp }
+        return items.sorted { $0.dateCreated > $1.dateCreated }
     }
     
-    enum ContentType {
-        case note(CapturedNote)
-        case quote(CapturedQuote)
-        case question(CapturedQuestion)
+    // Delete note from SwiftData
+    private func deleteNote(_ note: Note) {
+        // Find and delete the corresponding SwiftData object
+        if let capturedNote = notes.first(where: { $0.id == note.id }) {
+            modelContext.delete(capturedNote)
+        } else if let capturedQuote = quotes.first(where: { $0.id == note.id }) {
+            modelContext.delete(capturedQuote)
+        }
+        
+        // Save the context
+        do {
+            try modelContext.save()
+        } catch {
+            print("Error deleting note: \(error)")
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var searchBar: some View {
+        HStack(spacing: 0) {
+            // Search icon
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .font(.system(size: 16, weight: .medium))
+                .padding(.leading, 12)
+                .padding(.trailing, 8)
+            
+            // Text field
+            ZStack(alignment: .leading) {
+                if searchText.isEmpty {
+                    Text("Search notes and quotes")
+                        .foregroundColor(.white.opacity(0.5))
+                        .font(.system(size: 16))
+                }
+                
+                TextField("", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .padding(.trailing, 12)
+            
+            // Clear button
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(.trailing, 12)
+            }
+        }
+        .frame(minHeight: 40)
+        .glassEffect(.regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15)), in: RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        }
+    }
+    
+    private var notesContent: some View {
+        VStack(spacing: 16) {
+            // Custom search bar
+            searchBar
+                .padding(.horizontal)
+                .padding(.top, 8)
+            
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                ForEach(allNotes) { note in
+                    noteCardView(for: note)
+                }
+                
+                ForEach(questions) { question in
+                    CapturedQuestionCard(question: question)
+                        .id(question.id)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 80)
+    }
+    
+    @ViewBuilder
+    private func noteCardView(for note: Note) -> some View {
+        NoteCard(
+            note: note,
+            isSelectionMode: false,
+            isSelected: false,
+            onSelectionToggle: { },
+            openOptionsNoteId: $openOptionsNoteId,
+            onContextMenuRequest: { note, rect in
+                contextMenuNote = note
+                contextMenuSourceRect = rect
+            }
+        )
+        .environmentObject(notesViewModel)
+        .id(note.id)
+        .overlay(highlightOverlay(for: note))
+        .transition(.asymmetric(
+            insertion: .scale(scale: 0.95).combined(with: .opacity),
+            removal: .scale(scale: 0.95).combined(with: .opacity)
+        ))
+    }
+    
+    @ViewBuilder
+    private func highlightOverlay(for note: Note) -> some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+            .opacity(navigationCoordinator.highlightedNoteID == note.id ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: navigationCoordinator.highlightedNoteID)
+    }
+    
+    @ViewBuilder
+    private var contextMenuOverlay: some View {
+        if let contextMenuNote = contextMenuNote {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    self.contextMenuNote = nil
+                }
+            
+            SwiftDataNoteContextMenu(
+                note: contextMenuNote,
+                sourceRect: contextMenuSourceRect,
+                isPresented: Binding(
+                    get: { self.contextMenuNote != nil },
+                    set: { if !$0 { self.contextMenuNote = nil } }
+                ),
+                onDelete: {
+                    deleteNote(contextMenuNote)
+                    self.contextMenuNote = nil
+                },
+                onEdit: {
+                    editingNote = contextMenuNote
+                    self.contextMenuNote = nil
+                }
+            )
+            .zIndex(1000)
+        }
     }
     
     var body: some View {
@@ -89,33 +212,12 @@ struct SwiftDataNotesView: View {
                 
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(spacing: 20) {
-                            // Filter pills
-                            filterSection
-                            
-                            // Book filter
-                            bookFilterSection
-                            
-                            // Content
-                            LazyVStack(spacing: 16) {
-                                ForEach(filteredItems, id: \.id) { item in
-                                    contentCard(for: item.type)
-                                        .id(item.id)
-                                        .transition(.asymmetric(
-                                            insertion: .scale(scale: 0.95).combined(with: .opacity),
-                                            removal: .scale(scale: 0.95).combined(with: .opacity)
-                                        ))
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .padding(.top)
-                        .padding(.bottom, 100)
+                        notesContent
                     }
                     .onChange(of: navigationCoordinator.highlightedNoteID) { _, noteID in
                         if let noteID = noteID {
                             withAnimation {
-                                proxy.scrollTo(noteID.uuidString, anchor: .center)
+                                proxy.scrollTo(noteID, anchor: .center)
                             }
                             // Clear after scrolling
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -126,7 +228,7 @@ struct SwiftDataNotesView: View {
                     .onChange(of: navigationCoordinator.highlightedQuoteID) { _, quoteID in
                         if let quoteID = quoteID {
                             withAnimation {
-                                proxy.scrollTo(quoteID.uuidString, anchor: .center)
+                                proxy.scrollTo(quoteID, anchor: .center)
                             }
                             // Clear after scrolling
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -135,165 +237,316 @@ struct SwiftDataNotesView: View {
                         }
                     }
                 }
+                
+                contextMenuOverlay
             }
-            .navigationTitle("All Content")
+            .navigationTitle("Notes")
             .navigationBarTitleDisplayMode(.large)
-            .searchable(text: $searchText, prompt: "Search notes, quotes, and questions")
-        }
-    }
-    
-    // MARK: - Filter Section
-    
-    private var filterSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(ContentFilter.allCases, id: \.self) { filter in
-                    filterPill(for: filter)
+            .sheet(item: $editingNote) { note in
+                NoteEditSheet(note: note)
+                    .environmentObject(notesViewModel)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
+                if let note = notification.object as? Note {
+                    editingNote = note
                 }
             }
-            .padding(.horizontal)
+        }
+    }
+}
+
+// MARK: - SwiftData Note Context Menu
+struct SwiftDataNoteContextMenu: View {
+    let note: Note
+    let sourceRect: CGRect
+    @Binding var isPresented: Bool
+    let onDelete: () -> Void
+    let onEdit: () -> Void
+    
+    @State private var containerOpacity: Double = 0
+    @State private var containerScale: CGFloat = 0.8
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                backdrop
+                popoverMenu(in: geometry)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                containerOpacity = 1
+                containerScale = 1
+            }
         }
     }
     
-    private func filterPill(for filter: ContentFilter) -> some View {
-        let count: Int = switch filter {
-        case .all: notes.count + quotes.count + questions.count
-        case .notes: notes.count
-        case .quotes: quotes.count
-        case .questions: questions.count
-        }
-        
-        return Button {
-            withAnimation(.spring(response: 0.3)) {
-                selectedFilter = filter
+    private var backdrop: some View {
+        Color.black.opacity(0.001)
+            .ignoresSafeArea()
+            .onTapGesture {
+                dismissMenu()
             }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: filter.icon)
-                    .font(.system(size: 14))
-                Text(filter.rawValue)
-                    .font(.system(size: 14, weight: .medium))
-                Text("\(count)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(selectedFilter == filter ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2) : Color.white.opacity(0.08))
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(selectedFilter == filter ? Color(red: 1.0, green: 0.55, blue: 0.26) : Color.white.opacity(0.1), lineWidth: 1)
-            )
-        }
-        .foregroundStyle(selectedFilter == filter ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white)
     }
-    
-    // MARK: - Book Filter Section
-    
-    private var bookFilterSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                // All books pill
-                Button {
-                    withAnimation {
-                        selectedBook = nil
-                    }
-                } label: {
-                    Text("All Books")
-                        .font(.system(size: 14, weight: .medium))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(selectedBook == nil ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2) : Color.white.opacity(0.08))
-                        )
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(selectedBook == nil ? Color(red: 1.0, green: 0.55, blue: 0.26) : Color.white.opacity(0.1), lineWidth: 1)
-                        )
-                }
-                .foregroundStyle(selectedBook == nil ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white)
-                
-                // Individual book pills
-                ForEach(libraryViewModel.books) { book in
-                    bookPill(for: book)
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-    
-    private func bookPill(for book: Book) -> some View {
-        Button {
-            withAnimation {
-                selectedBook = book
-            }
-        } label: {
-            HStack(spacing: 8) {
-                if let coverURL = book.coverImageURL {
-                    AsyncImage(url: URL(string: coverURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.gray.opacity(0.3))
-                    }
-                    .frame(width: 20, height: 28)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                }
-                
-                Text(book.title)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(selectedBook?.id == book.id ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2) : Color.white.opacity(0.08))
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(selectedBook?.id == book.id ? Color(red: 1.0, green: 0.55, blue: 0.26) : Color.white.opacity(0.1), lineWidth: 1)
-            )
-        }
-        .foregroundStyle(selectedBook?.id == book.id ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white)
-    }
-    
-    // MARK: - Content Cards
     
     @ViewBuilder
-    private func contentCard(for type: ContentType) -> some View {
-        switch type {
-        case .note(let note):
-            MiniNoteCard(note: note) {
-                // Handle navigation if needed
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
-                    .opacity(navigationCoordinator.highlightedNoteID == note.id ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.5), value: navigationCoordinator.highlightedNoteID)
+    private func popoverMenu(in geometry: GeometryProxy) -> some View {
+        menuContent()
+            .frame(width: 260)
+            .glassEffect(in: RoundedRectangle(cornerRadius: 24))
+            .overlay(menuBorder)
+            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+            .scaleEffect(containerScale)
+            .opacity(containerOpacity)
+            .position(calculatePosition(in: geometry))
+    }
+    
+    private var menuBorder: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.3),
+                        Color.white.opacity(0.1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.5
             )
-            
-        case .quote(let quote):
-            MiniQuoteCard(quote: quote) {
-                // Handle navigation if needed
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
-                    .opacity(navigationCoordinator.highlightedQuoteID == quote.id ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.5), value: navigationCoordinator.highlightedQuoteID)
-            )
-            
-        case .question(let question):
-            CapturedQuestionCard(question: question)
+    }
+    
+    private func calculatePosition(in geometry: GeometryProxy) -> CGPoint {
+        let menuHeight: CGFloat = note.type == .quote ? 220 : 180
+        let menuWidth: CGFloat = 260
+        let padding: CGFloat = 8
+        
+        var x = sourceRect.midX
+        if x - menuWidth/2 < padding {
+            x = menuWidth/2 + padding
+        } else if x + menuWidth/2 > geometry.size.width - padding {
+            x = geometry.size.width - menuWidth/2 - padding
         }
+        
+        var y = sourceRect.midY
+        if y + menuHeight/2 > geometry.size.height - 100 {
+            y = geometry.size.height - 100 - menuHeight/2
+        }
+        if y - menuHeight/2 < 100 {
+            y = 100 + menuHeight/2
+        }
+        
+        return CGPoint(x: x, y: y)
+    }
+    
+    @ViewBuilder
+    private func menuContent() -> some View {
+        VStack(spacing: 0) {
+            if note.type == .quote {
+                shareButton
+                menuDivider
+            }
+            
+            copyButton
+            menuDivider
+            
+            editButton
+            menuDivider
+            
+            deleteButton
+        }
+    }
+    
+    private var shareButton: some View {
+        ContextMenuButton(
+            icon: "square.and.arrow.up",
+            title: "Share as Image",
+            action: {
+                shareAsImage()
+                dismissMenu()
+            }
+        )
+    }
+    
+    private var copyButton: some View {
+        ContextMenuButton(
+            icon: "doc.on.doc",
+            title: note.type == .quote ? "Copy Quote" : "Copy Note",
+            action: {
+                copyText()
+                dismissMenu()
+            }
+        )
+    }
+    
+    private var editButton: some View {
+        ContextMenuButton(
+            icon: "pencil",
+            title: "Edit",
+            action: {
+                dismissMenu()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    onEdit()
+                }
+            }
+        )
+    }
+    
+    private var deleteButton: some View {
+        ContextMenuButton(
+            icon: "trash",
+            title: "Delete",
+            isDestructive: true,
+            action: {
+                dismissMenu()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    HapticManager.shared.warning()
+                    onDelete()
+                }
+            }
+        )
+    }
+    
+    private var menuDivider: some View {
+        Divider()
+            .background(Color.white.opacity(0.15))
+    }
+    
+    private func dismissMenu() {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            containerOpacity = 0
+            containerScale = 0.9
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            isPresented = false
+        }
+    }
+    
+    private func shareAsImage() {
+        HapticManager.shared.mediumTap()
+        let shareView = ShareableQuoteView(note: note)
+        let renderer = ImageRenderer(content: shareView)
+        renderer.scale = 3.0
+        
+        if let image = renderer.uiImage {
+            let activityController = UIActivityViewController(
+                activityItems: [image],
+                applicationActivities: nil
+            )
+            
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootViewController = windowScene.windows.first?.rootViewController {
+                activityController.popoverPresentationController?.sourceView = rootViewController.view
+                rootViewController.present(activityController, animated: true)
+            }
+        }
+    }
+    
+    private func copyText() {
+        HapticManager.shared.success()
+        var textToCopy = note.content
+        
+        if note.type == .quote {
+            if let author = note.author {
+                textToCopy = "\"\(note.content)\"\n\n— \(author)"
+                if let bookTitle = note.bookTitle {
+                    textToCopy += ", \(bookTitle)"
+                }
+                if let pageNumber = note.pageNumber {
+                    textToCopy += ", p. \(pageNumber)"
+                }
+            } else {
+                textToCopy = "\"\(note.content)\""
+            }
+        }
+        
+        UIPasteboard.general.string = textToCopy
+    }
+}
+
+// MARK: - Context Menu Button (reusable)
+private struct ContextMenuButton: View {
+    let icon: String
+    let title: String
+    var isDestructive: Bool = false
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 17))
+                    .frame(width: 24)
+                
+                Text(title)
+                    .font(.system(size: 17, weight: .regular))
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .medium))
+                    .opacity(0.3)
+            }
+            .foregroundStyle(isDestructive ? Color.red : .white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Shareable Quote View
+private struct ShareableQuoteView: View {
+    let note: Note
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Large quote mark
+            Text("\u{201C}")
+                .font(.custom("Georgia", size: 80))
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Quote content
+            Text(note.content)
+                .font(.custom("Georgia", size: 28))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            // Attribution
+            if let author = note.author {
+                VStack(alignment: .leading, spacing: 8) {
+                    Rectangle()
+                        .fill(Color.black.opacity(0.2))
+                        .frame(width: 60, height: 2)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(author.uppercased())
+                            .font(.system(size: 16, weight: .semibold, design: .default))
+                            .kerning(1.5)
+                        
+                        if let bookTitle = note.bookTitle {
+                            Text(bookTitle)
+                                .font(.system(size: 14, weight: .regular, design: .serif))
+                                .italic()
+                        }
+                        
+                        if let pageNumber = note.pageNumber {
+                            Text("Page \(pageNumber)")
+                                .font(.system(size: 12, weight: .regular))
+                                .opacity(0.8)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(40)
+        .frame(width: 600, height: 600)
+        .background(Color(red: 0.98, green: 0.97, blue: 0.96))
     }
 }
 
@@ -316,33 +569,18 @@ struct CapturedQuestionCard: View {
                 
                 Spacer()
                 
-                if question.isAnswered {
-                    Label("Answered", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.green.opacity(0.8))
-                }
-                
                 Text(question.timestamp, style: .time)
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.4))
             }
             
-            // Question text
+            // Content
             Text(question.content)
-                .font(.system(size: 15))
+                .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(3)
+                .multilineTextAlignment(.leading)
             
-            // Answer if available
-            if let answer = question.answer {
-                Text(answer)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .lineLimit(2)
-                    .padding(.top, 4)
-            }
-            
-            // Book context
+            // Book context if available
             if let book = question.book {
                 HStack(spacing: 4) {
                     Image(systemName: "book.closed.fill")
@@ -361,25 +599,27 @@ struct CapturedQuestionCard: View {
                     }
                 }
             }
+            
+            if question.isAnswered {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green.opacity(0.6))
+                    Text("Answered")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.green.opacity(0.6))
+                }
+            }
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.08))
+                .fill(Color.white.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
         )
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    SwiftDataNotesView()
-        .environmentObject(NavigationCoordinator.shared)
-        .environmentObject(LibraryViewModel())
-        .preferredColorScheme(.dark)
 }

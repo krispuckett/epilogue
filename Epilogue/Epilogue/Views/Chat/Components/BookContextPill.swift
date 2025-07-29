@@ -107,6 +107,7 @@ struct BookContextPill: View {
             .scaleEffect(isPressed ? 0.95 : 1.0)
             .scaleEffect(isAnimatingIn ? 1.0 : 0.9)
             .opacity(isAnimatingIn ? 1.0 : 0)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onAppear {
@@ -151,6 +152,7 @@ struct BookContextPill: View {
             .scaleEffect(isPressed ? 0.95 : 1.0)
             .scaleEffect(isAnimatingIn ? 1.0 : 0.9)
             .opacity(isAnimatingIn ? 1.0 : 0)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onAppear {

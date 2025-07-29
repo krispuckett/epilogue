@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct LiquidCommandPalette: View {
     @Binding var isPresented: Bool
@@ -22,6 +23,7 @@ struct LiquidCommandPalette: View {
     
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(\.modelContext) private var modelContext
     
     // Animation namespace for matched geometry
     var animationNamespace: Namespace.ID
@@ -542,6 +544,25 @@ struct LiquidCommandPalette: View {
         
         content = content.trimmingCharacters(in: .whitespaces)
         
+        // Create SwiftData note
+        let capturedNote = CapturedNote(
+            content: content,
+            book: nil,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedNote)
+        
+        // Save to SwiftData
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save note to SwiftData: \(error)")
+        }
+        
+        // Also add to old system for compatibility
         let note = Note(
             type: .note,
             content: content,
@@ -550,7 +571,6 @@ struct LiquidCommandPalette: View {
             author: nil,
             pageNumber: nil
         )
-        
         notesViewModel.addNote(note)
         HapticManager.shared.success()
         showSuccessToast(message: "Note saved", icon: "note.text", color: Color(red: 0.4, green: 0.6, blue: 0.9))
@@ -594,6 +614,36 @@ struct LiquidCommandPalette: View {
             }
         }
         
+        // Create SwiftData quote
+        let capturedQuote = CapturedQuote(
+            text: content,
+            book: nil,
+            author: author,
+            pageNumber: pageNumber,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        print("🔍 ModelContext check - is nil: \(modelContext == nil)")
+        modelContext.insert(capturedQuote)
+        print("📝 Inserted quote into context")
+        
+        // Save to SwiftData
+        do {
+            try modelContext.save()
+            print("✅ Successfully saved quote to SwiftData: \(capturedQuote.text)")
+            print("   ID: \(capturedQuote.id)")
+            print("   Author: \(capturedQuote.author ?? "nil")")
+            
+            // Force a fetch to verify
+            let descriptor = FetchDescriptor<CapturedQuote>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+            let allQuotes = try modelContext.fetch(descriptor)
+            print("📊 Total quotes in database: \(allQuotes.count)")
+        } catch {
+            print("❌ Failed to save quote to SwiftData: \(error)")
+        }
+        
+        // Also add to old system for compatibility
         let quote = Note(
             type: .quote,
             content: content,
@@ -602,7 +652,6 @@ struct LiquidCommandPalette: View {
             author: author,
             pageNumber: pageNumber
         )
-        
         notesViewModel.addNote(quote)
         HapticManager.shared.success()
         showSuccessToast(message: "Quote captured", icon: "quote.opening", color: Color(red: 1.0, green: 0.55, blue: 0.26))

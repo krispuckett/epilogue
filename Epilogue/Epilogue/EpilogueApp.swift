@@ -36,7 +36,11 @@ struct EpilogueApp: App {
         let schema = Schema([
             ChatThread.self,
             ThreadedChatMessage.self,
-            ColorPaletteModel.self
+            ColorPaletteModel.self,
+            BookModel.self,
+            CapturedNote.self,
+            CapturedQuote.self,
+            CapturedQuestion.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         

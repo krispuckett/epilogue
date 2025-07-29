@@ -66,8 +66,10 @@ struct UnifiedChatInputBar: View {
                     Image(systemName: "command")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(adaptiveUIColor)
+                        .frame(height: 36)
                         .padding(.leading, 12)
                         .padding(.trailing, 8)
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             showingCommandPalette = true
                         }
@@ -78,20 +80,17 @@ struct UnifiedChatInputBar: View {
                             Text(placeholderText)
                                 .foregroundColor(.white.opacity(0.5))
                                 .font(.system(size: 16))
+                                .lineLimit(1)
                         }
                         
-                        TextField("", text: $messageText)
+                        TextField("", text: $messageText, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.system(size: 16))
                             .foregroundStyle(.white)
                             .focused($isInputFocused)
-                            .lineLimit(1)
-                            .submitLabel(.send)
-                            .onSubmit {
-                                if !messageText.isEmpty {
-                                    onSend()
-                                }
-                            }
+                            .lineLimit(1...5)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)

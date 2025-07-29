@@ -30,24 +30,7 @@ struct ContentView: View {
                 .ignoresSafeArea()
             
             // Native TabView with automatic blur - DO NOT MODIFY
-            TabView(selection: Binding(
-                get: { 
-                    switch navigationCoordinator.selectedTab {
-                    case .library: return 0
-                    case .notes: return 1
-                    case .chat: return 2
-                    }
-                },
-                set: { newValue in
-                    selectedTab = newValue
-                    switch newValue {
-                    case 0: navigationCoordinator.selectedTab = .library
-                    case 1: navigationCoordinator.selectedTab = .notes
-                    case 2: navigationCoordinator.selectedTab = .chat
-                    default: break
-                    }
-                }
-            )) {
+            TabView(selection: $selectedTab) {
                 NavigationStack {
                     LibraryView()
                 }
@@ -62,7 +45,7 @@ struct ContentView: View {
                 .tag(0)
                 
                 NavigationStack {
-                    NotesView()
+                    SwiftDataNotesView()
                 }
                 .tabItem {
                     Label {
@@ -107,6 +90,22 @@ struct ContentView: View {
             .onChange(of: selectedTab) { oldValue, newValue in
                 // Haptic feedback on tab change
                 HapticManager.shared.selectionChanged()
+                
+                // Sync with navigation coordinator
+                switch newValue {
+                case 0: navigationCoordinator.selectedTab = .library
+                case 1: navigationCoordinator.selectedTab = .notes
+                case 2: navigationCoordinator.selectedTab = .chat
+                default: break
+                }
+            }
+            .onChange(of: navigationCoordinator.selectedTab) { oldValue, newValue in
+                // Sync from navigation coordinator
+                switch newValue {
+                case .library: selectedTab = 0
+                case .notes: selectedTab = 1
+                case .chat: selectedTab = 2
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 // Quick Add button positioned right above tab bar
@@ -188,6 +187,13 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToTab"))) { notification in
             if let tabIndex = notification.object as? Int {
                 selectedTab = tabIndex
+                // Also update navigation coordinator
+                switch tabIndex {
+                case 0: navigationCoordinator.selectedTab = .library
+                case 1: navigationCoordinator.selectedTab = .notes
+                case 2: navigationCoordinator.selectedTab = .chat
+                default: break
+                }
             }
         }
         .onAppear {

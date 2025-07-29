@@ -10,13 +10,15 @@ struct NoteCard: View {
     @State private var showingOptions = false
     @Binding var openOptionsNoteId: UUID?
     @State private var cardRect: CGRect = .zero
+    var onContextMenuRequest: ((Note, CGRect) -> Void)?
     
-    init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}, openOptionsNoteId: Binding<UUID?> = .constant(nil)) {
+    init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}, openOptionsNoteId: Binding<UUID?> = .constant(nil), onContextMenuRequest: ((Note, CGRect) -> Void)? = nil) {
         self.note = note
         self.isSelectionMode = isSelectionMode
         self.isSelected = isSelected
         self.onSelectionToggle = onSelectionToggle
         self._openOptionsNoteId = openOptionsNoteId
+        self.onContextMenuRequest = onContextMenuRequest
     }
     
     var body: some View {
@@ -66,28 +68,18 @@ struct NoteCard: View {
         .onChange(of: showingOptions) { _, newValue in
             if newValue {
                 openOptionsNoteId = note.id
+                onContextMenuRequest?(note, cardRect)
             } else if openOptionsNoteId == note.id {
                 openOptionsNoteId = nil
             }
         }
-        .onTapGesture(count: 2) {
-            // Double tap to edit
-            HapticManager.shared.mediumTap()
-            NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
+        .onChange(of: openOptionsNoteId) { _, newValue in
+            if newValue != note.id {
+                showingOptions = false
+            }
         }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
-        .overlay {
-            if showingOptions && openOptionsNoteId == note.id {
-                NoteContextMenu(
-                    note: note,
-                    sourceRect: cardRect,
-                    isPresented: $showingOptions
-                )
-                .environmentObject(notesViewModel)
-                .zIndex(1000)
-            }
-        }
     }
     
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -184,44 +176,9 @@ struct QuoteCard: View {
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .contextMenu {
-            // Edit
-            Button {
-                HapticManager.shared.lightTap()
-                NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            
-            Divider()
-            
-            // Copy
-            Button {
-                HapticManager.shared.lightTap()
-                UIPasteboard.general.string = note.content
-            } label: {
-                Label("Copy", systemImage: "doc.on.doc")
-            }
-            
-            // Share as Image
-            Button {
-                HapticManager.shared.lightTap()
-                // TODO: Implement share as image
-            } label: {
-                Label("Share as Image", systemImage: "square.and.arrow.up")
-            }
-            
-            Divider()
-            
-            // Delete
-            Button(role: .destructive) {
-                HapticManager.shared.lightTap()
-                withAnimation {
-                    notesViewModel.deleteNote(note)
-                }
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
+        .onTapGesture(count: 2) {
+            HapticManager.shared.mediumTap()
+            showingOptions = true
         }
     }
 }
@@ -306,60 +263,9 @@ struct RegularNoteCard: View {
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .onTapGesture {
-            withAnimation(.spring(response: 0.3)) {
-                isPressed = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.3)) {
-                    isPressed = false
-                }
-            }
-            HapticManager.shared.lightTap()
-        }
-        .contextMenu {
-            // Edit
-            Button {
-                HapticManager.shared.lightTap()
-                NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            
-            Divider()
-            
-            // Copy
-            Button {
-                HapticManager.shared.lightTap()
-                UIPasteboard.general.string = note.content
-            } label: {
-                Label("Copy", systemImage: "doc.on.doc")
-            }
-            
-            // Share
-            Button {
-                HapticManager.shared.lightTap()
-                let activityVC = UIActivityViewController(activityItems: [note.content], applicationActivities: nil)
-                
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let window = windowScene.windows.first {
-                    window.rootViewController?.present(activityVC, animated: true)
-                }
-            } label: {
-                Label("Share", systemImage: "square.and.arrow.up")
-            }
-            
-            Divider()
-            
-            // Delete
-            Button(role: .destructive) {
-                HapticManager.shared.lightTap()
-                withAnimation {
-                    notesViewModel.deleteNote(note)
-                }
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
+        .onTapGesture(count: 2) {
+            HapticManager.shared.mediumTap()
+            showingOptions = true
         }
     }
 }

@@ -154,30 +154,30 @@ struct CommandParser {
             return .existingNote(note: matchedNote)
         }
         
-        // Phase 3: Smart Quote Detection
+        // Phase 3: Note Detection (check first for personal thoughts)
+        if isLikelyNote(input: trimmed) {
+            print("CommandParser: Detected note pattern")
+            return .createNote(text: input)
+        }
+        
+        // Phase 4: Smart Quote Detection
         if isLikelyQuote(input: trimmed) {
             print("CommandParser: Detected quote pattern")
             return .createQuote(text: input)
         }
         
-        // Phase 4: Smart Book Title Detection - Check for "by" pattern first
+        // Phase 5: Smart Book Title Detection - Check for "by" pattern first
         if trimmed.lowercased().contains(" by ") {
             let query = cleanBookQuery(from: input)
             print("CommandParser: Detected 'by' pattern for book, query: '\(query)'")
             return .addBook(query: query)
         }
         
-        // Phase 5: General Book Title Detection
+        // Phase 6: General Book Title Detection
         if isLikelyBookTitle(input: trimmed) && !isLikelyNote(input: trimmed) {
             let query = cleanBookQuery(from: input)
             print("CommandParser: Detected book title pattern, query: '\(query)'")
             return .addBook(query: query)
-        }
-        
-        // Phase 5: Note Detection
-        if isLikelyNote(input: trimmed) {
-            print("CommandParser: Detected note pattern")
-            return .createNote(text: input)
         }
         
         // Phase 6: Explicit Commands
@@ -355,7 +355,8 @@ struct CommandParser {
         }
         
         // Informal language patterns that suggest notes
-        let notePatterns = ["i think", "remember", "todo", "need to", "should", "must", "don't forget"]
+        let notePatterns = ["i think", "i want", "i feel", "i believe", "i need", "i wish", "i love", "i hate", 
+                          "remember", "todo", "need to", "should", "must", "don't forget", "my thoughts", "my opinion"]
         for pattern in notePatterns {
             if lowercased.contains(pattern) {
                 return true

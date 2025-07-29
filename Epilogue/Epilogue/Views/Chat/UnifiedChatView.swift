@@ -152,10 +152,20 @@ struct UnifiedChatView: View {
                     VStack(spacing: 0) {
                         // Live transcription preview during recording
                         if isRecording && !liveTranscription.isEmpty {
-                            LiveTranscriptionView(transcription: liveTranscription, adaptiveUIColor: adaptiveUIColor)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 8)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                            LiveTranscriptionView(
+                                transcription: liveTranscription, 
+                                adaptiveUIColor: adaptiveUIColor,
+                                onCancel: {
+                                    // Cancel the transcription
+                                    voiceManager.stopListening()
+                                    isRecording = false
+                                    liveTranscription = ""
+                                    HapticManager.shared.lightTap()
+                                }
+                            )
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 8)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                         
                         // Chat input bar
@@ -299,28 +309,28 @@ struct UnifiedChatView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 64, height: 64)
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.white.opacity(0.6))
             
             Text("What are we reading \(timeBasedGreeting)?")
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
             
             if currentBookContext != nil {
                 Text("Discussing \(currentBookContext?.title ?? "")")
                     .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.white.opacity(0.6))
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
                 
                 Text("Ask questions, explore themes, or share thoughts")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.white.opacity(0.5))
                     .multilineTextAlignment(.center)
             } else {
                 Text("Select a book to start a focused conversation")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.25))
+                    .foregroundStyle(.white.opacity(0.5))
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
             }
@@ -333,7 +343,11 @@ struct UnifiedChatView: View {
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        // Create user message
+        // Store message text before clearing
+        let userInput = messageText
+        let trimmed = userInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Create user message FIRST
         let userMessage = UnifiedChatMessage(
             content: messageText,
             isUser: true,
@@ -344,20 +358,162 @@ struct UnifiedChatView: View {
         // Add to messages
         messages.append(userMessage)
         
-        // Store message text before clearing
-        let userInput = messageText
+        // Use CommandParser to detect intent intelligently
+        let intent = CommandParser.parse(trimmed, books: libraryViewModel.books, notes: [])
+        var isProcessedAsNoteOrQuote = false
+        
+        switch intent {
+        case .createQuote(let text):
+            // Process as quote
+            processQuoteFromKeyboard(text: text)
+            isProcessedAsNoteOrQuote = true
+            
+        case .createNote(let text):
+            // Process as note
+            processNoteFromKeyboard(text: text)
+            isProcessedAsNoteOrQuote = true
+            
+        default:
+            // For other intents, just send as normal message
+            break
+        }
         
         // Clear input
         messageText = ""
         
-        // Scroll to bottom - use the actual message we just added
-        withAnimation {
-            scrollProxy?.scrollTo(userMessage.id, anchor: .bottom)
+        // Delay scroll slightly to ensure all messages are rendered
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation {
+                // Scroll to the last message
+                if let lastMessage = messages.last {
+                    scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            }
         }
         
-        // Send to AI service and get response
-        Task {
-            await getAIResponse(for: userInput)
+        // Send to AI service and get response (only if not processed as note/quote)
+        if !isProcessedAsNoteOrQuote {
+            Task {
+                await getAIResponse(for: userInput)
+            }
+        }
+    }
+    
+    // MARK: - Keyboard Note/Quote Processing
+    
+    private func processNoteFromKeyboard(text: String) {
+        // CommandParser already cleaned the text, just use it directly
+        let noteText = text
+        
+        // Create BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let book = currentBookContext {
+            bookModel = BookModel(from: book)
+            // Insert book model if not already in context
+            modelContext.insert(bookModel!)
+        }
+        
+        // Create and save the note
+        let capturedNote = CapturedNote(
+            content: noteText,
+            book: bookModel,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedNote)
+        
+        // Save to SwiftData
+        do {
+            try modelContext.save()
+            print("✅ Saved note from keyboard: \(noteText)")
+            
+            // Add system message to chat
+            let systemMessage = UnifiedChatMessage(
+                content: "📝 Note saved",
+                isUser: false,
+                timestamp: Date(),
+                bookContext: currentBookContext,
+                messageType: .system
+            )
+            messages.append(systemMessage)
+            
+            // Haptic feedback
+            HapticManager.shared.success()
+        } catch {
+            print("❌ Failed to save note: \(error)")
+        }
+    }
+    
+    private func processQuoteFromKeyboard(text: String) {
+        // Use CommandParser to parse the quote properly
+        let (content, attribution) = CommandParser.parseQuote(text)
+        
+        var author: String? = nil
+        var bookTitle: String? = nil
+        var pageNumber: Int? = nil
+        
+        // Parse the attribution if present
+        if let attr = attribution {
+            let parts = attr.split(separator: "|||").map { String($0) }
+            if parts.count >= 1 {
+                author = parts[0]
+            }
+            if parts.count >= 3 && parts[1] == "BOOK" {
+                bookTitle = parts[2]
+            }
+            if parts.count >= 5 && parts[3] == "PAGE" {
+                if let pageStr = parts[4].split(separator: " ").last {
+                    pageNumber = Int(pageStr)
+                }
+            }
+        }
+        
+        // Create BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let book = currentBookContext {
+            bookModel = BookModel(from: book)
+            // Insert book model if not already in context
+            modelContext.insert(bookModel!)
+            
+            // If no author specified, use book author
+            if author == nil {
+                author = book.author
+            }
+        }
+        
+        // Create and save the quote
+        let capturedQuote = CapturedQuote(
+            text: content,
+            book: bookModel,
+            author: author,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedQuote)
+        
+        // Save to SwiftData
+        do {
+            try modelContext.save()
+            print("✅ Saved quote from keyboard: \(content)")
+            
+            // Add system message to chat with mini quote card
+            let systemMessage = UnifiedChatMessage(
+                content: "",
+                isUser: false,
+                timestamp: Date(),
+                bookContext: currentBookContext,
+                messageType: .quote(capturedQuote)
+            )
+            messages.append(systemMessage)
+            
+            // Haptic feedback
+            HapticManager.shared.success()
+        } catch {
+            print("❌ Failed to save quote: \(error)")
         }
     }
     
@@ -692,20 +848,10 @@ struct UnifiedChatView: View {
         var notes: [ExtractedNote] = []
         var questions: [ExtractedQuestion] = []
         
-        // Split by sentences first, then by newlines if needed
-        let sentences = transcription
-            .replacingOccurrences(of: ". ", with: ".\n")
-            .replacingOccurrences(of: "? ", with: "?\n")
-            .replacingOccurrences(of: "! ", with: "!\n")
-            .components(separatedBy: .newlines)
-        
-        print("Split into \(sentences.count) sentences")
-        
-        for (index, sentence) in sentences.enumerated() {
-            let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty { continue }
-            
-            print("\nSentence \(index + 1): \(trimmed)")
+        // Process the entire transcription as one unit instead of splitting by sentences
+        let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            print("\nProcessing full transcription: \(trimmed)")
             let lowercased = trimmed.lowercased()
             
             // Improved QUOTE detection
@@ -841,7 +987,7 @@ struct UnifiedChatView: View {
                     timestamp: Date()
                 ))
             }
-        }
+        }  // End of if !trimmed.isEmpty
         
         print("\nPROCESSING SUMMARY:")
         print("   - Quotes: \(quotes.count)")
@@ -1015,6 +1161,7 @@ struct UnifiedChatMessage: Identifiable {
 struct LiveTranscriptionView: View {
     let transcription: String
     let adaptiveUIColor: Color
+    var onCancel: (() -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 12) {
@@ -1047,9 +1194,19 @@ struct LiveTranscriptionView: View {
             Text(transcription)
                 .font(.system(size: 16, weight: .regular, design: .rounded))
                 .foregroundStyle(.white.opacity(0.95))
-                .lineLimit(3)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Elegant cancel button (only if onCancel is provided)
+            if let onCancel = onCancel {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3), .white.opacity(0.1))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)

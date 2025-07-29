@@ -133,11 +133,7 @@ struct ChatCommandPalette: View {
                                     handleCommandSelection(command)
                                 }
                             
-                            if index < filteredCommands.count - 1 || !filteredBooks.isEmpty {
-                                Divider()
-                                    .foregroundStyle(.white.opacity(0.08))
-                                    .padding(.leading, 60)
-                            }
+                            // Remove dividers
                         }
                     }
                     
@@ -161,11 +157,7 @@ struct ChatCommandPalette: View {
                                     handleBookSelection(book)
                                 }
                             
-                            if index < filteredBooks.count - 1 {
-                                Divider()
-                                    .foregroundStyle(.white.opacity(0.08))
-                                    .padding(.leading, 60)
-                            }
+                            // Remove dividers
                         }
                     }
                     
@@ -224,10 +216,6 @@ struct ChatCommandPalette: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.white.opacity(0.8))
                 .frame(width: 32, height: 32)
-                .background(
-                    Circle()
-                        .fill(.white.opacity(0.08))
-                )
             
             // Text
             VStack(alignment: .leading, spacing: 2) {
