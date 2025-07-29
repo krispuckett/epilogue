@@ -476,24 +476,65 @@ struct UnifiedChatView: View {
             
             // Process quotes and notes first
             await MainActor.run {
+                // Create BookModel from current book context if available
+                let bookModel: BookModel? = if let book = currentBookContext {
+                    BookModel(from: book)
+                } else {
+                    nil
+                }
+                
                 // Add quotes
                 for quote in processed.quotes {
+                    // Create and save Quote to SwiftData
+                    let quoteModel = Quote(
+                        text: quote.text,
+                        book: bookModel,
+                        timestamp: quote.timestamp,
+                        source: .ambient
+                    )
+                    
+                    // Insert into SwiftData
+                    modelContext.insert(quoteModel)
+                    
+                    // Add to messages with quote type
                     messages.append(UnifiedChatMessage(
                         content: "\"\(quote.text)\"",
-                        isUser: true,
+                        isUser: false,
                         timestamp: Date(),
-                        bookContext: currentBookContext
+                        bookContext: currentBookContext,
+                        messageType: .quote(quoteModel)
                     ))
                 }
                 
                 // Add notes
                 for note in processed.notes {
+                    // Create and save Note to SwiftData
+                    let noteModel = Note(
+                        content: note.text,
+                        book: bookModel,
+                        timestamp: note.timestamp,
+                        source: .ambient
+                    )
+                    
+                    // Insert into SwiftData
+                    modelContext.insert(noteModel)
+                    
+                    // Add to messages with note type
                     messages.append(UnifiedChatMessage(
                         content: note.text,
-                        isUser: true,
+                        isUser: false,
                         timestamp: Date(),
-                        bookContext: currentBookContext
+                        bookContext: currentBookContext,
+                        messageType: .note(noteModel)
                     ))
+                }
+                
+                // Save the context after inserting all items
+                do {
+                    try modelContext.save()
+                    print("Successfully saved \(processed.quotes.count) quotes and \(processed.notes.count) notes to SwiftData")
+                } catch {
+                    print("Failed to save to SwiftData: \(error)")
                 }
             }
             
@@ -588,7 +629,8 @@ struct UnifiedChatView: View {
                         content: summary,
                         isUser: false,
                         timestamp: Date(),
-                        bookContext: currentBookContext
+                        bookContext: currentBookContext,
+                        messageType: .system
                     ))
                 } else if !liveTranscription.isEmpty {
                     // If no structured content was extracted, add the raw transcription
@@ -916,10 +958,28 @@ struct UnifiedChatMessage: Identifiable {
     let isUser: Bool
     let timestamp: Date
     let bookContext: Book?
+    let messageType: MessageType
     
     enum Role {
         case user
         case assistant
+    }
+    
+    enum MessageType {
+        case text
+        case note(Note)
+        case quote(Quote)
+        case system
+        case contextSwitch
+        case transcribing
+    }
+    
+    init(content: String, isUser: Bool, timestamp: Date = Date(), bookContext: Book? = nil, messageType: MessageType = .text) {
+        self.content = content
+        self.isUser = isUser
+        self.timestamp = timestamp
+        self.bookContext = bookContext
+        self.messageType = messageType
     }
 }
 

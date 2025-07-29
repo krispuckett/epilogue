@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let navigateToNote = Notification.Name("navigateToNote")
+    static let navigateToQuote = Notification.Name("navigateToQuote")
+}
+
 struct ChatMessageView: View {
     let message: UnifiedChatMessage
     let currentBookContext: Book?
@@ -16,11 +23,15 @@ struct ChatMessageView: View {
             if message.isContextSwitch {
                 contextSwitchView
                     .transition(.scale.combined(with: .opacity))
+            } else if message.isSystemMessage {
+                // System messages (centered, no bubble)
+                systemMessageView
+                    .transition(.scale.combined(with: .opacity))
             } else {
                 // Regular message layout
                 HStack(alignment: .bottom, spacing: 12) {
                     if message.isUser {
-                        Spacer(minLength: 80) // Reduced from 60 to 80 for better right anchoring
+                        Spacer(minLength: 100) // Increased to keep bubbles narrower
                     }
                     
                     VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
@@ -68,35 +79,75 @@ struct ChatMessageView: View {
         } else if message.isUser {
             userMessageBubble
         } else {
-            aiMessageContent
+            // Check message type for special content
+            switch message.messageType {
+            case .note(let note):
+                MiniNoteCard(note: note) {
+                    // Navigation will be handled by parent view
+                    NotificationCenter.default.post(
+                        name: .navigateToNote,
+                        object: note
+                    )
+                }
+                .frame(maxWidth: 300)
+            case .quote(let quote):
+                MiniQuoteCard(quote: quote) {
+                    // Navigation will be handled by parent view
+                    NotificationCenter.default.post(
+                        name: .navigateToQuote,
+                        object: quote
+                    )
+                }
+                .frame(maxWidth: 300)
+            default:
+                aiMessageContent
+            }
         }
     }
     
     // MARK: - User Message Bubble
     
     private var userMessageBubble: some View {
-        Text(message.content)
-            .font(.system(size: 15))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: 300, alignment: .trailing)
-            .glassEffect(in: .rect(cornerRadius: 20))
-            .overlay(alignment: .topTrailing) {
-                // Subtle border
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.15),
-                                .white.opacity(0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.5
-                    )
+        GeometryReader { geometry in
+            HStack {
+                Spacer()
+                Text(message.content)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: geometry.size.width * 0.7, alignment: .trailing)
+                    .glassEffect(in: .rect(cornerRadius: 20))
+                    .overlay(alignment: .topTrailing) {
+                        // Subtle border
+                        RoundedRectangle(cornerRadius: 20)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(0.15),
+                                        .white.opacity(0.05)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.5
+                            )
+                    }
             }
+        }
+        .frame(height: intrinsicHeight)
+    }
+    
+    private var intrinsicHeight: CGFloat {
+        let text = message.content as NSString
+        let maxWidth = UIScreen.main.bounds.width * 0.7 - 32 // 70% minus padding
+        let boundingRect = text.boundingRect(
+            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: UIFont.systemFont(ofSize: 15)],
+            context: nil
+        )
+        return boundingRect.height + 24 // Add vertical padding
     }
     
     // MARK: - AI Message Content
@@ -162,6 +213,18 @@ struct ChatMessageView: View {
                 rotationAngle = 360
             }
         }
+    }
+    
+    // MARK: - System Message View
+    
+    private var systemMessageView: some View {
+        Text(message.content)
+            .font(.system(size: 13))
+            .foregroundStyle(.white.opacity(0.5))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
     }
     
     // MARK: - Context Switch View
@@ -298,14 +361,27 @@ struct TypingIndicatorView: View {
 
 extension UnifiedChatMessage {
     var isContextSwitch: Bool {
-        // You can add a messageType enum to UnifiedChatMessage
-        // For now, check if content starts with specific pattern
-        content.hasPrefix("[Context Switch]")
+        if case .contextSwitch = messageType {
+            return true
+        }
+        // Fallback for legacy messages
+        return content.hasPrefix("[Context Switch]")
+    }
+    
+    var isSystemMessage: Bool {
+        if case .system = messageType {
+            return true
+        }
+        // Fallback for legacy messages
+        return content.hasPrefix("[System]") || content.hasPrefix("Added ")
     }
     
     var isWhisperTranscription: Bool {
-        // Check if this is a transcription in progress
-        content.hasPrefix("[Transcribing]")
+        if case .transcribing = messageType {
+            return true
+        }
+        // Fallback for legacy messages
+        return content.hasPrefix("[Transcribing]")
     }
     
     var isDelivered: Bool {

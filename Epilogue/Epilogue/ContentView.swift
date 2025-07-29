@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
     @State private var selectedTab = 0
     @StateObject private var libraryViewModel = LibraryViewModel()
     @StateObject private var notesViewModel = NotesViewModel()
@@ -29,7 +30,24 @@ struct ContentView: View {
                 .ignoresSafeArea()
             
             // Native TabView with automatic blur - DO NOT MODIFY
-            TabView(selection: $selectedTab) {
+            TabView(selection: Binding(
+                get: { 
+                    switch navigationCoordinator.selectedTab {
+                    case .library: return 0
+                    case .notes: return 1
+                    case .chat: return 2
+                    }
+                },
+                set: { newValue in
+                    selectedTab = newValue
+                    switch newValue {
+                    case 0: navigationCoordinator.selectedTab = .library
+                    case 1: navigationCoordinator.selectedTab = .notes
+                    case 2: navigationCoordinator.selectedTab = .chat
+                    default: break
+                    }
+                }
+            )) {
                 NavigationStack {
                     LibraryView()
                 }
@@ -71,6 +89,7 @@ struct ContentView: View {
             .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
             .environmentObject(libraryViewModel)
             .environmentObject(notesViewModel)
+            .environmentObject(navigationCoordinator)
             .toolbar {
                 // Privacy settings button (only on Library tab)
                 if selectedTab == 0 {
