@@ -51,67 +51,66 @@ struct UnifiedChatView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Gradient system with ambient recording support
-            Group {
-                if isRecording, let book = currentBookContext {
-                    // Use the breathing gradient during recording with book context
-                    ClaudeInspiredGradient(
-                        book: currentBookContext,
-                        colorPalette: colorPalette, // Pass existing palette
-                        audioLevel: $audioLevel,
-                        isListening: $isRecording,
-                        voiceFrequency: voiceManager.voiceFrequency,
-                        voiceIntensity: voiceManager.voiceIntensity,
-                        voiceRhythm: voiceManager.voiceRhythm
-                    )
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                    .id("recording-\(book.localId)")
-                } else if isRecording {
-                    // Recording without book context - use ambient gradient
-                    ClaudeInspiredGradient(
-                        book: nil,
-                        colorPalette: nil,
-                        audioLevel: $audioLevel,
-                        isListening: $isRecording,
-                        voiceFrequency: voiceManager.voiceFrequency,
-                        voiceIntensity: voiceManager.voiceIntensity,
-                        voiceRhythm: voiceManager.voiceRhythm
-                    )
+        // Root gradient with proper ignoresSafeArea
+        Group {
+            if isRecording, let book = currentBookContext {
+                // Use the breathing gradient during recording with book context
+                ClaudeInspiredGradient(
+                    book: currentBookContext,
+                    colorPalette: colorPalette, // Pass existing palette
+                    audioLevel: $audioLevel,
+                    isListening: $isRecording,
+                    voiceFrequency: voiceManager.voiceFrequency,
+                    voiceIntensity: voiceManager.voiceIntensity,
+                    voiceRhythm: voiceManager.voiceRhythm
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .id("recording-\(book.localId)")
+            } else if isRecording {
+                // Recording without book context - use ambient gradient
+                ClaudeInspiredGradient(
+                    book: nil,
+                    colorPalette: nil,
+                    audioLevel: $audioLevel,
+                    isListening: $isRecording,
+                    voiceFrequency: voiceManager.voiceFrequency,
+                    voiceIntensity: voiceManager.voiceIntensity,
+                    voiceRhythm: voiceManager.voiceRhythm
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .id("recording-ambient")
+            } else if let book = currentBookContext {
+                // Use the same BookAtmosphericGradientView with extracted colors
+                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                BookAtmosphericGradientView(colorPalette: palette, intensity: 0.85)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .transition(.opacity)
-                    .id("recording-ambient")
-                } else if let book = currentBookContext {
-                    // Use the same BookAtmosphericGradientView with extracted colors
-                    let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-                    BookAtmosphericGradientView(colorPalette: palette, intensity: 0.85)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                        .id(book.localId) // Simplify ID to just book ID
-                        .onAppear {
-                            print("BookAtmosphericGradientView appeared for: \(book.title)")
-                            print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
-                            if let cp = colorPalette {
-                                print("Primary: \(cp.primary)")
-                                print("Secondary: \(cp.secondary)")
-                                print("Accent: \(cp.accent)")
-                            }
+                    .id(book.localId) // Simplify ID to just book ID
+                    .onAppear {
+                        print("BookAtmosphericGradientView appeared for: \(book.title)")
+                        print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
+                        if let cp = colorPalette {
+                            print("Primary: \(cp.primary)")
+                            print("Secondary: \(cp.secondary)")
+                            print("Accent: \(cp.accent)")
                         }
-                } else {
-                    // Use existing ambient gradient for empty state
-                    AmbientChatGradientView()
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                }
+                    }
+            } else {
+                // Use existing ambient gradient for empty state
+                AmbientChatGradientView()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
             }
-            .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
-            .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
-            
+        }
+        .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
+        .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
+        .overlay {
             // Messages area with proper safe area insets
             ScrollViewReader { proxy in
                 ScrollView {
@@ -1078,76 +1077,25 @@ struct AmbientChatGradientView: View {
 struct BookContextMenuView: View {
     @Binding var currentBook: Book?
     let books: [Book]
-    @State private var hasPreCached = false
+    @State private var showingBookPicker = false
     
     var body: some View {
-        Menu {
-            Section {
-                // Show user's books with lazy loading
-                ForEach(Array(books.prefix(20))) { book in
-                Button {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        currentBook = book
-                    }
-                    HapticManager.shared.lightTap()
-                } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(book.title)
-                                .font(.body)
-                            Text(book.author)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        // Use lower quality URL for menu thumbnails
-                        let thumbnailURL = book.coverImageURL?.replacingOccurrences(of: "&zoom=5", with: "")
-                            .replacingOccurrences(of: "&zoom=4", with: "")
-                            .replacingOccurrences(of: "&zoom=3", with: "")
-                            .replacingOccurrences(of: "&zoom=2", with: "")
-                        
-                        AsyncImage(url: URL(string: thumbnailURL ?? "")) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 30, height: 40)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                            case .failure(_), .empty:
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 30, height: 40)
-                            @unknown default:
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 30, height: 40)
-                            }
-                        }
-                        .id(book.id) // Help SwiftUI cache the image
-                    }
-                }
-                } // Close ForEach
-            }
-            
-            if !books.isEmpty {
-                Divider()
-            }
-            
-            Button {
-                currentBook = nil
-                HapticManager.shared.lightTap()
-            } label: {
-                Label("Clear Selection", systemImage: "xmark.circle")
-            }
+        Button {
+            showingBookPicker = true
+            HapticManager.shared.lightTap()
         } label: {
             BookContextPill(
                 book: currentBook,
                 onTap: {}
             )
         }
-        .menuStyle(.automatic) // Use native iOS menu style
-        .preferredColorScheme(.dark) // Prefer dark mode for menu
+        .sheet(isPresented: $showingBookPicker) {
+            ChatBookPickerSheet(
+                selectedBook: $currentBook,
+                isPresented: $showingBookPicker,
+                books: books
+            )
+        }
     }
 }
 
