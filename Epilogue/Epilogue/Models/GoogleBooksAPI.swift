@@ -191,12 +191,6 @@ struct Book: Identifiable, Codable, Equatable {
     }
 }
 
-enum ReadingStatus: String, CaseIterable, Codable {
-    case wantToRead = "Want to Read"
-    case currentlyReading = "Currently Reading"
-    case finished = "Finished"
-}
-
 // MARK: - Google Books API Service
 @MainActor
 class GoogleBooksService: ObservableObject {

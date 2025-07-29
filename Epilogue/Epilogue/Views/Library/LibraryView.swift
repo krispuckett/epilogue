@@ -235,8 +235,8 @@ struct LibraryGridItem: View {
                     }
                 } label: {
                     Label(
-                        book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
-                        systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                        book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                        systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
                     )
                 }
                 
@@ -328,8 +328,8 @@ struct LibraryListItemWrapper: View {
                     }
                 } label: {
                     Label(
-                        book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
-                        systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                        book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                        systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
                     )
                 }
                 
@@ -473,8 +473,8 @@ struct LibraryBookCard: View {
                 }
             } label: {
                 Label(
-                    book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
-                    systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                    book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                    systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
                 )
             }
             
@@ -869,8 +869,8 @@ struct LibraryBookListItem: View {
                 }
             } label: {
                 Label(
-                    book.readingStatus == .finished ? "Mark as Want to Read" : "Mark as Finished",
-                    systemImage: book.readingStatus == .finished ? "checkmark.circle.fill" : "checkmark.circle"
+                    book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                    systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
                 )
             }
             
@@ -917,7 +917,7 @@ struct LibraryBookListItem: View {
             return .blue
         case .currentlyReading:
             return .green
-        case .finished:
+        case .read:
             return .purple
         }
     }
@@ -1021,7 +1021,7 @@ class LibraryViewModel: ObservableObject {
     }
     
     func toggleReadingStatus(for book: Book) {
-        let newStatus: ReadingStatus = book.readingStatus == .finished ? .wantToRead : .finished
+        let newStatus: ReadingStatus = book.readingStatus == .read ? .wantToRead : .read
         updateReadingStatus(for: book.id, status: newStatus)
     }
     
