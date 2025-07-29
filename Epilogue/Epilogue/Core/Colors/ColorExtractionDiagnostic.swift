@@ -339,6 +339,8 @@ public class ColorExtractionDiagnostic {
     // MARK: - Save to Photos
     
     private func saveDiagnosticImage(_ image: UIImage, title: String) async {
+        // Debug saving disabled - no longer saves to photo library
+        /*
         // Request photo library permission
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized else {
@@ -361,6 +363,8 @@ public class ColorExtractionDiagnostic {
         } catch {
             print("❌ Failed to save diagnostic image: \(error)")
         }
+        */
+        print("💾 Diagnostic image saving disabled")
     }
     
     // MARK: - Helper Functions

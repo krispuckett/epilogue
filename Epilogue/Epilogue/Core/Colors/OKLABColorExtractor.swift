@@ -40,8 +40,8 @@ public class OKLABColorExtractor {
         // Calculate checksum
         let _ = calculateChecksum(for: image)
         
-        // Save for debugging
-        saveImageForDebug(image, suffix: "EXTRACTED_\(imageSource)")
+        // Debug saving disabled
+        // saveImageForDebug(image, suffix: "EXTRACTED_\(imageSource)")
         
         // Check image size to detect cropped covers
         if image.size.width < 100 || image.size.height < 100 {
@@ -698,6 +698,8 @@ public class OKLABColorExtractor {
     }
     
     private func saveImageForDebug(_ image: UIImage, suffix: String) {
+        // Debug saving disabled - no longer saves to photo library
+        /*
         Task {
             guard let data = image.pngData() else { return }
             let fileName = "\(suffix)_\(Date().timeIntervalSince1970).png"
@@ -713,6 +715,7 @@ public class OKLABColorExtractor {
         // print("❌ Failed to save extracted image: \(error)")
             }
         }
+        */
     }
 }
 

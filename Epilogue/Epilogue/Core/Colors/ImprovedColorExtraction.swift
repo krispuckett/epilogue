@@ -13,8 +13,8 @@ struct ImprovedColorExtraction {
         
         // Removed hard-coded test - was causing inconsistent extractions
         
-        // DEBUG: Save image to Photos to verify what we're processing
-        debugSaveExtractedImage(image, bookTitle: bookTitle)
+        // DEBUG: Save image to Photos - DISABLED
+        // debugSaveExtractedImage(image, bookTitle: bookTitle)
         
         // Preprocess image to reduce text anti-aliasing artifacts
         let processedImage = preprocessImageForColorExtraction(image)
@@ -59,9 +59,9 @@ struct ImprovedColorExtraction {
         // Fallback 4: Enhance image and retry OKLAB
         print("🔍 Trying enhanced image extraction...")
         if let enhancedImage = enhanceImageForExtraction(image) {
-            // DEBUG: Save enhanced image
-            print("📸 Saving ENHANCED image for \(bookTitle)")
-            UIImageWriteToSavedPhotosAlbum(enhancedImage, nil, nil, nil)
+            // DEBUG: Save enhanced image - DISABLED
+            // print("📸 Saving ENHANCED image for \(bookTitle)")
+            // UIImageWriteToSavedPhotosAlbum(enhancedImage, nil, nil, nil)
             
             if let cgImage = enhancedImage.cgImage {
                 let enhancedPalette = await extractor.extractPalette(from: cgImage, imageSource: bookTitle)
@@ -341,7 +341,8 @@ struct ImprovedColorExtraction {
     
     // DEBUG: Save image to Photos app to verify what's being extracted
     private static func debugSaveExtractedImage(_ image: UIImage, bookTitle: String) {
-        // Save to Photos app so you can SEE what's being extracted
+        // Debug saving disabled - no longer saves to photo library
+        /*
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
         print("📸 SAVED IMAGE TO PHOTOS for \(bookTitle) - CHECK IF IT MATCHES!")
         print("   Image size: \(image.size)")
@@ -352,6 +353,7 @@ struct ImprovedColorExtraction {
             print("⚠️ WARNING: Image too small (\(image.size.width)x\(image.size.height)), likely cropped!")
             print("   This may be caused by zoom parameter - consider using zoom=0 or zoom=1")
         }
+        */
     }
     
     // Preprocess image to reduce text anti-aliasing artifacts
@@ -407,9 +409,9 @@ struct ImprovedColorExtraction {
                 
                 print("✅ Downloaded image: \(image.size)")
                 
-                // Save to Photos for inspection
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-                print("📸 SAVED TEST IMAGE #\(index + 1) TO PHOTOS")
+                // Save to Photos for inspection - DISABLED
+                // UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                // print("📸 SAVED TEST IMAGE #\(index + 1) TO PHOTOS")
                 
                 // Try extraction
                 let extractor = OKLABColorExtractor()
