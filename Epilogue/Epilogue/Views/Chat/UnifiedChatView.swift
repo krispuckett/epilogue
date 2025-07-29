@@ -54,10 +54,26 @@ struct UnifiedChatView: View {
         ZStack {
             // Gradient system with ambient recording support
             Group {
-                if isRecording {
-                    // Use the breathing gradient during recording
+                if isRecording, let book = currentBookContext {
+                    // Use the breathing gradient during recording with book context
                     ClaudeInspiredGradient(
                         book: currentBookContext,
+                        colorPalette: colorPalette, // Pass existing palette
+                        audioLevel: $audioLevel,
+                        isListening: $isRecording,
+                        voiceFrequency: voiceManager.voiceFrequency,
+                        voiceIntensity: voiceManager.voiceIntensity,
+                        voiceRhythm: voiceManager.voiceRhythm
+                    )
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .id("recording-\(book.localId)")
+                } else if isRecording {
+                    // Recording without book context - use ambient gradient
+                    ClaudeInspiredGradient(
+                        book: nil,
+                        colorPalette: nil,
                         audioLevel: $audioLevel,
                         isListening: $isRecording,
                         voiceFrequency: voiceManager.voiceFrequency,
@@ -67,6 +83,7 @@ struct UnifiedChatView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .transition(.opacity)
+                    .id("recording-ambient")
                 } else if let book = currentBookContext {
                     // Use the same BookAtmosphericGradientView with extracted colors
                     let palette = colorPalette ?? generatePlaceholderPalette(for: book)
@@ -93,7 +110,7 @@ struct UnifiedChatView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
-            .animation(.easeInOut(duration: 0.5), value: isRecording)
+            .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
             
             // Messages area with proper safe area insets
             ScrollViewReader { proxy in
@@ -252,32 +269,32 @@ struct UnifiedChatView: View {
         VStack(spacing: 16) {
             // Use custom glass-msgs icon
             Image("glass-msgs")
-                .renderingMode(.original)
+                .renderingMode(.template)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 64, height: 64)
-                .opacity(0.5)
+                .foregroundStyle(.white.opacity(0.3))
             
             Text("What are we reading \(timeBasedGreeting)?")
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.white.opacity(0.5))
                 .multilineTextAlignment(.center)
             
             if currentBookContext != nil {
                 Text("Discussing \(currentBookContext?.title ?? "")")
                     .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.35))
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
                 
                 Text("Ask questions, explore themes, or share thoughts")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.25))
                     .multilineTextAlignment(.center)
             } else {
                 Text("Select a book to start a focused conversation")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.25))
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
             }
@@ -1001,13 +1018,17 @@ struct AmbientChatGradientView: View {
 struct BookContextMenuView: View {
     @Binding var currentBook: Book?
     let books: [Book]
+    @State private var hasPreCached = false
     
     var body: some View {
         Menu {
-            // Show user's books
-            ForEach(books) { book in
+            Section {
+                // Show user's books with lazy loading
+                ForEach(Array(books.prefix(20))) { book in
                 Button {
-                    currentBook = book
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        currentBook = book
+                    }
                     HapticManager.shared.lightTap()
                 } label: {
                     Label {
@@ -1019,14 +1040,34 @@ struct BookContextMenuView: View {
                                 .foregroundStyle(.secondary)
                         }
                     } icon: {
-                        SharedBookCoverView(
-                            coverURL: book.coverImageURL,
-                            width: 30,
-                            height: 40
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        // Use lower quality URL for menu thumbnails
+                        let thumbnailURL = book.coverImageURL?.replacingOccurrences(of: "&zoom=5", with: "")
+                            .replacingOccurrences(of: "&zoom=4", with: "")
+                            .replacingOccurrences(of: "&zoom=3", with: "")
+                            .replacingOccurrences(of: "&zoom=2", with: "")
+                        
+                        AsyncImage(url: URL(string: thumbnailURL ?? "")) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 30, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            case .failure(_), .empty:
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 30, height: 40)
+                            @unknown default:
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 30, height: 40)
+                            }
+                        }
+                        .id(book.id) // Help SwiftUI cache the image
                     }
                 }
+                } // Close ForEach
             }
             
             if !books.isEmpty {
@@ -1045,7 +1086,8 @@ struct BookContextMenuView: View {
                 onTap: {}
             )
         }
-        .menuStyle(.automatic)
+        .menuStyle(.automatic) // Use native iOS menu style
+        .preferredColorScheme(.dark) // Prefer dark mode for menu
     }
 }
 
@@ -1119,13 +1161,30 @@ struct BookContextPillContent: View {
             if let book = book {
                 // Mini book cover
                 if let coverURL = book.coverImageURL {
-                    SharedBookCoverView(
-                        coverURL: coverURL,
-                        width: 16,
-                        height: 24
-                    )
-                    .cornerRadius(2)
-                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                    AsyncImage(url: URL(string: coverURL)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 16, height: 24)
+                                .clipShape(RoundedRectangle(cornerRadius: 2))
+                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        case .failure(_), .empty:
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(.white.opacity(0.1))
+                                .frame(width: 16, height: 24)
+                                .overlay {
+                                    Image(systemName: "book.closed.fill")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                        @unknown default:
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(.white.opacity(0.1))
+                                .frame(width: 16, height: 24)
+                        }
+                    }
                 } else {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(.white.opacity(0.1))

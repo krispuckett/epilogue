@@ -38,7 +38,7 @@ struct ProcessedAmbientSession {
 struct ClaudeInspiredGradient: View {
     @State private var phase: CGFloat = 0
     let book: Book?
-    @State private var colorPalette: ColorPalette?
+    let colorPalette: ColorPalette? // Changed from @State to regular property
     @Binding var audioLevel: Float
     @Binding var isListening: Bool
     
@@ -85,61 +85,12 @@ struct ClaudeInspiredGradient: View {
         }
         .onAppear {
             startWaveAnimation()
-            if let book = book {
-                Task {
-                    await extractBookColors(book)
-                }
-            }
-        }
-        .onChange(of: book) { _, newBook in
-            if let newBook = newBook {
-                Task {
-                    await extractBookColors(newBook)
-                }
-            } else {
-                colorPalette = nil
-            }
         }
     }
     
     private func startWaveAnimation() {
         withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
             phase = 1
-        }
-    }
-    
-    private func extractBookColors(_ book: Book) async {
-        guard let coverURL = book.coverImageURL else { return }
-        
-        let highQualityURL = coverURL
-            .replacingOccurrences(of: "http://", with: "https://")
-            .replacingOccurrences(of: "&zoom=5", with: "")
-            .replacingOccurrences(of: "&zoom=4", with: "")
-            .replacingOccurrences(of: "&zoom=3", with: "")
-            .replacingOccurrences(of: "&zoom=2", with: "")
-            .replacingOccurrences(of: "&zoom=1", with: "")
-            .replacingOccurrences(of: "zoom=5", with: "")
-            .replacingOccurrences(of: "zoom=4", with: "")
-            .replacingOccurrences(of: "zoom=3", with: "")
-            .replacingOccurrences(of: "zoom=2", with: "")
-            .replacingOccurrences(of: "zoom=1", with: "")
-        
-        guard let url = URL(string: highQualityURL),
-              let data = try? await URLSession.shared.data(from: url).0,
-              let image = UIImage(data: data) else { return }
-        
-        print("AmbientChat: Extracting colors for \(book.title)")
-        
-        // Use improved color extraction with OKLAB as primary
-        if let palette = await ImprovedColorExtraction.extractColors(from: image, bookTitle: book.title) {
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.8)) {
-                    self.colorPalette = palette
-                    print("AmbientChat: Color extraction successful")
-                }
-            }
-        } else {
-            print("AmbientChat: Color extraction failed for \(book.title)")
         }
     }
 }
@@ -564,12 +515,14 @@ struct AmbientChatOverlay: View {
     @StateObject private var autoStopManager = AutoStopManager.shared
     @State private var showAutoStopWarning = false
     @State private var realtimeQuestions: [String] = []  // Track questions already processed in real-time
+    @State private var bookColorPalette: ColorPalette? = nil  // Store extracted colors
     
     var body: some View {
         ZStack {
             // Claude-inspired gradient background
             ClaudeInspiredGradient(
                 book: selectedBook,
+                colorPalette: bookColorPalette,
                 audioLevel: $audioLevel,
                 isListening: $isRecording,
                 voiceFrequency: voiceManager.voiceFrequency,
@@ -733,13 +686,23 @@ struct AmbientChatOverlay: View {
             }
         }
         .onAppear {
-            if selectedBook != nil {
+            if let book = selectedBook {
                 startListening()
+                // Extract colors for initial book
+                Task {
+                    await extractBookColors(book)
+                }
             }
         }
         .onChange(of: selectedBook) { _, newValue in
-            if newValue != nil {
+            if let book = newValue {
                 startListening()
+                // Extract colors for the selected book
+                Task {
+                    await extractBookColors(book)
+                }
+            } else {
+                bookColorPalette = nil
             }
         }
         .onChange(of: voiceManager.transcribedText) { oldValue, newValue in
@@ -1394,6 +1357,29 @@ struct AmbientChatOverlay: View {
             .replacingOccurrences(of: "\u{201D}", with: "")
             .replacingOccurrences(of: "'", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Color Extraction
+    
+    private func extractBookColors(_ book: Book) async {
+        guard let coverURL = book.coverImageURL,
+              let url = URL(string: coverURL) else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                let extractor = OKLABColorExtractor()
+                let palette = try await extractor.extractPalette(from: image, imageSource: book.title)
+                
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        self.bookColorPalette = palette
+                    }
+                }
+            }
+        } catch {
+            print("Failed to extract colors for ambient chat: \(error)")
+        }
     }
 }
 
