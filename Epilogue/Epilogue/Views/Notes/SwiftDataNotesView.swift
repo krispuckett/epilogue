@@ -292,14 +292,14 @@ struct SwiftDataNotesView: View {
             )
             
         case .question(let question):
-            QuestionCard(question: question)
+            CapturedQuestionCard(question: question)
         }
     }
 }
 
-// MARK: - Question Card
+// MARK: - Captured Question Card
 
-struct QuestionCard: View {
+struct CapturedQuestionCard: View {
     let question: CapturedQuestion
     
     var body: some View {
