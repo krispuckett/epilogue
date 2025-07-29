@@ -3,9 +3,15 @@ import SwiftUI
 /// Apple Music-style atmospheric gradient background for book views
 struct BookAtmosphericGradientView: View {
     let colorPalette: ColorPalette
+    let intensity: Double
     
     @State private var gradientOffset: CGFloat = 0
     @State private var displayedPalette: ColorPalette?
+    
+    init(colorPalette: ColorPalette, intensity: Double = 1.0) {
+        self.colorPalette = colorPalette
+        self.intensity = intensity
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -14,20 +20,20 @@ struct BookAtmosphericGradientView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                // Multi-color gradient layer - blend all extracted colors
+                // Single direction gradient - no mirroring, with intensity control
                 if let palette = displayedPalette {
                     LinearGradient(
                         stops: [
-                            .init(color: palette.primary, location: 0.0),
-                            .init(color: palette.secondary, location: 0.2),  // Add secondary!
-                            .init(color: palette.accent.opacity(0.7), location: 0.35),
-                            .init(color: palette.background.opacity(0.3), location: 0.5),
+                            .init(color: palette.primary.opacity(intensity), location: 0.0),
+                            .init(color: palette.secondary.opacity(intensity * 0.8), location: 0.2),
+                            .init(color: palette.accent.opacity(intensity * 0.5), location: 0.35),
+                            .init(color: palette.background.opacity(intensity * 0.3), location: 0.5),
                             .init(color: Color.clear, location: 0.6)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .blur(radius: 40) // Same blur as ambient
+                    .blur(radius: 40)
                     .ignoresSafeArea()
                 }
                 

@@ -4,8 +4,11 @@ import SwiftData
 struct ChatMessageView: View {
     let message: UnifiedChatMessage
     let currentBookContext: Book?
+    let colorPalette: ColorPalette?
     @State private var isAnimatingIn = false
     @State private var showTypingIndicator = false
+    @State private var glowAnimation = 0.0
+    @State private var rotationAngle = 0.0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -17,7 +20,7 @@ struct ChatMessageView: View {
                 // Regular message layout
                 HStack(alignment: .bottom, spacing: 12) {
                     if message.isUser {
-                        Spacer(minLength: 60)
+                        Spacer(minLength: 80) // Reduced from 60 to 80 for better right anchoring
                     }
                     
                     VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
@@ -34,7 +37,7 @@ struct ChatMessageView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, message.isUser ? 16 : 20) // Less padding for user messages
         .scaleEffect(isAnimatingIn ? 1 : 0.95)
         .opacity(isAnimatingIn ? 1 : 0)
         .onAppear {
@@ -78,7 +81,7 @@ struct ChatMessageView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: 300, alignment: .trailing)
-            .glassEffect(.regular, in: .rect(cornerRadius: 20))
+            .glassEffect(in: .rect(cornerRadius: 20))
             .overlay(alignment: .topTrailing) {
                 // Subtle border
                 RoundedRectangle(cornerRadius: 20)
@@ -118,22 +121,47 @@ struct ChatMessageView: View {
     // MARK: - Whisper Transcription View
     
     private var whisperTranscriptionView: some View {
-        HStack(spacing: 8) {
+        let primaryColor = colorPalette?.primary ?? Color.red
+        
+        return HStack(spacing: 8) {
             Image(systemName: "mic.fill")
                 .font(.system(size: 12))
-                .foregroundStyle(.red)
+                .foregroundStyle(primaryColor)
             
             Text("Transcribing...")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.6))
-            
-            ProgressView()
-                .scaleEffect(0.7)
-                .tint(.white.opacity(0.6))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .glassEffect(in: .rect(cornerRadius: 16))
+        .overlay {
+            // Animated glowing border with angular gradient for smooth loop
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            primaryColor,
+                            primaryColor.opacity(0.3),
+                            primaryColor.opacity(0.1),
+                            primaryColor.opacity(0.3),
+                            primaryColor
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(rotationAngle),
+                        endAngle: .degrees(rotationAngle + 360)
+                    ),
+                    lineWidth: 2
+                )
+                .blur(radius: 4)
+                .shadow(color: primaryColor.opacity(0.5), radius: 8)
+                .shadow(color: primaryColor.opacity(0.3), radius: 16)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                rotationAngle = 360
+            }
+        }
     }
     
     // MARK: - Context Switch View
@@ -302,7 +330,8 @@ extension UnifiedChatMessage {
                     timestamp: Date(),
                     bookContext: nil
                 ),
-                currentBookContext: nil
+                currentBookContext: nil,
+                colorPalette: nil
             )
             
             // AI response with book context
@@ -320,7 +349,8 @@ extension UnifiedChatMessage {
                         pageCount: 300
                     )
                 ),
-                currentBookContext: nil
+                currentBookContext: nil,
+                colorPalette: nil
             )
             
             // Context switch
@@ -338,7 +368,8 @@ extension UnifiedChatMessage {
                         pageCount: 250
                     )
                 ),
-                currentBookContext: nil
+                currentBookContext: nil,
+                colorPalette: nil
             )
         }
         .padding()
