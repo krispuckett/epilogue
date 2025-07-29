@@ -103,7 +103,10 @@ struct ProgressPopover: View {
                 )
                 .tint(accentColor)
                 .onChange(of: sliderValue) { _, newValue in
-                    currentPage = Int(newValue)
+                    // Update currentPage on next run loop to avoid state modification during view update
+                    Task { @MainActor in
+                        currentPage = Int(newValue)
+                    }
                 }
                 
                 // Percentage labels
@@ -158,8 +161,8 @@ struct ProgressPopover: View {
                         .padding(.vertical, 10)
                         .glassEffect(in: RoundedRectangle(cornerRadius: 10))
                         .focused($isTextFieldFocused)
-                        .onChange(of: currentPage) { _, newValue in
-                            sliderValue = Double(newValue)
+                        .onSubmit {
+                            sliderValue = Double(currentPage)
                             updateProgress()
                         }
                         .onTapGesture {

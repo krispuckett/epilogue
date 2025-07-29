@@ -13,11 +13,22 @@ struct UnifiedChatInputBar: View {
     @Binding var isRecording: Bool
     let onMicrophoneTap: () -> Void
     
+    // Color palette for adaptive UI
+    let colorPalette: ColorPalette?
+    
     private var placeholderText: String {
         if let book = currentBook {
             return "Ask about \(book.title)..."
         } else {
             return "Ask about your books..."
+        }
+    }
+    
+    private var adaptiveUIColor: Color {
+        if let palette = colorPalette {
+            return palette.adaptiveUIColor
+        } else {
+            return Color(red: 1.0, green: 0.55, blue: 0.26)
         }
     }
     
@@ -54,7 +65,7 @@ struct UnifiedChatInputBar: View {
                     // Command icon - matching search icon style
                     Image(systemName: "command")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(adaptiveUIColor)
                         .padding(.leading, 12)
                         .padding(.trailing, 8)
                         .onTapGesture {
@@ -96,8 +107,8 @@ struct UnifiedChatInputBar: View {
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundStyle(
                                     isRecording ? 
-                                    Color(red: 1.0, green: 0.55, blue: 0.26) : 
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7)
+                                    adaptiveUIColor : 
+                                    adaptiveUIColor.opacity(0.7)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -109,7 +120,7 @@ struct UnifiedChatInputBar: View {
                             Button(action: onSend) {
                                 Image(systemName: "arrow.up.circle.fill")
                                     .font(.system(size: 32))
-                                    .foregroundStyle(.white, Color(red: 1.0, green: 0.55, blue: 0.26))
+                                    .foregroundStyle(.white, adaptiveUIColor)
                             }
                             .buttonStyle(.plain)
                             .transition(.asymmetric(
@@ -127,8 +138,8 @@ struct UnifiedChatInputBar: View {
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                                    adaptiveUIColor.opacity(0.3),
+                                    adaptiveUIColor.opacity(0.1)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -152,7 +163,8 @@ extension UnifiedChatInputBar {
         isInputFocused: FocusState<Bool>.Binding,
         isRecording: Binding<Bool>,
         onSend: @escaping () -> Void,
-        onMicrophoneTap: @escaping () -> Void
+        onMicrophoneTap: @escaping () -> Void,
+        colorPalette: ColorPalette? = nil
     ) {
         self._messageText = messageText
         self._showingCommandPalette = showingCommandPalette
@@ -161,6 +173,7 @@ extension UnifiedChatInputBar {
         self.currentBook = nil
         self.onSend = onSend
         self.onMicrophoneTap = onMicrophoneTap
+        self.colorPalette = colorPalette
     }
 }
 
@@ -180,7 +193,8 @@ extension UnifiedChatInputBar {
                 currentBook: nil,
                 onSend: {},
                 isRecording: .constant(false),
-                onMicrophoneTap: {}
+                onMicrophoneTap: {},
+                colorPalette: nil
             )
             .padding()
         }

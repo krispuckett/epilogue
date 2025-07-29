@@ -53,7 +53,6 @@ struct SharedBookCoverView: View {
         self.width = width
         self.height = height
         self.onImageLoaded = onImageLoaded
-        print("📚 SharedBookCoverView init - URL: \(coverURL ?? "nil"), dimensions: \(width)x\(height)")
     }
     
     

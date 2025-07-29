@@ -148,7 +148,7 @@ public class SharedBookCoverManager: ObservableObject {
     /// Clear all caches
     public func clearCache() {
         imageCache.removeAll()
-        print("🧹 Cleared SharedBookCoverManager cache")
+        print("Cleared SharedBookCoverManager cache")
     }
     
     /// Get cached image if available

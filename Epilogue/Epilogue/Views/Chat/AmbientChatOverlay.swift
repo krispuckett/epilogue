@@ -42,6 +42,11 @@ struct ClaudeInspiredGradient: View {
     @Binding var audioLevel: Float
     @Binding var isListening: Bool
     
+    // Voice pattern parameters
+    let voiceFrequency: CGFloat
+    let voiceIntensity: CGFloat
+    let voiceRhythm: CGFloat
+    
     var body: some View {
         ZStack {
             Color.black
@@ -49,10 +54,33 @@ struct ClaudeInspiredGradient: View {
             
             if let palette = colorPalette, book != nil {
                 // Book-specific gradient when we have colors
-                BookSpecificGradient(palette: palette, phase: phase, audioLevel: audioLevel, isListening: isListening)
+                BookSpecificGradient(
+                    palette: palette,
+                    phase: phase,
+                    audioLevel: audioLevel,
+                    isListening: isListening,
+                    voiceFrequency: voiceFrequency,
+                    voiceIntensity: voiceIntensity,
+                    voiceRhythm: voiceRhythm
+                )
+                .onAppear {
+                    print("🎨 BookSpecificGradient appeared with voiceIntensity: \(voiceIntensity)")
+                }
+                .onChange(of: voiceIntensity) { _, newIntensity in
+                    if newIntensity > 0.01 {
+                        print("🎨 Gradient voiceIntensity changed to: \(newIntensity)")
+                    }
+                }
             } else {
                 // Default enhanced amber gradient with motion
-                EnhancedAmberGradient(phase: phase, audioLevel: audioLevel, isListening: isListening)
+                EnhancedAmberGradient(
+                    phase: phase,
+                    audioLevel: audioLevel,
+                    isListening: isListening,
+                    voiceFrequency: voiceFrequency,
+                    voiceIntensity: voiceIntensity,
+                    voiceRhythm: voiceRhythm
+                )
             }
         }
         .onAppear {
@@ -75,7 +103,7 @@ struct ClaudeInspiredGradient: View {
     }
     
     private func startWaveAnimation() {
-        withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
             phase = 1
         }
     }
@@ -100,66 +128,185 @@ struct ClaudeInspiredGradient: View {
               let data = try? await URLSession.shared.data(from: url).0,
               let image = UIImage(data: data) else { return }
         
-        print("🎨 AmbientChat: Extracting colors for \(book.title)")
+        print("AmbientChat: Extracting colors for \(book.title)")
         
         // Use improved color extraction with OKLAB as primary
         if let palette = await ImprovedColorExtraction.extractColors(from: image, bookTitle: book.title) {
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.8)) {
                     self.colorPalette = palette
-                    print("✅ AmbientChat: Color extraction successful")
+                    print("AmbientChat: Color extraction successful")
                 }
             }
         } else {
-            print("❌ AmbientChat: Color extraction failed for \(book.title)")
+            print("AmbientChat: Color extraction failed for \(book.title)")
         }
     }
 }
 
-// Enhanced amber gradient - simple mirrored version
+// Enhanced amber gradient - mirrored version without jumps
 struct EnhancedAmberGradient: View {
     let phase: CGFloat
     let audioLevel: Float
     let isListening: Bool
+    let voiceFrequency: CGFloat
+    let voiceIntensity: CGFloat
+    let voiceRhythm: CGFloat
+    
+    // Refined voice-modulated color function
+    private func voiceModulatedColor(base: Color, level: CGFloat) -> Color {
+        let uiColor = UIColor(base)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Subtle color shifts based on voice level
+        let hueShift = sin(level * .pi) * 0.05 // ±5% hue variation
+        let newHue = (hue + hueShift).truncatingRemainder(dividingBy: 1.0)
+        
+        // Saturation and brightness respond to voice
+        let newSaturation = min(saturation + (level * 0.2), 1.0) // Up to 20% more saturated
+        let newBrightness = min(brightness + (level * 0.15), 1.0) // Up to 15% brighter
+        
+        return Color(hue: newHue, saturation: newSaturation, brightness: newBrightness, opacity: alpha)
+    }
+    
+    // EXTREME color modulation based on voice characteristics
+    private func modulatedColor(base: Color, frequency: CGFloat, intensity: CGFloat) -> Color {
+        let uiColor = UIColor(base)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // EXTREME hue shift based on frequency (warmer for low, cooler for high)
+        let hueShift = (frequency - 0.5) * 0.2 // ±20% hue shift (doubled!)
+        let newHue = (hue + hueShift).truncatingRemainder(dividingBy: 1.0)
+        
+        // EXTREME saturation boost with intensity
+        let newSaturation = min(saturation + (intensity * 0.6), 1.0) // Doubled!
+        
+        // EXTREME brightness responds to overall energy
+        let newBrightness = min(brightness + (intensity * 0.5), 1.0) // More than doubled!
+        
+        // Over-saturate opacity when loud
+        let newAlpha = min(alpha * (1.0 + (intensity * 0.5)), 1.0)
+        
+        return Color(hue: newHue, saturation: newSaturation, brightness: newBrightness, opacity: newAlpha)
+    }
     
     var body: some View {
-        ZStack {
-            // Base black layer
-            Color.black
-                .ignoresSafeArea()
-            
-            // Top gradient
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 1.0, green: 0.35, blue: 0.1), location: 0.0),
-                    .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.15),
-                    .init(color: Color(red: 1.0, green: 0.7, blue: 0.4).opacity(0.5), location: 0.3),
-                    .init(color: Color.clear, location: 0.6)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .blur(radius: 40)
-            .scaleEffect(y: 0.6 + phase * 0.2)
-            .offset(y: -100 + phase * 30)
-            
-            // Bottom gradient (mirrored)
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 1.0, green: 0.35, blue: 0.1), location: 0.0),
-                    .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.15),
-                    .init(color: Color(red: 1.0, green: 0.7, blue: 0.4).opacity(0.5), location: 0.3),
-                    .init(color: Color.clear, location: 0.6)
-                ],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-            .ignoresSafeArea()
-            .blur(radius: 40)
-            .scaleEffect(y: 0.6 + phase * 0.2)
-            .offset(y: 100 - phase * 30)
+        GeometryReader { geometry in
+            ZStack {
+                // Base black layer
+                Color.black
+                
+                // Top gradient container
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color(red: 1.0, green: 0.35, blue: 0.1), location: 0.0),
+                            .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.15),
+                            .init(color: Color(red: 1.0, green: 0.7, blue: 0.4).opacity(0.5), location: 0.3),
+                            .init(color: Color.clear, location: 0.6)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.height * 0.6)
+                    .blur(radius: 40)
+                    .scaleEffect(y: 0.8 + phase * 0.15)
+                    .opacity(0.8 + phase * 0.1)
+                    
+                    Spacer()
+                }
+                
+                // Voice-responsive bottom gradient - REFINED VERSION
+                ZStack {
+                    // Base gradient layer (always visible)
+                    VStack(spacing: 0) {
+                        Spacer()
+                        
+                        LinearGradient(
+                            stops: [
+                                .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.0),
+                                .init(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5), location: 0.3),
+                                .init(color: Color.clear, location: 0.6)
+                            ],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                        .frame(height: geometry.size.height * 0.5)
+                        .blur(radius: 40)
+                    }
+                    
+                    // Voice-responsive overlay (capped at 50% height)
+                    VStack(spacing: 0) {
+                        Spacer()
+                        
+                        LinearGradient(
+                            stops: [
+                                .init(
+                                    color: voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity),
+                                    location: 0.0
+                                ),
+                                .init(
+                                    color: voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity).opacity(0.6),
+                                    location: 0.2 + (voiceIntensity * 0.1)
+                                ),
+                                .init(
+                                    color: voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity).opacity(0.3),
+                                    location: 0.4 + (voiceIntensity * 0.2)
+                                ),
+                                .init(
+                                    color: Color.clear,
+                                    location: 0.6 + (voiceIntensity * 0.2)
+                                )
+                            ],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                        .frame(height: geometry.size.height * 0.5)
+                        .blur(radius: 40 + (voiceIntensity * 20)) // Subtle blur increase
+                        .scaleEffect(
+                            x: 1.0,
+                            y: 1.0 + (voiceIntensity * 0.3), // Max 30% height increase
+                            anchor: .bottom
+                        )
+                        .opacity(0.5 + (voiceIntensity * 0.5)) // Fade in with voice
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: voiceIntensity)
+                    }
+                    
+                    // Gentle pulsing glow at the base
+                    VStack {
+                        Spacer()
+                        
+                        Circle()
+                            .fill(voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity))
+                            .blur(radius: 80)
+                            .frame(width: 300, height: 300)
+                            .scaleEffect(1.0 + (voiceIntensity * 0.3))
+                            .opacity(voiceIntensity * 0.3)
+                            .offset(y: 150) // Keep it anchored at bottom
+                            .animation(.easeInOut(duration: 0.4), value: voiceIntensity)
+                    }
+                }
+                // IMPORTANT: Clip to bottom 50% of screen
+                .mask(
+                    LinearGradient(
+                        colors: [Color.black, Color.black, Color.clear],
+                        startPoint: .bottom,
+                        endPoint: UnitPoint(x: 0.5, y: 0.5) // Cuts off at 50% height
+                    )
+                )
+            }
         }
+        .ignoresSafeArea()
     }
 }
 
@@ -169,14 +316,194 @@ struct BookSpecificGradient: View {
     let phase: CGFloat
     let audioLevel: Float
     let isListening: Bool
+    let voiceFrequency: CGFloat
+    let voiceIntensity: CGFloat
+    let voiceRhythm: CGFloat
+    
+    // Refined voice-modulated color function
+    private func voiceModulatedColor(base: Color, level: CGFloat) -> Color {
+        let uiColor = UIColor(base)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Subtle color shifts based on voice level
+        let hueShift = sin(level * .pi) * 0.05 // ±5% hue variation
+        let newHue = (hue + hueShift).truncatingRemainder(dividingBy: 1.0)
+        
+        // Saturation and brightness respond to voice
+        let newSaturation = min(saturation + (level * 0.2), 1.0) // Up to 20% more saturated
+        let newBrightness = min(brightness + (level * 0.15), 1.0) // Up to 15% brighter
+        
+        return Color(hue: newHue, saturation: newSaturation, brightness: newBrightness, opacity: alpha)
+    }
+    
+    // EXTREME color modulation based on voice characteristics
+    private func modulatedColor(base: Color, frequency: CGFloat, intensity: CGFloat) -> Color {
+        let uiColor = UIColor(base)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // EXTREME hue shift based on frequency (warmer for low, cooler for high)
+        let hueShift = (frequency - 0.5) * 0.2 // ±20% hue shift (doubled!)
+        let newHue = (hue + hueShift).truncatingRemainder(dividingBy: 1.0)
+        
+        // EXTREME saturation boost with intensity
+        let newSaturation = min(saturation + (intensity * 0.6), 1.0) // Doubled!
+        
+        // EXTREME brightness responds to overall energy
+        let newBrightness = min(brightness + (intensity * 0.5), 1.0) // More than doubled!
+        
+        // Over-saturate opacity when loud
+        let newAlpha = min(alpha * (1.0 + (intensity * 0.5)), 1.0)
+        
+        return Color(hue: newHue, saturation: newSaturation, brightness: newBrightness, opacity: newAlpha)
+    }
+    
+    private var enhancedPrimary: Color {
+        enhanceColor(palette.primary)
+    }
+    
+    private var enhancedSecondary: Color {
+        enhanceColor(palette.secondary)
+    }
+    
+    private var enhancedAccent: Color {
+        enhanceColor(palette.accent)
+    }
+    
+    private func enhanceColor(_ color: Color) -> Color {
+        // Same enhancement as BookCoverBackgroundView
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Boost saturation and brightness
+        let enhancedSaturation = min(1.0, saturation * 1.5)
+        let enhancedBrightness = min(1.0, brightness * 1.3)
+        
+        return Color(hue: hue, saturation: enhancedSaturation, brightness: enhancedBrightness, opacity: alpha)
+    }
     
     var body: some View {
-        // Use the exact same gradient as BookDetailView
-        BookCoverBackgroundView(colorPalette: palette)
-            .ignoresSafeArea()
-            // Add animation by scaling and moving the entire gradient
-            .scaleEffect(y: 0.8 + phase * 0.1)
-            .offset(y: -50 + phase * 20)
+        GeometryReader { geometry in
+            ZStack {
+                // Base black layer
+                Color.black
+                
+                // Top gradient container with book colors
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        stops: [
+                            .init(color: enhancedPrimary, location: 0.0),
+                            .init(color: enhancedPrimary.opacity(0.9), location: 0.1),
+                            .init(color: enhancedSecondary.opacity(0.7), location: 0.25),
+                            .init(color: enhancedAccent.opacity(0.5), location: 0.4),
+                            .init(color: Color.clear, location: 0.7)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.height * 0.65)
+                    .blur(radius: 45)
+                    .scaleEffect(y: 0.8 + phase * 0.12)
+                    .opacity(0.7 + phase * 0.15)
+                    
+                    Spacer()
+                }
+                
+                // Voice-responsive bottom gradient - REFINED VERSION
+                ZStack {
+                    // Base gradient layer (always visible)
+                    VStack(spacing: 0) {
+                        Spacer()
+                        
+                        LinearGradient(
+                            stops: [
+                                .init(color: enhancedAccent, location: 0.0),
+                                .init(color: enhancedAccent.opacity(0.5), location: 0.3),
+                                .init(color: Color.clear, location: 0.6)
+                            ],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                        .frame(height: geometry.size.height * 0.5)
+                        .blur(radius: 40)
+                    }
+                    
+                    // Voice-responsive overlay (capped at 50% height)
+                    VStack(spacing: 0) {
+                        Spacer()
+                        
+                        LinearGradient(
+                            stops: [
+                                .init(
+                                    color: voiceModulatedColor(base: enhancedAccent, level: voiceIntensity),
+                                    location: 0.0
+                                ),
+                                .init(
+                                    color: voiceModulatedColor(base: enhancedAccent, level: voiceIntensity).opacity(0.6),
+                                    location: 0.2 + (voiceIntensity * 0.1)
+                                ),
+                                .init(
+                                    color: voiceModulatedColor(base: enhancedSecondary, level: voiceIntensity).opacity(0.3),
+                                    location: 0.4 + (voiceIntensity * 0.2)
+                                ),
+                                .init(
+                                    color: Color.clear,
+                                    location: 0.6 + (voiceIntensity * 0.2)
+                                )
+                            ],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                        .frame(height: geometry.size.height * 0.5)
+                        .blur(radius: 40 + (voiceIntensity * 20)) // Subtle blur increase
+                        .scaleEffect(
+                            x: 1.0,
+                            y: 1.0 + (voiceIntensity * 0.3), // Max 30% height increase
+                            anchor: .bottom
+                        )
+                        .opacity(0.5 + (voiceIntensity * 0.5)) // Fade in with voice
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: voiceIntensity)
+                    }
+                    
+                    // Gentle pulsing glow at the base
+                    VStack {
+                        Spacer()
+                        
+                        Circle()
+                            .fill(voiceModulatedColor(base: enhancedAccent, level: voiceIntensity))
+                            .blur(radius: 80)
+                            .frame(width: 300, height: 300)
+                            .scaleEffect(1.0 + (voiceIntensity * 0.3))
+                            .opacity(voiceIntensity * 0.3)
+                            .offset(y: 150) // Keep it anchored at bottom
+                            .animation(.easeInOut(duration: 0.4), value: voiceIntensity)
+                    }
+                }
+                // IMPORTANT: Clip to bottom 50% of screen
+                .mask(
+                    LinearGradient(
+                        colors: [Color.black, Color.black, Color.clear],
+                        startPoint: .bottom,
+                        endPoint: UnitPoint(x: 0.5, y: 0.5) // Cuts off at 50% height
+                    )
+                )
+            }
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -244,7 +571,10 @@ struct AmbientChatOverlay: View {
             ClaudeInspiredGradient(
                 book: selectedBook,
                 audioLevel: $audioLevel,
-                isListening: $isRecording
+                isListening: $isRecording,
+                voiceFrequency: voiceManager.voiceFrequency,
+                voiceIntensity: voiceManager.voiceIntensity,
+                voiceRhythm: voiceManager.voiceRhythm
             )
             .ignoresSafeArea()
             
@@ -599,7 +929,7 @@ struct AmbientChatOverlay: View {
                     
                     // Add a message summarizing the ambient session
                     let summaryMessage = ThreadedChatMessage(
-                        content: "🎙️ Ambient Session (\(processed.formattedDuration))\n\n" +
+                        content: "Ambient Session (\(processed.formattedDuration))\n\n" +
                                 "Captured: \(processed.quotes.count) quotes, \(processed.notes.count) notes, \(processed.questions.count) questions\n\n" +
                                 processed.summary,
                         isUser: false,
@@ -632,8 +962,7 @@ struct AmbientChatOverlay: View {
             // Add notes as messages in the chat thread
             for note in processed.notes {
                 await MainActor.run {
-                    let notePrefix = note.type == .insight ? "💡 " : 
-                                   note.type == .connection ? "🔗 " : "💭 "
+                    let notePrefix = ""
                     let noteMessage = ThreadedChatMessage(
                         content: notePrefix + note.text,
                         isUser: true,
@@ -728,94 +1057,156 @@ struct AmbientChatOverlay: View {
             let patterns = CognitivePatternRecognizer.shared.recognizePatterns(in: trimmed)
             let primaryPattern = patterns.first?.pattern
             
-            // Look for quotes (multiple patterns)
+            // Improved QUOTE detection
             var foundQuote = false
+            let lowercased = trimmed.lowercased()
             
-            // Pattern 1: Text in quotation marks
-            let quotePatterns = [
-                #"\"([^\"]+)\""#, // Double quotes
-                #"'([^']+)'"#, // Single quotes
-                #""([^"]+)""#, // Smart quotes
-            ]
-            
-            for pattern in quotePatterns {
-                if let regex = try? NSRegularExpression(pattern: pattern) {
-                    let matches = regex.matches(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed))
-                    for match in matches {
-                        if let range = Range(match.range(at: 1), in: trimmed) {
-                            let quoteText = String(trimmed[range])
-                            quotes.append(ExtractedQuote(
-                                text: quoteText,
-                                context: session.book?.title,
-                                timestamp: Date()
-                            ))
-                            foundQuote = true
-                        }
-                    }
+            // Check for explicit quote indicators FIRST
+            if lowercased.starts(with: "quote:") ||
+               lowercased.contains("save this quote") ||
+               lowercased.contains("i want to quote") ||
+               lowercased.contains("remember this quote") ||
+               lowercased.contains("here's a quote") ||
+               lowercased.contains("the book says") ||
+               lowercased.contains("the author says") ||
+               lowercased.contains("it says") ||
+               lowercased.contains("she says") ||
+               lowercased.contains("he says") ||
+               lowercased.contains("they say") ||
+               lowercased.contains("passage") ||
+               lowercased.contains("writes") ||
+               lowercased.contains("wrote") ||
+               lowercased.contains("according to") {
+                print("   Detected as QUOTE (by keyword)")
+                foundQuote = true
+                
+                // Extract the actual quote text
+                var quoteText = trimmed
+                
+                // Remove the quote indicator prefix if present
+                if lowercased.starts(with: "quote:") {
+                    quoteText = String(trimmed.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                }
+                
+                // Clean quotation marks if present
+                quoteText = cleanQuotationMarks(from: quoteText)
+                
+                if !quoteText.isEmpty {
+                    quotes.append(ExtractedQuote(
+                        text: quoteText,
+                        context: session.book?.title,
+                        timestamp: Date()
+                    ))
+                }
+            }
+            // Check for quotation marks as secondary indicator
+            else if trimmed.contains("\"") || trimmed.contains("\u{201C}") || trimmed.contains("\u{201D}") {
+                // Extract content between quotes
+                let quotedContent = extractQuotedContent(from: trimmed)
+                if !quotedContent.isEmpty && quotedContent.count > 10 { // At least 10 chars
+                    print("   Detected as QUOTE (by quotation marks)")
+                    foundQuote = true
+                    quotes.append(ExtractedQuote(
+                        text: quotedContent,
+                        context: session.book?.title,
+                        timestamp: Date()
+                    ))
                 }
             }
             
-            // Pattern 2: Sentences that mention quoting or reading
-            let quoteIndicators = ["quote", "passage", "says", "writes", "wrote", "according to"]
-            let lowercased = trimmed.lowercased()
-            if !foundQuote && quoteIndicators.contains(where: { lowercased.contains($0) }) {
-                // Extract the sentence after the indicator
-                quotes.append(ExtractedQuote(
-                    text: trimmed,
-                    context: session.book?.title,
-                    timestamp: Date()
-                ))
-                foundQuote = true
-            }
-            
-            // Look for questions
+            // Improved QUESTION detection
             var foundQuestion = false
-            if trimmed.contains("?") || 
-               trimmed.lowercased().starts(with: "why") ||
-               trimmed.lowercased().starts(with: "how") ||
-               trimmed.lowercased().starts(with: "what") ||
-               trimmed.lowercased().starts(with: "when") ||
-               trimmed.lowercased().starts(with: "where") ||
-               trimmed.lowercased().starts(with: "who") ||
-               trimmed.lowercased().contains("i wonder") ||
-               trimmed.lowercased().contains("i'm unsure") {
+            if !foundQuote && (trimmed.hasSuffix("?") ||
+                lowercased.starts(with: "why ") ||
+                lowercased.starts(with: "how ") ||
+                lowercased.starts(with: "what ") ||
+                lowercased.starts(with: "when ") ||
+                lowercased.starts(with: "where ") ||
+                lowercased.starts(with: "who ") ||
+                lowercased.starts(with: "which ") ||
+                lowercased.starts(with: "can you") ||
+                lowercased.starts(with: "could you") ||
+                lowercased.starts(with: "would you") ||
+                lowercased.starts(with: "should ") ||
+                lowercased.starts(with: "is this") ||
+                lowercased.starts(with: "are these") ||
+                lowercased.starts(with: "do you") ||
+                lowercased.starts(with: "does this") ||
+                lowercased.contains("i wonder") ||
+                lowercased.contains("i'm curious") ||
+                lowercased.contains("i'm unsure") ||
+                lowercased.contains("what does this mean") ||
+                lowercased.contains("what does that mean") ||
+                lowercased.contains("can you explain") ||
+                lowercased.contains("could you explain") ||
+                lowercased.contains("please explain") ||
+                lowercased.contains("tell me about") ||
+                lowercased.contains("tell me more")) {
+                print("   Detected as QUESTION")
+                foundQuestion = true
                 questions.append(ExtractedQuestion(
                     text: trimmed,
                     context: session.book?.title,
                     timestamp: Date()
                 ))
-                foundQuestion = true
             }
             
-            // Everything else becomes a note (reflection/insight)
+            // Improved NOTE detection
             if !foundQuote && !foundQuestion {
-                // Determine note type based on cognitive pattern
-                let noteType: ExtractedNote.NoteType
+                // Determine note type based on cognitive pattern and content
+                var noteType: ExtractedNote.NoteType = .reflection
                 
-                switch primaryPattern {
-                case .connecting:
-                    noteType = .connection
-                case .analyzing, .synthesizing, .evaluating:
-                    noteType = .insight
-                case .reflecting, .creating, nil:
+                // First check explicit note indicators
+                if lowercased.starts(with: "note:") ||
+                   lowercased.starts(with: "i think") ||
+                   lowercased.starts(with: "i feel") ||
+                   lowercased.starts(with: "i believe") ||
+                   lowercased.starts(with: "my thought") ||
+                   lowercased.starts(with: "my opinion") ||
+                   lowercased.contains("reminds me of") ||
+                   lowercased.contains("this makes me think") {
                     noteType = .reflection
-                default:
-                    // Use content-based detection as fallback
-                    if trimmed.lowercased().contains("reminds me") || 
-                       trimmed.lowercased().contains("similar to") ||
-                       trimmed.lowercased().contains("connects to") {
+                    print("   Detected as NOTE - reflection (by keyword)")
+                } else if lowercased.contains("similar to") ||
+                          lowercased.contains("connects to") ||
+                          lowercased.contains("relates to") ||
+                          lowercased.contains("like when") ||
+                          lowercased.contains("reminds me") {
+                    noteType = .connection
+                    print("   Detected as NOTE - connection (by keyword)")
+                } else if lowercased.contains("i realize") ||
+                          lowercased.contains("i understand") ||
+                          lowercased.contains("this shows") ||
+                          lowercased.contains("this means") ||
+                          lowercased.contains("insight") {
+                    noteType = .insight
+                    print("   Detected as NOTE - insight (by keyword)")
+                } else {
+                    // Fall back to cognitive pattern if available
+                    switch primaryPattern {
+                    case .connecting:
                         noteType = .connection
-                    } else if trimmed.lowercased().contains("realize") ||
-                              trimmed.lowercased().contains("understand") ||
-                              trimmed.lowercased().contains("insight") {
+                        print("   Detected as NOTE - connection (by pattern)")
+                    case .analyzing, .synthesizing, .evaluating:
                         noteType = .insight
-                    } else {
+                        print("   Detected as NOTE - insight (by pattern)")
+                    case .reflecting, .creating, nil:
                         noteType = .reflection
+                        print("   Detected as NOTE - reflection (by pattern)")
+                    default:
+                        noteType = .reflection
+                        print("   Detected as NOTE - reflection (default)")
                     }
                 }
                 
+                // Remove "Note:" prefix if present
+                var noteText = trimmed
+                if lowercased.starts(with: "note:") {
+                    noteText = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                }
+                
                 notes.append(ExtractedNote(
-                    text: trimmed,
+                    text: noteText,
                     type: noteType,
                     timestamp: Date()
                 ))
@@ -868,7 +1259,7 @@ struct AmbientChatOverlay: View {
                let existingThread = existingThreads.first {
                 // Add summary message to existing thread
                 let summaryMessage = ThreadedChatMessage(
-                    content: "🎙️ Ambient Session (\(processed.formattedDuration))\n\n" +
+                    content: "Ambient Session (\(processed.formattedDuration))\n\n" +
                             "Captured: \(processed.quotes.count) quotes, \(processed.notes.count) notes, \(processed.questions.count) questions",
                     isUser: false,
                     timestamp: Date()
@@ -972,6 +1363,37 @@ struct AmbientChatOverlay: View {
         } catch {
             print("[AmbientChat] Real-time question processing failed: \(error)")
         }
+    }
+    
+    // Helper function to extract quoted content from a string
+    private func extractQuotedContent(from text: String) -> String {
+        // Try to find content between quotation marks
+        let patterns = [
+            "\"([^\"]+)\"",      // Double quotes
+            "\u{201C}([^\u{201D}]+)\u{201D}", // Smart quotes
+            "'([^']+)'"         // Single quotes
+        ]
+        
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+               let range = Range(match.range(at: 1), in: text) {
+                return String(text[range])
+            }
+        }
+        
+        // If no quotes found, return empty
+        return ""
+    }
+    
+    // Helper function to clean quotation marks from text
+    private func cleanQuotationMarks(from text: String) -> String {
+        return text
+            .replacingOccurrences(of: "\"", with: "")
+            .replacingOccurrences(of: "\u{201C}", with: "")
+            .replacingOccurrences(of: "\u{201D}", with: "")
+            .replacingOccurrences(of: "'", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

@@ -15,7 +15,14 @@ struct AmbientSessionSummaryView: View {
                 .ignoresSafeArea()
             
             // Enhanced amber gradient background
-            EnhancedAmberGradient(phase: 0.5, audioLevel: 0, isListening: false)
+            EnhancedAmberGradient(
+                phase: 0.5,
+                audioLevel: 0,
+                isListening: false,
+                voiceFrequency: 0.5,
+                voiceIntensity: 0.0,
+                voiceRhythm: 0.0
+            )
                 .ignoresSafeArea()
             
             ScrollView {

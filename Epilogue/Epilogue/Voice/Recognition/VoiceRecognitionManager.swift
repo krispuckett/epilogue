@@ -25,6 +25,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     @Published var isProcessingWhisper = false
     @Published var detectedLanguage = "en"
     
+    // Advanced voice pattern analysis
+    @Published var voiceFrequency: CGFloat = 0.5  // 0.0 = low pitch, 1.0 = high pitch
+    @Published var voiceIntensity: CGFloat = 0.0  // 0.0 = silent, 1.0 = loud
+    @Published var voiceRhythm: CGFloat = 0.0     // 0.0 = steady, 1.0 = variable
+    
     // MARK: - Private Properties
     private var speechRecognizer: SFSpeechRecognizer?
     private var audioBufferCount = 0
@@ -47,6 +52,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     // Audio analysis
     private var amplitudeBuffer: [Float] = []
     private let amplitudeBufferSize = 50
+    
+    // Rhythm analysis
+    private var rhythmBuffer: [Float] = []
+    private let rhythmBufferSize = 30
+    private var lastRhythmUpdate = Date()
     
     // Advanced pipeline integration
     private let intelligencePipeline = AmbientIntelligencePipeline()
@@ -433,10 +443,116 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // Calculate average amplitude for visualization
         vDSP_meamgv(channelData, 1, &amplitude, vDSP_Length(frames))
         
-        // Smooth the amplitude for visualization
+        // Make amplitude more sensitive but balanced - multiply by 5
+        let boostedAmplitude = min(amplitude * 5.0, 1.0)
+        
+        // Analyze voice patterns with boosted amplitude
+        analyzeVoicePatterns(from: buffer, amplitude: boostedAmplitude)
+        
+        // Smooth the amplitude for visualization (less smoothing for more responsiveness)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.currentAmplitude = self.currentAmplitude * 0.8 + amplitude * 0.2
+            let previousAmplitude = self.currentAmplitude
+            self.currentAmplitude = self.currentAmplitude * 0.6 + boostedAmplitude * 0.4
+            
+            // Debug logging for audio level changes
+            if abs(self.currentAmplitude - previousAmplitude) > 0.01 {
+                logger.info("🎤 Audio Level Update: \(String(format: "%.3f", self.currentAmplitude)) (raw: \(String(format: "%.3f", amplitude)))")
+            }
+        }
+    }
+    
+    // MARK: - Advanced Voice Pattern Analysis
+    
+    private func analyzeVoicePatterns(from buffer: AVAudioPCMBuffer, amplitude: Float) {
+        // Update intensity (normalized amplitude)
+        // Balanced scaling factor for refined response
+        let normalizedIntensity = min(amplitude * 50.0, 1.0)
+        
+        // Analyze frequency
+        let dominantFreq = calculateDominantFrequency(from: buffer)
+        let normalizedFreq = mapFrequencyToRange(dominantFreq)
+        
+        // Update rhythm analysis
+        updateRhythmAnalysis(normalizedIntensity)
+        
+        // Smooth all values
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let previousIntensity = self.voiceIntensity
+            let previousFrequency = self.voiceFrequency
+            
+            // Smooth intensity
+            self.voiceIntensity = self.voiceIntensity * 0.85 + CGFloat(normalizedIntensity) * 0.15
+            
+            // Smooth frequency
+            self.voiceFrequency = self.voiceFrequency * 0.9 + normalizedFreq * 0.1
+            
+            // Debug logging for voice pattern changes
+            if abs(self.voiceIntensity - previousIntensity) > 0.05 || abs(self.voiceFrequency - previousFrequency) > 0.05 {
+                logger.info("🎵 Voice Patterns - Intensity: \(String(format: "%.2f", self.voiceIntensity)), Frequency: \(String(format: "%.2f", self.voiceFrequency)), Rhythm: \(String(format: "%.2f", self.voiceRhythm))")
+            }
+        }
+    }
+    
+    private func calculateDominantFrequency(from buffer: AVAudioPCMBuffer) -> Float {
+        guard let channelData = buffer.floatChannelData?[0] else { return 440.0 }
+        
+        let frames = buffer.frameLength
+        
+        // Simple zero-crossing rate for pitch estimation
+        var zeroCrossings: Float = 0
+        for i in 1..<Int(frames) {
+            if (channelData[i] > 0 && channelData[i-1] <= 0) ||
+               (channelData[i] < 0 && channelData[i-1] >= 0) {
+                zeroCrossings += 1
+            }
+        }
+        
+        // Convert to frequency estimate (rough approximation)
+        let sampleRate: Float = 44100.0
+        let frequency = (zeroCrossings * sampleRate) / (2.0 * Float(frames))
+        
+        return frequency
+    }
+    
+    private func mapFrequencyToRange(_ frequency: Float) -> CGFloat {
+        // Map typical voice frequencies to 0-1 range
+        // Male voice: 85-180 Hz
+        // Female voice: 165-255 Hz
+        // Children: 250-400 Hz
+        
+        let minFreq: Float = 85.0
+        let maxFreq: Float = 400.0
+        
+        let normalized = (frequency - minFreq) / (maxFreq - minFreq)
+        return CGFloat(max(0.0, min(1.0, normalized)))
+    }
+    
+    private func updateRhythmAnalysis(_ intensity: Float) {
+        let now = Date()
+        let timeDelta = now.timeIntervalSince(lastRhythmUpdate)
+        
+        // Update rhythm buffer every 100ms
+        if timeDelta > 0.1 {
+            rhythmBuffer.append(intensity)
+            if rhythmBuffer.count > rhythmBufferSize {
+                rhythmBuffer.removeFirst()
+            }
+            lastRhythmUpdate = now
+            
+            // Calculate rhythm variance
+            if rhythmBuffer.count >= 5 {
+                // Calculate variance manually
+                let mean = rhythmBuffer.reduce(0, +) / Float(rhythmBuffer.count)
+                let squaredDiffs = rhythmBuffer.map { pow($0 - mean, 2) }
+                let variance = squaredDiffs.reduce(0, +) / Float(rhythmBuffer.count)
+                
+                DispatchQueue.main.async { [weak self] in
+                    self?.voiceRhythm = CGFloat(min(variance * 10.0, 1.0))
+                }
+            }
         }
     }
     

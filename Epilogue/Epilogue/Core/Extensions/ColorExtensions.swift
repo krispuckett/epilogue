@@ -27,3 +27,40 @@ extension Color {
         )
     }
 }
+
+// MARK: - Adaptive UI Color Extension
+extension ColorPalette {
+    /// Returns the primary color unless it's predominantly red, then returns secondary
+    var adaptiveUIColor: Color {
+        // Check if primary is predominantly red
+        let uiColor = UIColor(primary)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        // Consider it "pure red" if red component is high and others are low
+        let isRed = red > 0.7 && green < 0.4 && blue < 0.4
+        
+        return isRed ? secondary : primary
+    }
+}
+
+// MARK: - Color Analysis Extension
+extension Color {
+    /// Check if color is predominantly red
+    var isPredominantlyRed: Bool {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        // Consider it "pure red" if red component is high and others are low
+        return red > 0.7 && green < 0.4 && blue < 0.4
+    }
+}

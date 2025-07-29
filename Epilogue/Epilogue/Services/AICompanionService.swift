@@ -205,12 +205,9 @@ class AICompanionService: ObservableObject {
         for message in history where message.isUser {
             let content = message.content
             
-            // Look for note indicators (emojis used in ambient session)
-            if content.starts(with: "💡") || // Insight
-               content.starts(with: "🔗") || // Connection
-               content.starts(with: "💭") {  // Reflection
-                notes.append(content)
-            }
+            // Look for note indicators (note prefixes removed in new version)
+            // Notes are now unprefixed plain text
+            notes.append(content)
         }
         
         return notes
@@ -219,22 +216,22 @@ class AICompanionService: ObservableObject {
     // MARK: - Debug Methods
     
     func debugProcessMessage(_ message: String, bookContext: Book?) async {
-        print("🤖 AI Service Debug")
-        print("📝 Message: \(message)")
-        print("📚 Book: \(bookContext?.title ?? "None")")
+        print("AI Service Debug")
+        print("Message: \(message)")
+        print("Book: \(bookContext?.title ?? "None")")
         print("🔧 Provider: \(currentProvider.rawValue)")
-        print("✅ Configured: \(isConfigured())")
+        print("Configured: \(isConfigured())")
         
         do {
             switch currentProvider {
             case .perplexity:
                 print("🌐 Testing Perplexity service...")
                 if isConfigured() {
-                    print("✅ Perplexity API key is configured")
+                    print("Perplexity API key is configured")
                     let response = try await processMessage(message, bookContext: bookContext)
                     print("📤 Response received: \(response.prefix(100))...")
                 } else {
-                    print("❌ Perplexity API key NOT configured")
+                    print("Perplexity API key NOT configured")
                     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String {
                         print("🔑 API Key found but invalid: \(apiKey.prefix(10))...")
                     } else {
@@ -247,8 +244,8 @@ class AICompanionService: ObservableObject {
             }
             
         } catch {
-            print("❌ Error during debug: \(error)")
-            print("📋 Error details: \(error.localizedDescription)")
+            print("Error during debug: \(error)")
+            print("Error details: \(error.localizedDescription)")
         }
     }
 }

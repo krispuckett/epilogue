@@ -645,7 +645,14 @@ struct BookCentricBackground: View {
                 }
             } else {
                 // Default amber gradient while loading
-                EnhancedAmberGradient(phase: gradientPhase, audioLevel: 0, isListening: false)
+                EnhancedAmberGradient(
+                    phase: gradientPhase,
+                    audioLevel: 0,
+                    isListening: false,
+                    voiceFrequency: 0.5,
+                    voiceIntensity: 0.0,
+                    voiceRhythm: 0.0
+                )
             }
             
             // Book cover in center (only when no messages)

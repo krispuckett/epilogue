@@ -43,7 +43,7 @@ class PerplexityService: ObservableObject {
     func streamChat(message: String, bookContext: Book? = nil) async throws -> AsyncThrowingStream<String, Error> {
         // Check if we have a valid API key
         if apiKey == "PLACEHOLDER_API_KEY" {
-            print("⚠️ Cannot make API request with placeholder key")
+            print("Cannot make API request with placeholder key")
             return AsyncThrowingStream { continuation in
                 continuation.yield("Chat is currently unavailable. Please configure your Perplexity API key in Info.plist.")
                 continuation.finish()
@@ -108,7 +108,7 @@ class PerplexityService: ObservableObject {
     func chat(with message: String, bookContext: Book? = nil) async throws -> String {
         // Check if we have a valid API key
         if apiKey == "PLACEHOLDER_API_KEY" {
-            print("⚠️ Cannot make API request with placeholder key")
+            print("Cannot make API request with placeholder key")
             return "Chat is currently unavailable. Please configure your Perplexity API key in Info.plist."
         }
         

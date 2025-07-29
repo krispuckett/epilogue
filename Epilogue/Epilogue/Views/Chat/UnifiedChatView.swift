@@ -40,6 +40,16 @@ struct UnifiedChatView: View {
     @State private var currentSession: AmbientSession?
     @State private var liveTranscription: String = ""
     
+    // Adaptive UI color based on current palette
+    private var adaptiveUIColor: Color {
+        if let palette = colorPalette {
+            return palette.adaptiveUIColor
+        } else {
+            // Default warm amber
+            return Color(red: 1.0, green: 0.55, blue: 0.26)
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Gradient system with ambient recording support
@@ -49,7 +59,10 @@ struct UnifiedChatView: View {
                     ClaudeInspiredGradient(
                         book: currentBookContext,
                         audioLevel: $audioLevel,
-                        isListening: $isRecording
+                        isListening: $isRecording,
+                        voiceFrequency: voiceManager.voiceFrequency,
+                        voiceIntensity: voiceManager.voiceIntensity,
+                        voiceRhythm: voiceManager.voiceRhythm
                     )
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
@@ -121,7 +134,7 @@ struct UnifiedChatView: View {
                     VStack(spacing: 0) {
                         // Live transcription preview during recording
                         if isRecording && !liveTranscription.isEmpty {
-                            LiveTranscriptionView(transcription: liveTranscription)
+                            LiveTranscriptionView(transcription: liveTranscription, adaptiveUIColor: adaptiveUIColor)
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 8)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -135,7 +148,8 @@ struct UnifiedChatView: View {
                             currentBook: currentBookContext,
                             onSend: sendMessage,
                             isRecording: $isRecording,
-                            onMicrophoneTap: handleMicrophoneTap
+                            onMicrophoneTap: handleMicrophoneTap,
+                            colorPalette: colorPalette
                         )
                         .padding(.horizontal, 16)
                         .padding(.vertical, 16)
@@ -172,6 +186,10 @@ struct UnifiedChatView: View {
                     coverImage = nil
                 }
             }
+        }
+        // Sync audio level from voice manager
+        .onChange(of: voiceManager.currentAmplitude) { _, newAmplitude in
+            audioLevel = newAmplitude
         }
         .overlay(alignment: .bottom) {
             if showingCommandPalette {
@@ -893,6 +911,7 @@ struct UnifiedChatMessage: Identifiable {
 
 struct LiveTranscriptionView: View {
     let transcription: String
+    let adaptiveUIColor: Color
     
     var body: some View {
         HStack(spacing: 12) {
@@ -903,8 +922,8 @@ struct LiveTranscriptionView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2),
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.0)
+                                adaptiveUIColor.opacity(0.2),
+                                adaptiveUIColor.opacity(0.0)
                             ],
                             center: .center,
                             startRadius: 0,
@@ -917,7 +936,7 @@ struct LiveTranscriptionView: View {
                 // Simple waveform indicator (no animation, just shows we're listening)
                 Image(systemName: "waveform")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(adaptiveUIColor)
             }
             .frame(width: 36, height: 36)
             

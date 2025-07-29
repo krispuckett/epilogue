@@ -121,7 +121,7 @@ struct ChatMessageView: View {
     // MARK: - Whisper Transcription View
     
     private var whisperTranscriptionView: some View {
-        let primaryColor = colorPalette?.primary ?? Color.red
+        let primaryColor = colorPalette?.adaptiveUIColor ?? Color.red
         
         return HStack(spacing: 8) {
             Image(systemName: "mic.fill")

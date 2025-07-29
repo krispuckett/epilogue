@@ -45,7 +45,7 @@ public class OKLABColorExtractor {
         
         // Check image size to detect cropped covers
         if image.size.width < 100 || image.size.height < 100 {
-            print("⚠️ WARNING: Image too small (\(image.size.width)x\(image.size.height)), likely cropped!")
+            print("WARNING: Image too small (\(image.size.width)x\(image.size.height)), likely cropped!")
         }
         
         guard let cgImage = image.cgImage else {
@@ -62,7 +62,7 @@ public class OKLABColorExtractor {
         let scale = min(maxDimension / CGFloat(cgImage.width), maxDimension / CGFloat(cgImage.height), 1.0)
         
         if scale < 1.0 {
-            print("  ⚡ Image too large (\(cgImage.width)x\(cgImage.height)), downsampling to \(Int(CGFloat(cgImage.width) * scale))x\(Int(CGFloat(cgImage.height) * scale))")
+            print("  Image too large (\(cgImage.width)x\(cgImage.height)), downsampling to \(Int(CGFloat(cgImage.width) * scale))x\(Int(CGFloat(cgImage.height) * scale))")
             
             // Downsample image first
             if let downsampledImage = await downsampleImage(cgImage, scale: scale) {
@@ -120,7 +120,7 @@ public class OKLABColorExtractor {
         let bytesPerPixel = 4
         let bytesPerRow = cgImage.bytesPerRow
         
-        print("\n🎨 ColorCube Extraction for \(imageSource)")
+        print("\nColorCube Extraction for \(imageSource)")
         print("  🚀 FRESH EXTRACTION STARTING (not from cache)")
         print("  Processing size: \(width)x\(height) = \(width * height) pixels")
         if originalSize.width > CGFloat(width) {
@@ -209,7 +209,7 @@ public class OKLABColorExtractor {
         
         // For dark covers, perform multi-scale analysis to find small accent colors
         if isDarkCover {
-            print("\n🔍 Performing multi-scale analysis for dark cover...")
+            print("\nPerforming multi-scale analysis for dark cover...")
             // Skip multi-scale if already downsampled significantly
             let wasDownsampled = originalSize.width > CGFloat(width) * 1.5
             if wasDownsampled {
@@ -298,10 +298,10 @@ public class OKLABColorExtractor {
             }
         }
         
-        print("\n📊 Found \(colorPeaks.count) distinct color peaks")
+        print("\nFound \(colorPeaks.count) distinct color peaks")
         
         // After sorting peaks
-        print("🔍 DEBUG: Sorted peaks for role assignment:")
+        print("DEBUG: Sorted peaks for role assignment:")
         for (index, peak) in colorPeaks.prefix(3).enumerated() {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             peak.color.getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -340,7 +340,7 @@ public class OKLABColorExtractor {
         // Assign roles based on the sorted order (frequency)
         let roles = assignColorRolesDirectly(filteredPeaks, isDarkCover: isDarkCover)
         
-        print("\n✅ Final ColorCube Palette:")
+        print("\nFinal ColorCube Palette:")
         print("  Primary: \(colorDescription(roles.primary))")
         print("  Secondary: \(colorDescription(roles.secondary))")
         print("  Accent: \(colorDescription(roles.accent))")

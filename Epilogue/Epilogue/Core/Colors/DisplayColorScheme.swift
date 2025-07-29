@@ -56,7 +56,7 @@ class DisplayColorScheme {
         
         // Debug logging
         #if DEBUG
-        print("🎨 DisplayColorScheme updated:")
+        print("DisplayColorScheme updated:")
         print("  Average luminance: \(String(format: "%.2f", averageGradientLuminance))")
         print("  Text color: \(primaryTextColor == .black ? "black" : "white")")
         #endif
@@ -183,7 +183,7 @@ class DisplayColorScheme {
         
         #if DEBUG
         let finalContrast = calculateContrast(text: primaryTextColor, background: averageGradientColor)
-        print("✅ Final contrast: \(String(format: "%.2f", finalContrast))")
+        print("Final contrast: \(String(format: "%.2f", finalContrast))")
         #endif
     }
     
