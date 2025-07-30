@@ -136,11 +136,20 @@ struct BookSearchSheet: View {
                             .padding(.top, 40)
                             .padding(.bottom, 32)
                         } else {
-                            LazyVStack(spacing: 12) {
+                            // Debug info
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Found \(searchResults.count) books")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.5))
+                                    .padding(.horizontal, 16)
+                            }
+                            
+                            VStack(spacing: 12) {
                                 ForEach(searchResults) { book in
                                     BookSearchResultRow(book: book) {
                                         addBookToLibrary(book)
                                     }
+                                    .id(book.id) // Force unique ID for each row
                                 }
                             }
                             .padding(.horizontal, 16)
@@ -162,7 +171,7 @@ struct BookSearchSheet: View {
                 }
             }
         }
-        .presentationDetents([.fraction(0.75)])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
         .onAppear {

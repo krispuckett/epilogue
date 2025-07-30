@@ -180,6 +180,31 @@ struct CommandParser {
             return .addBook(query: query)
         }
         
+        // Phase 6.5: Check if lowercase version might be a book title
+        // This handles cases where user types book title in lowercase
+        if trimmed.split(separator: " ").count >= 2 && trimmed.split(separator: " ").count <= 5 {
+            // Try title-casing the input
+            let titleCased = trimmed.split(separator: " ")
+                .map { word in
+                    let str = String(word)
+                    // Don't capitalize articles/prepositions unless they're first
+                    if ["a", "an", "the", "and", "or", "of", "in", "on", "at", "to", "for", "with", "by"].contains(str.lowercased()) {
+                        return str.lowercased()
+                    }
+                    return str.prefix(1).uppercased() + str.dropFirst().lowercased()
+                }
+                .joined(separator: " ")
+            
+            // Capitalize first word regardless
+            let finalTitleCased = titleCased.prefix(1).uppercased() + titleCased.dropFirst()
+            
+            if isLikelyBookTitle(input: finalTitleCased) && !isLikelyNote(input: trimmed) {
+                let query = cleanBookQuery(from: input)
+                print("CommandParser: Detected book title pattern (after title-casing), query: '\(query)'")
+                return .addBook(query: query)
+            }
+        }
+        
         // Phase 6: Explicit Commands
         // Book additions - explicit commands
         if lowercased.starts(with: "add book") ||
