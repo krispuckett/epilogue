@@ -11,12 +11,16 @@ struct LibraryView: View {
     @Namespace private var viewModeAnimation
     @State private var showingCoverPicker = false
     @State private var selectedBookForEdit: Book?
-    @State private var bookRotation: Double = -5.0
-    @State private var floatingOffset: Double = -10.0
     @State private var highlightedBookId: UUID? = nil
     @State private var scrollToBookId: UUID? = nil
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
+    @State private var isScrolling = false
+    
+    #if DEBUG
+    @State private var frameDrops = 0
+    @State private var performanceTimer: Timer?
+    #endif
     
     enum ViewMode {
         case grid, list
@@ -30,39 +34,18 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var emptyStateView: some View {
-        ZStack {
-            VStack(spacing: 20) {
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Glowing orange #FF8C42
-                    .shadow(color: .orange.opacity(0.3), radius: 20)
-                    .shadow(color: .orange.opacity(0.2), radius: 40)
-                    .rotationEffect(.degrees(bookRotation))
-                    .offset(y: floatingOffset)
-                    .onAppear {
-                        withAnimation(
-                            .easeInOut(duration: 4)
-                            .repeatForever(autoreverses: true)
-                        ) {
-                            bookRotation = 5
-                        }
-                        
-                        withAnimation(
-                            .easeInOut(duration: 3)
-                            .repeatForever(autoreverses: true)
-                        ) {
-                            floatingOffset = 10
-                        }
-                    }
+        VStack(spacing: 20) {
+            Image(systemName: "book.closed.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+        
+            Text("Your library awaits")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
             
-                Text("Your library awaits")
-                    .font(.system(size: 24, weight: .medium, design: .serif))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96)) // Warm white
-                
-                Text("Tap + to add your first book")
-                    .font(.system(size: 14, weight: .regular, design: .monospaced))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.7))
-            }
+            Text("Tap + to add your first book")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.6))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 100)
@@ -70,22 +53,9 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var backgroundView: some View {
-        // Midnight scholar background with warm charcoal
-        Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
+        // Simple background for performance
+        Color(red: 0.11, green: 0.105, blue: 0.102)
             .ignoresSafeArea(.all)
-        
-        // Soft vignette effect - simplified
-        RadialGradient(
-            gradient: Gradient(colors: [
-                Color.clear,
-                Color.black.opacity(0.15)
-            ]),
-            center: .center,
-            startRadius: 200,
-            endRadius: 400
-        )
-        .ignoresSafeArea(.all)
-        .allowsHitTesting(false) // Performance optimization
     }
     
     @ViewBuilder
@@ -104,16 +74,17 @@ struct LibraryView: View {
         LazyVGrid(columns: [
             GridItem(.flexible(), spacing: 16),
             GridItem(.flexible(), spacing: 16)
-        ], spacing: 40) {
-            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
+        ], spacing: 20) { // Reduced spacing for performance
+            ForEach(viewModel.books) { book in
                 LibraryGridItem(
                     book: book,
-                    index: index,
+                    index: 0, // Remove index-based animations
                     viewModel: viewModel,
                     highlightedBookId: highlightedBookId,
                     onChangeCover: { book in changeCover(for: book) }
                 )
                 .frame(height: 360) // Fixed height: 255 (cover) + 12 (spacing) + ~93 (text area)
+                .id(book.localId) // Stable identity for recycling
             }
         }
         .padding(.horizontal)
@@ -122,17 +93,18 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var listContent: some View {
-        LazyVStack(spacing: 20) {
-            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
+        LazyVStack(spacing: 12) { // Reduced spacing
+            ForEach(viewModel.books) { book in
                 LibraryListItemWrapper(
                     book: book,
-                    index: index,
+                    index: 0, // Remove index-based animations
                     viewModel: viewModel,
                     viewMode: viewMode,
                     highlightedBookId: highlightedBookId,
                     onChangeCover: { book in changeCover(for: book) }
                 )
-                .frame(height: 100)
+                .frame(height: 90) // Reduced height
+                .id(book.localId) // Stable identity
             }
         }
         .padding(.horizontal)
@@ -149,19 +121,21 @@ struct LibraryView: View {
             // Content
             ScrollViewReader { proxy in
                 ScrollView {
+                    ScrollViewTracker(isScrolling: $isScrolling)
+                    
                     if viewModel.isLoading {
-                    LiteraryLoadingView(message: "Loading books...")
-                        .padding(.top, 100)
-                } else if viewModel.books.isEmpty {
-                    emptyStateView
-                } else {
-                    if viewMode == .grid {
-                        gridContent
+                        LiteraryLoadingView(message: "Loading books...")
+                            .padding(.top, 100)
+                    } else if viewModel.books.isEmpty {
+                        emptyStateView
                     } else {
-                        listContent
+                        if viewMode == .grid {
+                            gridContent
+                        } else {
+                            listContent
+                        }
                     }
                 }
-            }
             .ignoresSafeArea(edges: .bottom) // Allow scroll content to go under tab bar
             .onChange(of: scrollToBookId) { _, bookId in
                 if let bookId = bookId {
@@ -183,7 +157,7 @@ struct LibraryView: View {
                 ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
+        .animation(.easeInOut(duration: 0.2), value: viewMode) // Simpler animation
         .sheet(isPresented: $showingCoverPicker) {
             if let book = selectedBookForEdit {
                 BookSearchSheet(
@@ -204,6 +178,14 @@ struct LibraryView: View {
                 navigateToBookDetail = true
             }
         }
+        #if DEBUG
+        .onAppear {
+            startPerformanceMonitoring()
+        }
+        .onDisappear {
+            stopPerformanceMonitoring()
+        }
+        #endif
     }
 }
 
@@ -215,18 +197,19 @@ struct LibraryGridItem: View {
     let viewModel: LibraryViewModel
     let highlightedBookId: UUID?
     let onChangeCover: (Book) -> Void
+    @State private var isVisible = false
     
     var body: some View {
-        GeometryReader { geo in
-            NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
-                BookCard(book: book)
-                    .environmentObject(viewModel)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .overlay(highlightOverlay)
-            }
-            .buttonStyle(PlainButtonStyle())
-            .id(book.localId)
-            .contextMenu {
+        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+            BookCard(book: book)
+                .environmentObject(viewModel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(highlightOverlay)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
+        .contextMenu {
                 // Same menu items as card
                 Button {
                     HapticManager.shared.lightTap()
@@ -276,28 +259,12 @@ struct LibraryGridItem: View {
                     Label("Delete from Library", systemImage: "trash")
                 }
             }
-        }
-        .transition(gridTransition)
-        .animation(gridAnimation, value: viewModel.books.count)
     }
     
     private var highlightOverlay: some View {
         RoundedRectangle(cornerRadius: 16)
             .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
             .opacity(highlightedBookId == book.localId ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: highlightedBookId)
-    }
-    
-    private var gridTransition: AnyTransition {
-        .asymmetric(
-            insertion: .scale(scale: 0.8).combined(with: .opacity),
-            removal: .scale(scale: 1.2).combined(with: .opacity)
-        )
-    }
-    
-    private var gridAnimation: Animation {
-        .spring(response: 0.5, dampingFraction: 0.8)
-        .delay(Double(index) * 0.05)
     }
 }
 
@@ -309,6 +276,7 @@ struct LibraryListItemWrapper: View {
     let viewMode: LibraryView.ViewMode
     let highlightedBookId: UUID?
     let onChangeCover: (Book) -> Void
+    @State private var isVisible = false
     
     var body: some View {
         NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
@@ -316,9 +284,8 @@ struct LibraryListItemWrapper: View {
                 .overlay(highlightOverlay)
         }
         .buttonStyle(PlainButtonStyle())
-        .id(book.localId)
-        .transition(listTransition)
-        .animation(listAnimation, value: viewMode)
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
             .contextMenu {
                 // Same menu items
                 Button {
@@ -374,19 +341,6 @@ struct LibraryListItemWrapper: View {
         RoundedRectangle(cornerRadius: 16)
             .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
             .opacity(highlightedBookId == book.localId ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: highlightedBookId)
-    }
-    
-    private var listTransition: AnyTransition {
-        .asymmetric(
-            insertion: .move(edge: .trailing).combined(with: .opacity),
-            removal: .move(edge: .leading).combined(with: .opacity)
-        )
-    }
-    
-    private var listAnimation: Animation {
-        .spring(response: 0.5, dampingFraction: 0.8)
-        .delay(Double(index) * 0.05)
     }
 }
 
@@ -929,6 +883,55 @@ struct LibraryBookListItem: View {
             .environmentObject(LibraryViewModel())
     }
 }
+
+// MARK: - Scroll Performance Tracking
+struct ScrollViewTracker: View {
+    @Binding var isScrolling: Bool
+    @State private var lastOffset: CGFloat = 0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            Color.clear
+                .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                    let delta = abs(value - lastOffset)
+                    isScrolling = delta > 10
+                    lastOffset = value
+                }
+        }
+        .frame(height: 0)
+    }
+}
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+// MARK: - Performance Monitoring
+#if DEBUG
+extension LibraryView {
+    func startPerformanceMonitoring() {
+        performanceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            let fps = CACurrentMediaTime()
+            if fps < 55 { // Below 60fps threshold
+                frameDrops += 1
+                print("⚠️ Frame drop detected. Total drops: \(frameDrops)")
+            }
+        }
+    }
+    
+    func stopPerformanceMonitoring() {
+        performanceTimer?.invalidate()
+        performanceTimer = nil
+        if frameDrops > 0 {
+            print("📊 Performance Report: \(frameDrops) frame drops detected")
+        }
+    }
+}
+#endif
 
 // MARK: - Library View Model
 @MainActor

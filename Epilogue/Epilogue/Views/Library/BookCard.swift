@@ -8,23 +8,24 @@ struct BookCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Book cover
-            BookCoverView(coverURL: book.coverImageURL)
-                .frame(width: 170, height: 255)
-                .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 6)
+            // Book cover - using thumbnail for grid view
+            BookCoverThumbnailView(
+                coverURL: book.coverImageURL,
+                width: UIScreen.main.bounds.width / 2 - 24,
+                height: 220
+            )
             
             // Title and author only (no progress)
             VStack(alignment: .leading, spacing: 0) {
                 Text(book.title)
-                    .font(.system(size: 16, weight: .semibold, design: .serif))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .frame(minHeight: 40)
                 
                 Text(book.author)
-                    .font(.system(size: 13, weight: .regular, design: .monospaced))
-                    .kerning(1.2)
+                    .font(.system(size: 13))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)
