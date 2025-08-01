@@ -34,32 +34,6 @@ struct UnifiedChatInputBar: View {
     
     var body: some View {
         HStack(spacing: 12) {
-                // Library navigation button
-                Button {
-                    // Navigate to library tab
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToTab"), object: 0)
-                    HapticManager.shared.lightTap()
-                } label: {
-                    // Try custom image first, fallback to system icon
-                    if let _ = UIImage(named: "glass-book-open") {
-                        Image("glass-book-open")
-                            .renderingMode(.original)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 22, height: 22)
-                    } else {
-                        Image(systemName: "books.vertical")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .glassEffect(.regular, in: .circle)
-                .overlay {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
-                }
-                
                 // Main input bar - liquid glass style matching command palette
                 HStack(spacing: 0) {
                     // Command icon - matching search icon style

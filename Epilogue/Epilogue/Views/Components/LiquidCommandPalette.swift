@@ -21,6 +21,24 @@ struct LiquidCommandPalette: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     
+    // Voice recognition states
+    @State private var isListening = false
+    @StateObject private var voiceManager = VoiceRecognitionManager()
+    @State private var voicePulseAnimation = false
+    @State private var voiceButtonScale: CGFloat = 1.0
+    @State private var voiceRecognitionTimer: Timer?
+    
+    // Attribution suggestion
+    @State private var suggestedAttribution: String? = nil
+    @State private var showAttributionSuggestion = false
+    
+    // Command history
+    @StateObject private var historyManager = CommandHistoryManager.shared
+    @State private var recentCommands: [RecentCommand] = []
+    @State private var showRecents = false
+    @State private var recentCardOpacities: [Double] = [0, 0, 0, 0, 0]
+    @State private var recentCardScales: [CGFloat] = [0.9, 0.9, 0.9, 0.9, 0.9]
+    
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.modelContext) private var modelContext
@@ -39,13 +57,15 @@ struct LiquidCommandPalette: View {
     let initialContent: String?
     let editingNote: Note?
     let onUpdate: ((Note) -> Void)?
+    let bookContext: Book?
     
-    init(isPresented: Binding<Bool>, animationNamespace: Namespace.ID, initialContent: String? = nil, editingNote: Note? = nil, onUpdate: ((Note) -> Void)? = nil) {
+    init(isPresented: Binding<Bool>, animationNamespace: Namespace.ID, initialContent: String? = nil, editingNote: Note? = nil, onUpdate: ((Note) -> Void)? = nil, bookContext: Book? = nil) {
         self._isPresented = isPresented
         self.animationNamespace = animationNamespace
         self.initialContent = initialContent
         self.editingNote = editingNote
         self.onUpdate = onUpdate
+        self.bookContext = bookContext
     }
     
     private var showActionButton: Bool {
@@ -146,6 +166,40 @@ struct LiquidCommandPalette: View {
                     .padding(.bottom, 8)
                 }
                 
+                // Recent commands when focused but empty
+                if showRecents && commandText.isEmpty && isFocused && !recentCommands.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recent")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(.horizontal, 16)
+                        
+                        ForEach(Array(recentCommands.enumerated()), id: \.element.id) { index, command in
+                            RecentCommandCard(
+                                command: command,
+                                opacity: recentCardOpacities[safe: index] ?? 0,
+                                scale: recentCardScales[safe: index] ?? 0.9,
+                                action: {
+                                    // Populate input with command
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        commandText = command.text
+                                        showRecents = false
+                                        // Re-detect intent
+                                        detectedIntent = CommandParser.parse(command.text, books: libraryViewModel.books, notes: notesViewModel.notes)
+                                    }
+                                    HapticManager.shared.lightTap()
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                    .padding(.bottom, 12)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                }
+                
                 // Preview for matched content
                 if showPreview {
                     VStack(spacing: 0) {
@@ -204,6 +258,32 @@ struct LiquidCommandPalette: View {
                             .glassEffect(.regular.tint(Color.white.opacity(0.1)), in: Circle())
                     }
                     
+                    // Voice button
+                    Button {
+                        if isListening {
+                            stopListening()
+                        } else {
+                            startListening()
+                        }
+                    } label: {
+                        Image(systemName: isListening ? "waveform" : "waveform.circle")
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(isListening ? Color.red : .white.opacity(0.9))
+                            .frame(width: 36, height: 36)
+                            .scaleEffect(voiceButtonScale)
+                            .glassEffect(.regular.tint(isListening ? Color.red.opacity(0.2) : Color.white.opacity(0.1)), in: Circle())
+                            .overlay {
+                                if isListening {
+                                    Circle()
+                                        .strokeBorder(Color.red.opacity(0.3), lineWidth: 2)
+                                        .scaleEffect(voicePulseAnimation ? 1.3 : 1.0)
+                                        .opacity(voicePulseAnimation ? 0 : 0.6)
+                                        .animation(.easeOut(duration: 1.0).repeatForever(autoreverses: false), value: voicePulseAnimation)
+                                }
+                            }
+                    }
+                    .sensoryFeedback(.impact(flexibility: .soft), trigger: isListening)
+                    
                     // Input field container with glass effect
                     HStack(spacing: 0) {
                         // Dynamic icon based on intent
@@ -217,9 +297,23 @@ struct LiquidCommandPalette: View {
                         // Text field
                         ZStack(alignment: .leading) {
                             if commandText.isEmpty {
-                                Text(placeholderText)
-                                    .foregroundColor(.white.opacity(0.5))
-                                    .font(.system(size: 16))
+                                HStack(spacing: 8) {
+                                    if isListening {
+                                        // Animated listening indicator
+                                        HStack(spacing: 3) {
+                                            ForEach(0..<3) { index in
+                                                RoundedRectangle(cornerRadius: 2)
+                                                    .fill(Color.red.opacity(0.6))
+                                                    .frame(width: 3, height: isListening && voiceManager.currentAmplitude > 0.05 ? 12 + (CGFloat(voiceManager.currentAmplitude) * 8) : 6)
+                                                    .animation(.easeInOut(duration: 0.1).delay(Double(index) * 0.05), value: voiceManager.currentAmplitude)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Text(isListening ? "Listening..." : placeholderText)
+                                        .foregroundColor(.white.opacity(0.5))
+                                        .font(.system(size: 16))
+                                }
                             }
                             
                             TextField("", text: $commandText, axis: .vertical)
@@ -241,6 +335,13 @@ struct LiquidCommandPalette: View {
                                                 pillOpacities[i] = 0
                                                 pillScales[i] = 0.8
                                             }
+                                        }
+                                    }
+                                    
+                                    // Hide recent commands when typing
+                                    if !newValue.isEmpty && showRecents {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            showRecents = false
                                         }
                                     }
                                     
@@ -296,6 +397,60 @@ struct LiquidCommandPalette: View {
                                     } else {
                                         showPreview = false
                                     }
+                                    
+                                    // Handle quote attribution suggestion
+                                    if case .createQuote(let text) = detectedIntent {
+                                        let (_, attribution) = CommandParser.parseQuote(text)
+                                        if attribution == nil && bookContext != nil {
+                                            // Only suggest when we have specific book context
+                                            if let book = bookContext {
+                                                suggestedAttribution = "- \(book.author), \(book.title)"
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                    showAttributionSuggestion = true
+                                                }
+                                            }
+                                        } else {
+                                            // Already has attribution or no book context
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                showAttributionSuggestion = false
+                                                suggestedAttribution = nil
+                                            }
+                                        }
+                                    } else {
+                                        // Not a quote
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            showAttributionSuggestion = false
+                                            suggestedAttribution = nil
+                                        }
+                                    }
+                                }
+                                .onChange(of: isFocused) { _, newValue in
+                                    if newValue && commandText.isEmpty && !recentCommands.isEmpty {
+                                        // Show recent commands when focused and empty
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            showRecents = true
+                                        }
+                                        
+                                        // Animate recent cards in with stagger
+                                        for i in 0..<min(recentCommands.count, 5) {
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8).delay(Double(i) * 0.05)) {
+                                                if i < recentCardOpacities.count {
+                                                    recentCardOpacities[i] = 1.0
+                                                }
+                                                if i < recentCardScales.count {
+                                                    recentCardScales[i] = 1.0
+                                                }
+                                            }
+                                        }
+                                    } else if !newValue {
+                                        // Hide recent commands when losing focus
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            showRecents = false
+                                            // Reset animations
+                                            recentCardOpacities = [0, 0, 0, 0, 0]
+                                            recentCardScales = [0.9, 0.9, 0.9, 0.9, 0.9]
+                                        }
+                                    }
                                 }
                                 .onSubmit {
                                     executeCommand()
@@ -339,6 +494,20 @@ struct LiquidCommandPalette: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+                
+                // Attribution suggestion pill
+                if showAttributionSuggestion, let attribution = suggestedAttribution {
+                    AttributionSuggestionPill(
+                        attribution: attribution,
+                        onTap: { acceptAttributionSuggestion() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.9)),
+                        removal: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.9))
+                    ))
+                }
             }
         }
         .onAppear {
@@ -353,6 +522,19 @@ struct LiquidCommandPalette: View {
                 detectedIntent = .unknown
                 displayedIntent = .unknown
                 currentGlowColor = Color(red: 1.0, green: 0.55, blue: 0.26)
+            }
+            
+            // Load recent commands
+            recentCommands = historyManager.getRecentCommands()
+            if !recentCommands.isEmpty && commandText.isEmpty {
+                showRecents = true
+                // Animate recent cards in with stagger
+                for i in 0..<min(recentCommands.count, 5) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8).delay(Double(i) * 0.05)) {
+                        recentCardOpacities[i] = 1.0
+                        recentCardScales[i] = 1.0
+                    }
+                }
             }
             
             // Auto-focus immediately
@@ -371,6 +553,19 @@ struct LiquidCommandPalette: View {
             // Cancel any pending icon changes
             iconChangeDelay?.cancel()
             previewDelay?.cancel()
+            
+            // Stop voice recognition if active
+            if isListening {
+                voiceManager.stopListening()
+                voiceRecognitionTimer?.invalidate()
+                voiceRecognitionTimer = nil
+                isListening = false
+                voicePulseAnimation = false
+            }
+            
+            // Clear attribution suggestion
+            showAttributionSuggestion = false
+            suggestedAttribution = nil
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
@@ -470,6 +665,9 @@ struct LiquidCommandPalette: View {
         
         HapticManager.shared.mediumTap()
         
+        // Track command in history
+        historyManager.addCommand(commandText, intent: detectedIntent)
+        
         // Handle editing mode
         if let editingNote = editingNote, let onUpdate = onUpdate {
             switch detectedIntent {
@@ -489,10 +687,10 @@ struct LiquidCommandPalette: View {
             createNote(from: text)
         case .createQuote(let text):
             createQuote(from: text)
-        case .addBook(let query):
+        case .addBook(_):
             // Show book search sheet
             showBookSearch = true
-        case .searchLibrary(let query):
+        case .searchLibrary(_):
             // TODO: Implement library search
             HapticManager.shared.success()
             dismissPalette()
@@ -624,7 +822,7 @@ struct LiquidCommandPalette: View {
             source: .manual
         )
         
-        print("🔍 ModelContext check - is nil: \(modelContext == nil)")
+        print("🔍 ModelContext check - ready to insert quote")
         modelContext.insert(capturedQuote)
         print("📝 Inserted quote into context")
         
@@ -746,6 +944,236 @@ struct LiquidCommandPalette: View {
         onUpdate(updatedQuote)
         HapticManager.shared.success()
         dismissPalette()
+    }
+    
+    // MARK: - Voice Recognition Methods
+    
+    private func startListening() {
+        // Hide keyboard and quick suggestions first
+        isFocused = false
+        if showQuickSuggestions {
+            showQuickSuggestions = false
+            for i in (0..<suggestions.count).reversed() {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8).delay(Double(suggestions.count - i - 1) * 0.05)) {
+                    pillOpacities[i] = 0
+                    pillScales[i] = 0.8
+                }
+            }
+        }
+        
+        // Start listening
+        HapticManager.shared.mediumTap()
+        isListening = true
+        
+        // Start pulse animation
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            voiceButtonScale = 1.1
+            voicePulseAnimation = true
+        }
+        
+        // Scale back button
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                voiceButtonScale = 1.0
+            }
+        }
+        
+        // Clear existing text if it was a placeholder
+        if commandText.isEmpty || commandText == placeholderText {
+            commandText = ""
+        }
+        
+        // Start voice recognition
+        voiceManager.startAmbientListening()
+        
+        // Set up timer to update text from voice recognition
+        voiceRecognitionTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            updateFromVoiceRecognition()
+        }
+    }
+    
+    private func stopListening() {
+        HapticManager.shared.lightTap()
+        isListening = false
+        voicePulseAnimation = false
+        
+        // Stop voice recognition
+        voiceManager.stopListening()
+        voiceRecognitionTimer?.invalidate()
+        voiceRecognitionTimer = nil
+        
+        // Final update with any remaining text
+        updateFromVoiceRecognition()
+        
+        // Focus text field if we have content
+        if !commandText.isEmpty {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
+            }
+        }
+    }
+    
+    private func updateFromVoiceRecognition() {
+        let recognizedText = voiceManager.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if !recognizedText.isEmpty && recognizedText != commandText {
+            // Update text with animation
+            withAnimation(.easeInOut(duration: 0.2)) {
+                commandText = recognizedText
+            }
+            
+            // Update intent detection
+            DispatchQueue.main.async {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    detectedIntent = CommandParser.parse(commandText, books: libraryViewModel.books, notes: notesViewModel.notes)
+                    updateGlowColor()
+                }
+                
+                // Update icon
+                iconChangeDelay?.cancel()
+                let workItem = DispatchWorkItem {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        displayedIntent = detectedIntent
+                    }
+                }
+                iconChangeDelay = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+                
+                // Handle quote attribution suggestion for voice input
+                if case .createQuote(let text) = detectedIntent {
+                    let (_, attribution) = CommandParser.parseQuote(text)
+                    if attribution == nil && bookContext != nil {
+                        // Only suggest when we have specific book context
+                        if let book = bookContext {
+                            suggestedAttribution = "- \(book.author), \(book.title)"
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showAttributionSuggestion = true
+                            }
+                        }
+                    } else {
+                        // Already has attribution or no book context
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showAttributionSuggestion = false
+                            suggestedAttribution = nil
+                        }
+                    }
+                } else {
+                    // Not a quote
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showAttributionSuggestion = false
+                        suggestedAttribution = nil
+                    }
+                }
+            }
+            
+            // Haptic feedback for new text
+            if recognizedText.count > commandText.count + 5 {
+                HapticManager.shared.lightTap()
+            }
+        }
+        
+        // Handle voice recognition errors
+        if isListening && voiceManager.recognitionState == .idle && commandText.isEmpty {
+            // Show hint after 3 seconds of silence
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                if self.isListening && self.commandText.isEmpty {
+                    showSuccessToast(message: "Try speaking clearly", icon: "waveform", color: Color.orange)
+                }
+            }
+        }
+        
+        // Show visual feedback in input field when voice is detected
+        if isListening && voiceManager.currentAmplitude > 0.1 {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                // Subtle bounce on voice button
+                voiceButtonScale = 1.0 + (CGFloat(voiceManager.currentAmplitude) * 0.1)
+            }
+            
+            // Reset scale
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    voiceButtonScale = 1.0
+                }
+            }
+        }
+    }
+    
+    private func acceptAttributionSuggestion() {
+        guard let attribution = suggestedAttribution else { return }
+        
+        // Haptic feedback
+        HapticManager.shared.lightTap()
+        
+        // Append attribution to command text
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            // Remove any trailing quotes and whitespace
+            var cleanedText = commandText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if cleanedText.hasSuffix("\"") {
+                cleanedText = String(cleanedText.dropLast())
+            }
+            
+            // Add the quote and attribution
+            commandText = cleanedText + "\" " + attribution.replacingOccurrences(of: "- ", with: "")
+            
+            // Hide suggestion
+            showAttributionSuggestion = false
+            suggestedAttribution = nil
+        }
+        
+        // Update intent detection
+        DispatchQueue.main.async {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                detectedIntent = CommandParser.parse(commandText, books: libraryViewModel.books, notes: notesViewModel.notes)
+                updateGlowColor()
+                displayedIntent = detectedIntent
+            }
+        }
+    }
+}
+
+// MARK: - Attribution Suggestion Pill
+struct AttributionSuggestionPill: View {
+    let attribution: String
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text(attribution)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.9))
+                
+                Spacer()
+                
+                Text("TAP TO ADD")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                    .kerning(0.5)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .glassEffect(.regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)), in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
+                    )
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -879,3 +1307,6 @@ struct NotePreviewCard: View {
         }
     }
 }
+
+
+// MARK: - Safe Array Extension - Removed (already defined elsewhere)

@@ -164,7 +164,8 @@ struct NotesView: View {
         .sheet(isPresented: $showingAddNote) {
             LiquidCommandPalette(
                 isPresented: $showingAddNote,
-                animationNamespace: commandPaletteNamespace
+                animationNamespace: commandPaletteNamespace,
+                bookContext: nil  // No specific book context in general notes view
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)
@@ -178,7 +179,8 @@ struct NotesView: View {
                 onUpdate: { updatedNote in
                     notesViewModel.updateNote(updatedNote)
                     noteToEdit = nil
-                }
+                },
+                bookContext: nil  // No specific book context when editing existing notes
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)

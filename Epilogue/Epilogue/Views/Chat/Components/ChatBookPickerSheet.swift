@@ -124,8 +124,9 @@ struct ChatBookPickerSheet: View {
                 }
                 .padding(.top, 16)
             }
-            .frame(maxHeight: 400)
+            .frame(maxHeight: 320)
         }
+        .frame(maxWidth: 340)
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)

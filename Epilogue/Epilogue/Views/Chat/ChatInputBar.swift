@@ -110,7 +110,8 @@ struct ChatInputBar: View {
         .sheet(isPresented: $showCommandPalette) {
             LiquidCommandPalette(
                 isPresented: $showCommandPalette,
-                animationNamespace: commandPaletteNamespace
+                animationNamespace: commandPaletteNamespace,
+                bookContext: selectedBook  // Pass selected book if available
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)

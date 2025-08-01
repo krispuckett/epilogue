@@ -6,10 +6,16 @@ struct SessionContentCardsView: View {
     let bookTitle: String?
     let bookAuthor: String?
     
+    @StateObject private var processor = IntelligentSessionProcessor.shared
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    
     private enum ContentType {
         case quote
         case note
         case question
+        case progressUpdate
+        case bookReference
+        case suggestion
     }
     
     // Item wrapper for ForEach compatibility
@@ -61,9 +67,30 @@ struct SessionContentCardsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // Intelligent suggestions at the top
+                IntelligentSuggestionsSection(
+                    session: session,
+                    processor: processor,
+                    library: libraryViewModel.books
+                )
+                
+                // Original content items
                 ForEach(allItems) { item in
                     contentView(for: item)
                 }
+                
+                // Progress updates detected
+                ProgressUpdatesSection(
+                    content: session.summary,
+                    processor: processor
+                )
+                
+                // Book references
+                BookReferencesSection(
+                    content: session.summary,
+                    processor: processor,
+                    library: libraryViewModel.books
+                )
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
@@ -100,6 +127,9 @@ struct SessionContentCardsView: View {
                     timestamp: question.timestamp
                 )
             }
+        case .progressUpdate, .bookReference, .suggestion:
+            // These are handled by separate sections
+            EmptyView()
         }
     }
 }
@@ -283,5 +313,286 @@ struct ChatQuestionCard: View {
                 .stroke(Color.warmAmber.opacity(0.1), lineWidth: 0.5)
         }
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+    }
+}
+
+// MARK: - Intelligent Suggestions Section
+
+struct IntelligentSuggestionsSection: View {
+    let session: ProcessedAmbientSession
+    let processor: IntelligentSessionProcessor
+    let library: [Book]
+    
+    @State private var suggestions: [SessionSuggestion] = []
+    @State private var showingSuggestions = true
+    
+    var body: some View {
+        if !suggestions.isEmpty && showingSuggestions {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Suggested Actions", systemImage: "sparkles")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.warmAmber)
+                    
+                    Spacer()
+                    
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showingSuggestions = false
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                }
+                
+                ForEach(suggestions) { suggestion in
+                    SuggestionCard(suggestion: suggestion)
+                }
+            }
+            .padding(16)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.warmAmber.opacity(0.2), lineWidth: 0.5)
+            }
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.95).combined(with: .opacity),
+                removal: .scale(scale: 0.95).combined(with: .opacity)
+            ))
+            .onAppear {
+                // Create a temporary AmbientSession for processor
+                var ambientSession = AmbientSession(startTime: Date().addingTimeInterval(-session.duration))
+                ambientSession.endTime = Date()
+                ambientSession.processedData = session
+                
+                suggestions = processor.generateActionableSuggestions(
+                    session: ambientSession,
+                    library: library
+                )
+            }
+        }
+    }
+}
+
+struct SuggestionCard: View {
+    let suggestion: SessionSuggestion
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button {
+            HapticManager.shared.lightTap()
+            suggestion.action()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: suggestion.icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(Color.warmAmber)
+                    .frame(width: 32, height: 32)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(suggestion.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                    
+                    Text(suggestion.description)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .onLongPressGesture(
+            minimumDuration: 0,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isPressed = pressing
+                }
+            },
+            perform: {}
+        )
+    }
+}
+
+// MARK: - Progress Updates Section
+
+struct ProgressUpdatesSection: View {
+    let content: String
+    let processor: IntelligentSessionProcessor
+    
+    @State private var progressUpdates: [ProgressUpdate] = []
+    
+    var body: some View {
+        if !progressUpdates.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Reading Progress", systemImage: "bookmark.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.warmAmber.opacity(0.8))
+                
+                ForEach(progressUpdates, id: \.position) { update in
+                    ProgressUpdateCard(update: update)
+                }
+            }
+            .onAppear {
+                progressUpdates = processor.detectProgressUpdates(content: content)
+            }
+        }
+    }
+}
+
+struct ProgressUpdateCard: View {
+    let update: ProgressUpdate
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bookmark.circle.fill")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.warmAmber.opacity(0.6))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(update.type.displayText)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white)
+                
+                Text("From: \"\(update.rawText)\"")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            Button {
+                HapticManager.shared.lightTap()
+                NotificationCenter.default.post(
+                    name: Notification.Name("UpdateBookProgress"),
+                    object: update
+                )
+            } label: {
+                Text("Update")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.warmAmber)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.warmAmber.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.warmAmber.opacity(0.1), lineWidth: 0.5)
+        }
+    }
+}
+
+// MARK: - Book References Section
+
+struct BookReferencesSection: View {
+    let content: String
+    let processor: IntelligentSessionProcessor
+    let library: [Book]
+    
+    @State private var bookReferences: [BookReference] = []
+    
+    var body: some View {
+        if !bookReferences.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Book References", systemImage: "book.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.warmAmber.opacity(0.8))
+                
+                ForEach(bookReferences, id: \.bookTitle) { reference in
+                    BookReferenceCard(reference: reference)
+                }
+            }
+            .onAppear {
+                bookReferences = processor.detectBookReferences(
+                    content: content,
+                    library: library
+                )
+            }
+        }
+    }
+}
+
+struct BookReferenceCard: View {
+    let reference: BookReference
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            if let book = reference.matchedBook,
+               let coverURLString = book.coverImageURL,
+               let coverURL = URL(string: coverURLString) {
+                AsyncImage(url: coverURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.warmAmber.opacity(0.1))
+                }
+                .frame(width: 40, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Image(systemName: "book.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(Color.warmAmber.opacity(0.6))
+                    .frame(width: 40, height: 60)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(reference.bookTitle)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.green)
+                    
+                    Text("Confidence: \(Int(reference.confidence * 100))%")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            
+            Spacer()
+            
+            if reference.matchedBook != nil {
+                Button {
+                    HapticManager.shared.lightTap()
+                    NotificationCenter.default.post(
+                        name: Notification.Name("NavigateToBook"),
+                        object: reference.matchedBook
+                    )
+                } label: {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.warmAmber.opacity(0.6))
+                }
+            }
+        }
+        .padding(12)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.warmAmber.opacity(0.1), lineWidth: 0.5)
+        }
     }
 }

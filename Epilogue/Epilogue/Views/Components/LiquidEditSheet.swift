@@ -22,7 +22,8 @@ struct LiquidEditSheet: View {
             animationNamespace: animation,
             initialContent: formatNoteForEditing(note),
             editingNote: note,
-            onUpdate: onSave
+            onUpdate: onSave,
+            bookContext: nil  // No specific book context for general note editing
         )
         .onDisappear {
             onDismiss()

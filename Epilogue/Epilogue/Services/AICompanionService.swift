@@ -56,6 +56,21 @@ class AICompanionService: ObservableObject {
     
     // MARK: - Public Methods
     
+    func startReadingSession(for book: Book) {
+        let sessionKey = "reading_session_\(book.id)"
+        UserDefaults.standard.set(Date(), forKey: sessionKey)
+    }
+    
+    func updateReadingProgress(for book: Book, page: Int) {
+        let progressKey = "reading_progress_\(book.id)"
+        UserDefaults.standard.set(page, forKey: progressKey)
+    }
+    
+    func endReadingSession(for book: Book) {
+        let sessionKey = "reading_session_\(book.id)"
+        UserDefaults.standard.removeObject(forKey: sessionKey)
+    }
+    
     func processMessage(_ message: String, bookContext: Book?, conversationHistory: [UnifiedChatMessage] = []) async throws -> String {
         isProcessing = true
         defer { 
@@ -135,51 +150,44 @@ class AICompanionService: ObservableObject {
     // MARK: - Private Methods
     
     private func buildContextualMessage(message: String, bookContext: Book?, history: [UnifiedChatMessage]) -> String {
-        var context = message
+        var contextParts: [String] = []
         
-        // Add book context if available
-        if let book = bookContext {
-            context = "Discussing '\(book.title)' by \(book.author): \(message)"
+        // Add reading session context
+        if let sessionContext = getCurrentReadingSession(for: bookContext) {
+            contextParts.append(sessionContext)
         }
         
-        // Extract quotes and notes from conversation history
-        let recentQuotes = extractQuotesFromHistory(history)
-        let recentNotes = extractNotesFromHistory(history)
+        // Add time-based context
+        contextParts.append(getTimeBasedContext())
         
-        // Build enhanced context with quotes and notes
-        var enhancedContext = ""
+        // Add recent content from book
+        if let book = bookContext,
+           let recentContent = getRecentContentForBook(book, from: history) {
+            contextParts.append(recentContent)
+        }
         
-        if !recentQuotes.isEmpty {
-            enhancedContext += "\n\nRecent quotes from the book:\n"
-            for quote in recentQuotes.prefix(3) {
-                enhancedContext += "- \(quote)\n"
+        // Add recent ambient captures
+        if let ambientContext = getRecentAmbientCaptures(from: history) {
+            contextParts.append(ambientContext)
+        }
+        
+        // Build the final context message
+        var finalContext = message
+        
+        if !contextParts.isEmpty {
+            let contextSummary = contextParts.joined(separator: " | ")
+            
+            // Keep context concise (under 500 chars)
+            let trimmedContext = String(contextSummary.prefix(490))
+            
+            if let book = bookContext {
+                finalContext = "[Context: \(trimmedContext)] Currently discussing '\(book.title)': \(message)"
+            } else {
+                finalContext = "[Context: \(trimmedContext)] \(message)"
             }
         }
         
-        if !recentNotes.isEmpty {
-            enhancedContext += "\n\nReader's notes and reflections:\n"
-            for note in recentNotes.prefix(3) {
-                enhancedContext += "- \(note)\n"
-            }
-        }
-        
-        // Add recent conversation context (last 3 exchanges)
-        if history.count > 1 {
-            let recentHistory = history.suffix(6) // Last 3 exchanges
-            var conversationContext = "\n\nRecent conversation:\n"
-            for msg in recentHistory {
-                let role = msg.isUser ? "User" : "Assistant"
-                conversationContext += "\(role): \(msg.content)\n"
-            }
-            enhancedContext += conversationContext
-        }
-        
-        // Combine everything
-        if !enhancedContext.isEmpty {
-            context = enhancedContext + "\n\nUser: " + context
-        }
-        
-        return context
+        return finalContext
     }
     
     private func extractQuotesFromHistory(_ history: [UnifiedChatMessage]) -> [String] {
@@ -211,6 +219,126 @@ class AICompanionService: ObservableObject {
         }
         
         return notes
+    }
+    
+    // MARK: - Context Awareness Methods
+    
+    private func getCurrentReadingSession(for book: Book?) -> String? {
+        guard let book = book else { return nil }
+        
+        // Check if there's an active reading session
+        let sessionKey = "reading_session_\(book.id)"
+        let progressKey = "reading_progress_\(book.id)"
+        
+        if let sessionStart = UserDefaults.standard.object(forKey: sessionKey) as? Date {
+            let duration = Int(Date().timeIntervalSince(sessionStart) / 60) // minutes
+            let currentPage = UserDefaults.standard.integer(forKey: progressKey)
+            
+            if duration > 0 {
+                let pageInfo = currentPage > 0 ? "Page \(currentPage) of " : ""
+                return "Reading session: \(duration) min, \(pageInfo)\(book.title)"
+            }
+        }
+        
+        // Return last known progress if no active session
+        let lastPage = UserDefaults.standard.integer(forKey: progressKey)
+        if lastPage > 0 {
+            return "Progress: Page \(lastPage) of \(book.title)"
+        }
+        
+        return nil
+    }
+    
+    private func getTimeBasedContext() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let timeOfDay: String
+        
+        switch hour {
+        case 5..<12:
+            timeOfDay = "Morning reading"
+        case 12..<17:
+            timeOfDay = "Afternoon reading"
+        case 17..<22:
+            timeOfDay = "Evening reading"
+        default:
+            timeOfDay = "Late night reading"
+        }
+        
+        // Add day of week for additional context
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        let dayOfWeek = formatter.string(from: Date())
+        
+        return "\(timeOfDay) on \(dayOfWeek)"
+    }
+    
+    private func getRecentAmbientCaptures(from history: [UnifiedChatMessage]) -> String? {
+        // Look for ambient session messages (voice notes, reflections)
+        let recentThoughts = history
+            .suffix(10) // Last 10 messages
+            .filter { msg in
+                msg.isUser && (
+                    msg.content.contains("🎙️") || // Voice note indicator
+                    msg.content.lowercased().contains("note:") ||
+                    msg.content.lowercased().contains("thought:")
+                )
+            }
+            .map { $0.content }
+        
+        if !recentThoughts.isEmpty {
+            let thoughts = recentThoughts
+                .prefix(2)
+                .map { thought in
+                    // Truncate long thoughts
+                    thought.count > 50 ? String(thought.prefix(47)) + "..." : thought
+                }
+                .joined(separator: ", ")
+            
+            return "Recent thoughts: \(thoughts)"
+        }
+        
+        return nil
+    }
+    
+    private func getRecentContentForBook(_ book: Book, from history: [UnifiedChatMessage]) -> String? {
+        var highlights: [String] = []
+        
+        // Extract quotes and notes from history
+        for message in history.suffix(20) where message.isUser {
+            let content = message.content
+            
+            // Check for quotes (with quote marks)
+            if (content.contains("\"") || content.contains("\u{201C}") || content.contains("\u{201D}")) &&
+               content.count > 20 && content.count < 200 {
+                highlights.append(content)
+            }
+            // Check for notes about the book
+            else if content.count > 15 && content.count < 150 &&
+                    (content.lowercased().contains("note:") ||
+                     content.lowercased().contains("thought:") ||
+                     content.lowercased().contains("reflection:")) {
+                highlights.append(content)
+            }
+        }
+        
+        if !highlights.isEmpty {
+            let recentHighlights = highlights
+                .suffix(3)
+                .map { highlight in
+                    // Clean and truncate
+                    let cleaned = highlight
+                        .replacingOccurrences(of: "Note:", with: "")
+                        .replacingOccurrences(of: "Thought:", with: "")
+                        .replacingOccurrences(of: "Reflection:", with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    return cleaned.count > 60 ? String(cleaned.prefix(57)) + "..." : cleaned
+                }
+            
+            return "Recent highlights: \(recentHighlights.joined(separator: "; "))"
+        }
+        
+        return nil
     }
     
     // MARK: - Debug Methods

@@ -153,11 +153,18 @@ struct UnifiedChatView: View {
                         LiveTranscriptionView(
                             transcription: liveTranscription, 
                             adaptiveUIColor: adaptiveUIColor,
+                            isTranscribing: isRecording,
                             onCancel: {
                                 // Cancel the transcription
                                 voiceManager.stopListening()
                                 isRecording = false
                                 liveTranscription = ""
+                                
+                                // Remove temporary transcription message
+                                if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
+                                    messages.remove(at: lastIndex)
+                                }
+                                
                                 HapticManager.shared.lightTap()
                             }
                         )
@@ -237,38 +244,13 @@ struct UnifiedChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 120) // Above input bar with safe area
                 .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
+                    insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
+                    removal: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
                 ))
                 .zIndex(100)
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
-        .overlay(alignment: .top) {
-            if showingBookPicker {
-                // Tap outside backdrop
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingBookPicker = false
-                    }
-                    .ignoresSafeArea()
-                
-                ChatBookPickerSheet(
-                    selectedBook: $currentBookContext,
-                    isPresented: $showingBookPicker,
-                    books: libraryViewModel.books
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 100) // Below header with safe area
-                .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .move(edge: .top).combined(with: .opacity)
-                ))
-                .zIndex(100)
-            }
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookPicker)
         .onReceive(voiceManager.$transcribedText) { text in
             // Update live transcription
             if isRecording && !text.isEmpty {
@@ -280,6 +262,35 @@ struct UnifiedChatView: View {
             audioLevel = level
         }
         } // End of ZStack
+        .overlay(alignment: .top) {
+            if showingBookPicker {
+                // Tap outside backdrop
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingBookPicker = false
+                    }
+                    .ignoresSafeArea()
+                
+                VStack {
+                    ChatBookPickerSheet(
+                        selectedBook: $currentBookContext,
+                        isPresented: $showingBookPicker,
+                        books: libraryViewModel.books
+                    )
+                    .padding(.horizontal, 16)
+                    
+                    Spacer()
+                }
+                .offset(y: 50) // Position from top of screen
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.98, anchor: .top).combined(with: .opacity),
+                    removal: .scale(scale: 0.98, anchor: .top).combined(with: .opacity)
+                ))
+                .zIndex(100)
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookPicker)
         // Hide navigation bar but keep blur working
         .toolbar(.hidden, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -1261,6 +1272,7 @@ struct UnifiedChatMessage: Identifiable {
 struct LiveTranscriptionView: View {
     let transcription: String
     let adaptiveUIColor: Color
+    var isTranscribing: Bool = true
     var onCancel: (() -> Void)? = nil
     
     var body: some View {
@@ -1414,6 +1426,7 @@ struct BookContextMenuView: View {
             }
             .buttonStyle(.plain)
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookPicker)
     }
 }
 
@@ -1592,115 +1605,88 @@ struct SimplifiedUnifiedChatInputBar: View {
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Library navigation button
-            Button {
-                NotificationCenter.default.post(name: Notification.Name("NavigateToTab"), object: 0)
-                HapticManager.shared.lightTap()
-            } label: {
-                // Use custom icon if available
-                if let _ = UIImage(named: "glass-book-open") {
-                    Image("glass-book-open")
-                        .renderingMode(.original)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 22, height: 22)
-                } else {
-                    Image(systemName: "books.vertical")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
+        HStack(spacing: 0) {
+            // Command icon
+            Image(systemName: "command")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .padding(.leading, 12)
+                .padding(.trailing, 8)
+                .onTapGesture {
+                    showingCommandPalette = true
                 }
-            }
-            .frame(width: 44, height: 44)
-            .overlay {
-                Circle()
-                    .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
-            }
             
-            // Main input bar
-            HStack(spacing: 0) {
-                // Command icon
-                Image(systemName: "command")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                    .padding(.leading, 12)
-                    .padding(.trailing, 8)
-                    .onTapGesture {
-                        showingCommandPalette = true
-                    }
-                
-                // Text input
-                ZStack(alignment: .leading) {
-                    if messageText.isEmpty {
-                        Text(placeholderText)
-                            .foregroundColor(.white.opacity(0.5))
-                            .font(.system(size: 16))
-                    }
-                    
-                    TextField("", text: $messageText)
-                        .textFieldStyle(.plain)
+            // Text input
+            ZStack(alignment: .leading) {
+                if messageText.isEmpty {
+                    Text(placeholderText)
+                        .foregroundColor(.white.opacity(0.5))
                         .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .focused($isInputFocused)
-                        .submitLabel(.send)
-                        .onSubmit {
-                            if !messageText.isEmpty {
-                                onSend()
-                            }
-                        }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
                 
-                // Action buttons
-                HStack(spacing: 8) {
-                    // Waveform/Stop button
-                    Button {
-                        onMicrophoneTap()
-                    } label: {
-                        if isRecording {
-                            Image(systemName: "stop.fill")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                        } else {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                TextField("", text: $messageText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .focused($isInputFocused)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        if !messageText.isEmpty {
+                            onSend()
                         }
+                    }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            
+            // Action buttons
+            HStack(spacing: 8) {
+                // Waveform/Stop button
+                Button {
+                    onMicrophoneTap()
+                } label: {
+                    if isRecording {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    } else {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                // Send button
+                if !messageText.isEmpty {
+                    Button(action: onSend) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.white, Color(red: 1.0, green: 0.55, blue: 0.26))
                     }
                     .buttonStyle(.plain)
-                    
-                    // Send button
-                    if !messageText.isEmpty {
-                        Button(action: onSend) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.white, Color(red: 1.0, green: 0.55, blue: 0.26))
-                        }
-                        .buttonStyle(.plain)
-                        .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity),
-                            removal: .scale.combined(with: .opacity)
-                        ))
-                    }
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
                 }
-                .padding(.trailing, 12)
             }
-            .frame(minHeight: 36)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.5
-                    )
-            }
+            .padding(.trailing, 12)
+        }
+        .frame(minHeight: 36)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
     }

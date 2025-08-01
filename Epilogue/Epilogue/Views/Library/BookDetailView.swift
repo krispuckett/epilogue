@@ -340,7 +340,6 @@ struct BookDetailView: View {
                 .shadow(color: shadowColor, radius: 1, x: 0, y: 1)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
-                .modifier(ShimmerModifier(isActive: colorPalette == nil))
             
             // Author(s) - Handle multiple authors by splitting on comma
             VStack(spacing: 4) {
