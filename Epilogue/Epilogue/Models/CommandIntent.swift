@@ -154,16 +154,16 @@ struct CommandParser {
             return .existingNote(note: matchedNote)
         }
         
-        // Phase 3: Note Detection (check first for personal thoughts)
-        if isLikelyNote(input: trimmed) {
-            print("CommandParser: Detected note pattern")
-            return .createNote(text: input)
-        }
-        
-        // Phase 4: Smart Quote Detection
+        // Phase 3: Smart Quote Detection (check quotes BEFORE notes!)
         if isLikelyQuote(input: trimmed) {
             print("CommandParser: Detected quote pattern")
             return .createQuote(text: input)
+        }
+        
+        // Phase 4: Note Detection (check after quotes)
+        if isLikelyNote(input: trimmed) {
+            print("CommandParser: Detected note pattern")
+            return .createNote(text: input)
         }
         
         // Phase 5: Smart Book Title Detection - Check for "by" pattern first

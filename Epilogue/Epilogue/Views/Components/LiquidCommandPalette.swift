@@ -6,18 +6,18 @@ struct LiquidCommandPalette: View {
     // MARK: - State Properties (Minimal)
     @Binding var isPresented: Bool
     @State private var commandText = ""
-    @State private var detectedIntent: CommandIntent = .unknown
-    @FocusState private var isFocused: Bool
     @State private var showQuickActions = false
     @State private var showBookSearch = false
-    @State private var showBookScanner = false
-    @State private var isListening = false
-    @StateObject private var voiceManager = VoiceRecognitionManager()
+    @State private var bookSearchQuery = ""
+    @State private var shouldShowSearchResults = false
+    @FocusState private var isFocused: Bool
     
     // MARK: - Environment
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.modelContext) private var modelContext
+    @Query private var capturedNotes: [CapturedNote]
+    @Query private var capturedQuotes: [CapturedQuote]
     
     // Animation namespace
     var animationNamespace: Namespace.ID
@@ -37,431 +37,254 @@ struct LiquidCommandPalette: View {
         self.bookContext = bookContext
     }
     
-    // MARK: - Quick Action Definition
-    struct QuickAction {
-        let icon: String
-        let title: String
-        let description: String
-        let action: () -> Void
+    // MARK: - Helper Methods
+    private func determineContext() -> InputContext {
+        if let book = bookContext {
+            return .bookDetail(book: book)
+        }
+        return .quickActions
     }
     
-    // MARK: - Computed Properties
-    private var quickActions: [QuickAction] {
-        [
-            QuickAction(
-                icon: "note.text",
-                title: "New Note",
-                description: "Add a quick thought",
-                action: {
-                    commandText = "note: "
-                    showQuickActions = false
-                    isFocused = true
-                }
-            ),
-            QuickAction(
-                icon: "quote.opening",
-                title: "New Quote",
-                description: "Save a memorable quote",
-                action: {
-                    commandText = "\""
-                    showQuickActions = false
-                    isFocused = true
-                }
-            ),
-            QuickAction(
-                icon: "book",
-                title: "Add Book",
-                description: "Add to your library",
-                action: {
-                    commandText = "add book "
-                    showQuickActions = false
-                    isFocused = true
-                }
-            ),
-            QuickAction(
-                icon: "barcode.viewfinder",
-                title: "Scan Book Cover",
-                description: "Scan ISBN or cover",
-                action: {
-                    showQuickActions = false
-                    showBookScanner = true
-                }
-            ),
-            QuickAction(
-                icon: "magnifyingglass",
-                title: "Search",
-                description: "Find in your library",
-                action: {
-                    commandText = "search "
-                    showQuickActions = false
-                    isFocused = true
-                }
-            )
-        ]
+    private func handleMicrophoneTap() {
+        // Implement voice recognition functionality here
+        // This can integrate with existing voice manager if needed
     }
     
-    private var currentGlowColor: Color {
-        detectedIntent.color
-    }
-    
-    private var placeholderText: String {
-        if isListening {
-            return "Listening..."
+    private func handleQuickAction(_ action: String) {
+        switch action {
+        case "note":
+            commandText = "note: "
+            isFocused = true
+        case "quote":
+            commandText = "\""
+            isFocused = true
+        case "addBook":
+            commandText = ""
+            isFocused = true
+        case "search":
+            commandText = ""
+            isFocused = true
+        default:
+            break
         }
-        
-        if editingNote != nil {
-            return "Edit your note..."
-        }
-        
-        switch detectedIntent {
-        case .addBook:
-            return "Adding new book..."
-        case .createQuote:
-            return "Creating quote..."
-        case .createNote:
-            return "Creating note..."
-        case .searchLibrary, .existingBook:
-            return "Found in your library"
-        case .searchNotes, .existingNote:
-            return "Searching notes..."
-        case .searchAll:
-            return "Searching everything..."
-        case .unknown:
-            return "What's on your mind?"
-        }
+        showQuickActions = false
     }
     
     // MARK: - Body
     var body: some View {
         ZStack {
-            // Invisible backdrop
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissPalette()
+            // Show Universal Input Bar overlay when presented
+            if isPresented {
+                ZStack {
+                    // Backdrop
+                    Color.black.opacity(0.3)
+                        .onTapGesture {
+                            if showQuickActions {
+                                showQuickActions = false
+                            } else {
+                                dismissPalette()
+                            }
+                        }
+                        .ignoresSafeArea()
+                    
+                    VStack {
+                        Spacer()
+                        
+                        // Show search results (including recent commands when empty)
+                        if !showQuickActions && (commandText.count >= 3 || commandText.isEmpty) {
+                            ScrollView {
+                                LiquidSearchResultsView(searchText: commandText)
+                                    .environmentObject(libraryViewModel)
+                                    .environmentObject(notesViewModel)
+                            }
+                            .frame(maxHeight: 300)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8) // 8px above input bar
+                            .transition(AnyTransition.asymmetric(
+                                insertion: AnyTransition.move(edge: .bottom).combined(with: .opacity),
+                                removal: AnyTransition.move(edge: .top).combined(with: .opacity)
+                            ))
+                        }
+                        
+                        // Show command palette if active
+                        if showQuickActions {
+                            QuickActionsSheet(
+                                isPresented: $showQuickActions,
+                                onActionSelected: { action in
+                                    handleQuickAction(action)
+                                }
+                            )
+                            .environmentObject(libraryViewModel)
+                            .environmentObject(notesViewModel)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 120) // Above input bar
+                            .transition(AnyTransition.asymmetric(
+                                insertion: AnyTransition.scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
+                                removal: AnyTransition.scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
+                            ))
+                        }
+                        
+                        // Universal Input Bar
+                        UniversalInputBar(
+                            messageText: $commandText,
+                            showingCommandPalette: .constant(false),
+                            isInputFocused: $isFocused,
+                            context: determineContext(),
+                            onSend: {
+                                processCommand(commandText)
+                            },
+                            onMicrophoneTap: handleMicrophoneTap,
+                            onCommandTap: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    showQuickActions.toggle()
+                                }
+                            },
+                            isRecording: .constant(false),
+                            colorPalette: nil
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                    }
                 }
-            
-            VStack {
-                Spacer()
-                
-                // Main input bar
-                inputBarView
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                .onAppear {
+                    // Setup initial content if provided
+                    if let initial = initialContent {
+                        commandText = initial
+                    }
+                    isFocused = true
+                }
             }
-            
-            // Quick actions modal
-            if showQuickActions {
-                quickActionsModal
-            }
-        }
-        .onAppear {
-            setupInitialState()
-        }
-        .onDisappear {
-            cleanup()
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
-                searchQuery: {
-                    if case .addBook(let query) = detectedIntent {
-                        return query
-                    }
-                    return commandText
-                }(),
+                searchQuery: bookSearchQuery,
                 onBookSelected: { book in
+                    // Add the book to library
                     libraryViewModel.addBook(book)
                     HapticManager.shared.success()
+                    
+                    // Navigate to the newly added book
+                    NotificationCenter.default.post(
+                        name: Notification.Name("NavigateToBook"),
+                        object: book
+                    )
+                    
+                    // Close sheets
+                    showBookSearch = false
                     dismissPalette()
                 }
             )
         }
-        .fullScreenCover(isPresented: $showBookScanner) {
-            BookScannerView()
-                .environmentObject(libraryViewModel)
-        }
     }
     
-    // MARK: - View Components
     
-    private var inputBarView: some View {
-        HStack(spacing: 8) {
-            // Plus button
-            Button {
-                HapticManager.shared.lightTap()
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showQuickActions.toggle()
-                }
-            } label: {
-                Image(systemName: showQuickActions ? "xmark" : "plus")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .frame(width: 36, height: 36)
-                    .glassEffect(.regular.tint(showQuickActions ? currentGlowColor.opacity(0.2) : Color.white.opacity(0.1)), in: Circle())
-            }
-            
-            // Input field container
-            HStack(spacing: 0) {
-                // Dynamic icon
-                Image(systemName: iconForIntent(detectedIntent))
-                    .foregroundStyle(currentGlowColor)
-                    .font(.system(size: 20, weight: .medium))
-                    .frame(height: 36)
-                    .padding(.leading, 12)
-                    .padding(.trailing, 8)
-                
-                // Text field
-                ZStack(alignment: .leading) {
-                    if commandText.isEmpty {
-                        Text(placeholderText)
-                            .foregroundColor(.white.opacity(0.5))
-                            .font(.system(size: 16))
-                            .lineLimit(1)
-                    }
-                    
-                    TextField("", text: $commandText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                        .focused($isFocused)
-                        .lineLimit(1...5)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
-                        .submitLabel(.done)
-                        .onChange(of: commandText) { _, newValue in
-                            handleTextChange(newValue)
-                        }
-                        .onSubmit {
-                            executeCommand()
-                        }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                
-                // Action buttons
-                HStack(spacing: 8) {
-                    // Voice button
-                    Button {
-                        if isListening {
-                            stopListening()
-                        } else {
-                            startListening()
-                        }
-                    } label: {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(isListening ? currentGlowColor : currentGlowColor.opacity(0.7))
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    
-                    // Send button
-                    if !commandText.isEmpty && detectedIntent != .unknown {
-                        Button(action: executeCommand) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.white, currentGlowColor)
-                        }
-                        .buttonStyle(.plain)
-                        .transition(.opacity.combined(with: .scale))
-                    }
-                }
-                .padding(.trailing, 12)
-            }
-            .frame(minHeight: 36)
-            .glassEffect(.regular.tint(currentGlowColor.opacity(0.15)), in: RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                currentGlowColor.opacity(0.3),
-                                currentGlowColor.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.5
-                    )
-            }
-        }
-    }
     
-    private var quickActionsModal: some View {
-        ZStack {
-            // Background dimming
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showQuickActions = false
-                    }
-                }
-            
-            // Modal content
-            VStack(spacing: 0) {
-                // Handle bar
-                Capsule()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 40, height: 5)
-                    .padding(.top, 12)
-                    .padding(.bottom, 16)
-                
-                // Actions list
-                VStack(spacing: 8) {
-                    ForEach(quickActions, id: \.title) { action in
-                        quickActionRow(action)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-            .frame(maxWidth: .infinity)
-            .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(
-                        Color.white.opacity(0.1),
-                        lineWidth: 0.5
-                    )
-            }
-            .padding(.horizontal, 16)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, 100) // Space for input bar
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
     
-    private func quickActionRow(_ action: QuickAction) -> some View {
-        Button {
-            HapticManager.shared.lightTap()
-            action.action()
-        } label: {
-            HStack(spacing: 16) {
-                Image(systemName: action.icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(action.title)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
-                    
-                    Text(action.description)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func setupInitialState() {
-        if let initialContent = initialContent {
-            commandText = initialContent
-            detectedIntent = CommandParser.parse(initialContent, books: libraryViewModel.books, notes: notesViewModel.notes)
-        }
-        isFocused = true
-    }
-    
-    private func cleanup() {
-        isFocused = false
-        showQuickActions = false
-        if isListening {
-            voiceManager.stopListening()
-            isListening = false
-        }
-    }
-    
-    private func handleTextChange(_ newValue: String) {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            detectedIntent = CommandParser.parse(newValue, books: libraryViewModel.books, notes: notesViewModel.notes)
-        }
-    }
-    
-    private func iconForIntent(_ intent: CommandIntent) -> String {
-        switch intent {
-        case .addBook:
-            return "book.badge.plus.fill"
-        case .createNote:
-            return "plus"
-        case .createQuote:
-            return "quote.opening"
-        case .searchLibrary, .searchAll, .searchNotes:
-            return "magnifyingglass"
-        case .existingBook:
-            return "book.fill"
-        case .existingNote:
-            return "note.text"
-        case .unknown:
-            return "questionmark.circle.fill"
-        }
-    }
-    
-    private func dismissPalette() {
-        isFocused = false
-        withAnimation(.easeInOut(duration: 0.2)) {
-            isPresented = false
-        }
-    }
-    
-    private func executeCommand() {
-        guard detectedIntent != .unknown else { return }
+    // MARK: - Command Processing
+    private func processCommand(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
         
-        HapticManager.shared.mediumTap()
+        // Use CommandParser to detect intent with advanced NLP
+        let intent = CommandParser.parse(trimmed, books: libraryViewModel.books, notes: notesViewModel.notes)
         
+        print("🧠 LiquidCommandPalette: Processing command '\(trimmed)' with intent: \(intent)")
+        
+        // Handle editing note case
         if let editingNote = editingNote, let onUpdate = onUpdate {
-            switch detectedIntent {
-            case .createNote(let text):
-                updateNote(from: text, editingNote: editingNote, onUpdate: onUpdate)
-            case .createQuote(let text):
-                updateQuote(from: text, editingNote: editingNote, onUpdate: onUpdate)
+            switch intent {
+            case .createNote(let noteText):
+                updateNote(from: noteText, editingNote: editingNote, onUpdate: onUpdate)
+            case .createQuote(let quoteText):
+                updateQuote(from: quoteText, editingNote: editingNote, onUpdate: onUpdate)
             default:
                 break
             }
             return
         }
         
-        switch detectedIntent {
-        case .createNote(let text):
-            createNote(from: text)
-        case .createQuote(let text):
-            createQuote(from: text)
-        case .addBook(_):
-            showBookSearch = true
-        case .searchLibrary(_), .searchNotes(_), .searchAll(_):
-            HapticManager.shared.success()
-            dismissPalette()
+        // Handle regular commands with natural language understanding
+        switch intent {
+        case .createNote(let noteText):
+            createNote(from: noteText)
+        case .createQuote(let quoteText):
+            createQuote(from: quoteText)
+        case .addBook(let query):
+            // Search for book using the query
+            searchAndAddBook(query: query)
+        case .searchLibrary(let query), .searchNotes(let query), .searchAll(let query):
+            // Navigate to search with query
+            performSearch(query: query, intent: intent)
         case .existingBook(let book):
             HapticManager.shared.success()
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToBook"),
+                object: book
+            )
             dismissPalette()
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToBook"),
-                    object: book
-                )
-            }
         case .existingNote(let note):
             HapticManager.shared.success()
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToNote"),
+                object: note
+            )
             dismissPalette()
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToNote"),
-                    object: note
-                )
+        case .unknown:
+            // If unknown, try to be helpful based on content
+            if trimmed.contains("\"") || trimmed.contains("“") || trimmed.contains("”") {
+                // Contains quotes, likely a quote
+                createQuote(from: trimmed)
+            } else if trimmed.count < 50 && !trimmed.contains(" ") {
+                // Short single word might be a book title
+                searchAndAddBook(query: trimmed)
+            } else if trimmed.count < 100 {
+                // Medium length text could be book search
+                searchAndAddBook(query: trimmed)
+            } else {
+                // Long text defaults to note
+                createNote(from: trimmed)
             }
+        }
+    }
+    
+    // MARK: - Book Search & Add
+    private func searchAndAddBook(query: String) {
+        print("📚 Searching for book: \(query)")
+        
+        // Set the search query and show book search sheet
+        bookSearchQuery = query
+        showBookSearch = true
+        
+        HapticManager.shared.lightTap()
+    }
+    
+    // MARK: - Search Navigation
+    private func performSearch(query: String, intent: CommandIntent) {
+        print("🔍 Performing search: \(query) with intent: \(intent)")
+        
+        // Navigate to appropriate search view
+        switch intent {
+        case .searchLibrary(_):
+            NotificationCenter.default.post(
+                name: Notification.Name("SearchLibrary"),
+                object: query
+            )
+        case .searchNotes(_):
+            NotificationCenter.default.post(
+                name: Notification.Name("SearchNotes"),
+                object: query
+            )
+        case .searchAll(_):
+            NotificationCenter.default.post(
+                name: Notification.Name("SearchAll"),
+                object: query
+            )
         default:
             break
         }
+        
+        HapticManager.shared.success()
+        dismissPalette()
     }
     
     // MARK: - Note/Quote Creation Methods
@@ -485,16 +308,47 @@ struct LiquidCommandPalette: View {
         
         content = content.trimmingCharacters(in: .whitespaces)
         
+        // Create BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let book = bookContext {
+            bookModel = BookModel(from: book)
+            modelContext.insert(bookModel!)
+        }
+        
+        // Create and save to SwiftData using CapturedNote
+        let capturedNote = CapturedNote(
+            content: content,
+            book: bookModel,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedNote)
+        
+        // Also add to NotesViewModel for backward compatibility
         let note = Note(
             type: .note,
             content: content,
-            bookId: nil,
-            bookTitle: nil,
-            author: nil,
+            bookId: bookContext?.localId,
+            bookTitle: bookContext?.title,
+            author: bookContext?.author,
             pageNumber: nil
         )
         notesViewModel.addNote(note)
+        
+        // Save to SwiftData
+        do {
+            try modelContext.save()
+            print("✅ Note saved to SwiftData: \(content)")
+        } catch {
+            print("Failed to save note: \(error)")
+        }
+        
         HapticManager.shared.success()
+        
+        // Clear text immediately for better feedback
+        commandText = ""
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             dismissPalette()
@@ -516,33 +370,79 @@ struct LiquidCommandPalette: View {
         
         if let attr = attribution {
             let parts = attr.split(separator: "|||").map { String($0) }
-            if parts.count >= 3 {
-                author = parts[0]
-                if parts[1] == "BOOK" && parts.count > 2 {
-                    bookTitle = parts[2]
+            
+            // Parse the format: author|||BOOK|||bookTitle|||PAGE|||pageNumber
+            var idx = 0
+            if idx < parts.count {
+                author = parts[idx]
+                idx += 1
+            }
+            
+            // Check for BOOK marker
+            if idx < parts.count && parts[idx] == "BOOK" {
+                idx += 1
+                if idx < parts.count {
+                    bookTitle = parts[idx]
+                    idx += 1
                 }
-                if parts.count > 4 && parts[3] == "PAGE" {
-                    let pageStr = parts[4].trimmingCharacters(in: .whitespaces)
+            }
+            
+            // Check for PAGE marker
+            if idx < parts.count && parts[idx] == "PAGE" {
+                idx += 1
+                if idx < parts.count {
+                    let pageStr = parts[idx].trimmingCharacters(in: .whitespaces)
                     pageNumber = Int(pageStr.replacingOccurrences(of: "p.", with: "")
                         .replacingOccurrences(of: "page", with: "")
                         .replacingOccurrences(of: "pg", with: "")
                         .trimmingCharacters(in: .whitespaces))
                 }
-            } else {
-                author = attr
             }
         }
         
+        // Create BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let book = bookContext {
+            bookModel = BookModel(from: book)
+            modelContext.insert(bookModel!)
+        }
+        
+        // Create and save to SwiftData using CapturedQuote
+        let capturedQuote = CapturedQuote(
+            text: content,
+            book: bookModel,
+            author: author,
+            pageNumber: pageNumber,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedQuote)
+        
+        // Also add to NotesViewModel for backward compatibility
+        // Use the parsed values directly, bookContext info is already in CapturedQuote
         let quote = Note(
             type: .quote,
             content: content,
-            bookId: nil,
+            bookId: bookContext?.localId,
             bookTitle: bookTitle,
             author: author,
             pageNumber: pageNumber
         )
         notesViewModel.addNote(quote)
+        
+        // Save to SwiftData
+        do {
+            try modelContext.save()
+            print("✅ Quote saved to SwiftData: \(content)")
+        } catch {
+            print("Failed to save quote: \(error)")
+        }
+        
         HapticManager.shared.success()
+        
+        // Clear text immediately for better feedback
+        commandText = ""
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             dismissPalette()
@@ -630,47 +530,9 @@ struct LiquidCommandPalette: View {
         dismissPalette()
     }
     
-    // MARK: - Voice Recognition Methods
-    
-    private func startListening() {
-        isFocused = false
-        HapticManager.shared.mediumTap()
-        isListening = true
-        
-        if commandText.isEmpty {
-            commandText = ""
-        }
-        
-        voiceManager.startAmbientListening()
-        
-        // Simple timer to update text
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            Task { @MainActor in
-                if !isListening {
-                    timer.invalidate()
-                    return
-                }
-                
-                let recognizedText = voiceManager.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !recognizedText.isEmpty && recognizedText != commandText {
-                    commandText = recognizedText
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        detectedIntent = CommandParser.parse(commandText, books: libraryViewModel.books, notes: notesViewModel.notes)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func stopListening() {
-        HapticManager.shared.lightTap()
-        isListening = false
-        voiceManager.stopListening()
-        
-        if !commandText.isEmpty {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isFocused = true
-            }
+    private func dismissPalette() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isPresented = false
         }
     }
 }
