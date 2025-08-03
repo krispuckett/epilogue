@@ -17,13 +17,17 @@ class PerplexityService: ObservableObject {
         config.urlCache = nil  // Disable caching for real-time responses
         self.session = URLSession(configuration: config)
         
-        // First try to load from Info.plist
-        if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
+        // First try KeychainManager, then Info.plist
+        let apiKey = KeychainManager.shared.getPerplexityAPIKey() ?? 
+                     Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
+        
+        if let apiKey = apiKey,
            !apiKey.isEmpty,
            apiKey != "your_actual_api_key_here",
            !apiKey.contains("$(") {
             self.apiKey = apiKey
-            print("✅ Perplexity Service initialized with API key from Info.plist")
+            let source = KeychainManager.shared.hasPerplexityAPIKey ? "Settings (Keychain)" : "Info.plist"
+            print("✅ Perplexity Service initialized with API key from \(source)")
         } else {
             // Fallback: Use a placeholder key to prevent crashes
             // IMPORTANT: Replace this with your actual API key

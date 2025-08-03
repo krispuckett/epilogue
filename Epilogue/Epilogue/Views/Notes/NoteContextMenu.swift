@@ -195,7 +195,8 @@ struct NoteContextMenu: View {
     
     private func deleteNote() {
         HapticManager.shared.warning()
-        notesViewModel.deleteNote(note)
+        // Use sync-aware deletion
+        notesViewModel.deleteNoteWithSync(note)
     }
 }
 

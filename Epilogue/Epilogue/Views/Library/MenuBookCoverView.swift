@@ -37,18 +37,10 @@ struct MenuBookCoverView: View {
         guard !isLoading, let coverURL = coverURL else { return }
         isLoading = true
         
-        // Check cache first
-        if let cachedImage = SharedBookCoverManager.shared.getCachedImage(for: coverURL, quality: .low) {
+        // Use the new loadThumbnail method
+        if let thumbnail = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL) {
             withAnimation(.easeOut(duration: 0.15)) {
-                self.image = cachedImage
-            }
-            return
-        }
-        
-        // Load low quality image only
-        if let loadedImage = await SharedBookCoverManager.shared.loadImage(from: coverURL, quality: .low) {
-            withAnimation(.easeOut(duration: 0.15)) {
-                self.image = loadedImage
+                self.image = thumbnail
             }
         }
     }
@@ -65,11 +57,9 @@ extension SharedBookCoverManager {
             
             // Load thumbnails in background with lower priority
             for book in books.prefix(10) { // Limit to first 10 books for faster initial load
-                if await self.getCachedImage(for: book.coverImageURL, quality: .low) == nil {
-                    // Smaller delay for faster pre-caching
-                    try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
-                    _ = await self.loadImage(from: book.coverImageURL, quality: .low)
-                }
+                // Smaller delay for faster pre-caching
+                try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
+                _ = await self.loadThumbnail(from: book.coverImageURL)
             }
         }
     }

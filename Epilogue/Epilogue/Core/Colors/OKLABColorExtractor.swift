@@ -41,7 +41,6 @@ public class OKLABColorExtractor {
         let _ = calculateChecksum(for: image)
         
         // Debug saving disabled
-        // saveImageForDebug(image, suffix: "EXTRACTED_\(imageSource)")
         
         // Check image size to detect cropped covers
         if image.size.width < 100 || image.size.height < 100 {
@@ -153,12 +152,7 @@ public class OKLABColorExtractor {
         var totalValidPixels = 0
         var blackPixels = 0
         
-        // COMMENT OUT THIS ENTIRE SECTION
-        // print("  Starting edge detection...")
-        // let edgePixels = detectEdges(pixelData: pixelData, width: width, height: height, bytesPerRow: bytesPerRow)
-        // print("  Edge detection complete. Found \(edgePixels.count) edge pixels")
-        
-        // INSTEAD, just use an empty set
+        // Skip edge detection for performance
         let edgePixels: [(Int, Int)] = []
         print("  Skipping edge detection for performance...")
         
@@ -192,10 +186,6 @@ public class OKLABColorExtractor {
                 let cubeG = Int(g) * cubeSize / 256
                 let cubeB = Int(b) * cubeSize / 256
                 
-                // Change this:
-                // let weight = edgePixels.contains(where: { $0.0 == x && $0.1 == y }) ? 3 : 1
-                
-                // To this:
                 let weight = 1
                 colorCube[cubeR][cubeG][cubeB] += weight
             }
@@ -515,50 +505,6 @@ public class OKLABColorExtractor {
         return context.makeImage()
     }
     
-    // Edge detection to find important visual elements
-    private func detectEdges(pixelData: [UInt8], width: Int, height: Int, bytesPerRow: Int) -> [(Int, Int)] {
-        var edgePixels: [(Int, Int)] = []
-        
-        // Simple Sobel edge detection
-        for y in 1..<(height-1) {
-            for x in 1..<(width-1) {
-                let offset = (y * bytesPerRow) + (x * 4)
-                guard offset + 3 < pixelData.count else { continue }
-                
-                // Get center pixel brightness
-                let _ = Int(pixelData[offset]) + Int(pixelData[offset + 1]) + Int(pixelData[offset + 2])
-                
-                // Calculate gradient
-                var gradientX = 0
-                var gradientY = 0
-                
-                // Horizontal gradient
-                let leftOffset = offset - 4
-                let rightOffset = offset + 4
-                if leftOffset >= 0 && rightOffset < pixelData.count {
-                    let leftBrightness = Int(pixelData[leftOffset]) + Int(pixelData[leftOffset + 1]) + Int(pixelData[leftOffset + 2])
-                    let rightBrightness = Int(pixelData[rightOffset]) + Int(pixelData[rightOffset + 1]) + Int(pixelData[rightOffset + 2])
-                    gradientX = abs(rightBrightness - leftBrightness)
-                }
-                
-                // Vertical gradient
-                let topOffset = ((y - 1) * bytesPerRow) + (x * 4)
-                let bottomOffset = ((y + 1) * bytesPerRow) + (x * 4)
-                if topOffset >= 0 && bottomOffset < pixelData.count {
-                    let topBrightness = Int(pixelData[topOffset]) + Int(pixelData[topOffset + 1]) + Int(pixelData[topOffset + 2])
-                    let bottomBrightness = Int(pixelData[bottomOffset]) + Int(pixelData[bottomOffset + 1]) + Int(pixelData[bottomOffset + 2])
-                    gradientY = abs(bottomBrightness - topBrightness)
-                }
-                
-                // If gradient is strong, it's an edge
-                if gradientX + gradientY > 100 {
-                    edgePixels.append((x, y))
-                }
-            }
-        }
-        
-        return edgePixels
-    }
     
     // Filter out JPEG compression artifacts
     private func filterCompressionArtifacts(_ peaks: [(color: UIColor, count: Int, distinctiveness: Double)]) -> [(color: UIColor, count: Int, distinctiveness: Double)] {
@@ -697,26 +643,6 @@ public class OKLABColorExtractor {
         return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(16).uppercased()
     }
     
-    private func saveImageForDebug(_ image: UIImage, suffix: String) {
-        // Debug saving disabled - no longer saves to photo library
-        /*
-        Task {
-            guard let data = image.pngData() else { return }
-            let fileName = "\(suffix)_\(Date().timeIntervalSince1970).png"
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-            
-            do {
-                try data.write(to: tempURL)
-        // print("💾 Saved extracted image to: \(tempURL.path)")
-                
-                // Save to Photos for easy inspection
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            } catch {
-        // print("❌ Failed to save extracted image: \(error)")
-            }
-        }
-        */
-    }
 }
 
 // MARK: - UIImage Extension
@@ -730,27 +656,4 @@ extension UIImage {
     }
 }
 
-// MARK: - Debug Extension
-extension OKLABColorExtractor {
-    /// Test extraction with a book cover
-    public func testExtraction(with image: UIImage) async {
-        do {
-        // print("🧪 Testing OKLAB Color Extraction...")
-            let _ = try await extractPalette(from: image)
-            
-        // print("\n📊 Extraction Results:")
-        // print("Primary: \(palette.primary.description)")
-        // print("Secondary: \(palette.secondary.description)")
-        // print("Accent: \(palette.accent.description)")
-        // print("Background: \(palette.background.description)")
-        // print("Text Color: \(palette.textColor.description)")
-        // print("Luminance: \(String(format: "%.2f", palette.luminance))")
-        // print("Monochromatic: \(palette.isMonochromatic)")
-        // print("Quality: \(String(format: "%.2f", palette.extractionQuality))")
-            
-        } catch {
-        // print("❌ Extraction failed: \(error.localizedDescription)")
-        }
-    }
-}
 

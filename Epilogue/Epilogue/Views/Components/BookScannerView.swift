@@ -61,9 +61,7 @@ struct BookScannerView: View {
                     .ignoresSafeArea()
                     .overlay {
                         VStack(spacing: 20) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 1.0, green: 0.55, blue: 0.26)))
-                                .scaleEffect(1.5)
+                            SimpleProgressIndicator(scale: 1.5)
                             Text("Initializing camera...")
                                 .font(.system(size: 16))
                                 .foregroundStyle(.white.opacity(0.7))

@@ -7,19 +7,27 @@ struct UnifiedChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @ObservedObject private var syncManager = NotesSyncManager.shared
     
     // Filter messages for current context
     private var filteredMessages: [UnifiedChatMessage] {
+        let baseMessages: [UnifiedChatMessage]
+        
         if let currentBook = currentBookContext {
             // Show only messages for this specific book
-            return messages.filter { message in
+            baseMessages = messages.filter { message in
                 message.bookContext?.id == currentBook.id
             }
         } else {
             // Show only messages with NO book context (general chat)
-            return messages.filter { message in
+            baseMessages = messages.filter { message in
                 message.bookContext == nil
             }
+        }
+        
+        // Filter out messages that reference deleted notes
+        return baseMessages.filter { message in
+            !message.isDeleted()
         }
     }
     
@@ -173,15 +181,15 @@ struct UnifiedChatView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                     
-                    // Chat input bar
-                    UnifiedChatInputBar(
+                    // Universal input bar (same design as Quick Actions)
+                    UniversalInputBar(
                         messageText: $messageText,
                         showingCommandPalette: $showingCommandPalette,
                         isInputFocused: $isInputFocused,
-                        currentBook: currentBookContext,
+                        context: .chat(book: currentBookContext),
                         onSend: sendMessage,
-                        isRecording: $isRecording,
                         onMicrophoneTap: handleMicrophoneTap,
+                        isRecording: $isRecording,
                         colorPalette: colorPalette
                     )
                     .padding(.horizontal, 16)
@@ -242,7 +250,7 @@ struct UnifiedChatView: View {
                 )
                 .environmentObject(libraryViewModel)
                 .padding(.horizontal, 16)
-                .padding(.bottom, 120) // Above input bar with safe area
+                .padding(.bottom, 80) // Above input bar with safe area
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
                     removal: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)

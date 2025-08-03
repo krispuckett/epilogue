@@ -86,11 +86,11 @@ struct BookDetailView: View {
     @State private var selectedSection: BookSection = .notes
     @Namespace private var sectionAnimation
     
-    // Chat integration
-    @Query private var threads: [ChatThread]
+    // Chat integration - DISABLED (ChatThread removed)
+    // @Query private var threads: [ChatThread]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @State private var bookThread: ChatThread?
+    // @State private var bookThread: ChatThread?
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     
@@ -270,7 +270,7 @@ struct BookDetailView: View {
             .environmentObject(libraryViewModel)
         }
         .onAppear {
-            findOrCreateThreadForBook()
+            // findOrCreateThreadForBook() // DISABLED - ChatThread removed
             
             // TEMPORARY: Clear cache to test new color extraction
             Task {
@@ -697,90 +697,27 @@ struct BookDetailView: View {
     }
     
     private var chatSection: some View {
-        VStack(spacing: 0) {
-            if let thread = bookThread {
-                // Messages ScrollView
-                ScrollViewReader { scrollProxy in
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            // Welcome message
-                            if thread.messages.isEmpty {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                                        .font(.system(size: 48))
-                                        .foregroundColor(accentColor.opacity(0.6))
-                                    
-                                    Text("Ask me about this book")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(secondaryTextColor)
-                                        .shadow(color: shadowColor.opacity(0.7), radius: 0.5, x: 0, y: 0.5)
-                                    
-                                    Text("I can help you explore themes, characters, or discuss any aspect of \"\(book.title)\"")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(textColor.opacity(0.6))
-                                        .shadow(color: shadowColor.opacity(0.7), radius: 0.5, x: 0, y: 0.5)
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 40)
-                                }
-                                .padding(.vertical, 60)
-                            }
-                            
-                            // Messages
-                            ForEach(thread.messages) { message in
-                                ChatMessageBubble(message: message, accentColor: accentColor, textColor: textColor)
-                                    .id(message.id)
-                            }
-                            
-                            // Spacer for input
-                            Color.clear
-                                .frame(height: 20)
-                                .id("bottom")
-                        }
-                    }
-                    .onChange(of: thread.messages.count) { _, _ in
-                        withAnimation {
-                            scrollProxy.scrollTo("bottom", anchor: .bottom)
-                        }
-                    }
-                }
+        // Chat functionality disabled - ChatThread removed
+        VStack(spacing: 16) {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 48))
+                .foregroundColor(accentColor.opacity(0.3))
+            
+            VStack(spacing: 8) {
+                Text("Chat Temporarily Unavailable")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(textColor.opacity(0.7))
+                    .shadow(color: shadowColor.opacity(0.7), radius: 0.5, x: 0, y: 0.5)
                 
-                // Input field
-                HStack(spacing: 12) {
-                    TextField("Ask about this book...", text: $messageText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(accentColor.opacity(0.15))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(accentColor.opacity(0.3), lineWidth: 1)
-                        )
-                        .focused($isInputFocused)
-                    
-                    Button {
-                        sendMessage()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(messageText.isEmpty ? accentColor.opacity(0.3) : accentColor)
-                    }
-                    .disabled(messageText.isEmpty)
-                }
-                .padding(.vertical, 16)
-            } else {
-                // Loading state
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(accentColor)
-                    Text("Setting up chat...")
-                        .font(.system(size: 14))
-                        .foregroundColor(textColor.opacity(0.6))
-                        .shadow(color: shadowColor.opacity(0.7), radius: 0.5, x: 0, y: 0.5)
-                }
-                .padding(.vertical, 60)
+                Text("Chat functionality is being updated")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(textColor.opacity(0.5))
+                    .shadow(color: shadowColor.opacity(0.7), radius: 0.5, x: 0, y: 0.5)
+                    .multilineTextAlignment(.center)
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
     
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
@@ -806,8 +743,9 @@ struct BookDetailView: View {
         .padding(.vertical, 60)
     }
     
-    // MARK: - Chat Functions
+    // MARK: - Chat Functions - DISABLED (ChatThread removed)
     
+    /*
     private func findOrCreateThreadForBook() {
         // Check if thread already exists for this book
         if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
@@ -860,6 +798,7 @@ struct BookDetailView: View {
             }
         }
     }
+    */
     
     // MARK: - Color Extraction
     
@@ -1056,8 +995,9 @@ struct BookDetailView: View {
         
         // Try to get the cover image
         if let coverImage = coverImage {
-            let diagnostic = ColorExtractionDiagnostic()
-            await diagnostic.runDiagnostic(on: coverImage, bookTitle: book.title)
+            // ColorExtractionDiagnostic was removed - diagnostic functionality no longer available
+            // let diagnostic = ColorExtractionDiagnostic()
+            // await diagnostic.runDiagnostic(on: coverImage, bookTitle: book.title)
         } else if let coverURLString = book.coverImageURL {
             // Download the image if we don't have it
             let secureURLString = coverURLString
@@ -1084,8 +1024,9 @@ struct BookDetailView: View {
                     return
                 }
                 
-                let diagnostic = ColorExtractionDiagnostic()
-                await diagnostic.runDiagnostic(on: uiImage, bookTitle: book.title)
+                // ColorExtractionDiagnostic was removed - diagnostic functionality no longer available
+                // let diagnostic = ColorExtractionDiagnostic()
+                // await diagnostic.runDiagnostic(on: uiImage, bookTitle: book.title)
             } catch {
                 print("❌ Failed to download image for diagnostic: \(error)")
             }
@@ -1440,6 +1381,8 @@ struct QuestionCard: View {
     }
 }
 
+// ChatMessageBubble - DISABLED (ThreadedChatMessage removed)
+/*
 struct ChatMessageBubble: View {
     let message: ThreadedChatMessage
     let accentColor: Color
@@ -1474,6 +1417,7 @@ struct ChatMessageBubble: View {
         }
     }
 }
+*/
 
 // MARK: - Shimmer Modifier
 
@@ -1527,6 +1471,6 @@ struct BookDetailView_Previews: PreviewProvider {
         .preferredColorScheme(.dark)
         .environmentObject(NotesViewModel())
         .environmentObject(LibraryViewModel())
-        .modelContainer(for: [ChatThread.self])
+        // .modelContainer(for: [ChatThread.self]) // DISABLED - ChatThread removed
     }
 }

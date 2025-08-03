@@ -16,6 +16,7 @@ struct LibraryView: View {
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
     @State private var isScrolling = false
+    @State private var showingSettings = false
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -30,6 +31,23 @@ struct LibraryView: View {
     private func changeCover(for book: Book) {
         selectedBookForEdit = book
         showingCoverPicker = true
+    }
+    
+    private func preloadNeighboringCovers(for book: Book) {
+        guard let index = viewModel.books.firstIndex(where: { $0.id == book.id }) else { return }
+        
+        // Preload 2 books before and after the current one
+        let preloadRange = max(0, index - 2)..<min(viewModel.books.count, index + 3)
+        
+        Task {
+            for i in preloadRange where i != index {
+                let neighborBook = viewModel.books[i]
+                if let coverURL = neighborBook.coverImageURL {
+                    // Just trigger the load - SharedBookCoverManager will cache it
+                    _ = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL)
+                }
+            }
+        }
     }
     
     @ViewBuilder
@@ -74,7 +92,7 @@ struct LibraryView: View {
         LazyVGrid(columns: [
             GridItem(.flexible(), spacing: 16),
             GridItem(.flexible(), spacing: 16)
-        ], spacing: 20) { // Reduced spacing for performance
+        ], spacing: 32) { // Increased spacing between rows
             ForEach(viewModel.books) { book in
                 LibraryGridItem(
                     book: book,
@@ -83,8 +101,11 @@ struct LibraryView: View {
                     highlightedBookId: highlightedBookId,
                     onChangeCover: { book in changeCover(for: book) }
                 )
-                .frame(height: 360) // Fixed height: 255 (cover) + 12 (spacing) + ~93 (text area)
                 .id(book.localId) // Stable identity for recycling
+                .onAppear {
+                    // Preload neighboring book covers
+                    preloadNeighboringCovers(for: book)
+                }
             }
         }
         .padding(.horizontal)
@@ -154,7 +175,18 @@ struct LibraryView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
+                HStack(spacing: 16) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    }
+                    .sensoryFeedback(.impact(flexibility: .soft), trigger: showingSettings)
+                    
+                    ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
+                }
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewMode) // Simpler animation
@@ -170,6 +202,9 @@ struct LibraryView: View {
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {

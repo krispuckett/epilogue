@@ -14,18 +14,126 @@ struct NotesView: View {
     @State private var contextMenuNote: Note? = nil
     @State private var contextMenuSourceRect: CGRect = .zero
     
+    // Search states
+    @State private var searchText = ""
+    @State private var searchScope: SearchScope = .all
+    @State private var searchTokens: [SearchToken] = []
+    @State private var searchDebounceTask: Task<Void, Never>?
+    
     @Namespace private var commandPaletteNamespace
     @Namespace private var noteTransition
     
-    // Filtered notes based on filter
+    // Search scopes
+    enum SearchScope: String, CaseIterable {
+        case all = "All"
+        case quotes = "Quotes"
+        case notes = "Notes"
+        case books = "Books"
+        
+        var icon: String {
+            switch self {
+            case .all: return "magnifyingglass"
+            case .quotes: return "quote.opening"
+            case .notes: return "note.text"
+            case .books: return "book.closed"
+            }
+        }
+    }
+    
+    // Search tokens
+    enum SearchToken: Identifiable, Hashable {
+        case book(String)
+        case tag(String)
+        case type(NoteType)
+        
+        var id: String {
+            switch self {
+            case .book(let name): return "book:\(name)"
+            case .tag(let tag): return "tag:\(tag)"
+            case .type(let type): return "type:\(type.rawValue)"
+            }
+        }
+        
+        var displayText: String {
+            switch self {
+            case .book(let name): return "@\(name)"
+            case .tag(let tag): return "#\(tag)"
+            case .type(let type): return type == .quote ? "\"quote\"" : "note"
+            }
+        }
+    }
+    
+    // Filtered notes based on filter and search
     var filteredNotes: [Note] {
         var filtered = notesViewModel.notes
         
+        // Apply type filter
         if let selectedFilter = selectedFilter {
             filtered = filtered.filter { $0.type == selectedFilter }
         }
         
+        // Apply search scope
+        switch searchScope {
+        case .all:
+            break // No additional filtering
+        case .quotes:
+            filtered = filtered.filter { $0.type == .quote }
+        case .notes:
+            filtered = filtered.filter { $0.type == .note }
+        case .books:
+            // Filter to only notes with book context
+            filtered = filtered.filter { $0.bookTitle != nil }
+        }
+        
+        // Apply search tokens
+        for token in searchTokens {
+            switch token {
+            case .book(let bookName):
+                filtered = filtered.filter { note in
+                    note.bookTitle?.localizedCaseInsensitiveContains(bookName) ?? false
+                }
+            case .tag(let tag):
+                // For now, search in content for hashtags
+                filtered = filtered.filter { note in
+                    note.content.localizedCaseInsensitiveContains("#\(tag)")
+                }
+            case .type(let type):
+                filtered = filtered.filter { $0.type == type }
+            }
+        }
+        
+        // Apply search text (fuzzy search)
+        if !searchText.isEmpty {
+            let searchTerms = searchText.lowercased().components(separatedBy: .whitespaces)
+            filtered = filtered.filter { note in
+                let searchableText = "\(note.content) \(note.bookTitle ?? "") \(note.author ?? "")".lowercased()
+                return searchTerms.allSatisfy { searchableText.contains($0) }
+            }
+        }
+        
         return filtered.sorted { $0.dateCreated > $1.dateCreated }
+    }
+    
+    // Parse search text for tokens
+    private func parseSearchTokens(from text: String) {
+        var tokens: [SearchToken] = []
+        let components = text.components(separatedBy: .whitespaces)
+        
+        for component in components {
+            if component.hasPrefix("@") && component.count > 1 {
+                let bookName = String(component.dropFirst())
+                tokens.append(.book(bookName))
+            } else if component.hasPrefix("#") && component.count > 1 {
+                let tag = String(component.dropFirst())
+                tokens.append(.tag(tag))
+            } else if component.lowercased() == "type:quote" || component == "\"quote\"" {
+                tokens.append(.type(.quote))
+            } else if component.lowercased() == "type:note" {
+                tokens.append(.type(.note))
+            }
+        }
+        
+        searchTokens = tokens
     }
     
     // Helper function to create note card view
@@ -106,13 +214,23 @@ struct NotesView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Notes grid
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                        ForEach(filteredNotes) { note in
-                            noteCardView(for: note)
+                    // Notes grid or empty state
+                    if filteredNotes.isEmpty {
+                        EmptyNotesView(
+                            searchText: searchText,
+                            selectedFilter: selectedFilter,
+                            searchScope: searchScope
+                        )
+                        .frame(minHeight: 400)
+                        .padding(.top, 60)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                            ForEach(filteredNotes) { note in
+                                noteCardView(for: note)
+                            }
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 80)
@@ -152,6 +270,23 @@ struct NotesView: View {
         }
         .navigationTitle("Notes")
         .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search notes, quotes, and books")
+        .searchScopes($searchScope) {
+            ForEach(SearchScope.allCases, id: \.self) { scope in
+                Label(scope.rawValue, systemImage: scope.icon)
+                    .tag(scope)
+            }
+        }
+        .onChange(of: searchText) { _, newValue in
+            // Debounce search
+            searchDebounceTask?.cancel()
+            searchDebounceTask = Task {
+                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                if !Task.isCancelled {
+                    parseSearchTokens(from: newValue)
+                }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { showingAddNote = true }) {
@@ -286,5 +421,101 @@ struct FilterPill: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isActive)
+    }
+}
+
+// MARK: - Empty State View
+struct EmptyNotesView: View {
+    let searchText: String
+    let selectedFilter: NoteType?
+    let searchScope: NotesView.SearchScope
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Icon
+            Image(systemName: emptyStateIcon)
+                .font(.system(size: 64))
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5))
+            
+            // Title
+            Text(emptyStateTitle)
+                .font(.system(size: 24, weight: .semibold, design: .serif))
+                .foregroundStyle(.white)
+            
+            // Subtitle
+            Text(emptyStateSubtitle)
+                .font(.system(size: 16))
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 300)
+            
+            // Quick action suggestions
+            if searchText.isEmpty && selectedFilter == nil {
+                VStack(spacing: 12) {
+                    Text("Quick Actions")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                    
+                    HStack(spacing: 12) {
+                        Button {
+                            NotificationCenter.default.post(name: NSNotification.Name("ShowCommandPalette"), object: nil)
+                        } label: {
+                            Label("Add Note", systemImage: "note.text.badge.plus")
+                                .font(.system(size: 14))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .glassEffect(in: Capsule())
+                        }
+                        
+                        Button {
+                            NotificationCenter.default.post(name: NSNotification.Name("ShowCommandPalette"), object: nil)
+                        } label: {
+                            Label("Add Quote", systemImage: "quote.opening")
+                                .font(.system(size: 14))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .glassEffect(in: Capsule())
+                        }
+                    }
+                }
+                .padding(.top, 20)
+            }
+        }
+    }
+    
+    private var emptyStateIcon: String {
+        if !searchText.isEmpty {
+            return "magnifyingglass"
+        } else if selectedFilter == .quote {
+            return "quote.opening"
+        } else if selectedFilter == .note {
+            return "note.text"
+        } else {
+            return "note.text.badge.plus"
+        }
+    }
+    
+    private var emptyStateTitle: String {
+        if !searchText.isEmpty {
+            return "No results found"
+        } else if selectedFilter == .quote {
+            return "No quotes yet"
+        } else if selectedFilter == .note {
+            return "No notes yet"
+        } else {
+            return "Start capturing"
+        }
+    }
+    
+    private var emptyStateSubtitle: String {
+        if !searchText.isEmpty {
+            return "Try searching with different keywords or filters"
+        } else if selectedFilter == .quote {
+            return "Highlight memorable passages from your reading"
+        } else if selectedFilter == .note {
+            return "Jot down thoughts and reflections"
+        } else {
+            return "Capture quotes, notes, and thoughts from your reading journey"
+        }
     }
 }

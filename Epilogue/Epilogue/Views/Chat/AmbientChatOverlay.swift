@@ -89,9 +89,7 @@ struct ClaudeInspiredGradient: View {
     }
     
     private func startWaveAnimation() {
-        withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
-            phase = 1
-        }
+        phase = 1
     }
 }
 
@@ -869,7 +867,9 @@ struct AmbientChatOverlay: View {
             // Process the session
             let processed = await processAmbientSession(session)
             
-            // Save to SwiftData - find existing thread or create new one
+            // TODO: Save to SwiftData - find existing thread or create new one
+            // ChatThread and ThreadedChatMessage models have been removed
+            /*
             let bookId = session.book?.localId
             let descriptor = FetchDescriptor<ChatThread>(
                 predicate: bookId != nil ? #Predicate<ChatThread> { thread in
@@ -907,8 +907,11 @@ struct AmbientChatOverlay: View {
                 
                 return chatThread
             }
+            */
             
-            // Add quotes as messages in the chat thread
+            // TODO: Add quotes as messages in the chat thread
+            // ChatThread and ThreadedChatMessage models have been removed
+            /*
             for quote in processed.quotes {
                 await MainActor.run {
                     let quoteMessage = ThreadedChatMessage(
@@ -921,8 +924,11 @@ struct AmbientChatOverlay: View {
                     chatThread.messages.append(quoteMessage)
                 }
             }
+            */
             
-            // Add notes as messages in the chat thread
+            // TODO: Add notes as messages in the chat thread
+            // ChatThread and ThreadedChatMessage models have been removed
+            /*
             for note in processed.notes {
                 await MainActor.run {
                     let notePrefix = ""
@@ -936,10 +942,13 @@ struct AmbientChatOverlay: View {
                     chatThread.messages.append(noteMessage)
                 }
             }
+            */
             
             // Process questions with AI outside of MainActor.run
             for question in processed.questions {
-                // Add user's question to chat on main actor
+                // TODO: Add user's question to chat on main actor
+                // ChatThread and ThreadedChatMessage models have been removed
+                /*
                 await MainActor.run {
                     let questionMessage = ThreadedChatMessage(
                         content: question.text,
@@ -948,6 +957,7 @@ struct AmbientChatOverlay: View {
                     )
                     chatThread.messages.append(questionMessage)
                 }
+                */
                 
                 // Get AI response to the question (outside MainActor)
                 do {
@@ -958,7 +968,9 @@ struct AmbientChatOverlay: View {
                         conversationHistory: []  // Empty history for now, as questions are processed independently
                     )
                     
-                    // Add AI's answer to chat on main actor
+                    // TODO: Add AI's answer to chat on main actor
+                    // ChatThread and ThreadedChatMessage models have been removed
+                    /*
                     await MainActor.run {
                         let answerMessage = ThreadedChatMessage(
                             content: answer,
@@ -967,10 +979,13 @@ struct AmbientChatOverlay: View {
                         )
                         chatThread.messages.append(answerMessage)
                     }
+                    */
                     
                 } catch {
                     print("[AmbientChat] Failed to get AI response: \(error)")
-                    // Add error message if AI fails on main actor
+                    // TODO: Add error message if AI fails on main actor
+                    // ChatThread and ThreadedChatMessage models have been removed
+                    /*
                     await MainActor.run {
                         let errorMessage = ThreadedChatMessage(
                             content: "I couldn't process that question right now. Please try asking again.",
@@ -979,6 +994,7 @@ struct AmbientChatOverlay: View {
                         )
                         chatThread.messages.append(errorMessage)
                     }
+                    */
                 }
             }
             
@@ -1209,7 +1225,9 @@ struct AmbientChatOverlay: View {
         // Process the current session
         let processed = await processAmbientSession(session)
         
-        // Save to existing thread
+        // TODO: Save to existing thread
+        // ChatThread and ThreadedChatMessage models have been removed
+        /*
         await MainActor.run {
             let bookId = session.book?.localId
             let descriptor = FetchDescriptor<ChatThread>(
@@ -1238,6 +1256,7 @@ struct AmbientChatOverlay: View {
             // Clear current session transcriptions for new book
             self.session?.rawTranscriptions.removeAll()
         }
+        */
     }
     
     // MARK: - Real-time Question Processing
@@ -1263,7 +1282,9 @@ struct AmbientChatOverlay: View {
         guard let book = selectedBook else { return }
         
         do {
-            // Find or create chat thread for this book
+            // TODO: Find or create chat thread for this book
+            // ChatThread and ThreadedChatMessage models have been removed
+            /*
             let bookId = book.localId
             let descriptor = FetchDescriptor<ChatThread>(
                 predicate: #Predicate<ChatThread> { thread in
@@ -1287,8 +1308,11 @@ struct AmbientChatOverlay: View {
                     return newThread
                 }
             }
+            */
             
-            // Add user's question to chat
+            // TODO: Add user's question to chat
+            // ChatThread and ThreadedChatMessage models have been removed
+            /*
             await MainActor.run {
                 let questionMessage = ThreadedChatMessage(
                     content: question,
@@ -1299,6 +1323,7 @@ struct AmbientChatOverlay: View {
                 chatThread.lastMessageDate = Date()
                 try? modelContext.save()
             }
+            */
             
             // Get AI response asynchronously
             let aiService = AICompanionService.shared
@@ -1308,7 +1333,9 @@ struct AmbientChatOverlay: View {
                 conversationHistory: []
             )
             
-            // Add answer on main actor
+            // TODO: Add answer on main actor
+            // ChatThread and ThreadedChatMessage models have been removed
+            /*
             await MainActor.run {
                 let answerMessage = ThreadedChatMessage(
                     content: answer,
@@ -1322,6 +1349,7 @@ struct AmbientChatOverlay: View {
                 // Haptic feedback for response
                 HapticManager.shared.lightTap()
             }
+            */
             
         } catch {
             print("[AmbientChat] Real-time question processing failed: \(error)")
@@ -1372,9 +1400,7 @@ struct AmbientChatOverlay: View {
                 let palette = try await extractor.extractPalette(from: image, imageSource: book.title)
                 
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        self.bookColorPalette = palette
-                    }
+                    self.bookColorPalette = palette
                 }
             }
         } catch {
@@ -1393,9 +1419,7 @@ struct ProcessingOverlay: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(1.5)
+                SimpleProgressIndicator(tintColor: .white, scale: 1.5)
                 
                 Text("Processing your session...")
                     .font(.system(size: 18, weight: .medium))

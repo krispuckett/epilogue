@@ -11,11 +11,14 @@ struct LiquidCommandPalette: View {
     @State private var bookSearchQuery = ""
     @State private var shouldShowSearchResults = false
     @FocusState private var isFocused: Bool
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var contentOffset: CGFloat = 0
     
     // MARK: - Environment
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query private var capturedNotes: [CapturedNote]
     @Query private var capturedQuotes: [CapturedQuote]
     
@@ -72,24 +75,31 @@ struct LiquidCommandPalette: View {
     
     // MARK: - Body
     var body: some View {
-        ZStack {
-            // Show Universal Input Bar overlay when presented
-            if isPresented {
-                ZStack {
-                    // Backdrop
-                    Color.black.opacity(0.3)
-                        .onTapGesture {
-                            if showQuickActions {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                // Backdrop with proper tap handling
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if showQuickActions {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 showQuickActions = false
-                            } else {
-                                dismissPalette()
                             }
+                        } else {
+                            dismissPalette()
                         }
-                        .ignoresSafeArea()
+                    }
+                
+                // Main content container with proper safe area handling
+                VStack(spacing: 0) {
+                    // Invisible spacer for top safe area + additional padding
+                    Color.clear
+                        .frame(height: max(geometry.safeAreaInsets.top + 44, 88))
                     
-                    VStack {
-                        Spacer()
-                        
+                    Spacer()
+                    
+                    // Content area
+                    VStack(spacing: 0) {
                         // Show search results (including recent commands when empty)
                         if !showQuickActions && (commandText.count >= 3 || commandText.isEmpty) {
                             ScrollView {
@@ -117,14 +127,16 @@ struct LiquidCommandPalette: View {
                             .environmentObject(libraryViewModel)
                             .environmentObject(notesViewModel)
                             .padding(.horizontal, 16)
-                            .padding(.bottom, 120) // Above input bar
+                            .padding(.bottom, 16) // Above input bar
                             .transition(AnyTransition.asymmetric(
-                                insertion: AnyTransition.scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
-                                removal: AnyTransition.scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
+                                insertion: AnyTransition.scale(scale: 0.95, anchor: .bottom)
+                                    .combined(with: .opacity),
+                                removal: AnyTransition.scale(scale: 0.95, anchor: .bottom)
+                                    .combined(with: .opacity)
                             ))
                         }
                         
-                        // Universal Input Bar
+                        // Universal Input Bar with matched geometry
                         UniversalInputBar(
                             messageText: $commandText,
                             showingCommandPalette: .constant(false),
@@ -143,15 +155,52 @@ struct LiquidCommandPalette: View {
                             colorPalette: nil
                         )
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, max(16, geometry.safeAreaInsets.bottom + 8))
+                        .matchedGeometryEffect(id: "inputBar", in: animationNamespace)
+                    }
+                    .offset(y: contentOffset)
+                }
+            }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+        }
+        .background(Color.black.opacity(0.4))
+        .presentationBackground(.clear)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(0)
+        .interactiveDismissDisabled(showQuickActions)
+        .onAppear {
+            // Setup initial content if provided
+            if let initial = initialContent {
+                commandText = initial
+            }
+            
+            // Delay focus to ensure smooth animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isFocused = true
+            }
+            
+            // Subscribe to keyboard notifications
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillShowNotification,
+                object: nil,
+                queue: .main
+            ) { notification in
+                withAnimation(.easeOut(duration: 0.25)) {
+                    if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                        keyboardHeight = keyboardFrame.height
                     }
                 }
-                .onAppear {
-                    // Setup initial content if provided
-                    if let initial = initialContent {
-                        commandText = initial
-                    }
-                    isFocused = true
+            }
+            
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillHideNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                withAnimation(.easeOut(duration: 0.25)) {
+                    keyboardHeight = 0
                 }
             }
         }
@@ -531,8 +580,40 @@ struct LiquidCommandPalette: View {
     }
     
     private func dismissPalette() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        // First dismiss keyboard if visible
+        isFocused = false
+        
+        // Then dismiss the palette with smooth animation
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             isPresented = false
         }
+    }
+}
+
+// MARK: - Presentation Wrapper
+struct LiquidCommandPalettePresentation: View {
+    @Binding var isPresented: Bool
+    let animationNamespace: Namespace.ID
+    let initialContent: String?
+    let editingNote: Note?
+    let onUpdate: ((Note) -> Void)?
+    let bookContext: Book?
+    @State private var showSheet = false
+    
+    var body: some View {
+        Color.clear
+            .sheet(isPresented: $isPresented) {
+                LiquidCommandPalette(
+                    isPresented: $isPresented,
+                    animationNamespace: animationNamespace,
+                    initialContent: initialContent,
+                    editingNote: editingNote,
+                    onUpdate: onUpdate,
+                    bookContext: bookContext
+                )
+                .presentationBackground(.ultraThinMaterial)
+                .presentationBackgroundInteraction(.enabled)
+                .presentationContentInteraction(.scrolls)
+            }
     }
 }

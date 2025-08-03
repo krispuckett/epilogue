@@ -5,7 +5,8 @@ import Combine
 struct VoiceModeOverlay: View {
     @Binding var isActive: Bool
     @Binding var transcript: String
-    let thread: ChatThread
+    let bookTitle: String?
+    let bookAuthor: String?
     let onSendTranscript: (String) -> Void
     
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
@@ -102,7 +103,7 @@ struct VoiceModeOverlay: View {
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.white)
                         
-                        if let bookTitle = thread.bookTitle {
+                        if let bookTitle = bookTitle {
                             Text("Discussing \(bookTitle)")
                                 .font(.system(size: 14))
                                 .foregroundStyle(.white.opacity(0.6))
@@ -295,14 +296,11 @@ struct VoiceModeOverlay: View {
 
 // MARK: - Preview
 #Preview {
-    let thread = ChatThread()
-    thread.bookTitle = "The Great Gatsby"
-    thread.bookAuthor = "F. Scott Fitzgerald"
-    
-    return VoiceModeOverlay(
+    VoiceModeOverlay(
         isActive: .constant(true),
         transcript: .constant(""),
-        thread: thread,
+        bookTitle: "The Great Gatsby",
+        bookAuthor: "F. Scott Fitzgerald",
         onSendTranscript: { _ in }
     )
 }

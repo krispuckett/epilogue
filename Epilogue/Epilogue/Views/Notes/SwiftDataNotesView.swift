@@ -101,6 +101,8 @@ struct SwiftDataNotesView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(.white.opacity(0.5))
                 }
+                .buttonStyle(.plain)
+                .sensoryFeedback(.impact(flexibility: .soft), trigger: searchText.isEmpty)
                 .padding(.trailing, 12)
             }
         }

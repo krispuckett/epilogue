@@ -11,6 +11,12 @@ struct EpilogueApp: App {
                 ContentView()
                     .preferredColorScheme(.dark)
                     .modelContainer(container)
+                    .onAppear {
+                        // Clear command history on app launch to prevent artifacts
+                        Task { @MainActor in
+                            CommandHistoryManager.shared.clearHistory()
+                        }
+                    }
             } else {
                 // Minimal launch screen while loading
                 ZStack {
@@ -34,9 +40,9 @@ struct EpilogueApp: App {
         DisplayedImageStore.clearAllCaches()
         
         let schema = Schema([
-            ChatThread.self,
-            ThreadedChatMessage.self,
-            ColorPaletteModel.self,
+            // ChatThread.self,  // Removed - old chat system
+            // ThreadedChatMessage.self,  // Removed - old chat system
+            // ColorPaletteModel.self,  // Removed - no longer exists
             BookModel.self,
             CapturedNote.self,
             CapturedQuote.self,

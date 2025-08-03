@@ -41,71 +41,92 @@ struct SharedBookCoverView: View {
     let coverURL: String?
     let width: CGFloat
     let height: CGFloat
-    @State private var lowQualityImage: UIImage?
-    @State private var highQualityImage: UIImage?
+    let loadFullImage: Bool
+    
+    @State private var thumbnailImage: UIImage?
+    @State private var fullImage: UIImage?
     @State private var isLoadingStarted = false
+    
+    // Simple in-memory cache to avoid state recreation
+    private static let quickImageCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        // Configure quick cache - small, for immediate reuse
+        cache.countLimit = 30 // Only keep 30 most recent
+        cache.totalCostLimit = 20 * 1024 * 1024 // 20MB max
+        return cache
+    }()
     
     // Callback to notify when image is loaded
     var onImageLoaded: ((UIImage) -> Void)?
     
-    init(coverURL: String?, width: CGFloat = 170, height: CGFloat = 255, onImageLoaded: ((UIImage) -> Void)? = nil) {
+    init(
+        coverURL: String?,
+        width: CGFloat = 170,
+        height: CGFloat = 255,
+        loadFullImage: Bool = true,
+        onImageLoaded: ((UIImage) -> Void)? = nil
+    ) {
         self.coverURL = coverURL
         self.width = width
         self.height = height
+        self.loadFullImage = loadFullImage
         self.onImageLoaded = onImageLoaded
-    }
-    
-    
-    private func calculateChecksum(for image: UIImage) -> String {
-        guard let data = image.pngData() else { return "no-data" }
-        let hash = SHA256.hash(data: data)
-        return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(16).uppercased()
-    }
-    
-    private func saveImageForDebug(_ image: UIImage, suffix: String) {
-        // DEBUG IMAGE SAVING DISABLED
-        /*
-        Task {
-            guard let data = image.pngData() else { return }
-            let fileName = "DISPLAYED_\(suffix)_\(Date().timeIntervalSince1970).png"
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-            
-            do {
-                try data.write(to: tempURL)
-                print("💾 Saved displayed image to: \(tempURL.path)")
-                
-                // Save to Photos for easy inspection
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            } catch {
-                print("❌ Failed to save displayed image: \(error)")
-            }
-        }
-        */
     }
     
     private func loadImage() {
         guard !isLoadingStarted, let urlString = coverURL else { return }
+        
+        // Check quick cache first for immediate display
+        let cacheKey = "\(urlString)_\(loadFullImage ? "full" : "thumb")" as NSString
+        if let cachedImage = Self.quickImageCache.object(forKey: cacheKey) {
+            if loadFullImage {
+                self.fullImage = cachedImage
+            } else {
+                self.thumbnailImage = cachedImage
+            }
+            self.onImageLoaded?(cachedImage)
+            return
+        }
+        
         isLoadingStarted = true
         
-        SharedBookCoverManager.shared.loadProgressiveImage(
-            from: urlString,
-            onLowQualityLoaded: { image in
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.lowQualityImage = image
-                }
-                if self.highQualityImage == nil {
+        if loadFullImage {
+            // Progressive loading for detail views
+            SharedBookCoverManager.shared.loadProgressiveImage(
+                from: urlString,
+                onThumbnailLoaded: { image in
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.thumbnailImage = image
+                    }
+                    if self.fullImage == nil {
+                        self.onImageLoaded?(image)
+                    }
+                },
+                onFullImageLoaded: { image in
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.fullImage = image
+                    }
                     self.onImageLoaded?(image)
+                    DisplayedImageStore.shared.store(image: image, for: urlString)
+                    // Store in quick cache
+                    Self.quickImageCache.setObject(image, forKey: "\(urlString)_full" as NSString)
                 }
-            },
-            onHighQualityLoaded: { image in
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.highQualityImage = image
+            )
+        } else {
+            // Only load thumbnail for grid views
+            Task {
+                if let thumbnail = await SharedBookCoverManager.shared.loadThumbnail(from: urlString) {
+                    await MainActor.run {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.thumbnailImage = thumbnail
+                        }
+                        self.onImageLoaded?(thumbnail)
+                        // Store in quick cache
+                        Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
+                    }
                 }
-                self.onImageLoaded?(image)
-                
-                DisplayedImageStore.shared.store(image: image, for: urlString)
             }
-        )
+        }
     }
     
     var body: some View {
@@ -118,14 +139,14 @@ struct SharedBookCoverView: View {
                 }
                 .onChange(of: coverURL) { _, _ in
                     // Reset state and reload when URL changes
-                    lowQualityImage = nil
-                    highQualityImage = nil
+                    thumbnailImage = nil
+                    fullImage = nil
                     isLoadingStarted = false
                     loadImage()
                 }
             
             // Display the best available image
-            if let image = highQualityImage ?? lowQualityImage {
+            if let image = fullImage ?? thumbnailImage {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -147,5 +168,68 @@ struct SharedBookCoverView: View {
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+        .drawingGroup() // Cache the shadow rendering
+    }
+}
+
+// MARK: - Convenience Views
+
+/// Thumbnail version for grid views (120x180)
+struct BookCoverThumbnailView: View {
+    let coverURL: String?
+    let width: CGFloat
+    let height: CGFloat
+    var onImageLoaded: ((UIImage) -> Void)?
+    
+    init(
+        coverURL: String?,
+        width: CGFloat = 120,
+        height: CGFloat = 180,
+        onImageLoaded: ((UIImage) -> Void)? = nil
+    ) {
+        self.coverURL = coverURL
+        self.width = width
+        self.height = height
+        self.onImageLoaded = onImageLoaded
+    }
+    
+    var body: some View {
+        SharedBookCoverView(
+            coverURL: coverURL,
+            width: width,
+            height: height,
+            loadFullImage: false,
+            onImageLoaded: onImageLoaded
+        )
+    }
+}
+
+/// Full image version for detail views
+struct BookCoverFullView: View {
+    let coverURL: String?
+    let width: CGFloat
+    let height: CGFloat
+    var onImageLoaded: ((UIImage) -> Void)?
+    
+    init(
+        coverURL: String?,
+        width: CGFloat = 170,
+        height: CGFloat = 255,
+        onImageLoaded: ((UIImage) -> Void)? = nil
+    ) {
+        self.coverURL = coverURL
+        self.width = width
+        self.height = height
+        self.onImageLoaded = onImageLoaded
+    }
+    
+    var body: some View {
+        SharedBookCoverView(
+            coverURL: coverURL,
+            width: width,
+            height: height,
+            loadFullImage: true,
+            onImageLoaded: onImageLoaded
+        )
     }
 }

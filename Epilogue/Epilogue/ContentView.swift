@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     @StateObject private var navigationCoordinator = NavigationCoordinator.shared
@@ -6,6 +7,9 @@ struct ContentView: View {
     @StateObject private var libraryViewModel = LibraryViewModel()
     @StateObject private var notesViewModel = NotesViewModel()
     @State private var showCommandPalette = false
+    @State private var showCommandInput = false
+    @State private var commandText = ""
+    @FocusState private var isInputFocused: Bool
     @State private var selectedDetent: PresentationDetent = .height(300)
     @Namespace private var animation
     @State private var showPrivacySettings = false
@@ -16,6 +20,13 @@ struct ContentView: View {
     @StateObject private var bookScanner = BookScannerService.shared
     @State private var showVoiceRecording = false
     @State private var showNoQuotesToast = false
+    @State private var showLiquidCommandPalette = false
+    @State private var showingLibraryCommandPalette = false
+    
+    // Command processing
+    @Environment(\.modelContext) private var modelContext
+    @Query private var capturedNotes: [CapturedNote]
+    @Query private var capturedQuotes: [CapturedQuote]
     
     init() {
         print("🏠 DEBUG: ContentView init")
@@ -31,6 +42,111 @@ struct ContentView: View {
     }
     
     var body: some View {
+        mainContent
+            .overlay(alignment: .bottom) {
+                advancedActionsOverlay
+            }
+            .overlay(alignment: .bottom) {
+                commandInputOverlay
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandInput)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showAdvancedActions)
+            .preferredColorScheme(.dark)
+            .sheet(isPresented: $showPrivacySettings) {
+                NavigationView {
+                    PrivacySettingsView()
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showPrivacySettings = false
+                                }
+                            }
+                        }
+                }
+            }
+            .fullScreenCover(isPresented: $showBookScanner) {
+                BookScannerView()
+                    .environmentObject(libraryViewModel)
+            }
+            .sheet(isPresented: $bookScanner.showSearchResults) {
+                BookSearchSheet(
+                    searchQuery: bookScanner.extractedText,
+                    onBookSelected: { book in
+                        libraryViewModel.addBook(book)
+                        HapticManager.shared.success()
+                        bookScanner.reset()
+                    }
+                )
+            }
+            .overlay {
+                BookScannerLoadingOverlay()
+            }
+            .overlay {
+                VoiceNoteButtonOverlay(showVoiceRecording: $showVoiceRecording)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("StartVoiceNote"))) { _ in
+                showVoiceRecording = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShareQuote"))) { notification in
+                if let quote = notification.object as? Note {
+                    ShareQuoteService.shareQuote(quote)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowNoQuotesToast"))) { _ in
+                showNoQuotesToast = true
+                HapticManager.shared.warning()
+            }
+            .glassToast(
+                isShowing: $showNoQuotesToast,
+                message: "No quotes to share yet"
+            )
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
+                if notification.object is Book {
+                    selectedTab = 0  // Switch to library tab
+                    // TODO: Implement scrolling to specific book in LibraryView
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNote"))) { notification in
+                if notification.object is Note {
+                    selectedTab = 1  // Switch to notes tab
+                    // NotesView will handle the scrolling and editing
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToTab"))) { notification in
+                if let tabIndex = notification.object as? Int {
+                    selectedTab = tabIndex
+                    // Also update navigation coordinator
+                    switch tabIndex {
+                    case 0: navigationCoordinator.selectedTab = .library
+                    case 1: navigationCoordinator.selectedTab = .notes
+                    case 2: navigationCoordinator.selectedTab = .chat
+                    default: break
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookScanner"))) { _ in
+                showBookScanner = true
+                showCommandInput = false
+                showingLibraryCommandPalette = false
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowLiquidCommandPalette"))) { _ in
+                showingLibraryCommandPalette = false
+                showLiquidCommandPalette = true
+            }
+            .onAppear {
+                // Defer cache cleaning to background after launch
+                Task {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                    ResponseCache.shared.cleanExpiredEntries()
+                }
+                
+                // Prepare only essential haptic generators
+                HapticManager.shared.lightTap() // Prepare the most used one
+            }
+    }
+    
+    private var mainContent: some View {
         ZStack(alignment: .bottom) {
             // Background
             Color(red: 0.11, green: 0.105, blue: 0.102)
@@ -46,7 +162,7 @@ struct ContentView: View {
                         Text("Library")
                     } icon: {
                         Image("glass-book-open")
-                            .renderingMode(.original)
+                            .renderingMode(.template)
                     }
                 }
                 .tag(0)
@@ -59,7 +175,7 @@ struct ContentView: View {
                         Text("Notes")
                     } icon: {
                         Image("glass-feather")
-                            .renderingMode(.original)
+                            .renderingMode(.template)
                     }
                 }
                 .tag(1)
@@ -70,8 +186,7 @@ struct ContentView: View {
                         Text("Chat")
                     } icon: {
                         Image("glass-msgs")
-                            .renderingMode(.original)
-                            .interpolation(.high)
+                            .renderingMode(.template)
                     }
                 }
                 .tag(2)
@@ -80,6 +195,7 @@ struct ContentView: View {
             .environmentObject(libraryViewModel)
             .environmentObject(notesViewModel)
             .environmentObject(navigationCoordinator)
+            .sensoryFeedback(.selection, trigger: selectedTab)
             .toolbar {
                 // Privacy settings button (only on Library tab)
                 if selectedTab == 0 {
@@ -91,12 +207,12 @@ struct ContentView: View {
                                 .font(.system(size: 18))
                                 .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
                         }
+                        .sensoryFeedback(.impact(flexibility: .soft), trigger: showPrivacySettings)
                     }
                 }
             }
             .onChange(of: selectedTab) { oldValue, newValue in
-                // Haptic feedback on tab change
-                HapticManager.shared.selectionChanged()
+                // No need for manual haptic feedback - sensoryFeedback handles it
                 
                 // Sync with navigation coordinator
                 switch newValue {
@@ -116,7 +232,7 @@ struct ContentView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 // Quick Add button positioned right above tab bar
-                if selectedTab != 2 && !showCommandPalette && !notesViewModel.isEditingNote {
+                if selectedTab != 2 && !showCommandInput && !notesViewModel.isEditingNote {
                     // Quick Actions button
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
@@ -133,15 +249,15 @@ struct ContentView: View {
                         Capsule()
                             .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
                     }
+                    .matchedGeometryEffect(id: "quickActionsButton", in: animation)
                     .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    .matchedGeometryEffect(id: "commandInput", in: animation)
                     .simultaneousGesture(
                         TapGesture()
                             .onEnded {
-                                HapticManager.shared.lightTap()
-                                showCommandPalette = true
+                                showCommandInput = true
                             }
                     )
+                    .sensoryFeedback(.impact(flexibility: .soft), trigger: showCommandInput)
                     .onLongPressGesture(
                         minimumDuration: 0.6,
                         maximumDistance: .infinity,
@@ -189,142 +305,251 @@ struct ContentView: View {
             case .chat: selectedTab = 2
             }
         }
-        
-        // Command palette overlay
-        .overlay {
-            if showCommandPalette {
-                LiquidCommandPalette(
-                    isPresented: $showCommandPalette,
-                    animationNamespace: animation,
-                    bookContext: nil  // No specific book context in general library view
-                )
-                .environmentObject(libraryViewModel)
-                .environmentObject(notesViewModel)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.9, anchor: .bottom)
-                        .combined(with: .opacity),
-                    removal: .scale(scale: 0.95, anchor: .bottom)
-                        .combined(with: .opacity)
-                ))
+    }
+    
+    @ViewBuilder
+    private var advancedActionsOverlay: some View {
+        if showAdvancedActions {
+            ZStack {
+                // Dark background
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showAdvancedActions = false
+                        }
+                    }
+                
+                VStack {
+                    Spacer()
+                    AdvancedActionsMenu(
+                        showAdvancedActions: $showAdvancedActions,
+                        showBookScanner: $showBookScanner,
+                        notesViewModel: notesViewModel
+                    )
+                    .padding(.bottom, 180) // Position above Quick Actions button
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity),
+                        removal: .scale(scale: 0.95, anchor: .bottom).combined(with: .opacity)
+                    ))
+                    .onAppear {
+                        print("🟢 AdvancedActionsMenu appeared!")
+                    }
+                }
             }
         }
-        .overlay(alignment: .bottom) {
-            // Advanced actions menu overlay
-            if showAdvancedActions {
-                ZStack {
-                    // Dark background
-                    Color.black.opacity(0.5)
-                        .ignoresSafeArea()
-                        .onTapGesture {
+    }
+    
+    @ViewBuilder
+    private var commandInputOverlay: some View {
+        if showCommandInput {
+            ZStack(alignment: .bottom) {
+                // Backdrop
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        if showingLibraryCommandPalette {
+                            showingLibraryCommandPalette = false
+                        } else {
+                            isInputFocused = false
+                            commandText = ""
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                showAdvancedActions = false
+                                showCommandInput = false
                             }
                         }
+                    }
+                
+                VStack(spacing: 0) {
+                    Spacer()
                     
-                    VStack {
-                        Spacer()
-                        AdvancedActionsMenu(
-                            showAdvancedActions: $showAdvancedActions,
-                            showBookScanner: $showBookScanner,
-                            notesViewModel: notesViewModel
+                    // Command palette (if showing)
+                    if showingLibraryCommandPalette {
+                        LibraryCommandPalette(
+                            isPresented: $showingLibraryCommandPalette,
+                            commandText: $commandText
                         )
-                        .padding(.bottom, 180) // Position above Quick Actions button
+                        .environmentObject(libraryViewModel)
+                        .environmentObject(notesViewModel)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16) // Above input bar
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity),
-                            removal: .scale(scale: 0.95, anchor: .bottom).combined(with: .opacity)
+                            insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
+                            removal: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
                         ))
-                        .onAppear {
-                            print("🟢 AdvancedActionsMenu appeared!")
-                        }
+                        .zIndex(100)
                     }
-                }
-            }
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandPalette)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showAdvancedActions)
-        .preferredColorScheme(.dark)
-        .sheet(isPresented: $showPrivacySettings) {
-            NavigationView {
-                PrivacySettingsView()
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") {
-                                showPrivacySettings = false
+                    
+                    // Input bar
+                    UniversalInputBar(
+                        messageText: $commandText,
+                        showingCommandPalette: .constant(false),
+                        isInputFocused: $isInputFocused,
+                        context: .quickActions,
+                        onSend: {
+                            processInlineCommand()
+                        },
+                        onMicrophoneTap: {
+                            // Handle voice input if needed
+                        },
+                        onCommandTap: {
+                            // Toggle command palette
+                            HapticManager.shared.lightTap()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showingLibraryCommandPalette.toggle()
                             }
-                        }
-                    }
-            }
-        }
-        .fullScreenCover(isPresented: $showBookScanner) {
-            BookScannerView()
-                .environmentObject(libraryViewModel)
-        }
-        .sheet(isPresented: $bookScanner.showSearchResults) {
-            BookSearchSheet(
-                searchQuery: bookScanner.extractedText,
-                onBookSelected: { book in
-                    libraryViewModel.addBook(book)
-                    HapticManager.shared.success()
-                    bookScanner.reset()
+                        },
+                        isRecording: .constant(false),
+                        colorPalette: nil
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16) // Above tab bar
                 }
-            )
-        }
-        .overlay {
-            BookScannerLoadingOverlay()
-        }
-        .overlay {
-            VoiceNoteButtonOverlay(showVoiceRecording: $showVoiceRecording)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("StartVoiceNote"))) { _ in
-            showVoiceRecording = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShareQuote"))) { notification in
-            if let quote = notification.object as? Note {
-                ShareQuoteService.shareQuote(quote)
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowNoQuotesToast"))) { _ in
-            showNoQuotesToast = true
-            HapticManager.shared.warning()
-        }
-        .glassToast(
-            isShowing: $showNoQuotesToast,
-            message: "No quotes to share yet"
-        )
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
-            if notification.object is Book {
-                selectedTab = 0  // Switch to library tab
-                // TODO: Implement scrolling to specific book in LibraryView
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNote"))) { notification in
-            if notification.object is Note {
-                selectedTab = 1  // Switch to notes tab
-                // NotesView will handle the scrolling and editing
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToTab"))) { notification in
-            if let tabIndex = notification.object as? Int {
-                selectedTab = tabIndex
-                // Also update navigation coordinator
-                switch tabIndex {
-                case 0: navigationCoordinator.selectedTab = .library
-                case 1: navigationCoordinator.selectedTab = .notes
-                case 2: navigationCoordinator.selectedTab = .chat
-                default: break
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingLibraryCommandPalette)
+            .onAppear {
+                // Auto-focus the input field
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isInputFocused = true
                 }
             }
         }
-        .onAppear {
-            // Defer cache cleaning to background after launch
-            Task {
-                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                ResponseCache.shared.cleanExpiredEntries()
+    }
+    
+    private func processInlineCommand() {
+        let trimmedText = commandText.trimmingCharacters(in: .whitespaces)
+        guard !trimmedText.isEmpty else {
+            dismissCommandInput()
+            return
+        }
+        
+        // Parse the command
+        let intent = CommandParser.parse(trimmedText, books: libraryViewModel.books, notes: [])
+        
+        switch intent {
+        case .createQuote(let text):
+            HapticManager.shared.success()
+            createQuote(from: text)
+            dismissCommandInput()
+            
+        case .createNote(let text):
+            HapticManager.shared.success()
+            createNote(from: text)
+            dismissCommandInput()
+            
+        case .addBook(_):
+            HapticManager.shared.lightTap()
+            dismissCommandInput()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                selectedTab = 0
             }
             
-            // Prepare only essential haptic generators
-            HapticManager.shared.lightTap() // Prepare the most used one
+        case .searchLibrary(_), .searchAll(_):
+            HapticManager.shared.lightTap()
+            dismissCommandInput()
+            selectedTab = 0
+            
+        case .searchNotes(_):
+            HapticManager.shared.lightTap()
+            dismissCommandInput()
+            selectedTab = 1
+            
+        case .existingBook(let book):
+            HapticManager.shared.selectionChanged()
+            dismissCommandInput()
+            selectedTab = 0
+            navigationCoordinator.navigateToBook(book.id)
+            
+        case .existingNote(let note):
+            HapticManager.shared.selectionChanged()
+            dismissCommandInput()
+            selectedTab = 1
+            navigationCoordinator.highlightedNoteID = note.id
+            
+        case .unknown:
+            HapticManager.shared.lightTap()
+            dismissCommandInput()
+            selectedTab = 0
+        }
+    }
+    
+    private func dismissCommandInput() {
+        isInputFocused = false
+        commandText = ""
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            showCommandInput = false
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func createQuote(from text: String) {
+        let parsedQuote = CommandParser.parseQuote(text)
+        var author: String? = nil
+        var bookTitle: String? = nil
+        var pageNumber: Int? = nil
+        
+        // Parse the format: author|||BOOK|||bookTitle|||PAGE|||pageNumber
+        if let authorString = parsedQuote.author {
+            let parts = authorString.split(separator: "|||").map(String.init)
+            var idx = 0
+            
+            if idx < parts.count {
+                author = parts[idx]
+                idx += 1
+            }
+            
+            while idx < parts.count - 1 {
+                if parts[idx] == "BOOK" && idx + 1 < parts.count {
+                    bookTitle = parts[idx + 1]
+                    idx += 2
+                } else if parts[idx] == "PAGE" && idx + 1 < parts.count {
+                    pageNumber = Int(parts[idx + 1])
+                    idx += 2
+                } else {
+                    idx += 1
+                }
+            }
+        }
+        
+        // Find book if title is provided
+        var bookModel: BookModel? = nil
+        if let bookTitle = bookTitle {
+            let book = libraryViewModel.books.first { $0.title.localizedCaseInsensitiveContains(bookTitle) }
+            if let book = book {
+                // Convert Book to BookModel
+                bookModel = BookModel(from: book)
+            }
+        }
+        
+        // Create the quote
+        let capturedQuote = CapturedQuote(
+            text: parsedQuote.content,
+            book: bookModel,
+            pageNumber: pageNumber
+        )
+        
+        // Set attribution
+        if let author = author {
+            capturedQuote.author = author
+        }
+        
+        modelContext.insert(capturedQuote)
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("Error saving quote: \(error)")
+        }
+    }
+    
+    private func createNote(from text: String) {
+        let capturedNote = CapturedNote(content: text, book: nil)
+        modelContext.insert(capturedNote)
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("Error saving note: \(error)")
         }
     }
 }
@@ -476,4 +701,3 @@ struct AdvancedActionButton: View {
 #Preview {
     ContentView()
 }
-

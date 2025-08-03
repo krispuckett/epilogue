@@ -132,8 +132,11 @@ class AICompanionService: ObservableObject {
     func isConfigured() -> Bool {
         switch currentProvider {
         case .perplexity:
-            // Check if API key is configured
-            if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
+            // Check if API key is configured - try KeychainManager first, then Info.plist
+            let apiKey = KeychainManager.shared.getPerplexityAPIKey() ?? 
+                         Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
+            
+            if let apiKey = apiKey,
                !apiKey.isEmpty,
                apiKey != "your_actual_api_key_here",
                !apiKey.contains("$("),

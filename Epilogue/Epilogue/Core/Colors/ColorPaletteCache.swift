@@ -37,12 +37,30 @@ public class BookColorPaletteCache {
     private init() {
         setupMemoryCache()
         cleanExpiredCache()
+        registerForMemoryWarnings()
     }
     
     private func setupMemoryCache() {
         // Configure memory cache
         memoryCache.countLimit = 50 // Store last 50 palettes
         memoryCache.totalCostLimit = 50 * 1024 * 1024 // Assume ~1MB per palette (very conservative)
+        memoryCache.name = "ColorPaletteCache"
+    }
+    
+    private func registerForMemoryWarnings() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMemoryWarning),
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleMemoryWarning() {
+        print("⚠️ Memory warning - reducing color palette cache")
+        // Reduce cache to half capacity
+        memoryCache.countLimit = 25
+        // This will automatically evict LRU items
     }
     
     // MARK: - Cache Operations
@@ -77,8 +95,10 @@ public class BookColorPaletteCache {
             extractionVersion: "1.0"
         )
         
-        // Add to memory cache
-        memoryCache.setObject(cached, forKey: bookID as NSString)
+        // Add to memory cache with cost estimation
+        // Rough estimate: ~1KB per palette (colors + metadata)
+        let estimatedCost = 1024
+        memoryCache.setObject(cached, forKey: bookID as NSString, cost: estimatedCost)
         
         // Save to disk in background
         await saveToDisk(cached)
@@ -216,8 +236,8 @@ public class BookColorPaletteCache {
     }
     
     private func extractAndCachePalette(bookID: String, coverURL: String) async {
-        // Load image using SharedBookCoverManager
-        guard let image = await SharedBookCoverManager.shared.loadImage(from: coverURL, quality: .high) else {
+        // Load full image using SharedBookCoverManager
+        guard let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURL) else {
             return
         }
         

@@ -11,26 +11,28 @@ struct BookCard: View {
             // Book cover - using thumbnail for grid view
             BookCoverThumbnailView(
                 coverURL: book.coverImageURL,
-                width: UIScreen.main.bounds.width / 2 - 24,
-                height: 220
+                width: 170,
+                height: 255
             )
             
             // Title and author only (no progress)
             VStack(alignment: .leading, spacing: 0) {
                 Text(book.title)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .frame(minHeight: 40)
                 
                 Text(book.author)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .kerning(1.2)
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 8) // Add padding after author text
         }
         .onLongPressGesture(minimumDuration: 0.5) {
             showingProgress = true
@@ -231,24 +233,46 @@ struct ProgressPopover: View {
 struct CircularProgressView: View {
     let progress: Double
     let accentColor: Color
+    var isIndeterminate: Bool = false
+    @State private var rotation: Double = 0
     
     var body: some View {
         ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.1), lineWidth: 10)
-            
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    accentColor,
-                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.5), value: progress)
-            
-            Text("\(Int(progress * 100))%")
-                .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white)
+            if isIndeterminate {
+                // Indeterminate spinner
+                Circle()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 3)
+                
+                Circle()
+                    .trim(from: 0, to: 0.3)
+                    .stroke(
+                        accentColor,
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(rotation))
+                    .onAppear {
+                        withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                            rotation = 360
+                        }
+                    }
+            } else {
+                // Determinate progress
+                Circle()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 10)
+                
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        accentColor,
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.5), value: progress)
+                
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white)
+            }
         }
     }
 }

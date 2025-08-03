@@ -5,7 +5,6 @@ struct BookAtmosphericGradientView: View {
     let colorPalette: ColorPalette
     let intensity: Double
     
-    @State private var gradientOffset: CGFloat = 0
     @State private var displayedPalette: ColorPalette?
     
     init(colorPalette: ColorPalette, intensity: Double = 1.0) {
@@ -47,7 +46,6 @@ struct BookAtmosphericGradientView: View {
         }
         .onAppear {
             displayedPalette = processColors(colorPalette)
-            startSubtleAnimation()
         }
         .onChange(of: colorPalette) { _, newPalette in
             displayedPalette = processColors(newPalette)
@@ -177,12 +175,6 @@ struct BookAtmosphericGradientView: View {
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
     
-    /// Start subtle 30-second animation
-    private func startSubtleAnimation() {
-        withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
-            gradientOffset = 0.1 // Subtle movement
-        }
-    }
 }
 
 // MARK: - Convenience Transition
