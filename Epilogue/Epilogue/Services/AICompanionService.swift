@@ -89,7 +89,8 @@ class AICompanionService: ObservableObject {
         switch currentProvider {
         case .perplexity:
             let service = PerplexityService()
-            return try await service.chat(with: contextualMessage, bookContext: bookContext)
+            let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
+            return try await service.chat(with: contextualMessage, bookContext: bookContext, model: model)
             
         case .appleIntelligence:
             // Future implementation
@@ -114,7 +115,8 @@ class AICompanionService: ObservableObject {
         switch currentProvider {
         case .perplexity:
             let service = PerplexityService()
-            return try await service.streamChat(message: contextualMessage, bookContext: bookContext)
+            let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
+            return try await service.streamChat(message: contextualMessage, bookContext: bookContext, model: model)
             
         case .appleIntelligence:
             throw AIServiceError.providerNotImplemented
@@ -360,11 +362,11 @@ class AICompanionService: ObservableObject {
                 if isConfigured() {
                     print("Perplexity API key is configured")
                     let response = try await processMessage(message, bookContext: bookContext)
-                    print("📤 Response received: \(response.prefix(100))...")
+                    print("📤 Response received [\(response.count) characters]")
                 } else {
                     print("Perplexity API key NOT configured")
                     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String {
-                        print("🔑 API Key found but invalid: \(apiKey.prefix(10))...")
+                        print("🔑 API Key validation failed")
                     } else {
                         print("🔑 No API key found in Info.plist")
                     }

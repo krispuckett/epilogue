@@ -63,8 +63,29 @@ struct NotesView: View {
         }
     }
     
+    // Cached filtered notes to avoid expensive recomputation
+    @State private var cachedFilteredNotes: [Note] = []
+    @State private var lastFilterKey: String = ""
+    
     // Filtered notes based on filter and search
-    var filteredNotes: [Note] {
+    private var filteredNotes: [Note] {
+        // Create a cache key from current filter state
+        let filterKey = "\(selectedFilter?.rawValue ?? "nil")|\(searchScope.rawValue)|\(searchText)|\(searchTokens.map(\.id).joined(separator: ","))"
+        
+        // Return cached results if filter hasn't changed
+        if filterKey == lastFilterKey && !cachedFilteredNotes.isEmpty {
+            return cachedFilteredNotes
+        }
+        
+        // Recompute and cache
+        let result = computeFilteredNotes()
+        cachedFilteredNotes = result
+        lastFilterKey = filterKey
+        return result
+    }
+    
+    // Separated computation for clarity
+    private func computeFilteredNotes() -> [Note] {
         var filtered = notesViewModel.notes
         
         // Apply type filter
@@ -154,10 +175,7 @@ struct NotesView: View {
         .matchedTransitionSource(id: note.id, in: noteTransition)
         .id(note.id)
         .overlay(highlightOverlay(for: note))
-        .transition(.asymmetric(
-            insertion: .scale(scale: 0.95).combined(with: .opacity),
-            removal: .scale(scale: 0.95).combined(with: .opacity)
-        ))
+        .transition(.glassAppear)
         .onTapGesture(count: 2) {
             // Direct test - bypass the callback chain
             HapticManager.shared.mediumTap()
@@ -237,11 +255,12 @@ struct NotesView: View {
             }
             .onChange(of: scrollToNoteId) { _, noteId in
                 if let noteId = noteId {
-                    withAnimation(.easeInOut(duration: 0.5)) {
+                    withAnimation(SmoothAnimationType.smooth.animation) {
                         proxy.scrollTo(noteId, anchor: .center)
                     }
-                    // Clear the scroll request after scrolling
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Clear the scroll request after animation completes
+                    Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                         scrollToNoteId = nil
                     }
                 }
@@ -337,7 +356,7 @@ struct NotesView: View {
                 
                 // Remove highlight after a delay, then open for editing
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation(.easeOut(duration: 0.5)) {
+                    withAnimation(SmoothAnimationType.gentle.animation) {
                         highlightedNoteId = nil
                     }
                     // Open the note for editing

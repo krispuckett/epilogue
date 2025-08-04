@@ -1015,7 +1015,7 @@ struct AmbientChatOverlay: View {
         
         // Combine all transcriptions into a single text for better context
         let fullTranscript = session.rawTranscriptions.joined(separator: " ")
-        print("[AmbientChat] Full transcript: \(fullTranscript)")
+        print("[AmbientChat] Full transcript captured [\(fullTranscript.count) characters]")
         
         // Extract quotes, notes, and questions from raw transcriptions
         var quotes: [ExtractedQuote] = []

@@ -163,6 +163,21 @@ struct ImprovedColorExtraction {
         }
         
         // Create palette with most vibrant colors in primary positions
+        guard sorted.count >= 4 else {
+            // Fallback if we don't have enough colors
+            let defaultColor = Color.gray
+            return ColorPalette(
+                primary: sorted.first.map { Color($0.color) } ?? defaultColor,
+                secondary: sorted.dropFirst().first.map { Color($0.color) } ?? defaultColor.opacity(0.8),
+                accent: sorted.dropFirst(2).first.map { Color($0.color) } ?? defaultColor.opacity(0.6),
+                background: sorted.dropFirst(3).first.map { Color($0.color) } ?? Color.black,
+                textColor: .white,
+                luminance: 0.5,
+                isMonochromatic: false,
+                extractionQuality: 0.5
+            )
+        }
+        
         return ColorPalette(
             primary: Color(sorted[0].color),    // Most vibrant
             secondary: Color(sorted[1].color),  // Second most vibrant

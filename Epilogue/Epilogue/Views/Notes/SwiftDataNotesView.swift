@@ -456,7 +456,7 @@ struct SwiftDataNoteContextMenu: View {
             }
         }
         
-        UIPasteboard.general.string = textToCopy
+        SecureClipboard.copyText(textToCopy)
     }
 }
 

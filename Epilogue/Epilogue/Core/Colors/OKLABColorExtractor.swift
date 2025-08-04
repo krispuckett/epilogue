@@ -104,16 +104,14 @@ public class OKLABColorExtractor {
     
     /// Extract color palette from already processed CGImage
     private func extractPaletteFromProcessedImage(_ cgImage: CGImage, imageSource: String, originalSize: CGSize) async -> ColorPalette {
-        return await withCheckedContinuation { continuation in
-            Task { @MainActor in
-                let palette = self.extractPaletteSync(from: cgImage, imageSource: imageSource, originalSize: originalSize)
-                continuation.resume(returning: palette)
-            }
-        }
+        // Perform extraction on background thread to avoid blocking main thread
+        return await Task.detached(priority: .utility) {
+            return self.extractPaletteSync(from: cgImage, imageSource: imageSource, originalSize: originalSize)
+        }.value
     }
     
     /// Synchronous extraction (moved from original extractPalette)
-    private func extractPaletteSync(from cgImage: CGImage, imageSource: String, originalSize: CGSize) -> ColorPalette {
+    nonisolated private func extractPaletteSync(from cgImage: CGImage, imageSource: String, originalSize: CGSize) -> ColorPalette {
         let width = cgImage.width
         let height = cgImage.height
         let bytesPerPixel = 4
@@ -349,7 +347,7 @@ public class OKLABColorExtractor {
     }
     
     // Multi-scale analysis for finding small accent colors on dark covers
-    private func performMultiScaleAnalysis(cgImage: CGImage, pixelData: [UInt8], width: Int, height: Int, bytesPerRow: Int) -> [(UIColor, Int)] {
+    nonisolated private func performMultiScaleAnalysis(cgImage: CGImage, pixelData: [UInt8], width: Int, height: Int, bytesPerRow: Int) -> [(UIColor, Int)] {
         var aggregatedColors: [UIColor: Int] = [:]
         
         // Analyze at three scales: 25%, 50%, and 100%
@@ -422,7 +420,7 @@ public class OKLABColorExtractor {
     }
     
     // Helper: Extract colors from pixel data
-    private func extractColorsFromPixelData(_ pixelData: [UInt8], width: Int, height: Int, bytesPerRow: Int, skipBlack: Bool) -> [(UIColor, Int)] {
+    nonisolated private func extractColorsFromPixelData(_ pixelData: [UInt8], width: Int, height: Int, bytesPerRow: Int, skipBlack: Bool) -> [(UIColor, Int)] {
         var colorHistogram: [UIColor: Int] = [:]
         
         for y in 0..<height {
@@ -453,7 +451,7 @@ public class OKLABColorExtractor {
     }
     
     // Helper: Extract colors from CGImage
-    private func extractColorsFromCGImage(_ cgImage: CGImage, skipBlack: Bool) -> [(UIColor, Int)] {
+    nonisolated private func extractColorsFromCGImage(_ cgImage: CGImage, skipBlack: Bool) -> [(UIColor, Int)] {
         let width = cgImage.width
         let height = cgImage.height
         let bytesPerRow = cgImage.bytesPerRow
@@ -479,7 +477,7 @@ public class OKLABColorExtractor {
     }
     
     // Helper: Resize CGImage
-    private func resizeImage(_ cgImage: CGImage, to size: CGSize) -> CGImage? {
+    nonisolated private func resizeImage(_ cgImage: CGImage, to size: CGSize) -> CGImage? {
         let width = Int(size.width)
         let height = Int(size.height)
         let bytesPerRow = width * 4
@@ -507,7 +505,7 @@ public class OKLABColorExtractor {
     
     
     // Filter out JPEG compression artifacts
-    private func filterCompressionArtifacts(_ peaks: [(color: UIColor, count: Int, distinctiveness: Double)]) -> [(color: UIColor, count: Int, distinctiveness: Double)] {
+    nonisolated private func filterCompressionArtifacts(_ peaks: [(color: UIColor, count: Int, distinctiveness: Double)]) -> [(color: UIColor, count: Int, distinctiveness: Double)] {
         return peaks.filter { peak in
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             peak.color.getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -527,7 +525,7 @@ public class OKLABColorExtractor {
     }
     
     // Assign roles based on the already-sorted peaks (by frequency)
-    private func assignColorRolesDirectly(_ sortedPeaks: [(color: UIColor, count: Int, distinctiveness: Double)], isDarkCover: Bool) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
+    nonisolated private func assignColorRolesDirectly(_ sortedPeaks: [(color: UIColor, count: Int, distinctiveness: Double)], isDarkCover: Bool) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
         
         if isDarkCover {
             // For dark covers, prefer bright/saturated colors for primary
@@ -609,7 +607,7 @@ public class OKLABColorExtractor {
     // MARK: - Color Helper Functions
     
     
-    private func luminance(of color: UIColor) -> Double {
+    nonisolated private func luminance(of color: UIColor) -> Double {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         color.getRed(&r, green: &g, blue: &b, alpha: &a)
         return 0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)
@@ -617,14 +615,14 @@ public class OKLABColorExtractor {
     
     
     
-    private func colorDescription(_ color: UIColor) -> String {
+    nonisolated private func colorDescription(_ color: UIColor) -> String {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         color.getRed(&r, green: &g, blue: &b, alpha: &a)
         return "RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255)))"
     }
     
     
-    private func createFallbackPalette() -> ColorPalette {
+    nonisolated private func createFallbackPalette() -> ColorPalette {
         return ColorPalette(
             primary: Color.orange,
             secondary: Color.purple,

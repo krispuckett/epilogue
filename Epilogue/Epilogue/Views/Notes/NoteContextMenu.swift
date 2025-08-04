@@ -172,7 +172,7 @@ struct NoteContextMenu: View {
     }
     
     private func copyText() {
-        HapticManager.shared.success()
+        HapticManager.shared.softTap()
         var textToCopy = note.content
         
         if note.type == .quote {
@@ -190,7 +190,7 @@ struct NoteContextMenu: View {
             }
         }
         
-        UIPasteboard.general.string = textToCopy
+        SecureClipboard.copyText(textToCopy)
     }
     
     private func deleteNote() {

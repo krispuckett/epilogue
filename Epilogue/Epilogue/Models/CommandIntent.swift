@@ -453,7 +453,7 @@ struct CommandParser {
         if notes.count > 0 {
             print("CommandParser: All notes:")
             for (index, note) in notes.enumerated() {
-                print("  \(index): '\(note.content.prefix(40))...' (type: \(note.type))")
+                print("  \(index): [Note - \(note.content.count) characters] (type: \(note.type))")
             }
         }
         
@@ -584,13 +584,13 @@ struct CommandParser {
                         var bookTitle: String? = nil
                         var pageNumber: Int? = nil
                         
-                        if parts.count >= 1 {
+                        if parts.indices.contains(0) {
                             author = parts[0]
                         }
-                        if parts.count >= 2 {
+                        if parts.indices.contains(1) {
                             bookTitle = parts[1]
                         }
-                        if parts.count >= 3 {
+                        if parts.indices.contains(2) {
                             let pageStr = parts[2]
                             // Extract page number from strings like "pg 30", "p. 30", "page 30"
                             if let pageMatch = pageStr.range(of: #"\d+"#, options: .regularExpression) {

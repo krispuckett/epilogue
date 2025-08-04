@@ -117,46 +117,33 @@ struct ChatMessageView: View {
     // MARK: - User Message Bubble
     
     private var userMessageBubble: some View {
-        GeometryReader { geometry in
-            HStack {
-                Spacer()
-                Text(message.content)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: geometry.size.width * 0.75, alignment: .trailing)
-                    .glassEffect(in: .rect(cornerRadius: 20))
-                    .overlay(alignment: .topTrailing) {
-                        // Subtle border
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(0.15),
-                                        .white.opacity(0.05)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.5
-                            )
-                    }
-            }
+        HStack {
+            Spacer(minLength: 80) // Ensure right alignment
+            
+            Text(message.content)
+                .font(.system(size: 15))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: .trailing)
+                .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
+                .glassEffect(in: .rect(cornerRadius: 20))
+                .overlay(alignment: .topTrailing) {
+                    // Subtle border
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.15),
+                                    .white.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
         }
-        .frame(height: intrinsicHeight)
-    }
-    
-    private var intrinsicHeight: CGFloat {
-        let text = message.content as NSString
-        let maxWidth = UIScreen.main.bounds.width * 0.75 - 32 // 75% minus padding
-        let boundingRect = text.boundingRect(
-            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: UIFont.systemFont(ofSize: 15)],
-            context: nil
-        )
-        return boundingRect.height + 24 // Add vertical padding
     }
     
     // MARK: - AI Message Content

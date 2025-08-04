@@ -28,6 +28,15 @@ struct ContentView: View {
     @Query private var capturedNotes: [CapturedNote]
     @Query private var capturedQuotes: [CapturedQuote]
     
+    // Command processing manager
+    private var commandProcessor: CommandProcessingManager {
+        CommandProcessingManager(
+            modelContext: modelContext,
+            libraryViewModel: libraryViewModel,
+            notesViewModel: notesViewModel
+        )
+    }
+    
     init() {
         print("🏠 DEBUG: ContentView init")
         
@@ -49,9 +58,9 @@ struct ContentView: View {
             .overlay(alignment: .bottom) {
                 commandInputOverlay
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandInput)
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showAdvancedActions)
+            .interruptibleAnimation(.snappy, value: showCommandInput)
+            .interruptibleAnimation(.smooth, value: selectedTab)
+            .interruptibleAnimation(.bouncy, value: showAdvancedActions)
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showPrivacySettings) {
                 NavigationView {
@@ -74,7 +83,7 @@ struct ContentView: View {
                     searchQuery: bookScanner.extractedText,
                     onBookSelected: { book in
                         libraryViewModel.addBook(book)
-                        HapticManager.shared.success()
+                        HapticManager.shared.bookOpen()
                         bookScanner.reset()
                     }
                 )
@@ -86,6 +95,7 @@ struct ContentView: View {
                 VoiceNoteButtonOverlay(showVoiceRecording: $showVoiceRecording)
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("StartVoiceNote"))) { _ in
+                HapticManager.shared.voiceModeStart()
                 showVoiceRecording = true
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShareQuote"))) { notification in
@@ -133,6 +143,7 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowLiquidCommandPalette"))) { _ in
                 showingLibraryCommandPalette = false
                 showLiquidCommandPalette = true
+                HapticManager.shared.commandPaletteOpen()
             }
             .onAppear {
                 // Defer cache cleaning to background after launch
@@ -262,7 +273,7 @@ struct ContentView: View {
                         minimumDuration: 0.6,
                         maximumDistance: .infinity,
                         pressing: { pressing in
-                            withAnimation(.easeInOut(duration: 0.1)) {
+                            withAnimation(SmoothAnimationType.snappy.animation) {
                                 isLongPressing = pressing
                             }
                             if pressing {
@@ -272,7 +283,7 @@ struct ContentView: View {
                         perform: {
                             print("🔵 Long press detected! showAdvancedActions = true")
                             HapticManager.shared.mediumTap()
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(SmoothAnimationType.bouncy.animation) {
                                 showAdvancedActions = true
                             }
                         }
@@ -315,7 +326,7 @@ struct ContentView: View {
                 Color.black.opacity(0.5)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(SmoothAnimationType.smooth.animation) {
                             showAdvancedActions = false
                         }
                     }
@@ -353,7 +364,7 @@ struct ContentView: View {
                         } else {
                             isInputFocused = false
                             commandText = ""
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(SmoothAnimationType.smooth.animation) {
                                 showCommandInput = false
                             }
                         }
@@ -405,12 +416,10 @@ struct ContentView: View {
                     .padding(.bottom, 16) // Above tab bar
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingLibraryCommandPalette)
+            .interruptibleAnimation(.smooth, value: showingLibraryCommandPalette)
             .onAppear {
-                // Auto-focus the input field
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isInputFocused = true
-                }
+                // Immediately focus the input field
+                isInputFocused = true
             }
         }
     }
@@ -422,136 +431,24 @@ struct ContentView: View {
             return
         }
         
-        // Parse the command
-        let intent = CommandParser.parse(trimmedText, books: libraryViewModel.books, notes: [])
+        // Delegate to command processor
+        commandProcessor.processInlineCommand(trimmedText)
         
-        switch intent {
-        case .createQuote(let text):
-            HapticManager.shared.success()
-            createQuote(from: text)
-            dismissCommandInput()
-            
-        case .createNote(let text):
-            HapticManager.shared.success()
-            createNote(from: text)
-            dismissCommandInput()
-            
-        case .addBook(_):
-            HapticManager.shared.lightTap()
-            dismissCommandInput()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                selectedTab = 0
-            }
-            
-        case .searchLibrary(_), .searchAll(_):
-            HapticManager.shared.lightTap()
-            dismissCommandInput()
-            selectedTab = 0
-            
-        case .searchNotes(_):
-            HapticManager.shared.lightTap()
-            dismissCommandInput()
-            selectedTab = 1
-            
-        case .existingBook(let book):
-            HapticManager.shared.selectionChanged()
-            dismissCommandInput()
-            selectedTab = 0
-            navigationCoordinator.navigateToBook(book.id)
-            
-        case .existingNote(let note):
-            HapticManager.shared.selectionChanged()
-            dismissCommandInput()
-            selectedTab = 1
-            navigationCoordinator.highlightedNoteID = note.id
-            
-        case .unknown:
-            HapticManager.shared.lightTap()
-            dismissCommandInput()
-            selectedTab = 0
-        }
+        // Provide haptic feedback and dismiss
+        HapticManager.shared.success()
+        dismissCommandInput()
     }
     
     private func dismissCommandInput() {
         isInputFocused = false
         commandText = ""
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(SmoothAnimationType.smooth.animation) {
             showCommandInput = false
         }
     }
     
     // MARK: - Helper Functions
-    
-    private func createQuote(from text: String) {
-        let parsedQuote = CommandParser.parseQuote(text)
-        var author: String? = nil
-        var bookTitle: String? = nil
-        var pageNumber: Int? = nil
-        
-        // Parse the format: author|||BOOK|||bookTitle|||PAGE|||pageNumber
-        if let authorString = parsedQuote.author {
-            let parts = authorString.split(separator: "|||").map(String.init)
-            var idx = 0
-            
-            if idx < parts.count {
-                author = parts[idx]
-                idx += 1
-            }
-            
-            while idx < parts.count - 1 {
-                if parts[idx] == "BOOK" && idx + 1 < parts.count {
-                    bookTitle = parts[idx + 1]
-                    idx += 2
-                } else if parts[idx] == "PAGE" && idx + 1 < parts.count {
-                    pageNumber = Int(parts[idx + 1])
-                    idx += 2
-                } else {
-                    idx += 1
-                }
-            }
-        }
-        
-        // Find book if title is provided
-        var bookModel: BookModel? = nil
-        if let bookTitle = bookTitle {
-            let book = libraryViewModel.books.first { $0.title.localizedCaseInsensitiveContains(bookTitle) }
-            if let book = book {
-                // Convert Book to BookModel
-                bookModel = BookModel(from: book)
-            }
-        }
-        
-        // Create the quote
-        let capturedQuote = CapturedQuote(
-            text: parsedQuote.content,
-            book: bookModel,
-            pageNumber: pageNumber
-        )
-        
-        // Set attribution
-        if let author = author {
-            capturedQuote.author = author
-        }
-        
-        modelContext.insert(capturedQuote)
-        
-        do {
-            try modelContext.save()
-        } catch {
-            print("Error saving quote: \(error)")
-        }
-    }
-    
-    private func createNote(from text: String) {
-        let capturedNote = CapturedNote(content: text, book: nil)
-        modelContext.insert(capturedNote)
-        
-        do {
-            try modelContext.save()
-        } catch {
-            print("Error saving note: \(error)")
-        }
-    }
+    // Note: Command processing logic moved to CommandProcessingManager
 }
 
 // MARK: - Advanced Actions Menu

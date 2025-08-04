@@ -82,7 +82,7 @@ struct LiquidCommandPalette: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if showQuickActions {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(SmoothAnimationType.smooth.animation) {
                                 showQuickActions = false
                             }
                         } else {
@@ -110,10 +110,7 @@ struct LiquidCommandPalette: View {
                             .frame(maxHeight: 300)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8) // 8px above input bar
-                            .transition(AnyTransition.asymmetric(
-                                insertion: AnyTransition.move(edge: .bottom).combined(with: .opacity),
-                                removal: AnyTransition.move(edge: .top).combined(with: .opacity)
-                            ))
+                            .transition(.smoothSlide)
                         }
                         
                         // Show command palette if active
@@ -128,12 +125,7 @@ struct LiquidCommandPalette: View {
                             .environmentObject(notesViewModel)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 16) // Above input bar
-                            .transition(AnyTransition.asymmetric(
-                                insertion: AnyTransition.scale(scale: 0.95, anchor: .bottom)
-                                    .combined(with: .opacity),
-                                removal: AnyTransition.scale(scale: 0.95, anchor: .bottom)
-                                    .combined(with: .opacity)
-                            ))
+                            .transition(.glassAppear)
                         }
                         
                         // Universal Input Bar with matched geometry
@@ -147,7 +139,7 @@ struct LiquidCommandPalette: View {
                             },
                             onMicrophoneTap: handleMicrophoneTap,
                             onCommandTap: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                withAnimation(SmoothAnimationType.bouncy.animation) {
                                     showQuickActions.toggle()
                                 }
                             },
@@ -210,7 +202,7 @@ struct LiquidCommandPalette: View {
                 onBookSelected: { book in
                     // Add the book to library
                     libraryViewModel.addBook(book)
-                    HapticManager.shared.success()
+                    HapticManager.shared.bookOpen()
                     
                     // Navigate to the newly added book
                     NotificationCenter.default.post(
@@ -265,14 +257,14 @@ struct LiquidCommandPalette: View {
             // Navigate to search with query
             performSearch(query: query, intent: intent)
         case .existingBook(let book):
-            HapticManager.shared.success()
+            HapticManager.shared.bookOpen()
             NotificationCenter.default.post(
                 name: Notification.Name("NavigateToBook"),
                 object: book
             )
             dismissPalette()
         case .existingNote(let note):
-            HapticManager.shared.success()
+            HapticManager.shared.lightTap()
             NotificationCenter.default.post(
                 name: Notification.Name("NavigateToNote"),
                 object: note
@@ -361,7 +353,9 @@ struct LiquidCommandPalette: View {
         var bookModel: BookModel? = nil
         if let book = bookContext {
             bookModel = BookModel(from: book)
-            modelContext.insert(bookModel!)
+            if let model = bookModel {
+                modelContext.insert(model)
+            }
         }
         
         // Create and save to SwiftData using CapturedNote
@@ -453,7 +447,9 @@ struct LiquidCommandPalette: View {
         var bookModel: BookModel? = nil
         if let book = bookContext {
             bookModel = BookModel(from: book)
-            modelContext.insert(bookModel!)
+            if let model = bookModel {
+                modelContext.insert(model)
+            }
         }
         
         // Create and save to SwiftData using CapturedQuote
@@ -488,7 +484,7 @@ struct LiquidCommandPalette: View {
             print("Failed to save quote: \(error)")
         }
         
-        HapticManager.shared.success()
+        HapticManager.shared.quoteCapture()
         
         // Clear text immediately for better feedback
         commandText = ""
@@ -584,7 +580,7 @@ struct LiquidCommandPalette: View {
         isFocused = false
         
         // Then dismiss the palette with smooth animation
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(SmoothAnimationType.smooth.animation) {
             isPresented = false
         }
     }

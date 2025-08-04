@@ -71,6 +71,16 @@ struct EditBookSheet: View {
                 .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
             
             CurrentBookRow(book: currentBook)
+            
+            // Add compact timeline if currently reading
+            if currentBook.readingStatus == .currentlyReading, let pageCount = currentBook.pageCount, pageCount > 0 {
+                AmbientReadingProgressView(
+                    book: currentBook,
+                    width: UIScreen.main.bounds.width - 32,
+                    showDetailed: false
+                )
+                .padding(.top, -8) // Reduce spacing since CurrentBookRow has bottom padding
+            }
         }
     }
     

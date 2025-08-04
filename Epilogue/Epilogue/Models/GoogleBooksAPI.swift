@@ -247,7 +247,9 @@ class GoogleBooksService: ObservableObject {
         }
         
         // Build URL with parameters
-        var components = URLComponents(string: baseURL)!
+        guard var components = URLComponents(string: baseURL) else {
+            throw URLError(.badURL)
+        }
         components.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
             URLQueryItem(name: "maxResults", value: "40"), // Get more results to filter
@@ -261,7 +263,13 @@ class GoogleBooksService: ObservableObject {
             throw APIError.invalidURL
         }
         
-        print("GoogleBooksAPI: Making request to: \(url.absoluteString)")
+        // Validate the URL for security
+        guard URLValidator.isValidAPIURL(url) else {
+            print("GoogleBooksAPI: URL validation failed")
+            throw APIError.invalidURL
+        }
+        
+        print("GoogleBooksAPI: Making search request")
         
         // Perform the request
         let (data, response) = try await session.data(from: url)

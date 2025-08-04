@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("defaultCaptureType") private var defaultCaptureType = "quote"
     @AppStorage("voiceQuality") private var voiceQuality = "high"
     @AppStorage("aiProvider") private var aiProvider = "apple"
+    @AppStorage("perplexityModel") private var perplexityModel = "sonar"
     @AppStorage("enableAnalytics") private var enableAnalytics = false
     @AppStorage("enableDataSync") private var enableDataSync = false
     @AppStorage("processOnDevice") private var processOnDevice = true
@@ -68,8 +69,15 @@ struct SettingsView: View {
                     Picker("AI Provider", selection: $aiProvider) {
                         Label("Apple Intelligence", systemImage: "apple.logo")
                             .tag("apple")
-                        Label("Perplexity", systemImage: "brain")
-                            .tag("perplexity")
+                        Label {
+                            HStack {
+                                PerplexityLogoDetailed(size: 16)
+                                Text("Perplexity")
+                            }
+                        } icon: {
+                            EmptyView()
+                        }
+                        .tag("perplexity")
                     }
                     
                     if aiProvider == "perplexity" {
@@ -82,6 +90,29 @@ struct SettingsView: View {
                                 Text(hasStoredAPIKey ? "••••••••" : "Not Set")
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Label("Model", systemImage: "cpu")
+                                Spacer()
+                                Text(perplexityModel == "sonar-pro" ? "Sonar Pro" : "Sonar")
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Toggle(isOn: Binding(
+                                get: { perplexityModel == "sonar-pro" },
+                                set: { perplexityModel = $0 ? "sonar-pro" : "sonar" }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Use Sonar Pro")
+                                        .font(.subheadline)
+                                    Text("More advanced reasoning, slower responses")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
                         }
                     }
                     

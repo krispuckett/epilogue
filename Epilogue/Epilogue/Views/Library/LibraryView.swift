@@ -241,6 +241,9 @@ struct LibraryGridItem: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(highlightOverlay)
         }
+        .simultaneousGesture(TapGesture().onEnded { _ in
+            HapticManager.shared.bookOpen()
+        })
         .buttonStyle(PlainButtonStyle())
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
@@ -318,6 +321,9 @@ struct LibraryListItemWrapper: View {
             LibraryBookListItem(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
                 .overlay(highlightOverlay)
         }
+        .simultaneousGesture(TapGesture().onEnded { _ in
+            HapticManager.shared.bookOpen()
+        })
         .buttonStyle(PlainButtonStyle())
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
@@ -439,14 +445,15 @@ struct LibraryBookCard: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 
-                // Reading progress indicator
-                if let pageCount = book.pageCount, pageCount > 0 {
-                    ReadingProgressIndicator(
-                        currentPage: book.currentPage,
-                        totalPages: pageCount,
-                        width: 150
+                // Compact reading timeline for books in progress
+                if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
+                    AmbientReadingProgressView(
+                        book: book,
+                        width: 150,
+                        showDetailed: false
                     )
-                    .padding(.top, 4)
+                    .environmentObject(viewModel)
+                    .padding(.top, 6)
                 }
             }
             .padding(.bottom, 8) // Add extra padding at bottom of text

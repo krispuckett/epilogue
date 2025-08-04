@@ -66,18 +66,7 @@ extension Color {
     }
 }
 
-// MARK: - Helper Extensions
-extension View {
-    @ViewBuilder
-    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
-    
-}
+// MARK: - Helper Extensions removed (already defined in AmbientReadingProgressView)
 
 struct BookDetailView: View {
     let book: Book
@@ -407,6 +396,22 @@ struct BookDetailView: View {
             }
             .padding(.top, 8)
             
+            // Compact progress timeline for currently reading books
+            if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
+                AmbientReadingProgressView(
+                    book: book,
+                    width: 300,
+                    showDetailed: false,
+                    colorPalette: colorPalette
+                )
+                .environmentObject(libraryViewModel)
+                .padding(.top, 12)
+                .onTapGesture {
+                    showingProgressEditor = true
+                    HapticManager.shared.lightTap()
+                }
+            }
+            
             // Icon-only segmented control
             iconOnlySegmentedControl
                 .padding(.top, 20)
@@ -550,7 +555,7 @@ struct BookDetailView: View {
                     .foregroundColor(accentColor)
                     .frame(width: 28, height: 28)
                 
-                Text("Reading Progress")
+                Text("Reading Timeline")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(textColor)
                 
@@ -567,72 +572,18 @@ struct BookDetailView: View {
                 }
             }
             
-            // Visual progress bar
-            VStack(spacing: 12) {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(textColor.opacity(0.1))
-                            .frame(height: 12)
-                        
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        accentColor.opacity(0.8),
-                                        accentColor
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width * progressPercentage, height: 12)
-                            .animation(.spring(response: 0.5), value: progressPercentage)
-                        
-                        // Progress indicator dot
-                        Circle()
-                            .fill(accentColor)
-                            .frame(width: 20, height: 20)
-                            .overlay {
-                                Circle()
-                                    .stroke(textColor.opacity(0.3), lineWidth: 2)
-                            }
-                            .shadow(color: accentColor.opacity(0.4), radius: 4)
-                            .offset(x: max(0, min(geometry.size.width - 20, geometry.size.width * progressPercentage - 10)))
-                            .animation(.spring(response: 0.5), value: progressPercentage)
-                    }
-                }
-                .frame(height: 20)
-                
-                HStack {
-                    Text("Page \(book.currentPage)")
-                        .font(.system(size: 14, weight: .medium, design: .monospaced))
-                        .foregroundColor(textColor)
-                    
-                    Spacer()
-                    
-                    Text("\(Int(progressPercentage * 100))% Complete")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(accentColor)
-                    
-                    Spacer()
-                    
-                    Text("\(book.pageCount ?? 0) pages")
-                        .font(.system(size: 14, design: .monospaced))
-                        .foregroundColor(textColor.opacity(0.7))
-                }
-            }
+            // Ambient Reading Progress Timeline - Detailed View
+            AmbientReadingProgressView(
+                book: book,
+                width: 320,
+                showDetailed: true,
+                colorPalette: colorPalette
+            )
+            .environmentObject(libraryViewModel)
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(accentColor.opacity(0.2), lineWidth: 0.5)
-        }
-        .popover(isPresented: $showingProgressEditor) {
-            ProgressPopover(book: book, viewModel: libraryViewModel, accentColor: accentColor)
-                .presentationCompactAdaptation(.popover)
-                .preferredColorScheme(.dark)
+        .sheet(isPresented: $showingProgressEditor) {
+            AmbientProgressSheet(book: book, isPresented: $showingProgressEditor, colorPalette: colorPalette)
+                .environmentObject(libraryViewModel)
         }
     }
     

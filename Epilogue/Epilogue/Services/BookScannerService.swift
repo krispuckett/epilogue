@@ -186,7 +186,7 @@ class BookScannerService: NSObject, ObservableObject {
                         let size = observation.boundingBox.size
                         allText.append((text: text, position: position, size: size))
                         confidenceScores.append(candidate.confidence)
-                        print("📝 Detected text: '\(text)' at Y:\(position.y), size: \(size.height)")
+                        print("📝 Detected text at Y:\(position.y), size: \(size.height)")
                         break // Use first good candidate
                     }
                 }
@@ -201,7 +201,7 @@ class BookScannerService: NSObject, ObservableObject {
             // The largest text is likely the main title
             if let largestText = sortedBySize.first {
                 info.title = largestText.text
-                print("📖 Main title (largest): '\(largestText.text)'")
+                print("📖 Main title identified")
                 
                 // Special case: if title is just "ENDURANCE", it's definitely the Shackleton book
                 if largestText.text.uppercased() == "ENDURANCE" {
@@ -230,7 +230,7 @@ class BookScannerService: NSObject, ObservableObject {
                     let numbers = item.text.filter { $0.isNumber }
                     if numbers.count == 13 {
                         info.isbn = numbers
-                        print("📚 Found ISBN: \(numbers)")
+                        print("📚 Found ISBN")
                     }
                 }
             }
@@ -287,7 +287,7 @@ class BookScannerService: NSObject, ObservableObject {
                 self.extractedText = allTextStrings.joined(separator: " ")
             }
             
-            print("📖 Final extraction - Title: '\(info.title ?? "none")', Author: '\(info.author ?? "none")'")
+            print("📖 Final extraction completed")
         }
         
         return info

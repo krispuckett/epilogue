@@ -136,6 +136,33 @@ final class HapticManager {
         }
     }
     
+    // MARK: - Sophisticated Haptic Experiences
+    
+    /// Play haptic when opening a book
+    func bookOpen() {
+        playCustomPattern(.bookOpen)
+    }
+    
+    /// Play haptic when capturing a quote
+    func quoteCapture() {
+        playCustomPattern(.quoteCapture)
+    }
+    
+    /// Play haptic when starting voice mode
+    func voiceModeStart() {
+        playCustomPattern(.voiceModeStart)
+    }
+    
+    /// Play haptic for page turn effect
+    func pageTurn() {
+        playCustomPattern(.pageTurn)
+    }
+    
+    /// Play haptic when command palette opens
+    func commandPaletteOpen() {
+        playCustomPattern(.commandPaletteOpen)
+    }
+    
     /// Prepare all generators (call when app becomes active)
     func prepareAll() {
         prepareGenerators()
@@ -177,6 +204,105 @@ struct HapticPattern {
                         CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)
                       ],
                       relativeTime: 0.1)
+    ])
+    
+    // Sophisticated patterns for awards-worthy experience
+    
+    /// Book opening pattern - like turning a page
+    static let bookOpen = HapticPattern(events: [
+        CHHapticEvent(eventType: .hapticContinuous,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.2),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.1)
+                      ],
+                      relativeTime: 0,
+                      duration: 0.2),
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)
+                      ],
+                      relativeTime: 0.15)
+    ])
+    
+    /// Quote capture - elegant double tap
+    static let quoteCapture = HapticPattern(events: [
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)
+                      ],
+                      relativeTime: 0),
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+                      ],
+                      relativeTime: 0.08)
+    ])
+    
+    /// Voice mode activation - smooth crescendo
+    static let voiceModeStart = HapticPattern(events: [
+        CHHapticEvent(eventType: .hapticContinuous,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.1),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)
+                      ],
+                      relativeTime: 0,
+                      duration: 0.3),
+        CHHapticEvent(eventType: .hapticContinuous,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+                      ],
+                      relativeTime: 0.2,
+                      duration: 0.2),
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
+                      ],
+                      relativeTime: 0.4)
+    ])
+    
+    /// Page turn - subtle swipe feeling
+    static let pageTurn = HapticPattern(events: [
+        CHHapticEvent(eventType: .hapticContinuous,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)
+                      ],
+                      relativeTime: 0,
+                      duration: 0.15),
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.2),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6)
+                      ],
+                      relativeTime: 0.12)
+    ])
+    
+    /// Command palette appearance - magical emergence
+    static let commandPaletteOpen = HapticPattern(events: [
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
+                      ],
+                      relativeTime: 0),
+        CHHapticEvent(eventType: .hapticContinuous,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.2),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
+                      ],
+                      relativeTime: 0.05,
+                      duration: 0.1),
+        CHHapticEvent(eventType: .hapticTransient,
+                      parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)
+                      ],
+                      relativeTime: 0.15)
     ])
     
     func createCHHapticPattern() throws -> CHHapticPattern {

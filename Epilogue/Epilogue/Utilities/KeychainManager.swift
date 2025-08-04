@@ -122,4 +122,45 @@ extension KeychainManager {
     var hasPerplexityAPIKey: Bool {
         exists(key: Self.perplexityAPIKeyIdentifier)
     }
+    
+    // MARK: - Security Validation
+    
+    /// Validates API key format (basic check)
+    func isValidAPIKey(_ apiKey: String) -> Bool {
+        // Basic validation - not empty and reasonable length
+        guard !apiKey.isEmpty,
+              apiKey.count >= 20,
+              apiKey.count <= 200 else {
+            return false
+        }
+        
+        // Check for common placeholder patterns
+        let placeholders = ["your-api-key", "placeholder", "xxxxxxxx", "api_key_here"]
+        for placeholder in placeholders {
+            if apiKey.lowercased().contains(placeholder) {
+                return false
+            }
+        }
+        
+        // Only allow alphanumeric, dash, and underscore
+        let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        return apiKey.unicodeScalars.allSatisfy { allowedCharacters.contains($0) }
+    }
+    
+    /// Migrate API key from Info.plist to Keychain
+    func migrateAPIKeyFromBundle() {
+        // Check if already migrated
+        if hasPerplexityAPIKey { return }
+        
+        // Try to get from bundle
+        if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
+           isValidAPIKey(apiKey) {
+            do {
+                try savePerplexityAPIKey(apiKey)
+                print("✅ Migrated API key to secure storage")
+            } catch {
+                print("❌ Failed to migrate API key: \(error)")
+            }
+        }
+    }
 }

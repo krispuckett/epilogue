@@ -11,6 +11,7 @@ struct NoteCard: View {
     @Binding var openOptionsNoteId: UUID?
     @State private var cardRect: CGRect = .zero
     var onContextMenuRequest: ((Note, CGRect) -> Void)?
+    @Environment(\.sizeCategory) var sizeCategory
     
     init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}, openOptionsNoteId: Binding<UUID?> = .constant(nil), onContextMenuRequest: ((Note, CGRect) -> Void)? = nil) {
         self.note = note
@@ -80,6 +81,29 @@ struct NoteCard: View {
         }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(isSelectionMode ? "Tap to select or deselect" : "Double tap to edit, long press for more options")
+        .accessibilityAddTraits(isSelectionMode ? [.isButton] : [])
+        .accessibilityValue(isSelectionMode && isSelected ? "Selected" : "")
+    }
+    
+    private var accessibilityLabel: String {
+        var label = note.type == .quote ? "Quote: " : "Note: "
+        label += note.content
+        
+        if let bookTitle = note.bookTitle {
+            label += ". From \(bookTitle)"
+        }
+        
+        if let author = note.author {
+            label += " by \(author)"
+        }
+        
+        let formatter = RelativeDateTimeFormatter()
+        label += ". Created \(formatter.localizedString(for: note.dateCreated, relativeTo: Date()))"
+        
+        return label
     }
     
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -91,6 +115,7 @@ struct QuoteCard: View {
     @Binding var isPressed: Bool
     @Binding var showingOptions: Bool
     @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(\.sizeCategory) var sizeCategory
     
     var firstLetter: String {
         String(note.content.prefix(1))
@@ -104,25 +129,26 @@ struct QuoteCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // Large transparent opening quote
             Text("\u{201C}")
-                .font(.custom("Georgia", size: 80))
+                .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 60 : 80))
                 .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
                 .offset(x: -10, y: 20)
                 .frame(height: 0)
+                .accessibilityHidden(true)
             
             // Quote content with drop cap
             HStack(alignment: .top, spacing: 0) {
                 // Drop cap
                 Text(firstLetter)
-                    .font(.custom("Georgia", size: 56))
+                    .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 70 : 56))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                     .padding(.trailing, 4)
                     .offset(y: -8)
                 
                 // Rest of quote
                 Text(restOfContent)
-                    .font(.custom("Georgia", size: 24))
+                    .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 30 : 24))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    .lineSpacing(11) // Line height 1.5
+                    .lineSpacing(sizeCategory.isAccessibilitySize ? 14 : 11) // Line height 1.5
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
             }

@@ -153,6 +153,7 @@ struct UnifiedChatView: View {
                 )
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
+                .glassEffect(.regular)
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
@@ -195,6 +196,7 @@ struct UnifiedChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
                 }
+                .glassEffect(.regular)
             }
         }
         .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
@@ -404,7 +406,8 @@ struct UnifiedChatView: View {
         messageText = ""
         
         // Delay scroll slightly to ensure all messages are rendered
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        Task {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             withAnimation {
                 // Scroll to the last message
                 if let lastMessage = messages.last {
@@ -449,7 +452,7 @@ struct UnifiedChatView: View {
         // Save to SwiftData
         do {
             try modelContext.save()
-            print("✅ Saved note from keyboard: \(noteText)")
+            print("✅ Saved note from keyboard [\(noteText.count) characters]")
             
             // Add system message to chat
             let systemMessage = UnifiedChatMessage(
@@ -520,7 +523,7 @@ struct UnifiedChatView: View {
         // Save to SwiftData
         do {
             try modelContext.save()
-            print("✅ Saved quote from keyboard: \(content)")
+            print("✅ Saved quote from keyboard [\(content.count) characters]")
             
             // Add system message to chat with mini quote card
             let systemMessage = UnifiedChatMessage(
@@ -877,7 +880,7 @@ struct UnifiedChatView: View {
     
     private func processTranscription(_ transcription: String) async -> ProcessedAmbientSession {
         print("\nTRANSCRIPTION PROCESSING:")
-        print("Raw text: \(transcription)")
+        print("Raw text received [\(transcription.count) characters]")
         
         var quotes: [ExtractedQuote] = []
         var notes: [ExtractedNote] = []
@@ -1385,7 +1388,7 @@ struct BookContextMenuView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Book cover OUTSIDE the Menu
+            // Book cover OUTSIDE the glass effect
             if let book = currentBook {
                 SharedBookCoverView(
                     coverURL: book.coverImageURL,
@@ -1396,7 +1399,7 @@ struct BookContextMenuView: View {
                 .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
             }
             
-            // Simplified pill button (no images inside Menu)
+            // Simplified button with glassEffect
             Button {
                 showingBookPicker = true
                 HapticManager.shared.lightTap()
@@ -1430,7 +1433,7 @@ struct BookContextMenuView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(.plain)
         }

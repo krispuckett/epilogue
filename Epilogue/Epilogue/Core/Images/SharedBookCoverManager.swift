@@ -168,13 +168,13 @@ public class SharedBookCoverManager: ObservableObject {
         
         // Create loading task
         let task = Task<UIImage?, Never> {
-            guard let url = URL(string: urlString) else {
-                print("❌ Invalid URL: \(urlString)")
+            guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else {
+                print("❌ Invalid or unsafe URL")
                 return nil
             }
             
             do {
-                print("📥 Loading image from: \(urlString)")
+                print("📥 Loading book cover image")
                 let (data, _) = try await URLSession.shared.data(from: url)
                 
                 guard let originalImage = UIImage(data: data) else { return nil }

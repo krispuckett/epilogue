@@ -44,7 +44,7 @@ class PerplexityService: ObservableObject {
     }
     
     // Fast streaming chat for real-time responses
-    func streamChat(message: String, bookContext: Book? = nil) async throws -> AsyncThrowingStream<String, Error> {
+    func streamChat(message: String, bookContext: Book? = nil, model: String? = nil) async throws -> AsyncThrowingStream<String, Error> {
         // Check if we have a valid API key
         if apiKey == "PLACEHOLDER_API_KEY" {
             print("Cannot make API request with placeholder key")
@@ -54,7 +54,8 @@ class PerplexityService: ObservableObject {
             }
         }
         
-        guard let url = URL(string: baseURL) else {
+        guard let url = URL(string: baseURL),
+              URLValidator.isValidAPIURL(url) else {
             throw PerplexityError.invalidURL
         }
         
@@ -66,15 +67,17 @@ class PerplexityService: ObservableObject {
         
         // Optimized for streaming
         let systemPrompt = "Literary assistant. Brief, insightful responses."
+        let selectedModel = model ?? UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
+        print("🤖 Using Perplexity model: \(selectedModel)")
         let requestBody: [String: Any] = [
-            "model": "sonar",
+            "model": selectedModel,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": message]
             ],
             "stream": true,  // Enable streaming
             "temperature": 0.7,
-            "max_tokens": 150
+            "max_tokens": selectedModel == "sonar-pro" ? 300 : 150
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -109,14 +112,15 @@ class PerplexityService: ObservableObject {
     }
     
     // Original non-streaming method
-    func chat(with message: String, bookContext: Book? = nil) async throws -> String {
+    func chat(with message: String, bookContext: Book? = nil, model: String? = nil) async throws -> String {
         // Check if we have a valid API key
         if apiKey == "PLACEHOLDER_API_KEY" {
             print("Cannot make API request with placeholder key")
             return "Chat is currently unavailable. Please configure your Perplexity API key in Info.plist."
         }
         
-        guard let url = URL(string: baseURL) else {
+        guard let url = URL(string: baseURL),
+              URLValidator.isValidAPIURL(url) else {
             throw PerplexityError.invalidURL
         }
         
@@ -131,15 +135,17 @@ class PerplexityService: ObservableObject {
             "Literary companion discussing '\(bookContext!.title)'. Be concise and insightful. Use *italics* for book titles and **bold** for key concepts." :
             "Literary companion. Be concise and insightful about books. Use *italics* for book titles and **bold** for key concepts."
         
-        // Build request body with faster model
+        // Build request body with selected model
+        let selectedModel = model ?? UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
+        print("🤖 Using Perplexity model: \(selectedModel)")
         let requestBody: [String: Any] = [
-            "model": "sonar",  // Faster model, still high quality
+            "model": selectedModel,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": message]
             ],
             "temperature": 0.7,
-            "max_tokens": 150  // Limit response length for speed
+            "max_tokens": selectedModel == "sonar-pro" ? 300 : 150  // More tokens for pro model
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)

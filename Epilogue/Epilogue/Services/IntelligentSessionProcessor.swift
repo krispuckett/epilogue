@@ -83,7 +83,7 @@ class IntelligentSessionProcessor: ObservableObject {
                 for match in matches {
                     if let range = Range(match.range(at: 1), in: content),
                        let pageNum = Int(content[range]) {
-                        let fullRange = Range(match.range, in: content)!
+                        guard let fullRange = Range(match.range, in: content) else { continue }
                         updates.append(ProgressUpdate(
                             type: .page(pageNum),
                             value: String(content[fullRange]),
@@ -111,7 +111,7 @@ class IntelligentSessionProcessor: ObservableObject {
                 for match in matches {
                     if let range = Range(match.range(at: 1), in: content),
                        let chapterNum = Int(content[range]) {
-                        let fullRange = Range(match.range, in: content)!
+                        guard let fullRange = Range(match.range, in: content) else { continue }
                         updates.append(ProgressUpdate(
                             type: .chapter(chapterNum),
                             value: String(content[fullRange]),
@@ -137,7 +137,7 @@ class IntelligentSessionProcessor: ObservableObject {
                 for match in matches {
                     if let range = Range(match.range(at: 1), in: content),
                        let percent = Int(content[range]) {
-                        let fullRange = Range(match.range, in: content)!
+                        guard let fullRange = Range(match.range, in: content) else { continue }
                         updates.append(ProgressUpdate(
                             type: .percentage(percent),
                             value: String(content[fullRange]),
@@ -195,7 +195,7 @@ class IntelligentSessionProcessor: ObservableObject {
                     }
                 }
                 
-                let confidence = Double(matchedWords) / Double(titleWords.count)
+                let confidence = titleWords.isEmpty ? 0.0 : Double(matchedWords) / Double(titleWords.count)
                 if confidence >= 0.6 && !references.contains(where: { $0.matchedBook?.id == book.id }) {
                     references.append(BookReference(
                         bookTitle: book.title,

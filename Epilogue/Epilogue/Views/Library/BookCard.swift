@@ -4,45 +4,86 @@ struct BookCard: View {
     let book: Book
     @State private var showingProgress = false
     @State private var longPressLocation: CGPoint = .zero
+    @State private var isPressed = false
     @EnvironmentObject var viewModel: LibraryViewModel
+    @Environment(\.sizeCategory) var sizeCategory
+    
+    private var accessibilityLabel: String {
+        let pages = book.pageCount ?? 0
+        let currentPage = book.currentPage
+        let progress = pages > 0 ? Int((Double(currentPage) / Double(pages)) * 100) : 0
+        
+        return "\(book.title) by \(book.author). Reading progress: \(progress)% complete, page \(currentPage) of \(pages). Long press to adjust reading progress."
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             // Book cover - using thumbnail for grid view
             BookCoverThumbnailView(
                 coverURL: book.coverImageURL,
                 width: 170,
                 height: 255
             )
+            .accessibilityHidden(true) // Hide decorative image from VoiceOver
             
-            // Title and author only (no progress)
-            VStack(alignment: .leading, spacing: 0) {
+            // Title and author
+            VStack(alignment: .leading, spacing: 4) {
                 Text(book.title)
-                    .font(.system(size: 16, weight: .semibold, design: .serif))
+                    .font(.system(size: sizeCategory.isAccessibilitySize ? 20 : 16, weight: .semibold, design: .serif))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    .lineLimit(2)
+                    .lineLimit(sizeCategory.isAccessibilitySize ? 3 : 2)
                     .truncationMode(.tail)
-                    .frame(minHeight: 40)
+                    .frame(minHeight: sizeCategory.isAccessibilitySize ? 60 : 40)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Text(book.author)
-                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .font(.system(size: sizeCategory.isAccessibilitySize ? 16 : 13, weight: .regular, design: .monospaced))
                     .kerning(1.2)
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
-                    .lineLimit(1)
+                    .lineLimit(sizeCategory.isAccessibilitySize ? 2 : 1)
                     .truncationMode(.tail)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 8) // Add padding after author text
+            
+            // Progress indicator
+            if let pageCount = book.pageCount, pageCount > 0 {
+                HStack {
+                    Text("\(book.currentPage)/\(pageCount)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                    
+                    Spacer()
+                    
+                    Text("\(Int((Double(book.currentPage) / Double(pageCount)) * 100))%")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                }
+                .padding(.top, 2)
+            }
         }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            showingProgress = true
-            HapticManager.shared.mediumTap()
-        }
+        .smoothScale(0.96, isActive: isPressed)
+        .onLongPressGesture(
+            minimumDuration: 0.5,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                withAnimation(SmoothAnimationType.snappy.animation) {
+                    isPressed = pressing
+                }
+            },
+            perform: {
+                showingProgress = true
+                HapticManager.shared.mediumTap()
+            }
+        )
         .popover(isPresented: $showingProgress) {
             ProgressPopover(book: book, viewModel: viewModel)
                 .presentationCompactAdaptation(.popover)
                 .preferredColorScheme(.dark)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("Long press to update reading progress")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -100,6 +141,7 @@ struct ProgressPopover: View {
                     onEditingChanged: { editing in
                         if !editing {
                             currentPage = Int(sliderValue)
+                            HapticManager.shared.pageTurn()
                             updateProgress()
                         }
                     }
@@ -147,6 +189,7 @@ struct ProgressPopover: View {
                         if currentPage > 0 {
                             currentPage -= 1
                             sliderValue = Double(currentPage)
+                            HapticManager.shared.pageTurn()
                             updateProgress()
                         }
                     } label: {
@@ -176,6 +219,7 @@ struct ProgressPopover: View {
                         if currentPage < (book.pageCount ?? 0) {
                             currentPage += 1
                             sliderValue = Double(currentPage)
+                            HapticManager.shared.pageTurn()
                             updateProgress()
                         }
                     } label: {
@@ -193,6 +237,7 @@ struct ProgressPopover: View {
                         Button {
                             currentPage = Int(Double(book.pageCount ?? 0) * Double(percentage) / 100.0)
                             sliderValue = Double(currentPage)
+                            HapticManager.shared.pageTurn()
                             updateProgress()
                         } label: {
                             Text("\(percentage)%")

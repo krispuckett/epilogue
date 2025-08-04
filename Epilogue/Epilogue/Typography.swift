@@ -242,7 +242,7 @@ class NotesViewModel: ObservableObject {
                 
                 // Print details of each note
                 for (index, note) in decodedNotes.enumerated() {
-                    print("🔍 DEBUG: Note \(index): type=\(note.type.rawValue), content=\(String(note.content.prefix(50)))...")
+                    print("🔍 DEBUG: Note \(index): type=\(note.type.rawValue), [\(note.content.count) characters]")
                 }
             } catch {
                 print("❌ DEBUG: Failed to decode notes: \(error)")
@@ -287,7 +287,7 @@ class NotesViewModel: ObservableObject {
     
     func addNote(_ note: Note) {
         print("➕ DEBUG: addNote() called")
-        print("➕ DEBUG: Adding note - type: \(note.type.rawValue), content: \(String(note.content.prefix(50)))...")
+        print("➕ DEBUG: Adding note - type: \(note.type.rawValue), [\(note.content.count) characters]")
         print("➕ DEBUG: Notes count before: \(notes.count)")
         
         notes.append(note)

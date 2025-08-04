@@ -11,6 +11,27 @@ import UIKit
 
 private let logger = Logger(subsystem: "com.epilogue", category: "VoiceRecognition")
 
+// MARK: - Voice Recognition Error
+enum VoiceRecognitionError: LocalizedError {
+    case audioSetupFailed
+    case permissionDenied
+    case recognitionFailed
+    case notAvailable
+    
+    var errorDescription: String? {
+        switch self {
+        case .audioSetupFailed:
+            return "Failed to set up audio engine"
+        case .permissionDenied:
+            return "Microphone or speech recognition permission denied"
+        case .recognitionFailed:
+            return "Failed to recognize speech"
+        case .notAvailable:
+            return "Speech recognition is not available"
+        }
+    }
+}
+
 @MainActor
 class VoiceRecognitionManager: NSObject, ObservableObject {
     static let shared = VoiceRecognitionManager()
@@ -36,8 +57,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine = AVAudioEngine()
-    private var inputNode: AVAudioInputNode!
-    private var audioSession: AVAudioSession!
+    private var inputNode: AVAudioInputNode?
+    private var audioSession: AVAudioSession?
     
     // Voice Activity Detection
     private var silenceTimer: Timer?
@@ -96,23 +117,24 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     // MARK: - Setup Methods
     private func setupAudioSession() async {
         do {
-            audioSession = AVAudioSession.sharedInstance()
+            let session = AVAudioSession.sharedInstance()
+            audioSession = session
             
             // Configure for ambient continuous listening
-            try audioSession.setCategory(.playAndRecord, 
+            try session.setCategory(.playAndRecord, 
                                         mode: .measurement,
                                         options: [.defaultToSpeaker, 
                                                  .allowBluetooth, 
                                                  .mixWithOthers])
             
             // Enable voice processing for better recognition
-            try audioSession.setMode(.voiceChat)
+            try session.setMode(.voiceChat)
             
             // Set preferred settings for low-power continuous listening
-            try audioSession.setPreferredSampleRate(16000) // Lower sample rate for efficiency
-            try audioSession.setPreferredIOBufferDuration(0.05) // 50ms buffer
+            try session.setPreferredSampleRate(16000) // Lower sample rate for efficiency
+            try session.setPreferredIOBufferDuration(0.05) // 50ms buffer
             
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
             
             logger.info("Audio session configured for ambient listening")
         } catch {
@@ -272,6 +294,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             
             // Configure audio engine
             inputNode = audioEngine.inputNode
+            guard let inputNode = inputNode else {
+                throw VoiceRecognitionError.audioSetupFailed
+            }
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
             // Install tap for audio analysis
@@ -800,10 +825,18 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // CRITICAL: Set frameLength before copying
         combinedBuffer.frameLength = AVAudioFrameCount(totalFrames)
         
-        var writePointer = combinedBuffer.floatChannelData![0]
+        guard let channelData = combinedBuffer.floatChannelData else {
+            logger.error("Failed to get combinedBuffer channel data")
+            return nil
+        }
+        var writePointer = channelData[0]
         
         for buffer in buffers {
-            let readPointer = buffer.floatChannelData![0]
+            guard let bufferChannelData = buffer.floatChannelData else {
+                logger.error("Failed to get buffer channel data")
+                continue
+            }
+            let readPointer = bufferChannelData[0]
             let frames = Int(buffer.frameLength)
             
             // Copy with explicit frame count

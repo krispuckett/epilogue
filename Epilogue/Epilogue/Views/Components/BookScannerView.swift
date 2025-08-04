@@ -438,7 +438,7 @@ struct BookScannerView: View {
                     try? await Task.sleep(nanoseconds: UInt64((0.8 - elapsed) * 1_000_000_000))
                 }
                 
-                print("🔵 Extracted info - Title: \(info.title ?? "none"), Author: \(info.author ?? "none"), ISBN: \(info.isbn ?? "none")")
+                print("🔵 Extracted book info successfully")
                 
                 if info.hasValidInfo {
                     print("🔵 Valid info found, preparing search...")
@@ -489,7 +489,10 @@ struct CameraPreviewView: UIViewRepresentable {
         }
         
         var videoPreviewLayer: AVCaptureVideoPreviewLayer {
-            return layer as! AVCaptureVideoPreviewLayer
+            guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
+                fatalError("Expected AVCaptureVideoPreviewLayer but got \(type(of: layer))")
+            }
+            return previewLayer
         }
     }
     
