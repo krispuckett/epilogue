@@ -70,6 +70,14 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var reactionDetectionEnabled = true
     private var lastReactionTime: Date?
     
+    // Pause detection for quote reactions
+    private var pauseDetectionTimer: Timer?
+    private var reactionPhraseDetected: String? = nil
+    private var textBeforePause: String = ""
+    private let shortPauseThreshold: TimeInterval = 0.5
+    private let mediumPauseThreshold: TimeInterval = 1.0
+    private let longPauseThreshold: TimeInterval = 2.0
+    
     // Audio analysis
     private var amplitudeBuffer: [Float] = []
     private let amplitudeBufferSize = 50
@@ -124,7 +132,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             try session.setCategory(.playAndRecord, 
                                         mode: .measurement,
                                         options: [.defaultToSpeaker, 
-                                                 .allowBluetooth, 
+                                                 .allowBluetoothHFP, 
                                                  .mixWithOthers])
             
             // Enable voice processing for better recognition
@@ -247,10 +255,15 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         audioEngine.stop()
         inputNode?.removeTap(onBus: 0)
         silenceTimer?.invalidate()
+        pauseDetectionTimer?.invalidate()
         whisperProcessingTimer?.invalidate()
         whisperProcessingTimer = nil
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
+        
+        // Reset pause detection state
+        reactionPhraseDetected = nil
+        textBeforePause = ""
         
         // Process any remaining audio with Whisper before clearing
         if !audioBufferForWhisper.isEmpty {
@@ -623,12 +636,68 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             logger.debug("Transcription confidence: \(segment.confidence) - '\(segment.substring)'")
         }
         
+        // Check for reaction phrases that might precede quotes
+        detectReactionPhrases(in: text)
+        
         // Process natural reactions only for substantial text
         if reactionDetectionEnabled && !text.isEmpty && text.split(separator: " ").count >= 3 {
             // Only process if we have a complete sentence or if it's been stable for a moment
             if result.isFinal || (self.confidenceScore > 0.8 && text.hasSuffix(".") || text.hasSuffix("?") || text.hasSuffix("!")) {
                 await processNaturalReaction(text)
             }
+        }
+    }
+    
+    private func detectReactionPhrases(in text: String) {
+        let lowercased = text.lowercased()
+        let reactionPhrases = [
+            "this is beautiful", "i love this", "listen to this", 
+            "oh wow", "this is amazing", "here's a great line",
+            "check this out", "this part", "the author says",
+            "this is incredible", "this is perfect", "yes exactly",
+            "this speaks to me", "this is so good", "love this",
+            "wow listen to this", "oh my god", "oh my gosh",
+            "this is powerful", "this is profound", "this is brilliant"
+        ]
+        
+        // Check if current text ends with a reaction phrase
+        for phrase in reactionPhrases {
+            if lowercased.hasSuffix(phrase) || lowercased == phrase {
+                logger.info("Detected reaction phrase: '\(phrase)' - waiting for potential quote")
+                reactionPhraseDetected = phrase
+                textBeforePause = text
+                
+                // Start pause detection timer
+                pauseDetectionTimer?.invalidate()
+                pauseDetectionTimer = Timer.scheduledTimer(withTimeInterval: shortPauseThreshold, repeats: false) { _ in
+                    self.handlePauseAfterReaction()
+                }
+                break
+            }
+        }
+    }
+    
+    private func handlePauseAfterReaction() {
+        guard let reaction = reactionPhraseDetected else { return }
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Check if we have new text after the pause
+            if self.transcribedText.count > self.textBeforePause.count + 10 {
+                // Text continued after pause - likely a quote
+                logger.info("Quote detected after reaction '\(reaction)' and pause")
+                
+                // Post notification for quote processing
+                NotificationCenter.default.post(
+                    name: Notification.Name("ReactionBasedQuoteDetected"),
+                    object: ["reaction": reaction, "fullText": self.transcribedText]
+                )
+            }
+            
+            // Reset detection state
+            self.reactionPhraseDetected = nil
+            self.textBeforePause = ""
         }
     }
     

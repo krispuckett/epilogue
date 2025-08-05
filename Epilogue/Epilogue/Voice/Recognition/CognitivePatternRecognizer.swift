@@ -221,7 +221,7 @@ class CognitivePatternRecognizer: ObservableObject {
             let punctuation: Set<Character> = [".", "!", "?", "\n"]
             var startIndex = text.startIndex
             
-            for (index, char) in text.enumerated().reversed() {
+            for (index, _) in text.enumerated().reversed() {
                 if index < text.distance(from: text.startIndex, to: questionMark) {
                     let charIndex = text.index(text.startIndex, offsetBy: index)
                     if punctuation.contains(text[charIndex]) {

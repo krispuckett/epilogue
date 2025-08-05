@@ -13,6 +13,14 @@ struct ExtractedNote {
     let text: String
     let type: NoteType
     let timestamp: Date
+    let emotionalContext: String?
+    
+    init(text: String, type: NoteType, timestamp: Date, emotionalContext: String? = nil) {
+        self.text = text
+        self.type = type
+        self.timestamp = timestamp
+        self.emotionalContext = emotionalContext
+    }
     
     enum NoteType {
         case reflection

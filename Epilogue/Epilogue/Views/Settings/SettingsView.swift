@@ -399,7 +399,7 @@ struct SettingsView: View {
         }
         
         // Export user settings from UserDefaults
-        let userDefaults = UserDefaults.standard
+        _ = UserDefaults.standard
         var settings: [String: String] = [:]
         settings["gradientIntensity"] = "\(gradientIntensity)"
         settings["enableAnimations"] = "\(enableAnimations)"

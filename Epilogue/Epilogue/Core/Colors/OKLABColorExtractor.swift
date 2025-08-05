@@ -151,7 +151,7 @@ public class OKLABColorExtractor {
         var blackPixels = 0
         
         // Skip edge detection for performance
-        let edgePixels: [(Int, Int)] = []
+        let _: [(Int, Int)] = []
         print("  Skipping edge detection for performance...")
         
         print("  Building histogram from \(width * height) pixels...")

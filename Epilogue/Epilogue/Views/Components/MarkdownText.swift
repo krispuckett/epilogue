@@ -61,7 +61,7 @@ struct MarkdownText: View {
     @available(iOS 15.0, *)
     private func parseCustomMarkdown() -> AttributedString {
         var result = AttributedString(text)
-        let workingText = text
+        _ = text
         
         // Process bold patterns: **text** or __text__
         result = processBoldPattern(result, pattern: "**", font: isUserMessage ?

@@ -5,6 +5,8 @@ struct LiteraryLoadingView: View {
     @State private var currentQuote: LiteraryQuote
     @State private var rotationAngle: Double = 0
     @State private var quoteOpacity: Double = 0
+    @State private var bookScale: CGFloat = 0.8
+    @State private var bookOpacity: Double = 0
     
     init(message: String? = nil) {
         self.message = message
@@ -12,63 +14,106 @@ struct LiteraryLoadingView: View {
     }
     
     var body: some View {
-        VStack(spacing: 24) {
-            // Warm amber spinner
+        VStack(spacing: 32) {
+            // Animated book icon
             ZStack {
+                // Background glow
                 Circle()
-                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), lineWidth: 3)
-                    .frame(width: 50, height: 50)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 10)
                 
-                Circle()
-                    .trim(from: 0, to: 0.3)
-                    .stroke(
+                // Book icon with page flip animation
+                Image(systemName: "book.pages.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(
                         LinearGradient(
                             colors: [
                                 Color(red: 1.0, green: 0.55, blue: 0.26),
                                 Color(red: 1.0, green: 0.7, blue: 0.4)
                             ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                    .frame(width: 50, height: 50)
-                    .rotationEffect(.degrees(rotationAngle))
+                    .scaleEffect(bookScale)
+                    .opacity(bookOpacity)
                     .onAppear {
-                        withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                            rotationAngle = 360
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                            bookScale = 1.0
+                            bookOpacity = 1.0
+                        }
+                        
+                        // Gentle pulsing animation
+                        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                            bookScale = 1.05
                         }
                     }
             }
             
-            // Loading message if provided
-            if let message = message {
-                Text(message)
-                    .font(.system(size: 16, weight: .medium, design: .serif))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
+            // Loading message with progress dots
+            HStack(spacing: 4) {
+                if let message = message {
+                    Text(message)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.9))
+                }
+                
+                // Animated dots
+                HStack(spacing: 2) {
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .frame(width: 4, height: 4)
+                            .opacity(rotationAngle > Double(index * 120) ? 1.0 : 0.3)
+                            .animation(.easeInOut(duration: 0.5), value: rotationAngle)
+                    }
+                }
             }
             
-            // Literary quote with Georgia italic
-            VStack(spacing: 8) {
+            // Literary quote with better styling
+            VStack(spacing: 12) {
                 Text(currentQuote.text)
-                    .font(.custom("Georgia", size: 15))
+                    .font(.system(size: 16, weight: .regular, design: .serif))
                     .italic()
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.7))
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 
-                Text("— \(currentQuote.author)")
-                    .font(.custom("Georgia", size: 13))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                HStack(spacing: 8) {
+                    Rectangle()
+                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5))
+                        .frame(width: 20, height: 1)
+                    
+                    Text(currentQuote.author)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    
+                    Rectangle()
+                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5))
+                        .frame(width: 20, height: 1)
+                }
             }
             .opacity(quoteOpacity)
             .onAppear {
-                withAnimation(.easeInOut(duration: 0.8).delay(0.3)) {
+                withAnimation(.easeInOut(duration: 0.8).delay(0.5)) {
                     quoteOpacity = 1
                 }
             }
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 50)
+        .frame(maxWidth: 400) // Limit width for better readability
         .onAppear {
             // Rotate quotes every 4 seconds
             Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in

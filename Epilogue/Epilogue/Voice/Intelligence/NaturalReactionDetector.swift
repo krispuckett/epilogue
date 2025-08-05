@@ -300,7 +300,7 @@ class NaturalReactionDetector: ObservableObject {
         tagger.string = utterance
         
         var hasQuestion = false
-        var hasExclamation = utterance.contains("!") || utterance.contains("?!")
+        let hasExclamation = utterance.contains("!") || utterance.contains("?!")
         var hasInterjection = false
         
         tagger.enumerateTags(

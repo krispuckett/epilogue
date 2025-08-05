@@ -145,8 +145,9 @@ struct LibraryView: View {
                     ScrollViewTracker(isScrolling: $isScrolling)
                     
                     if viewModel.isLoading {
-                        LiteraryLoadingView(message: "Loading books...")
-                            .padding(.top, 100)
+                        LiteraryLoadingView(message: "Loading your library")
+                            .padding(.top, 80)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     } else if viewModel.books.isEmpty {
                         emptyStateView
                     } else {
@@ -407,8 +408,13 @@ struct LibraryBookCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Book cover with 3D effect
-            BookCoverView(coverURL: book.coverImageURL)
-                .frame(width: 170, height: 255)
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 170,
+                height: 255,
+                loadFullImage: false,
+                isLibraryView: true
+            )
                 .overlay(alignment: .topTrailing) {
                     if isPressed {
                         Image(systemName: "ellipsis.circle.fill")
@@ -445,16 +451,7 @@ struct LibraryBookCard: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 
-                // Compact reading timeline for books in progress
-                if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
-                    AmbientReadingProgressView(
-                        book: book,
-                        width: 150,
-                        showDetailed: false
-                    )
-                    .environmentObject(viewModel)
-                    .padding(.top, 6)
-                }
+                // Progress bar removed per user request
             }
             .padding(.bottom, 8) // Add extra padding at bottom of text
         }
@@ -514,68 +511,7 @@ struct LibraryBookCard: View {
     }
 }
 
-// MARK: - Book Cover View
-struct BookCoverView: View {
-    let coverURL: String?
-    @State private var isImageLoaded = false
-    
-    // Simplified URL enhancement
-    private var imageURL: URL? {
-        guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
-        
-        // Quick enhancement without regex
-        var enhanced = coverURL.replacingOccurrences(of: "http://", with: "https://")
-        if !enhanced.contains("zoom=") {
-            enhanced += enhanced.contains("?") ? "&zoom=2" : "?zoom=2"
-        }
-        
-        return URL(string: enhanced)
-    }
-    
-    var body: some View {
-        ZStack {
-            // Lightweight placeholder
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
-            
-            if let url = imageURL {
-                AsyncImage(url: url, scale: 2) { phase in
-                    switch phase {
-                    case .empty:
-                        // Minimal loading state
-                        if !isImageLoaded {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                                .tint(.white.opacity(0.5))
-                        }
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 170, height: 255)
-                            .clipped()
-                            .onAppear { isImageLoaded = true }
-                    case .failure:
-                        // Simple failure state
-                        Image(systemName: "book.closed.fill")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.white.opacity(0.2))
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-            } else {
-                // No cover URL
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.white.opacity(0.2))
-            }
-        }
-        .frame(width: 170, height: 255)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-    }
-}
+// BookCoverView removed - now using SharedBookCoverView
 
 
 // MARK: - Placeholder Views

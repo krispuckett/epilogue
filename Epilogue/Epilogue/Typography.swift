@@ -415,7 +415,7 @@ class NotesViewModel: ObservableObject {
             userDefaults.set(encoded, forKey: "com.epilogue.testNotes")
             userDefaults.synchronize()
             
-            if let testData = userDefaults.data(forKey: "com.epilogue.testNotes") {
+            if userDefaults.data(forKey: "com.epilogue.testNotes") != nil {
                 print("✅ DEBUG: Test save/load successful")
                 userDefaults.removeObject(forKey: "com.epilogue.testNotes")
             } else {

@@ -344,11 +344,11 @@ extension ColorPalette: Codable {
         let textColorHex = try container.decode(String.self, forKey: .textColor)
         
         self.init(
-            primary: Color(hex: primaryHex) ?? .black,
-            secondary: Color(hex: secondaryHex) ?? .gray,
-            accent: Color(hex: accentHex) ?? .blue,
-            background: Color(hex: backgroundHex) ?? .black,
-            textColor: Color(hex: textColorHex) ?? .white,
+            primary: Color(hex: primaryHex),
+            secondary: Color(hex: secondaryHex),
+            accent: Color(hex: accentHex),
+            background: Color(hex: backgroundHex),
+            textColor: Color(hex: textColorHex),
             luminance: try container.decode(Double.self, forKey: .luminance),
             isMonochromatic: try container.decode(Bool.self, forKey: .isMonochromatic),
             extractionQuality: try container.decode(Double.self, forKey: .extractionQuality)

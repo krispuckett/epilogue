@@ -382,12 +382,13 @@ struct BookDetailView: View {
                 }
                 .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
-                if let pageCount = book.pageCount {
-                    Text("\(book.currentPage) of \(pageCount) pages")
-                        .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        .foregroundColor(secondaryTextColor.opacity(0.875))
-                                .accessibilityLabel("Progress: \(book.currentPage) of \(pageCount) pages")
-                }
+                // Page count and percentage removed per user request
+                // DEBUG: This area should be empty now
+                #if DEBUG
+                Text("DEBUG: If you see progress here, it's NOT from BookDetailView")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                #endif
                 
                 if let rating = book.userRating {
                     StatusPill(text: "★ \(rating)", color: accentColor.opacity(0.8))
@@ -396,21 +397,7 @@ struct BookDetailView: View {
             }
             .padding(.top, 8)
             
-            // Compact progress timeline for currently reading books
-            if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
-                AmbientReadingProgressView(
-                    book: book,
-                    width: 300,
-                    showDetailed: false,
-                    colorPalette: colorPalette
-                )
-                .environmentObject(libraryViewModel)
-                .padding(.top, 12)
-                .onTapGesture {
-                    showingProgressEditor = true
-                    HapticManager.shared.lightTap()
-                }
-            }
+            // Progress bar removed per user request
             
             // Icon-only segmented control
             iconOnlySegmentedControl
@@ -576,8 +563,7 @@ struct BookDetailView: View {
             AmbientReadingProgressView(
                 book: book,
                 width: 320,
-                showDetailed: true,
-                colorPalette: colorPalette
+                showDetailed: true
             )
             .environmentObject(libraryViewModel)
         }
@@ -802,7 +788,7 @@ struct BookDetailView: View {
     
     private func extractColorsFromDisplayedImage(_ displayedImage: UIImage) async {
         // Check cache first
-        let bookID = book.id ?? book.isbn ?? book.title
+        let bookID = book.id
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
@@ -849,7 +835,7 @@ struct BookDetailView: View {
     
     private func extractColorsFromCover() async {
         // Check cache first
-        let bookID = book.id ?? book.isbn ?? book.title
+        let bookID = book.id
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
@@ -945,7 +931,7 @@ struct BookDetailView: View {
         print("🔬 Running color diagnostic for: \(book.title)")
         
         // Try to get the cover image
-        if let coverImage = coverImage {
+        if coverImage != nil {
             // ColorExtractionDiagnostic was removed - diagnostic functionality no longer available
             // let diagnostic = ColorExtractionDiagnostic()
             // await diagnostic.runDiagnostic(on: coverImage, bookTitle: book.title)
@@ -970,7 +956,7 @@ struct BookDetailView: View {
             
             do {
                 let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-                guard let uiImage = UIImage(data: imageData) else {
+                guard UIImage(data: imageData) != nil else {
                     print("❌ Could not create UIImage for diagnostic")
                     return
                 }

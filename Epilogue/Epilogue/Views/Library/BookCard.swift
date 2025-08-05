@@ -45,21 +45,7 @@ struct BookCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
-            // Progress indicator
-            if let pageCount = book.pageCount, pageCount > 0 {
-                HStack {
-                    Text("\(book.currentPage)/\(pageCount)")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
-                    
-                    Spacer()
-                    
-                    Text("\(Int((Double(book.currentPage) / Double(pageCount)) * 100))%")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
-                }
-                .padding(.top, 2)
-            }
+            // Progress indicator removed per user request
         }
         .smoothScale(0.96, isActive: isPressed)
         .onLongPressGesture(

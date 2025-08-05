@@ -141,7 +141,7 @@ struct AmbientReadingView: View {
     
     private func setupIntelligence() {
         // Set up the reading context
-        let context = ReadingContext(
+        _ = ReadingContext(
             currentBook: bookTitle,
             currentChapter: chapterTitle,
             genre: "Philosophy"

@@ -365,7 +365,7 @@ class AICompanionService: ObservableObject {
                     print("📤 Response received [\(response.count) characters]")
                 } else {
                     print("Perplexity API key NOT configured")
-                    if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String {
+                    if Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") is String {
                         print("🔑 API Key validation failed")
                     } else {
                         print("🔑 No API key found in Info.plist")

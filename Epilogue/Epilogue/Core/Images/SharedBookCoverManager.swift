@@ -73,8 +73,8 @@ public class SharedBookCoverManager: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Load thumbnail (120x180) for grid views
-    public func loadThumbnail(from coverURL: String?) async -> UIImage? {
+    /// Load thumbnail for grid views
+    public func loadThumbnail(from coverURL: String?, targetSize: CGSize = CGSize(width: 120, height: 180)) async -> UIImage? {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
         let cleanedURL = cleanURL(coverURL)
@@ -95,7 +95,7 @@ public class SharedBookCoverManager: ObservableObject {
         return await loadAndCacheImage(
             from: cleanedURL,
             cacheKey: cacheKey as String,
-            targetSize: CGSize(width: 120, height: 180),
+            targetSize: targetSize,
             isThumbnail: true
         )
     }
@@ -126,6 +126,11 @@ public class SharedBookCoverManager: ObservableObject {
             targetSize: nil, // Full size
             isThumbnail: false
         )
+    }
+    
+    /// Load library thumbnail (200x300 max) for library grid views
+    public func loadLibraryThumbnail(from coverURL: String?) async -> UIImage? {
+        return await loadThumbnail(from: coverURL, targetSize: CGSize(width: 200, height: 300))
     }
     
     /// Progressive loading - thumbnail first, then full image

@@ -38,7 +38,7 @@ struct UnifiedChatView: View {
     // Input state
     @State private var messageText = ""
     @State private var showingCommandPalette = false
-    @State private var showingBookPicker = false
+    @State private var showingBookStrip = false
     @FocusState private var isInputFocused: Bool
     
     // Ambient/Whisper state
@@ -123,8 +123,13 @@ struct UnifiedChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         if filteredMessages.isEmpty {
-                            emptyStateView
-                                .padding(.top, 100)
+                            if showingBookStrip {
+                                bookGridView
+                                    .padding(.top, 40)
+                            } else {
+                                emptyStateView
+                                    .padding(.top, 100)
+                            }
                         } else {
                             ForEach(filteredMessages) { message in
                                 ChatMessageView(
@@ -144,17 +149,7 @@ struct UnifiedChatView: View {
                     scrollProxy = proxy
                 }
             }
-            // 3. Use safeAreaInset for header and input (exactly like LibraryView)
-            .safeAreaInset(edge: .top) {
-                BookContextMenuView(
-                    currentBook: $currentBookContext,
-                    books: libraryViewModel.books,
-                    showingBookPicker: $showingBookPicker
-                )
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .glassEffect(.regular)
-            }
+            // Native navigation setup
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     // Live transcription preview during recording
@@ -196,7 +191,6 @@ struct UnifiedChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
                 }
-                .glassEffect(.regular)
             }
         }
         .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
@@ -272,38 +266,34 @@ struct UnifiedChatView: View {
             audioLevel = level
         }
         } // End of ZStack
-        .overlay(alignment: .top) {
-            if showingBookPicker {
-                // Tap outside backdrop
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingBookPicker = false
+        // Navigation setup with native blur
+        .navigationTitle(currentBookContext?.title ?? "Chat")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingBookStrip.toggle()
                     }
-                    .ignoresSafeArea()
-                
-                VStack {
-                    ChatBookPickerSheet(
-                        selectedBook: $currentBookContext,
-                        isPresented: $showingBookPicker,
-                        books: libraryViewModel.books
-                    )
-                    .padding(.horizontal, 16)
-                    
-                    Spacer()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Switch books")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        
+                        Image(systemName: showingBookStrip ? "xmark.circle.fill" : "book.closed.circle")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    }
                 }
-                .offset(y: 50) // Position from top of screen
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.98, anchor: .top).combined(with: .opacity),
-                    removal: .scale(scale: 0.98, anchor: .top).combined(with: .opacity)
-                ))
-                .zIndex(100)
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookPicker)
-        // Hide navigation bar but keep blur working
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .onChange(of: showingBookStrip) { _, _ in
+            if showingBookStrip {
+                // Dismiss keyboard if active
+                isInputFocused = false
+            }
+        }
     }
     
     
@@ -362,6 +352,65 @@ struct UnifiedChatView: View {
         .padding(.horizontal, 40)
     }
     
+    // MARK: - Book Grid View
+    
+    private var bookGridView: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ], spacing: 20) {
+            // All Books button
+            Button {
+                currentBookContext = nil
+                showingBookStrip = false
+                HapticManager.shared.lightTap()
+            } label: {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.1))
+                    .aspectRatio(2/3, contentMode: .fit)
+                    .overlay {
+                        Image(systemName: "books.vertical")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .overlay {
+                        if currentBookContext == nil {
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
+                        }
+                    }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Book items
+            ForEach(libraryViewModel.books) { book in
+                Button {
+                    currentBookContext = book
+                    showingBookStrip = false
+                    HapticManager.shared.lightTap()
+                } label: {
+                    SharedBookCoverView(
+                        coverURL: book.coverImageURL,
+                        width: 90,
+                        height: 135
+                    )
+                    .aspectRatio(2/3, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay {
+                        if currentBookContext?.id == book.id {
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
+                        }
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 125)
+    }
+    
     // MARK: - Message Handling
     
     private func sendMessage() {
@@ -406,8 +455,7 @@ struct UnifiedChatView: View {
         messageText = ""
         
         // Delay scroll slightly to ensure all messages are rendered
-        Task {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             withAnimation {
                 // Scroll to the last message
                 if let lastMessage = messages.last {
@@ -452,7 +500,7 @@ struct UnifiedChatView: View {
         // Save to SwiftData
         do {
             try modelContext.save()
-            print("✅ Saved note from keyboard [\(noteText.count) characters]")
+            print("✅ Saved note from keyboard: \(noteText)")
             
             // Add system message to chat
             let systemMessage = UnifiedChatMessage(
@@ -523,7 +571,7 @@ struct UnifiedChatView: View {
         // Save to SwiftData
         do {
             try modelContext.save()
-            print("✅ Saved quote from keyboard [\(content.count) characters]")
+            print("✅ Saved quote from keyboard: \(content)")
             
             // Add system message to chat with mini quote card
             let systemMessage = UnifiedChatMessage(
@@ -880,7 +928,7 @@ struct UnifiedChatView: View {
     
     private func processTranscription(_ transcription: String) async -> ProcessedAmbientSession {
         print("\nTRANSCRIPTION PROCESSING:")
-        print("Raw text received [\(transcription.count) characters]")
+        print("Raw text: \(transcription)")
         
         var quotes: [ExtractedQuote] = []
         var notes: [ExtractedNote] = []
@@ -895,18 +943,73 @@ struct UnifiedChatView: View {
             // Improved QUOTE detection
             var isQuote = false
             
-            // Check for explicit quote indicators FIRST
-            if lowercased.starts(with: "quote:") ||
+            // Reaction-based quote detection patterns FIRST
+            let reactionPhrases = [
+                "i love this quote", "this is beautiful", "i love this", "listen to this", 
+                "oh wow", "this is amazing", "here's a great line",
+                "check this out", "this part", "the author says",
+                "this is incredible", "this is perfect", "yes exactly",
+                "this speaks to me", "this is so good", "love this",
+                "wow listen to this", "oh my god", "oh my gosh",
+                "this is powerful", "this is profound", "this is brilliant"
+            ]
+            
+            // Check for reaction phrase followed by more text (indicating a quote)
+            var detectedReactionQuote = false
+            for phrase in reactionPhrases {
+                if lowercased.contains(phrase) {
+                    // Find where the phrase ends and extract everything after it
+                    if let range = lowercased.range(of: phrase) {
+                        let afterPhrase = String(trimmed[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                        
+                        // Clean up common separators and filler words
+                        var quoteText = afterPhrase
+                        let separators = ["...", "…", "..", ".", ":", "-", "—", "–"]
+                        for separator in separators {
+                            if quoteText.starts(with: separator) {
+                                quoteText = String(quoteText.dropFirst(separator.count)).trimmingCharacters(in: .whitespaces)
+                                break
+                            }
+                        }
+                        
+                        // Clean quotation marks if present
+                        quoteText = quoteText
+                            .replacingOccurrences(of: "\"", with: "")
+                            .replacingOccurrences(of: "\u{201C}", with: "")
+                            .replacingOccurrences(of: "\u{201D}", with: "")
+                            .replacingOccurrences(of: "'", with: "")
+                            .replacingOccurrences(of: "'", with: "")
+                            .replacingOccurrences(of: "'", with: "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        // If we have text after the reaction phrase, it's a quote
+                        if !quoteText.isEmpty && quoteText.count > 5 {
+                            print("   Detected as QUOTE (by reaction pattern: '\(phrase)')")
+                            print("   Extracted quote: '\(quoteText)'")
+                            quotes.append(ExtractedQuote(
+                                text: quoteText,
+                                context: "User reaction: \(phrase)",
+                                timestamp: Date()
+                            ))
+                            detectedReactionQuote = true
+                            isQuote = true
+                            break
+                        }
+                    }
+                }
+            }
+            
+            // Check for explicit quote indicators (if not already detected by reaction)
+            if !detectedReactionQuote && (lowercased.starts(with: "quote:") ||
                lowercased.contains("save this quote") ||
                lowercased.contains("i want to quote") ||
                lowercased.contains("remember this quote") ||
                lowercased.contains("here's a quote") ||
                lowercased.contains("the book says") ||
-               lowercased.contains("the author says") ||
                lowercased.contains("it says") ||
                lowercased.contains("she says") ||
                lowercased.contains("he says") ||
-               lowercased.contains("they say") {
+               lowercased.contains("they say")) {
                 print("   Detected as QUOTE (by keyword)")
                 isQuote = true
                 
@@ -1379,224 +1482,7 @@ struct AmbientChatGradientView: View {
     }
 }
 
-// MARK: - Book Context Menu View
-
-struct BookContextMenuView: View {
-    @Binding var currentBook: Book?
-    let books: [Book]
-    @Binding var showingBookPicker: Bool
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Book cover OUTSIDE the glass effect
-            if let book = currentBook {
-                SharedBookCoverView(
-                    coverURL: book.coverImageURL,
-                    width: 24,
-                    height: 36
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-            }
-            
-            // Simplified button with glassEffect
-            Button {
-                showingBookPicker = true
-                HapticManager.shared.lightTap()
-            } label: {
-                HStack(spacing: 8) {
-                    if let book = currentBook {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(book.title)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.9))
-                                .lineLimit(1)
-                            
-                            Text(book.author ?? "")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.white.opacity(0.6))
-                                .lineLimit(1)
-                        }
-                    } else {
-                        Image(systemName: "books.vertical")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                        
-                        Text("Select a book")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
-            }
-            .buttonStyle(.plain)
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookPicker)
-    }
-}
-
-// MARK: - Simplified Components Without Glass Effects
-
-struct SimplifiedBookContextPill: View {
-    let book: Book?
-    let onBookSelected: (Book) -> Void
-    let onClearSelection: () -> Void
-    let libraryViewModel: LibraryViewModel
-    
-    var body: some View {
-        Menu {
-            // Show user's books
-            ForEach(libraryViewModel.books) { book in
-                Button {
-                    onBookSelected(book)
-                    HapticManager.shared.lightTap()
-                } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(book.title)
-                                .font(.body)
-                            Text(book.author)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        SharedBookCoverView(
-                            coverURL: book.coverImageURL,
-                            width: 30,
-                            height: 40
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
-                }
-            }
-            
-            if !libraryViewModel.books.isEmpty {
-                Divider()
-            }
-            
-            Button {
-                onClearSelection()
-                HapticManager.shared.lightTap()
-            } label: {
-                Label("Clear Selection", systemImage: "xmark.circle")
-            }
-        } label: {
-            // Use original BookContextPill but without glass effect
-            BookContextPillContent(book: book)
-        }
-    }
-}
-
-struct BookContextPillContent: View {
-    let book: Book?
-    
-    private var readingProgress: Double? {
-        if let book = book, 
-           let pageCount = book.pageCount, 
-           pageCount > 0,
-           book.currentPage > 0 {
-            return Double(book.currentPage) / Double(pageCount)
-        }
-        return nil
-    }
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            if let book = book {
-                // Mini book cover
-                if let coverURL = book.coverImageURL {
-                    AsyncImage(url: URL(string: coverURL)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 16, height: 24)
-                                .clipShape(RoundedRectangle(cornerRadius: 2))
-                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                        case .failure(_), .empty:
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(.white.opacity(0.1))
-                                .frame(width: 16, height: 24)
-                                .overlay {
-                                    Image(systemName: "book.closed.fill")
-                                        .font(.system(size: 8))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                }
-                        @unknown default:
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(.white.opacity(0.1))
-                                .frame(width: 16, height: 24)
-                        }
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(.white.opacity(0.1))
-                        .frame(width: 16, height: 24)
-                        .overlay {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 8))
-                                .foregroundStyle(.white.opacity(0.4))
-                        }
-                }
-                
-                // Book info
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(book.title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    
-                    HStack(spacing: 4) {
-                        Text(book.author)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        
-                        // Reading progress indicator
-                        if let progress = readingProgress {
-                            Text("•")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.white.opacity(0.4))
-                            
-                            Text("\(Int(progress * 100))%")
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.green.opacity(0.8))
-                        }
-                    }
-                }
-                .frame(maxWidth: 200, alignment: .leading)
-            } else {
-                Image(systemName: "books.vertical")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
-                
-                Text("Select a book")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            
-            // Chevron indicator
-            Image(systemName: "chevron.down")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
-        }
-    }
-}
+// MARK: - Input Bar Component
 
 struct SimplifiedUnifiedChatInputBar: View {
     @Binding var messageText: String
@@ -1702,6 +1588,7 @@ struct SimplifiedUnifiedChatInputBar: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
     }
 }
+
 
 // MARK: - Preview
 

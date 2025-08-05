@@ -15,7 +15,9 @@ struct ChatMessage: Identifiable {
 // MARK: - Chat View
 struct ChatView: View {
     var body: some View {
-        UnifiedChatView()
+        NavigationStack {
+            UnifiedChatView()
+        }
     }
 }
 

@@ -1,16 +1,15 @@
 import SwiftUI
 
-struct AmbientProgressSheet: View {
+/// Embedded version of AmbientProgressSheet with EXACT same visual design, just compact and auto-saving
+struct EmbeddedAmbientProgress: View {
     let book: Book
-    @Binding var isPresented: Bool
-    @EnvironmentObject var viewModel: LibraryViewModel
+    let width: CGFloat
     var colorPalette: ColorPalette? = nil
     
+    @EnvironmentObject var viewModel: LibraryViewModel
     @State private var currentPage: Int
     @State private var isDragging = false
     @State private var dragProgress: Double = 0
-    // Floating indicator removed per user request
-    @State private var hasUnsavedChanges = false
     
     private let amberColor = Color(red: 1.0, green: 0.55, blue: 0.26)
     
@@ -22,9 +21,9 @@ struct AmbientProgressSheet: View {
         colorPalette?.secondary ?? amberColor.opacity(0.7)
     }
     
-    init(book: Book, isPresented: Binding<Bool>, colorPalette: ColorPalette? = nil) {
+    init(book: Book, width: CGFloat, colorPalette: ColorPalette? = nil) {
         self.book = book
-        self._isPresented = isPresented
+        self.width = width
         self.colorPalette = colorPalette
         self._currentPage = State(initialValue: book.currentPage)
     }
@@ -47,66 +46,37 @@ struct AmbientProgressSheet: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Ambient background gradient
-                ambientBackground
+        ZStack {
+            // EXACT same ambient background from sheet
+            ambientBackground
+            
+            // Main content - made more compact
+            VStack(spacing: 24) {
+                // Compact version of the hero timeline
+                compactHeroTimeline
                 
-                // Main content
-                VStack(spacing: 0) {
-                    Spacer()
-                    
-                    // Hero timeline - the only interface
-                    heroTimelineSection
-                    
-                    Spacer()
-                    
-                    // Minimal bottom info
-                    bottomInfo
-                        .padding(.bottom, 40)
-                }
-                
-                // Floating progress indicator removed per user request
+                // Bottom info - exact same as sheet
+                bottomInfo
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        if hasUnsavedChanges {
-                            // Reset to original
-                            currentPage = book.currentPage
-                        }
-                        isPresented = false
-                    }
-                    .foregroundStyle(.white.opacity(0.8))
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        saveProgress()
-                    }
-                    .foregroundStyle(primaryColor)
-                    .fontWeight(.semibold)
-                    .opacity(hasUnsavedChanges ? 1.0 : 0.5)
-                    .disabled(!hasUnsavedChanges)
-                }
-            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
         }
-        .preferredColorScheme(.dark)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(32)
+        .frame(width: width, height: 200)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(primaryColor.opacity(0.1), lineWidth: 1)
+        }
     }
     
-    // MARK: - Views
+    // MARK: - Views (EXACT COPIES from AmbientProgressSheet)
     
     private var ambientBackground: some View {
         ZStack {
-            // Base dark background
-            Color.black.ignoresSafeArea()
+            // Base dark background - EXACT same as sheet
+            Color.black
             
-            // Animated gradient that responds to progress
+            // Animated gradient that responds to progress - EXACT same as sheet
             RadialGradient(
                 colors: [
                     primaryColor.opacity(0.3 * displayProgress),
@@ -118,49 +88,23 @@ struct AmbientProgressSheet: View {
                 startRadius: 100,
                 endRadius: 500
             )
-            .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.8), value: displayProgress)
             
-            // Subtle overlay texture
+            // Subtle overlay texture - EXACT same as sheet
             Color.white.opacity(0.02)
-                .ignoresSafeArea()
         }
     }
     
-    private var heroTimelineSection: some View {
-        VStack(spacing: 40) {
-            // Book title (minimal)
-            VStack(spacing: 8) {
-                Text(book.title)
-                    .font(.system(size: 28, weight: .light, design: .serif))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                
-                Text(book.author)
-                    .font(.system(size: 16, weight: .regular, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.6))
-                    .tracking(1)
-            }
-            .padding(.horizontal, 40)
-            
-            // The hero timeline - main interaction
-            interactiveTimeline
-                .frame(height: 300)
-                .padding(.horizontal, 30)
-        }
-    }
-    
-    private var interactiveTimeline: some View {
-        VStack(spacing: 30) {
-            // Progress ring (visual centerpiece)
+    private var compactHeroTimeline: some View {
+        HStack(spacing: 30) {
+            // Progress ring (scaled from 180 to 140 for compact)
             ZStack {
-                // Background ring
+                // Background ring - EXACT same styling
                 Circle()
                     .stroke(Color.white.opacity(0.1), lineWidth: 8)
-                    .frame(width: 180, height: 180)
+                    .frame(width: 140, height: 140)
                 
-                // Progress ring
+                // Progress ring - EXACT same gradient and styling
                 Circle()
                     .trim(from: 0, to: displayProgress)
                     .stroke(
@@ -175,12 +119,12 @@ struct AmbientProgressSheet: View {
                         ),
                         style: StrokeStyle(lineWidth: 8, lineCap: .round)
                     )
-                    .frame(width: 180, height: 180)
+                    .frame(width: 140, height: 140)
                     .rotationEffect(.degrees(-90))
                     .shadow(color: primaryColor.opacity(0.5), radius: 8)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8), value: displayProgress)
                 
-                // Center percentage
+                // Center percentage - EXACT same styling
                 Text("\(Int(displayProgress * 100))%")
                     .font(.system(size: 32, weight: .thin, design: .monospaced))
                     .foregroundStyle(.white)
@@ -190,21 +134,24 @@ struct AmbientProgressSheet: View {
             .scaleEffect(isDragging ? 1.05 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
             
-            // Interactive timeline bar
-            timelineBar
-                .frame(height: 12)
+            // Interactive timeline bar - positioned vertically
+            VStack(spacing: 12) {
+                timelineBar
+                    .frame(height: 12)
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
     
     private var timelineBar: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Background track
+                // Background track - EXACT same as sheet
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.white.opacity(0.15))
                     .frame(height: 12)
                 
-                // Progress segments (flowing animation)
+                // Progress segments (flowing animation) - EXACT copy from sheet
                 HStack(spacing: 2) {
                     ForEach(0..<40, id: \.self) { index in
                         let segmentProgress = Double(index) / 39.0
@@ -239,7 +186,7 @@ struct AmbientProgressSheet: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 
-                // Current position indicator
+                // Current position indicator - EXACT same as sheet
                 if displayProgress > 0.02 {
                     HStack {
                         Spacer()
@@ -256,19 +203,19 @@ struct AmbientProgressSheet: View {
                     }
                 }
             }
-            .contentShape(Rectangle()) // Make entire area tappable
-            .simultaneousGesture(
-                DragGesture(coordinateSpace: .local)
-                    .onChanged { value in
-                        handleTimelineDrag(value: value, geometry: geometry)
-                    }
-                    .onEnded { _ in
-                        endTimelineDrag()
-                    }
-            )
-            .onTapGesture { location in
-                handleTimelineTap(location: location, geometry: geometry)
-            }
+        }
+        .contentShape(Rectangle()) // Make entire area tappable
+        .simultaneousGesture(
+            DragGesture(coordinateSpace: .local)
+                .onChanged { value in
+                    handleTimelineDrag(value: value)
+                }
+                .onEnded { _ in
+                    endTimelineDrag()
+                }
+        )
+        .onTapGesture { location in
+            handleTimelineTap(location: location)
         }
     }
     
@@ -306,31 +253,33 @@ struct AmbientProgressSheet: View {
                 }
             }
         }
-        .padding(.horizontal, 40)
     }
     
-    // Floating progress indicator removed per user request
+    // MARK: - Gesture Handling (EXACT COPY from sheet with auto-save added)
     
-    // MARK: - Gesture Handling
-    
-    private func handleTimelineTap(location: CGPoint, geometry: GeometryProxy) {
+    private func handleTimelineTap(location: CGPoint) {
         guard let pageCount = book.pageCount else { return }
         
-        // Use the actual timeline width from GeometryReader
-        let timelineWidth = geometry.size.width
+        // Calculate progress based on tap location (assuming timeline width)
+        let timelineWidth = width - 200 // Account for ring and padding
         let tapProgress = max(0, min(1, location.x / timelineWidth))
         
         let targetPage = Int(tapProgress * Double(pageCount))
         
         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
             currentPage = targetPage
-            hasUnsavedChanges = (targetPage != book.currentPage)
         }
         
         HapticManager.shared.pageTurn()
+        
+        // Auto-save immediately
+        if targetPage != book.currentPage {
+            viewModel.updateBookProgress(book, currentPage: targetPage)
+            HapticManager.shared.success()
+        }
     }
     
-    private func handleTimelineDrag(value: DragGesture.Value, geometry: GeometryProxy) {
+    private func handleTimelineDrag(value: DragGesture.Value) {
         guard let pageCount = book.pageCount else { return }
         
         if !isDragging {
@@ -338,14 +287,12 @@ struct AmbientProgressSheet: View {
             HapticManager.shared.selectionChanged()
         }
         
-        // Use the actual timeline width from GeometryReader
-        let timelineWidth = geometry.size.width
+        // Calculate progress based on drag location
+        let timelineWidth = width - 200 // Account for ring and padding
         let dragLocationX = max(0, min(timelineWidth, value.location.x))
         let newProgress = dragLocationX / timelineWidth
         
         dragProgress = newProgress
-        
-        // Floating indicator removed
         
         // Haptic feedback every 5% progress
         let progressPercent = Int(newProgress * 100)
@@ -363,22 +310,14 @@ struct AmbientProgressSheet: View {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
             currentPage = targetPage
             isDragging = false
-            hasUnsavedChanges = (targetPage != book.currentPage)
         }
         
         HapticManager.shared.pageTurn()
-    }
-    
-    // showFloatingIndicator removed per user request
-    
-    private func saveProgress() {
-        viewModel.updateBookProgress(book, currentPage: currentPage)
-        hasUnsavedChanges = false
-        HapticManager.shared.success()
         
-        // Close sheet after brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            isPresented = false
+        // Auto-save immediately
+        if targetPage != book.currentPage {
+            viewModel.updateBookProgress(book, currentPage: targetPage)
+            HapticManager.shared.success()
         }
     }
 }
@@ -386,26 +325,35 @@ struct AmbientProgressSheet: View {
 // MARK: - Preview
 
 #Preview {
-    let previewBook: Book = {
-        var book = Book(
-            id: "preview",
-            title: "Sample Book",
-            author: "Sample Author",
-            publishedYear: "2024",
-            coverImageURL: nil,
-            isbn: nil,
-            description: nil,
-            pageCount: 354,
-            localId: UUID()
-        )
-        book.currentPage = 127
-        return book
-    }()
-    
-    AmbientProgressSheet(
-        book: previewBook,
-        isPresented: .constant(true),
-        colorPalette: nil
-    )
-    .environmentObject(LibraryViewModel())
+    ZStack {
+        Color(red: 0.11, green: 0.105, blue: 0.102)
+            .ignoresSafeArea()
+        
+        VStack(spacing: 30) {
+            Text("Embedded Ambient Progress")
+                .font(.title2)
+                .foregroundStyle(.white)
+            
+            EmbeddedAmbientProgress(
+                book: {
+                    var book = Book(
+                        id: "preview",
+                        title: "Sample Book",
+                        author: "Sample Author",
+                        publishedYear: "2024",
+                        coverImageURL: nil,
+                        isbn: nil,
+                        description: nil,
+                        pageCount: 354,
+                        localId: UUID()
+                    )
+                    book.currentPage = 127
+                    return book
+                }(),
+                width: 350
+            )
+            .environmentObject(LibraryViewModel())
+        }
+        .padding()
+    }
 }

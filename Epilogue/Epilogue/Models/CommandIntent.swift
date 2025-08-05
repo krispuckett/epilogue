@@ -315,12 +315,33 @@ struct CommandParser {
     
     private static func isLikelyQuote(input: String) -> Bool {
         // Quote Detection:
+        // - Reaction phrase followed by text
         // - Starts with quotation marks
         // - Or contains "..."
         // - Or is > 50 characters without being a question
         // - Has quote attribution pattern
         
         let trimmed = input.trimmingCharacters(in: .whitespaces)
+        let lowercased = trimmed.lowercased()
+        
+        // NEW: Check for reaction-based quote patterns
+        let reactionPhrases = [
+            "this is beautiful", "i love this", "listen to this", 
+            "oh wow", "this is amazing", "here's a great line",
+            "check this out", "this part", "the author says",
+            "this is incredible", "this is perfect", "yes exactly",
+            "this speaks to me", "this is so good", "love this",
+            "wow listen to this", "oh my god", "oh my gosh",
+            "this is powerful", "this is profound", "this is brilliant"
+        ]
+        
+        // Check if input starts with reaction phrase and has substantial text after
+        for phrase in reactionPhrases {
+            if lowercased.starts(with: phrase) && trimmed.count > phrase.count + 10 {
+                // There's text after the reaction phrase - likely a quote
+                return true
+            }
+        }
         
         // Check for quotation marks
         if trimmed.hasPrefix("\"") || trimmed.hasPrefix("\u{201C}") ||
@@ -547,11 +568,44 @@ struct CommandParser {
     // Parse quote content and attribution
     static func parseQuote(_ text: String) -> (content: String, author: String?) {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let lowercased = trimmed.lowercased()
         
         // Remove "quote:" prefix if present
         var workingText = trimmed
         if workingText.lowercased().hasPrefix("quote:") {
             workingText = String(workingText.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+        }
+        
+        // NEW: Handle reaction-based quotes
+        let reactionPhrases = [
+            "this is beautiful", "i love this", "listen to this", 
+            "oh wow", "this is amazing", "here's a great line",
+            "check this out", "this part", "the author says",
+            "this is incredible", "this is perfect", "yes exactly",
+            "this speaks to me", "this is so good", "love this",
+            "wow listen to this", "oh my god", "oh my gosh",
+            "this is powerful", "this is profound", "this is brilliant"
+        ]
+        
+        // Check if it starts with a reaction phrase
+        var detectedReaction: String? = nil
+        for phrase in reactionPhrases {
+            if lowercased.starts(with: phrase) && workingText.count > phrase.count + 10 {
+                detectedReaction = phrase
+                // Extract everything after the reaction
+                if let phraseRange = workingText.lowercased().range(of: phrase) {
+                    workingText = String(workingText[phraseRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    
+                    // Clean up common filler words
+                    let fillerWords = ["um", "uh", "umm", "uhh", "...", "okay", "so", "like"]
+                    for filler in fillerWords {
+                        if workingText.lowercased().starts(with: filler + " ") {
+                            workingText = String(workingText.dropFirst(filler.count + 1)).trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                }
+                break
+            }
         }
         
         // First try to match quoted text with attribution: "content" author, book, page
@@ -710,7 +764,7 @@ struct CommandParser {
         // Check for simple dash attribution without quotes
         if let dashRange = workingText.range(of: " — ") ?? workingText.range(of: " - ") {
             let content = String(workingText[..<dashRange.lowerBound]).trimmingCharacters(in: .whitespaces)
-            var attribution = String(workingText[dashRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+            let attribution = String(workingText[dashRange.upperBound...]).trimmingCharacters(in: .whitespaces)
             
             // Remove quotes if present
             var cleanContent = content

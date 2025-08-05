@@ -962,7 +962,7 @@ struct AmbientChatOverlay: View {
                 // Get AI response to the question (outside MainActor)
                 do {
                     let aiService = AICompanionService.shared
-                    let answer = try await aiService.processMessage(
+                    _ = try await aiService.processMessage(
                         question.text,
                         bookContext: session.book,
                         conversationHistory: []  // Empty history for now, as questions are processed independently
@@ -1223,7 +1223,7 @@ struct AmbientChatOverlay: View {
         guard let session = session, !session.rawTranscriptions.isEmpty else { return }
         
         // Process the current session
-        let processed = await processAmbientSession(session)
+        _ = await processAmbientSession(session)
         
         // TODO: Save to existing thread
         // ChatThread and ThreadedChatMessage models have been removed
@@ -1327,7 +1327,7 @@ struct AmbientChatOverlay: View {
             
             // Get AI response asynchronously
             let aiService = AICompanionService.shared
-            let answer = try await aiService.processMessage(
+            _ = try await aiService.processMessage(
                 question,
                 bookContext: book,
                 conversationHistory: []

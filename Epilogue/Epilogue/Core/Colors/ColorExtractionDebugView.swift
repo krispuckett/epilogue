@@ -257,7 +257,7 @@ struct ColorExtractionDebugView: View {
             Text("Debug Info")
                 .font(.headline)
             
-            debugRow("Book ID", value: book.id ?? "N/A")
+            debugRow("Book ID", value: book.id)
                 .font(.caption)
             debugRow("ISBN", value: book.isbn ?? "N/A")
                 .font(.caption)
@@ -306,7 +306,7 @@ struct ColorExtractionDebugView: View {
             let extractor = OKLABColorExtractor()
             let palette = try await extractor.extractPalette(
                 from: coverImage,
-                imageSource: "Debug-\(book.title ?? "Unknown")"
+                imageSource: "Debug-\(book.title)"
             )
             
             extractedPalette = palette
@@ -341,7 +341,7 @@ struct ColorExtractionDebugView: View {
             let extractor = OKLABColorExtractor()
             let palette = try await extractor.extractPalette(
                 from: imageToProcess,
-                imageSource: "Debug-\(useHighResolution ? "HighRes" : "LowRes")-\(book.title ?? "Unknown")"
+                imageSource: "Debug-\(useHighResolution ? "HighRes" : "LowRes")-\(book.title)"
             )
             
             extractedPalette = palette

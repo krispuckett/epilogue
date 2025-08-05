@@ -42,10 +42,12 @@ struct SharedBookCoverView: View {
     let width: CGFloat
     let height: CGFloat
     let loadFullImage: Bool
+    let isLibraryView: Bool
     
     @State private var thumbnailImage: UIImage?
     @State private var fullImage: UIImage?
     @State private var isLoadingStarted = false
+    @State private var isLoading = true
     
     // Simple in-memory cache to avoid state recreation
     private static let quickImageCache: NSCache<NSString, UIImage> = {
@@ -64,12 +66,14 @@ struct SharedBookCoverView: View {
         width: CGFloat = 170,
         height: CGFloat = 255,
         loadFullImage: Bool = true,
+        isLibraryView: Bool = false,
         onImageLoaded: ((UIImage) -> Void)? = nil
     ) {
         self.coverURL = coverURL
         self.width = width
         self.height = height
         self.loadFullImage = loadFullImage
+        self.isLibraryView = isLibraryView
         self.onImageLoaded = onImageLoaded
     }
     
@@ -84,6 +88,7 @@ struct SharedBookCoverView: View {
             } else {
                 self.thumbnailImage = cachedImage
             }
+            self.isLoading = false
             self.onImageLoaded?(cachedImage)
             return
         }
@@ -97,6 +102,7 @@ struct SharedBookCoverView: View {
                 onThumbnailLoaded: { image in
                     withAnimation(.easeInOut(duration: 0.3)) {
                         self.thumbnailImage = image
+                        self.isLoading = false
                     }
                     if self.fullImage == nil {
                         self.onImageLoaded?(image)
@@ -105,6 +111,7 @@ struct SharedBookCoverView: View {
                 onFullImageLoaded: { image in
                     withAnimation(.easeInOut(duration: 0.3)) {
                         self.fullImage = image
+                        self.isLoading = false
                     }
                     self.onImageLoaded?(image)
                     DisplayedImageStore.shared.store(image: image, for: urlString)
@@ -115,10 +122,20 @@ struct SharedBookCoverView: View {
         } else {
             // Only load thumbnail for grid views
             Task {
-                if let thumbnail = await SharedBookCoverManager.shared.loadThumbnail(from: urlString) {
+                let thumbnail: UIImage?
+                if isLibraryView {
+                    // Use larger thumbnails for library grid (200x300 max)
+                    thumbnail = await SharedBookCoverManager.shared.loadLibraryThumbnail(from: urlString)
+                } else {
+                    // Use standard thumbnails for other views
+                    thumbnail = await SharedBookCoverManager.shared.loadThumbnail(from: urlString)
+                }
+                
+                if let thumbnail = thumbnail {
                     await MainActor.run {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             self.thumbnailImage = thumbnail
+                            self.isLoading = false
                         }
                         self.onImageLoaded?(thumbnail)
                         // Store in quick cache
@@ -142,6 +159,7 @@ struct SharedBookCoverView: View {
                     thumbnailImage = nil
                     fullImage = nil
                     isLoadingStarted = false
+                    isLoading = true
                     loadImage()
                 }
             
@@ -153,11 +171,16 @@ struct SharedBookCoverView: View {
                     .frame(width: width, height: height)
                     .clipped()
                     .transition(.opacity)
-            } else if coverURL != nil {
-                // Loading state
-                ProgressView()
-                    .scaleEffect(0.5)
-                    .tint(.white.opacity(0.5))
+            } else if coverURL != nil && isLoading {
+                // Loading state - show gradient placeholder instead of spinner
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.3, green: 0.3, blue: 0.35),
+                        Color(red: 0.25, green: 0.25, blue: 0.3)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             } else {
                 // No cover URL
                 Image(systemName: "book.closed.fill")

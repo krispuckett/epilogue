@@ -311,7 +311,7 @@ class OptimizedWhisperProcessor: ObservableObject {
                             let result = try await self.processChunk(chunk, options: decodingOptions, index: index)
                             return (index, result)
                         } catch {
-                            logger.error("Failed to process chunk \(index): \(error)")
+                            await logger.error("Failed to process chunk \(index): \(error)")
                             return (index, nil)
                         }
                     }
