@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var showingAPIKeySheet = false
     @State private var apiKey = ""
     @State private var hasStoredAPIKey = false
+    @State private var showingSyncStatus = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -62,6 +63,26 @@ struct SettingsView: View {
                     .padding(.vertical, 8)
                 } header: {
                     Text("Account")
+                }
+                
+                // MARK: - Sync & Backup
+                Section {
+                    Button {
+                        showingSyncStatus = true
+                    } label: {
+                        HStack {
+                            Label("Sync Status", systemImage: "arrow.triangle.2.circlepath")
+                            Spacer()
+                            SyncStatusView()
+                        }
+                    }
+                    
+                    Toggle("Enable Auto-Sync", isOn: $enableDataSync)
+                    
+                } header: {
+                    Text("Sync & Backup")
+                } footer: {
+                    Text("Sync your data across devices when connected to the internet.")
                 }
                 
                 // MARK: - AI & Intelligence
@@ -252,6 +273,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingAPIKeySheet) {
                 APIKeyEntrySheet(apiKey: $apiKey, hasStoredAPIKey: $hasStoredAPIKey)
+            }
+            .sheet(isPresented: $showingSyncStatus) {
+                DetailedSyncStatusSheet(isPresented: $showingSyncStatus)
             }
         }
         .onAppear {

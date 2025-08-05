@@ -8,6 +8,7 @@ struct SwiftDataNotesView: View {
     @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @EnvironmentObject private var libraryViewModel: LibraryViewModel
     @EnvironmentObject private var notesViewModel: NotesViewModel
+    @StateObject private var performanceMonitor = PerformanceMonitor.shared
     
     // Queries
     @Query(sort: \CapturedNote.timestamp, order: .reverse) private var notes: [CapturedNote]
@@ -19,6 +20,13 @@ struct SwiftDataNotesView: View {
     @State private var contextMenuNote: Note? = nil
     @State private var contextMenuSourceRect: CGRect = .zero
     @State private var editingNote: Note? = nil
+    @State private var isInitialLoad = true
+    
+    // Batch selection
+    @StateObject private var selectionManager = BatchSelectionManager()
+    
+    // Deleted notes for undo
+    @State private var deletedNotes: [UUID: (note: Any, type: String)] = [:]
     
     // Computed properties for filtered content
     private var allNotes: [Note] {
@@ -45,103 +53,134 @@ struct SwiftDataNotesView: View {
         return items.sorted { $0.dateCreated > $1.dateCreated }
     }
     
-    // Delete note from SwiftData
+    // Delete note from SwiftData with undo support
     private func deleteNote(_ note: Note) {
-        // Find and delete the corresponding SwiftData object
+        // Store for undo
         if let capturedNote = notes.first(where: { $0.id == note.id }) {
+            deletedNotes[note.id] = (capturedNote, "note")
             modelContext.delete(capturedNote)
         } else if let capturedQuote = quotes.first(where: { $0.id == note.id }) {
+            deletedNotes[note.id] = (capturedQuote, "quote")
             modelContext.delete(capturedQuote)
         }
         
         // Save the context
         do {
             try modelContext.save()
+            SyncStatusManager.shared.incrementPendingChanges()
         } catch {
             print("Error deleting note: \(error)")
+        }
+    }
+    
+    // Restore deleted note
+    private func restoreNote(_ noteId: UUID) {
+        guard let (deletedItem, type) = deletedNotes[noteId] else { return }
+        
+        if type == "note", let capturedNote = deletedItem as? CapturedNote {
+            modelContext.insert(capturedNote)
+        } else if type == "quote", let capturedQuote = deletedItem as? CapturedQuote {
+            modelContext.insert(capturedQuote)
+        }
+        
+        deletedNotes.removeValue(forKey: noteId)
+        
+        do {
+            try modelContext.save()
+            SyncStatusManager.shared.incrementPendingChanges()
+        } catch {
+            print("Error restoring note: \(error)")
+        }
+    }
+    
+    // Batch delete selected notes
+    private func batchDeleteNotes(_ noteIds: Set<UUID>) {
+        let notesToDelete = allNotes.filter { noteIds.contains($0.id) }
+        
+        for note in notesToDelete {
+            deleteNote(note)
         }
     }
     
     // MARK: - View Components
     
     private var searchBar: some View {
-        HStack(spacing: 0) {
-            // Search icon
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                .font(.system(size: 16, weight: .medium))
-                .padding(.leading, 12)
-                .padding(.trailing, 8)
-            
-            // Text field
-            ZStack(alignment: .leading) {
-                if searchText.isEmpty {
-                    Text("Search notes and quotes")
-                        .foregroundColor(.white.opacity(0.5))
-                        .font(.system(size: 16))
-                }
-                
-                TextField("", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled(true)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .padding(.trailing, 12)
-            
-            // Clear button
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .buttonStyle(.plain)
-                .sensoryFeedback(.impact(flexibility: .soft), trigger: searchText.isEmpty)
-                .padding(.trailing, 12)
-            }
-        }
-        .frame(minHeight: 40)
-        .glassEffect(.regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15)), in: RoundedRectangle(cornerRadius: 18))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
-        }
+        StandardizedSearchField(
+            text: $searchText,
+            placeholder: "Search notes and quotes"
+        )
     }
     
     private var notesContent: some View {
         VStack(spacing: 16) {
-            // Custom search bar
-            searchBar
-                .padding(.horizontal)
-                .padding(.top, 8)
             
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                ForEach(allNotes) { note in
-                    noteCardView(for: note)
+            if allNotes.isEmpty && questions.isEmpty {
+                if isInitialLoad {
+                    // Show skeleton only during initial load
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                        ForEach(0..<6, id: \.self) { _ in
+                            NoteCardSkeleton()
+                        }
+                    }
+                    .padding(.horizontal)
+                    .transition(.opacity)
+                    .onAppear {
+                        // Set initial load to false after a short delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            withAnimation {
+                                isInitialLoad = false
+                            }
+                        }
+                    }
+                } else {
+                    // Show empty state when there are no notes
+                    if !searchText.isEmpty {
+                        EmptyStateView.noSearchResults
+                            .transition(.opacity)
+                    } else {
+                        EmptyStateView.noNotes
+                            .transition(.opacity)
+                    }
                 }
-                
-                ForEach(questions) { question in
-                    CapturedQuestionCard(question: question)
-                        .id(question.id)
+            } else {
+                // Reset initial load when we have content
+                let _ = isInitialLoad = false
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                    ForEach(allNotes) { note in
+                        SelectableNoteCard(
+                            note: note,
+                            selectionManager: selectionManager,
+                            content: AnyView(noteCardView(for: note)),
+                            onTap: {
+                                // Handle note tap
+                            }
+                        )
+                        .swipeToDelete(
+                            onDelete: {
+                                deleteNote(note)
+                            },
+                            undoAction: {
+                                restoreNote(note.id)
+                            },
+                            itemDescription: note.type == .quote ? "quote" : "note"
+                        )
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.95).combined(with: .opacity),
+                            removal: .scale(scale: 0.95).combined(with: .opacity)
+                        ))
+                    }
+                    
+                    ForEach(questions) { question in
+                        CapturedQuestionCard(question: question)
+                            .id(question.id)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                removal: .scale(scale: 0.95).combined(with: .opacity)
+                            ))
+                    }
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
         .padding(.top, 8)
         .padding(.bottom, 80)
@@ -213,41 +252,79 @@ struct SwiftDataNotesView: View {
                 // Background
                 Color.black.ignoresSafeArea()
                 
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        notesContent
-                    }
-                    .onChange(of: navigationCoordinator.highlightedNoteID) { _, noteID in
-                        if let noteID = noteID {
-                            withAnimation {
-                                proxy.scrollTo(noteID, anchor: .center)
+                VStack(spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            notesContent
+                        }
+                        .onChange(of: navigationCoordinator.highlightedNoteID) { _, noteID in
+                            if let noteID = noteID {
+                                withAnimation {
+                                    proxy.scrollTo(noteID, anchor: .center)
+                                }
+                                // Clear after scrolling
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                    navigationCoordinator.highlightedNoteID = nil
+                                }
                             }
-                            // Clear after scrolling
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                navigationCoordinator.highlightedNoteID = nil
+                        }
+                        .onChange(of: navigationCoordinator.highlightedQuoteID) { _, quoteID in
+                            if let quoteID = quoteID {
+                                withAnimation {
+                                    proxy.scrollTo(quoteID, anchor: .center)
+                                }
+                                // Clear after scrolling
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                    navigationCoordinator.highlightedQuoteID = nil
+                                }
                             }
                         }
                     }
-                    .onChange(of: navigationCoordinator.highlightedQuoteID) { _, quoteID in
-                        if let quoteID = quoteID {
-                            withAnimation {
-                                proxy.scrollTo(quoteID, anchor: .center)
-                            }
-                            // Clear after scrolling
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                navigationCoordinator.highlightedQuoteID = nil
-                            }
-                        }
-                    }
+                    
+                    // Batch selection toolbar
+                    BatchSelectionToolbar(
+                        selectionManager: selectionManager,
+                        allItems: allNotes,
+                        onDelete: batchDeleteNotes
+                    )
                 }
                 
                 contextMenuOverlay
+                
+                // Undo snackbar overlay
+                UndoSnackbar()
             }
-            .navigationTitle("Notes")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle(selectionManager.isSelectionMode ? "" : "Notes")
+            .navigationBarTitleDisplayMode(selectionManager.isSelectionMode ? .inline : .large)
+            .searchable(text: $searchText, prompt: "Search notes and quotes")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if !selectionManager.isSelectionMode {
+                        // Selection mode button
+                        Button {
+                            selectionManager.enterSelectionMode()
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            }
             .sheet(item: $editingNote) { note in
                 NoteEditSheet(note: note)
                     .environmentObject(notesViewModel)
+            }
+            .sheet(isPresented: $selectionManager.showingDeleteConfirmation) {
+                BatchDeleteConfirmationDialog(
+                    selectionManager: selectionManager,
+                    onConfirm: {
+                        selectionManager.performDelete()
+                        batchDeleteNotes(selectionManager.selectedItems)
+                    }
+                )
+                .presentationDetents([.height(400)])
+                .presentationDragIndicator(.visible)
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
                 if let note = notification.object as? Note {

@@ -7,8 +7,9 @@ import Combine
 struct LibraryView: View {
     @EnvironmentObject var viewModel: LibraryViewModel
     @State private var searchText = ""
-    @State private var viewMode: ViewMode = .grid
+    @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @Namespace private var viewModeAnimation
+    @Namespace private var listTransition
     @State private var showingCoverPicker = false
     @State private var selectedBookForEdit: Book?
     @State private var highlightedBookId: UUID? = nil
@@ -17,13 +18,16 @@ struct LibraryView: View {
     @State private var selectedBookForNavigation: Book? = nil
     @State private var isScrolling = false
     @State private var showingSettings = false
+    @State private var settingsButtonPressed = false
+    @State private var visibleBookIDs: Set<UUID> = []
+    @StateObject private var performanceMonitor = PerformanceMonitor.shared
     
     #if DEBUG
     @State private var frameDrops = 0
     @State private var performanceTimer: Timer?
     #endif
     
-    enum ViewMode {
+    enum ViewMode: String {
         case grid, list
     }
     
@@ -36,15 +40,18 @@ struct LibraryView: View {
     private func preloadNeighboringCovers(for book: Book) {
         guard let index = viewModel.books.firstIndex(where: { $0.id == book.id }) else { return }
         
-        // Preload 2 books before and after the current one
-        let preloadRange = max(0, index - 2)..<min(viewModel.books.count, index + 3)
+        // Preload based on view mode
+        let preloadCount = viewMode == .grid ? 4 : 2 // More for grid view
+        let preloadRange = max(0, index - preloadCount)..<min(viewModel.books.count, index + preloadCount + 1)
         
-        Task {
-            for i in preloadRange where i != index {
-                let neighborBook = viewModel.books[i]
-                if let coverURL = neighborBook.coverImageURL {
-                    // Just trigger the load - SharedBookCoverManager will cache it
-                    _ = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL)
+        Task(priority: .background) {
+            await performanceMonitor.measureAsync("preloadCovers") {
+                for i in preloadRange where i != index {
+                    let neighborBook = viewModel.books[i]
+                    if let coverURL = neighborBook.coverImageURL {
+                        // Use library thumbnail size for faster loading
+                        _ = await SharedBookCoverManager.shared.loadLibraryThumbnail(from: coverURL)
+                    }
                 }
             }
         }
@@ -103,8 +110,12 @@ struct LibraryView: View {
                 )
                 .id(book.localId) // Stable identity for recycling
                 .onAppear {
+                    visibleBookIDs.insert(book.localId)
                     // Preload neighboring book covers
                     preloadNeighboringCovers(for: book)
+                }
+                .onDisappear {
+                    visibleBookIDs.remove(book.localId)
                 }
             }
         }
@@ -114,23 +125,13 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var listContent: some View {
-        LazyVStack(spacing: 12) { // Reduced spacing
-            ForEach(viewModel.books) { book in
-                LibraryListItemWrapper(
-                    book: book,
-                    index: 0, // Remove index-based animations
-                    viewModel: viewModel,
-                    viewMode: viewMode,
-                    highlightedBookId: highlightedBookId,
-                    onChangeCover: { book in changeCover(for: book) }
-                )
-                .frame(height: 90) // Reduced height
-                .id(book.localId) // Stable identity
-            }
-        }
-        .padding(.horizontal)
-        .padding(.top, 8)
-        .padding(.bottom, 100)
+        LibraryBookListView(
+            books: viewModel.books,
+            viewModel: viewModel,
+            highlightedBookId: highlightedBookId,
+            onChangeCover: { book in changeCover(for: book) },
+            namespace: listTransition
+        )
     }
     
     var body: some View {
@@ -145,17 +146,34 @@ struct LibraryView: View {
                     ScrollViewTracker(isScrolling: $isScrolling)
                     
                     if viewModel.isLoading {
-                        LiteraryLoadingView(message: "Loading your library")
-                            .padding(.top, 80)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        // Show skeleton screens while loading
+                        ScrollView {
+                            if viewMode == .grid {
+                                SkeletonGrid(columns: 2, rows: 4)
+                            } else {
+                                SkeletonList(count: 6)
+                            }
+                        }
+                        .transition(.opacity)
                     } else if viewModel.books.isEmpty {
                         emptyStateView
                     } else {
-                        if viewMode == .grid {
-                            gridContent
-                        } else {
-                            listContent
+                        ZStack {
+                            if viewMode == .grid {
+                                gridContent
+                                    .transition(.asymmetric(
+                                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                        removal: .opacity.combined(with: .scale(scale: 1.02))
+                                    ))
+                            } else {
+                                listContent
+                                    .transition(.asymmetric(
+                                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                        removal: .opacity.combined(with: .scale(scale: 1.02))
+                                    ))
+                            }
                         }
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
                     }
                 }
             .ignoresSafeArea(edges: .bottom) // Allow scroll content to go under tab bar
@@ -176,17 +194,12 @@ struct LibraryView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    }
-                    .sensoryFeedback(.impact(flexibility: .soft), trigger: showingSettings)
-                    
+                HStack(spacing: 12) {
                     ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
+                    
+                    GlassOrbSettingsButton(isPressed: $settingsButtonPressed) {
+                        showingSettings = true
+                    }
                 }
             }
         }
@@ -243,7 +256,7 @@ struct LibraryGridItem: View {
                 .overlay(highlightOverlay)
         }
         .simultaneousGesture(TapGesture().onEnded { _ in
-            HapticManager.shared.bookOpen()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         })
         .buttonStyle(PlainButtonStyle())
         .onAppear { isVisible = true }
@@ -323,7 +336,7 @@ struct LibraryListItemWrapper: View {
                 .overlay(highlightOverlay)
         }
         .simultaneousGesture(TapGesture().onEnded { _ in
-            HapticManager.shared.bookOpen()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         })
         .buttonStyle(PlainButtonStyle())
         .onAppear { isVisible = true }
@@ -529,12 +542,14 @@ struct ViewModeToggle: View {
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     viewMode = .grid
+                    HapticManager.shared.lightTap()
                 }
             }) {
                 Image(systemName: "square.grid.2x2")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(viewMode == .grid ? Color(red: 0.98, green: 0.97, blue: 0.96) : Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
                     .frame(width: 40, height: 32)
+                    .contentTransition(.symbolEffect(.replace))
                     .background {
                         if viewMode == .grid {
                             RoundedRectangle(cornerRadius: 16)
@@ -553,12 +568,14 @@ struct ViewModeToggle: View {
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     viewMode = .list
+                    HapticManager.shared.lightTap()
                 }
             }) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(viewMode == .list ? Color(red: 0.98, green: 0.97, blue: 0.96) : Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
                     .frame(width: 40, height: 32)
+                    .contentTransition(.symbolEffect(.replace))
                     .background {
                         if viewMode == .list {
                             RoundedRectangle(cornerRadius: 16)
@@ -574,7 +591,6 @@ struct ViewModeToggle: View {
             }
         }
         .padding(4)
-       
     }
 }
 
@@ -910,6 +926,246 @@ extension LibraryView {
     }
 }
 #endif
+
+// MARK: - Library Book List View
+struct LibraryBookListView: View {
+    let books: [Book]
+    let viewModel: LibraryViewModel
+    let highlightedBookId: UUID?
+    let onChangeCover: (Book) -> Void
+    let namespace: Namespace.ID
+    
+    @State private var colorPalettes: [String: ColorPalette] = [:]
+    @State private var loadingGradients: Set<String> = []
+    
+    var body: some View {
+        LazyVStack(spacing: 16) {
+            ForEach(books) { book in
+                LibraryBookListRow(
+                    book: book,
+                    viewModel: viewModel,
+                    colorPalette: colorPalettes[book.id],
+                    isHighlighted: highlightedBookId == book.localId,
+                    onChangeCover: onChangeCover,
+                    namespace: namespace
+                )
+                .id(book.localId)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                    removal: .scale(scale: 0.95).combined(with: .opacity)
+                ))
+                .task {
+                    await loadColorPalette(for: book)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .padding(.bottom, 100)
+    }
+    
+    private func loadColorPalette(for book: Book) async {
+        guard colorPalettes[book.id] == nil,
+              !loadingGradients.contains(book.id),
+              let coverURL = book.coverImageURL else { return }
+        
+        loadingGradients.insert(book.id)
+        
+        // Check cache first
+        if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: book.id) {
+            await MainActor.run {
+                colorPalettes[book.id] = cachedPalette
+                loadingGradients.remove(book.id)
+            }
+            return
+        }
+        
+        // Load and extract colors
+        if let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURL) {
+            do {
+                let extractor = OKLABColorExtractor()
+                let palette = try await extractor.extractPalette(from: image, imageSource: book.id)
+                
+                await BookColorPaletteCache.shared.cachePalette(palette, for: book.id, coverURL: coverURL)
+                
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        colorPalettes[book.id] = palette
+                    }
+                    loadingGradients.remove(book.id)
+                }
+            } catch {
+                await MainActor.run {
+                    loadingGradients.remove(book.id)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Library Book List Row
+struct LibraryBookListRow: View {
+    let book: Book
+    let viewModel: LibraryViewModel
+    let colorPalette: ColorPalette?
+    let isHighlighted: Bool
+    let onChangeCover: (Book) -> Void
+    let namespace: Namespace.ID
+    
+    @State private var isPressed = false
+    @State private var isHovered = false
+    
+    private var progress: Double {
+        guard let pageCount = book.pageCount, pageCount > 0 else { return 0 }
+        return Double(book.currentPage) / Double(pageCount)
+    }
+    
+    var body: some View {
+        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+            ZStack {
+                // Background with edge-to-edge gradient
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black.opacity(0.2))
+                
+                // Blurred gradient overlay
+                if let palette = colorPalette {
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.clear,
+                            palette.primary.opacity(0.15),
+                            palette.primary.opacity(0.25)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .blur(radius: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .opacity(isHovered ? 1 : 0.7)
+                    .animation(.easeInOut(duration: 0.3), value: isHovered)
+                }
+                
+                // Border
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        isHighlighted ? Color(red: 1.0, green: 0.55, blue: 0.26) : Color.white.opacity(0.1),
+                        lineWidth: isHighlighted ? 2 : 1
+                    )
+                
+                // Content
+                HStack(spacing: 0) {
+                    // Book cover
+                    SharedBookCoverView(
+                        coverURL: book.coverImageURL,
+                        width: 60,
+                        height: 80,
+                        loadFullImage: false,
+                        isLibraryView: true
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                    .padding(.trailing, 12)
+                    
+                    // Content
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(book.title)
+                            .font(.system(size: 17, weight: .semibold, design: .serif))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                            .lineLimit(1)
+                        
+                        Text(book.author)
+                            .font(.system(size: 14, design: .monospaced))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.7))
+                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        // Progress bar
+                        if book.pageCount != nil && book.currentPage > 0 {
+                            HStack(spacing: 6) {
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color.white.opacity(0.1))
+                                            .frame(height: 4)
+                                        
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26),
+                                                        colorPalette?.secondary ?? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8)
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: geometry.size.width * progress, height: 4)
+                                    }
+                                }
+                                .frame(width: 80, height: 4)
+                                
+                                Text("\(Int(progress * 100))%")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+            }
+            .frame(height: 104)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isHovered = hovering
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+        .contextMenu {
+            Button {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    viewModel.toggleReadingStatus(for: book)
+                }
+            } label: {
+                Label(
+                    book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                    systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
+                )
+            }
+            
+            Divider()
+            
+            Button {
+                HapticManager.shared.lightTap()
+                onChangeCover(book)
+            } label: {
+                Label("Change Cover", systemImage: "photo")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive) {
+                HapticManager.shared.lightTap()
+                withAnimation {
+                    viewModel.deleteBook(book)
+                }
+            } label: {
+                Label("Delete from Library", systemImage: "trash")
+            }
+        }
+    }
+}
 
 // MARK: - Library View Model
 @MainActor

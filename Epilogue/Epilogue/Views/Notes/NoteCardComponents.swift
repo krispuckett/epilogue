@@ -130,7 +130,7 @@ struct QuoteCard: View {
             // Large transparent opening quote
             Text("\u{201C}")
                 .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 60 : 80))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .foregroundStyle(Color.white.opacity(0.15))
                 .offset(x: -10, y: 20)
                 .frame(height: 0)
                 .accessibilityHidden(true)
@@ -230,7 +230,7 @@ struct RegularNoteCard: View {
                 // Note indicator
                 Image(systemName: "note.text")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
+                    .foregroundStyle(Color.white.opacity(0.2))
             }
             
             // Content
