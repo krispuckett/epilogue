@@ -3,6 +3,9 @@ import SwiftData
 
 // MARK: - Main Component
 struct LiquidCommandPalette: View {
+    @StateObject private var voiceManager = VoiceRecognitionManager.shared
+    @StateObject private var transitionCoordinator = PaletteTransitionCoordinator()
+    
     // MARK: - State Properties (Minimal)
     @Binding var isPresented: Bool
     @State private var commandText = ""
@@ -49,11 +52,17 @@ struct LiquidCommandPalette: View {
     }
     
     private func handleMicrophoneTap() {
-        // Implement voice recognition functionality here
-        // This can integrate with existing voice manager if needed
+        if voiceManager.isListening {
+            voiceManager.stopListening()
+        } else {
+            voiceManager.startAmbientListening()
+        }
     }
     
     private func handleQuickAction(_ action: String) {
+        // Light haptic feedback when command is selected
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        
         switch action {
         case "note":
             commandText = "note: "
@@ -77,12 +86,15 @@ struct LiquidCommandPalette: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                // Backdrop with proper tap handling
-                Color.clear
+                // Backdrop with coordinated animation
+                Color.black
+                    .opacity(transitionCoordinator.backdropOpacity)
+                    .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if showQuickActions {
-                            withAnimation(SmoothAnimationType.smooth.animation) {
+                            transitionCoordinator.handleContentChange()
+                            withAnimation(.easeInOut(duration: 0.2)) {
                                 showQuickActions = false
                             }
                         } else {
@@ -143,7 +155,7 @@ struct LiquidCommandPalette: View {
                                     showQuickActions.toggle()
                                 }
                             },
-                            isRecording: .constant(false),
+                            isRecording: .constant(voiceManager.isListening),
                             colorPalette: nil
                         )
                         .padding(.horizontal, 16)
@@ -153,23 +165,26 @@ struct LiquidCommandPalette: View {
                     }
                     .offset(y: contentOffset)
                 }
+                .paletteTransition(transitionCoordinator)
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
         }
-        .background(Color.black.opacity(0.4))
         .presentationBackground(.clear)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(0)
-        .interactiveDismissDisabled(showQuickActions)
+        .interactiveDismissDisabled(showQuickActions || transitionCoordinator.state == .appearing || transitionCoordinator.state == .dismissing)
         .onAppear {
+            // Start the show transition
+            transitionCoordinator.show()
+            
             // Setup initial content if provided
             if let initial = initialContent {
                 commandText = initial
             }
             
-            // Delay focus to ensure smooth animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Coordinate keyboard with palette appearance
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 isFocused = true
             }
             
@@ -215,6 +230,28 @@ struct LiquidCommandPalette: View {
                     dismissPalette()
                 }
             )
+        }
+        .onChange(of: voiceManager.transcribedText) { _, newValue in
+            if !newValue.isEmpty {
+                commandText = newValue
+            }
+        }
+        .onDisappear {
+            voiceManager.stopListening()
+            // Handle interrupt if palette is being dismissed unexpectedly
+            if transitionCoordinator.state != .hidden {
+                transitionCoordinator.handleInterrupt()
+            }
+        }
+        .onChange(of: isPresented) { _, newValue in
+            if !newValue && transitionCoordinator.state != .hidden {
+                // External dismiss - coordinate the transition
+                transitionCoordinator.dismiss()
+            }
+        }
+        .onChange(of: showQuickActions) { _, _ in
+            // Animate content changes
+            transitionCoordinator.handleContentChange()
         }
     }
     
@@ -324,7 +361,8 @@ struct LiquidCommandPalette: View {
             break
         }
         
-        HapticManager.shared.success()
+        // Haptic feedback for note saved
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismissPalette()
     }
     
@@ -388,7 +426,8 @@ struct LiquidCommandPalette: View {
             print("Failed to save note: \(error)")
         }
         
-        HapticManager.shared.success()
+        // Haptic feedback for note saved
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         
         // Clear text immediately for better feedback
         commandText = ""
@@ -484,7 +523,8 @@ struct LiquidCommandPalette: View {
             print("Failed to save quote: \(error)")
         }
         
-        HapticManager.shared.quoteCapture()
+        // Haptic feedback for quote saved
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         
         // Clear text immediately for better feedback
         commandText = ""
@@ -525,7 +565,8 @@ struct LiquidCommandPalette: View {
         )
         
         onUpdate(updatedNote)
-        HapticManager.shared.success()
+        // Haptic feedback for note saved
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismissPalette()
     }
     
@@ -571,17 +612,16 @@ struct LiquidCommandPalette: View {
         )
         
         onUpdate(updatedQuote)
-        HapticManager.shared.success()
+        // Haptic feedback for note saved
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismissPalette()
     }
     
     private func dismissPalette() {
-        // First dismiss keyboard if visible
-        isFocused = false
-        
-        // Then dismiss the palette with smooth animation
-        withAnimation(SmoothAnimationType.smooth.animation) {
+        // Use transition coordinator for coordinated dismiss
+        transitionCoordinator.dismiss {
             isPresented = false
+            isFocused = false
         }
     }
 }

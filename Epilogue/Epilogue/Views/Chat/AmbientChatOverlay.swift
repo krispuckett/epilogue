@@ -36,6 +36,7 @@ struct ProcessedAmbientSession {
 
 // MARK: - Claude-Inspired Gradient Background
 struct ClaudeInspiredGradient: View {
+    @ObservedObject var voiceManager = VoiceRecognitionManager.shared
     @State private var phase: CGFloat = 0
     let book: Book?
     let colorPalette: ColorPalette? // Changed from @State to regular property
@@ -48,7 +49,12 @@ struct ClaudeInspiredGradient: View {
     let voiceRhythm: CGFloat
     
     var body: some View {
-        ZStack {
+        // Calculate final intensity with voice boost
+        let baseIntensity = CGFloat(voiceIntensity)
+        let voiceBoost = voiceManager.isListening ? Double(voiceManager.currentAmplitude) * 0.3 : 0
+        let finalIntensity = baseIntensity + voiceBoost
+        
+        return ZStack {
             Color.black
                 .ignoresSafeArea()
             
@@ -60,7 +66,7 @@ struct ClaudeInspiredGradient: View {
                     audioLevel: audioLevel,
                     isListening: isListening,
                     voiceFrequency: voiceFrequency,
-                    voiceIntensity: voiceIntensity,
+                    voiceIntensity: finalIntensity,
                     voiceRhythm: voiceRhythm
                 )
                 .onAppear {
@@ -78,11 +84,12 @@ struct ClaudeInspiredGradient: View {
                     audioLevel: audioLevel,
                     isListening: isListening,
                     voiceFrequency: voiceFrequency,
-                    voiceIntensity: voiceIntensity,
+                    voiceIntensity: finalIntensity,
                     voiceRhythm: voiceRhythm
                 )
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: voiceManager.currentAmplitude)
         .onAppear {
             startWaveAnimation()
         }

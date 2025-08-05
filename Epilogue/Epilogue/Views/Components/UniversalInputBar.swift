@@ -77,19 +77,16 @@ struct UniversalInputBar: View {
                         }
                     }
                 
-                // Text input - matching command palette
+                // Text input - using standardized styles
                 ZStack(alignment: .leading) {
                     if messageText.isEmpty {
                         Text(placeholderText)
-                            .foregroundColor(.white.opacity(0.5))
-                            .font(.system(size: 16))
+                            .standardizedPlaceholderStyle()
                             .lineLimit(1)
                     }
                     
                     TextField("", text: $messageText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
+                        .standardizedTextFieldStyle(isFocused: isInputFocused)
                         .focused($isInputFocused)
                         .lineLimit(1...5)
                         .fixedSize(horizontal: false, vertical: true)

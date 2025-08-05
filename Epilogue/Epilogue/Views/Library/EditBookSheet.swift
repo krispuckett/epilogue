@@ -77,7 +77,8 @@ struct EditBookSheet: View {
                 AmbientReadingProgressView(
                     book: currentBook,
                     width: UIScreen.main.bounds.width - 32,
-                    showDetailed: false
+                    showDetailed: false,
+                    colorPalette: nil // EditBookSheet doesn't have color palette context
                 )
                 .padding(.top, -8) // Reduce spacing since CurrentBookRow has bottom padding
             }
@@ -91,22 +92,13 @@ struct EditBookSheet: View {
                 .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
             
             HStack {
-                TextField("Enter book title or author...", text: $searchTerm)
-                    .font(.system(size: 17))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-                    }
-                    .focused($isSearchFieldFocused)
-                    .onSubmit {
-                        performSearch()
+                // Standardized search field
+                StandardizedSearchField(
+                    text: $searchTerm,
+                    placeholder: "Enter book title or author..."
+                )
+                .onSubmit {
+                    performSearch()
                     }
                 
                 Button(action: performSearch) {

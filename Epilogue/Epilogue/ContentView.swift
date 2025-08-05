@@ -265,10 +265,10 @@ struct ContentView: View {
                     .simultaneousGesture(
                         TapGesture()
                             .onEnded {
+                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                                 showCommandInput = true
                             }
                     )
-                    .sensoryFeedback(.impact(flexibility: .soft), trigger: showCommandInput)
                     .onLongPressGesture(
                         minimumDuration: 0.6,
                         maximumDistance: .infinity,
@@ -361,6 +361,12 @@ struct ContentView: View {
                     .onTapGesture {
                         if showingLibraryCommandPalette {
                             showingLibraryCommandPalette = false
+                            // Ensure quick actions reappear after dismissing command palette
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                withAnimation(SmoothAnimationType.smooth.animation) {
+                                    showCommandInput = false
+                                }
+                            }
                         } else {
                             isInputFocused = false
                             commandText = ""
@@ -388,6 +394,10 @@ struct ContentView: View {
                             removal: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
                         ))
                         .zIndex(100)
+                        .onDisappear {
+                            // Ensure quick actions reappear when command palette is dismissed
+                            showCommandInput = false
+                        }
                     }
                     
                     // Input bar

@@ -30,33 +30,11 @@ struct ChatBookPickerSheet: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             
-            // Search bar
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.5))
-                
-                TextField("Search books...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white)
-                    .focused($isFocused)
-                    .submitLabel(.go)
-                
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(.white.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            // Search bar - using standardized styles
+            StandardizedSearchField(
+                text: $searchText,
+                placeholder: "Search books..."
+            )
             .padding(.horizontal, 16)
             
             // Results

@@ -209,6 +209,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
         
         logger.info("🎤 Starting ambient listening...")
+        // Haptic feedback for voice recording start
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         isListening = true
         recognitionState = .listening  // Always listening when activated
         
@@ -249,6 +251,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     func stopListening() {
+        // Haptic feedback for voice recording stop
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         isListening = false
         recognitionState = .idle
         

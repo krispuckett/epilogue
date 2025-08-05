@@ -5,6 +5,7 @@ struct AmbientReadingProgressView: View {
     let book: Book
     let width: CGFloat
     let showDetailed: Bool
+    let colorPalette: ColorPalette?
     
     // MARK: - State Variables
     @State private var animatedProgress: Double = 0
@@ -16,6 +17,19 @@ struct AmbientReadingProgressView: View {
     
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    
+    // MARK: - Color Properties
+    private var primaryColor: Color {
+        colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26)
+    }
+    
+    private var secondaryColor: Color {
+        colorPalette?.secondary ?? Color(red: 1.0, green: 0.7, blue: 0.4)
+    }
+    
+    private var accentColor: Color {
+        colorPalette?.accent ?? Color(red: 0.9, green: 0.4, blue: 0.15)
+    }
     
     // MARK: - Computed Properties
     var progress: Double {
@@ -74,7 +88,7 @@ struct AmbientReadingProgressView: View {
             HStack {
                 Text("\(pagesRead)")
                     .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(primaryColor)
                 
                 Text("of \(totalPages)")
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -114,8 +128,8 @@ struct AmbientReadingProgressView: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(glowIntensity * 0.3),
-                            Color(red: 1.0, green: 0.7, blue: 0.4).opacity(glowIntensity * 0.2),
+                            primaryColor.opacity(glowIntensity * 0.3),
+                            secondaryColor.opacity(glowIntensity * 0.2),
                             Color.clear
                         ],
                         center: .center,
@@ -139,9 +153,9 @@ struct AmbientReadingProgressView: View {
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.8, blue: 0.5),
-                                Color(red: 1.0, green: 0.55, blue: 0.26),
-                                Color(red: 0.9, green: 0.4, blue: 0.15)
+                                secondaryColor,
+                                primaryColor,
+                                accentColor
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -151,7 +165,7 @@ struct AmbientReadingProgressView: View {
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
                     .shadow(
-                        color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
+                        color: primaryColor.opacity(0.6),
                         radius: 4,
                         y: 2
                     )
@@ -185,9 +199,9 @@ struct AmbientReadingProgressView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.8, blue: 0.5),
-                                Color(red: 1.0, green: 0.55, blue: 0.26),
-                                Color(red: 0.9, green: 0.4, blue: 0.15)
+                                secondaryColor,
+                                primaryColor,
+                                accentColor
                             ],
                             startPoint: .leading,
                             endPoint: .trailing
@@ -198,7 +212,7 @@ struct AmbientReadingProgressView: View {
                         height: 4
                     )
                     .shadow(
-                        color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8),
+                        color: primaryColor.opacity(0.8),
                         radius: 3,
                         y: 1
                     )
@@ -246,9 +260,9 @@ struct AmbientReadingProgressView: View {
                                     isActive
                                     ? LinearGradient(
                                         colors: [
-                                            Color(red: 1.0, green: 0.8, blue: 0.5),
-                                            Color(red: 1.0, green: 0.55, blue: 0.26),
-                                            Color(red: 0.9, green: 0.4, blue: 0.15)
+                                            secondaryColor,
+                                            primaryColor,
+                                            accentColor
                                         ],
                                         startPoint: .leading,
                                         endPoint: .trailing
@@ -280,8 +294,8 @@ struct AmbientReadingProgressView: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                        Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                                        primaryColor.opacity(0.3),
+                                        primaryColor.opacity(0.1)
                                     ],
                                     startPoint: .leading,
                                     endPoint: .trailing
@@ -321,7 +335,7 @@ struct AmbientReadingProgressView: View {
                 
                 Text(hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m")
                     .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(primaryColor)
                 
                 Text("remaining")
                     .font(.system(size: 12, weight: .medium))
@@ -423,7 +437,8 @@ struct AmbientReadingProgressDemo: View {
                         AmbientReadingProgressView(
                             book: sampleBook,
                             width: 300,
-                            showDetailed: false
+                            showDetailed: false,
+                            colorPalette: nil
                         )
                         .padding(20)
                         .background(Color.white.opacity(0.05))
@@ -439,7 +454,8 @@ struct AmbientReadingProgressDemo: View {
                         AmbientReadingProgressView(
                             book: sampleBook,
                             width: 320,
-                            showDetailed: true
+                            showDetailed: true,
+                            colorPalette: nil
                         )
                         .padding(30)
                         .background(Color.white.opacity(0.05))

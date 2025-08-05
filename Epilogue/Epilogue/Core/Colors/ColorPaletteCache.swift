@@ -12,6 +12,9 @@ public class BookColorPaletteCache {
     /// Memory cache for quick access
     private let memoryCache = NSCache<NSString, CachedPalette>()
     
+    /// Gradient cache for performance
+    private let gradientCache = NSCache<NSString, GradientCacheEntry>()
+    
     /// Background queue for disk operations
     private let cacheQueue = DispatchQueue(label: "com.epilogue.colorpalette.cache", qos: .background)
     
@@ -45,6 +48,11 @@ public class BookColorPaletteCache {
         memoryCache.countLimit = 50 // Store last 50 palettes
         memoryCache.totalCostLimit = 50 * 1024 * 1024 // Assume ~1MB per palette (very conservative)
         memoryCache.name = "ColorPaletteCache"
+        
+        // Configure gradient cache
+        gradientCache.countLimit = 100 // Store more gradients as they're lighter
+        gradientCache.totalCostLimit = 10 * 1024 * 1024 // 10MB for gradients
+        gradientCache.name = "GradientCache"
     }
     
     private func registerForMemoryWarnings() {
@@ -60,6 +68,7 @@ public class BookColorPaletteCache {
         print("⚠️ Memory warning - reducing color palette cache")
         // Reduce cache to half capacity
         memoryCache.countLimit = 25
+        gradientCache.countLimit = 50
         // This will automatically evict LRU items
     }
     
@@ -110,6 +119,7 @@ public class BookColorPaletteCache {
     public func clearCache() async {
         // Clear memory
         memoryCache.removeAllObjects()
+        gradientCache.removeAllObjects()
         
         // Clear disk
         if let cacheDir = cacheDirectory {
@@ -118,6 +128,19 @@ public class BookColorPaletteCache {
         }
         
         print("🧹 Cleared all color palette caches")
+    }
+    
+    // MARK: - Gradient Cache Operations
+    
+    /// Get cached gradient for book ID
+    public func getCachedGradient(for bookID: String) -> LinearGradient? {
+        return gradientCache.object(forKey: bookID as NSString)?.gradient
+    }
+    
+    /// Cache a gradient
+    public func cacheGradient(_ gradient: LinearGradient, for bookID: String) {
+        let entry = GradientCacheEntry(gradient: gradient)
+        gradientCache.setObject(entry, forKey: bookID as NSString)
     }
     
     // MARK: - Disk Cache Operations
@@ -288,6 +311,15 @@ public class BookColorPaletteCache {
 }
 
 // MARK: - Supporting Types
+
+/// Gradient cache entry
+private class GradientCacheEntry: NSObject {
+    let gradient: LinearGradient
+    
+    init(gradient: LinearGradient) {
+        self.gradient = gradient
+    }
+}
 
 /// Cached palette with metadata
 private class CachedPalette: NSObject, Codable {

@@ -7,6 +7,7 @@ struct UnifiedChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @EnvironmentObject var notesViewModel: NotesViewModel
     @ObservedObject private var syncManager = NotesSyncManager.shared
     
     // Filter messages for current context
@@ -61,6 +62,14 @@ struct UnifiedChatView: View {
     
     var body: some View {
         ZStack {
+            // Tap to dismiss keyboard background
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isInputFocused = false
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+            
             // 1. Gradient background (exactly like LibraryView)
             Group {
             if isRecording, let book = currentBookContext {
@@ -126,9 +135,18 @@ struct UnifiedChatView: View {
                             if showingBookStrip {
                                 bookGridView
                                     .padding(.top, 40)
+                                    .transition(.asymmetric(
+                                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                        removal: .scale(scale: 1.05).combined(with: .opacity)
+                                    ))
                             } else {
                                 emptyStateView
                                     .padding(.top, 100)
+                                    .transition(.asymmetric(
+                                        insertion: .scale(scale: 0.98).combined(with: .opacity),
+                                        removal: .scale(scale: 1.02).combined(with: .opacity)
+                                    ))
+                                    .animation(.easeInOut(duration: 0.5), value: colorPalette)
                             }
                         } else {
                             ForEach(filteredMessages) { message in
@@ -144,6 +162,12 @@ struct UnifiedChatView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 16) // Top padding for content
                     .padding(.bottom, 100) // Extra bottom padding to account for tab bar
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Dismiss keyboard when tapping on the content area
+                    isInputFocused = false
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                 }
                 .onAppear {
                     scrollProxy = proxy
@@ -316,40 +340,31 @@ struct UnifiedChatView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            // Use custom glass-msgs icon
-            Image("glass-msgs")
-                .renderingMode(.template)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 64, height: 64)
-                .foregroundStyle(.white.opacity(0.6))
-            
-            Text("What are we reading \(timeBasedGreeting)?")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
-            
-            if currentBookContext != nil {
-                Text("Discussing \(currentBookContext?.title ?? "")")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 4)
-                
-                Text("Ask questions, explore themes, or share thoughts")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
+        Group {
+            if let book = currentBookContext {
+                // Book-specific empty state
+                BookEmptyStateView(
+                    book: book,
+                    colorPalette: colorPalette,
+                    onSuggestionTap: { suggestion in
+                        messageText = suggestion
+                        isInputFocused = true
+                    }
+                )
+                .environmentObject(notesViewModel)
             } else {
-                Text("Select a book to start a focused conversation")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 4)
+                // Initial empty state
+                InitialEmptyStateView(
+                    onSuggestionTap: { suggestion in
+                        messageText = suggestion
+                        isInputFocused = true
+                    },
+                    onSelectBook: {
+                        showingBookStrip = true
+                    }
+                )
             }
         }
-        .padding(.horizontal, 40)
     }
     
     // MARK: - Book Grid View

@@ -383,12 +383,6 @@ struct BookDetailView: View {
                 .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 // Page count and percentage removed per user request
-                // DEBUG: This area should be empty now
-                #if DEBUG
-                Text("DEBUG: If you see progress here, it's NOT from BookDetailView")
-                    .font(.caption)
-                    .foregroundColor(.red)
-                #endif
                 
                 if let rating = book.userRating {
                     StatusPill(text: "★ \(rating)", color: accentColor.opacity(0.8))
@@ -563,7 +557,8 @@ struct BookDetailView: View {
             AmbientReadingProgressView(
                 book: book,
                 width: 320,
-                showDetailed: true
+                showDetailed: true,
+                colorPalette: colorPalette
             )
             .environmentObject(libraryViewModel)
         }
