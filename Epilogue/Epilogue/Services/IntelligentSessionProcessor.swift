@@ -390,35 +390,4 @@ class IntelligentSessionProcessor: ObservableObject {
     }
 }
 
-enum SessionMood {
-    case positive
-    case thoughtful
-    case challenging
-    case neutral
-    
-    var color: Color {
-        switch self {
-        case .positive:
-            return .green
-        case .thoughtful:
-            return .blue
-        case .challenging:
-            return .orange
-        case .neutral:
-            return .gray
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .positive:
-            return "face.smiling"
-        case .thoughtful:
-            return "brain"
-        case .challenging:
-            return "exclamationmark.triangle"
-        case .neutral:
-            return "circle"
-        }
-    }
-}
+// SessionMood enum moved to AmbientSessionModels.swift to avoid duplication

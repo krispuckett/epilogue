@@ -298,6 +298,9 @@ struct UnifiedChatView: View {
             // Start in voice mode if requested or if ambient mode
             if startInVoiceMode || isAmbientMode {
                 if isAmbientMode {
+                    // Update VoiceRecognitionManager with library books for detection
+                    voiceManager.updateLibraryBooks(libraryViewModel.books)
+                    
                     // For ambient mode, start immediately with minimal delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         print("🎙️ Starting ambient session immediately")

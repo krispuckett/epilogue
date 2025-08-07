@@ -101,6 +101,8 @@ extension View {
 
 struct SimplifiedAmbientPresentationModifier: ViewModifier {
     @ObservedObject var coordinator = SimplifiedAmbientCoordinator.shared
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @EnvironmentObject var notesViewModel: NotesViewModel
     
     func body(content: Content) -> some View {
         content
@@ -110,8 +112,8 @@ struct SimplifiedAmbientPresentationModifier: ViewModifier {
                     startInVoiceMode: true,  // Always start with voice
                     isAmbientMode: true
                 )
-                .environmentObject(LibraryViewModel())
-                .environmentObject(NotesViewModel())
+                .environmentObject(libraryViewModel)
+                .environmentObject(notesViewModel)
                 .environmentObject(NavigationCoordinator.shared)
                 .preferredColorScheme(.dark)
                 .statusBarHidden(true)

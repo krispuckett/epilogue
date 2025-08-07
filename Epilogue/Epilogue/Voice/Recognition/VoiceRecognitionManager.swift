@@ -95,6 +95,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var whisperProcessingTimer: Timer?
     private let whisperBufferDuration: TimeInterval = 2.0 // Process every 2 seconds for better responsiveness
     
+    // Library books for detection
+    private var libraryBooks: [Book] = []
+    
     // Debug logging counters
     private var voiceBufferLogCounter = 0
     private var vadCheckLogCounter = 0
@@ -646,6 +649,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             logger.debug("Transcription confidence: \(segment.confidence) - '\(segment.substring)'")
         }
         
+        // Real-time question detection for immediate AI responses
+        if isListeningInAmbientMode {
+            await detectAndProcessQuestions(in: text, confidence: self.confidenceScore, isFinal: result.isFinal)
+        }
+        
         // Check for reaction phrases that might precede quotes
         detectReactionPhrases(in: text)
         
@@ -656,6 +664,94 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 await processNaturalReaction(text)
             }
         }
+    }
+    
+    // MARK: - Real-time Question Detection
+    private var detectedQuestions: [String] = []
+    private var questionDetectionTimer: Timer?
+    private let questionConfidenceThreshold: Float = 0.6
+    
+    private func detectAndProcessQuestions(in text: String, confidence: Float, isFinal: Bool) async {
+        let lowercased = text.lowercased()
+        
+        // Question detection patterns
+        let questionPatterns = [
+            // Direct questions
+            #"what\s+(is|are|does|did|will|would|can|could)\s+"#,
+            #"how\s+(do|does|did|can|could|would|will)\s+"#,
+            #"why\s+(is|are|does|did|would|will)\s+"#,
+            #"when\s+(is|are|does|did|would|will)\s+"#,
+            #"where\s+(is|are|does|did|would|will)\s+"#,
+            #"who\s+(is|are|does|did|would|will)\s+"#,
+            
+            // Question words at start
+            #"^what\s+"#,
+            #"^how\s+"#,
+            #"^why\s+"#,
+            #"^when\s+"#,
+            #"^where\s+"#,
+            #"^who\s+"#,
+            
+            // Common question forms
+            #"\b(can you|could you|would you)\s+"#,
+            #"\b(tell me|explain)\s+"#,
+            #"\b(i wonder|wondering)\s+"#,
+            #"\bdoes this mean\b"#,
+            #"\bwhat does\b"#,
+            #"\bis this\b"#,
+        ]
+        
+        var detectedQuestion: String?
+        
+        // Check for question patterns
+        for pattern in questionPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                let matches = regex.matches(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased))
+                if !matches.isEmpty {
+                    detectedQuestion = text
+                    break
+                }
+            }
+        }
+        
+        // Also check for question mark at end
+        if text.hasSuffix("?") {
+            detectedQuestion = text
+        }
+        
+        // Process detected question
+        if let question = detectedQuestion,
+           confidence > questionConfidenceThreshold,
+           question.split(separator: " ").count >= 3,
+           !detectedQuestions.contains(question) {
+            
+            // Add to detected questions to avoid duplicates
+            detectedQuestions.append(question)
+            
+            // Limit array size
+            if detectedQuestions.count > 10 {
+                detectedQuestions.removeFirst()
+            }
+            
+            logger.info("🤔 Real-time question detected: '\(question)' (confidence: \(confidence))")
+            
+            // Immediate AI response for questions (don't wait for session end)
+            Task {
+                await triggerImmediateAIResponse(for: question)
+            }
+        }
+    }
+    
+    private func triggerImmediateAIResponse(for question: String) async {
+        // Post notification for immediate AI processing
+        NotificationCenter.default.post(
+            name: Notification.Name("ImmediateQuestionDetected"),
+            object: [
+                "question": question,
+                "timestamp": Date(),
+                "bookContext": SimplifiedAmbientCoordinator.shared.currentBook
+            ]
+        )
     }
     
     private func detectReactionPhrases(in text: String) {
@@ -974,6 +1070,12 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         stopListening()
     }
     
+    // Public method to update library books
+    func updateLibraryBooks(_ books: [Book]) {
+        self.libraryBooks = books
+        logger.info("Updated library books for voice detection: \(books.count) books")
+    }
+    
     private func detectBookFromSpeech(_ text: String) {
         let lowercased = text.lowercased()
         
@@ -1016,9 +1118,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     private func fuzzyMatchBook(_ text: String) -> Book? {
-        // Get books from library
-        let libraryViewModel = LibraryViewModel()
-        let books = libraryViewModel.books
+        // Use stored library books
+        let books = self.libraryBooks
         
         let lowercasedText = text.lowercased()
         
@@ -1047,8 +1148,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     private func fuzzyMatchBookTitle(in text: String) -> Book? {
-        let libraryViewModel = LibraryViewModel()
-        let books = libraryViewModel.books
+        // Use stored library books
+        let books = self.libraryBooks
         let lowercasedText = text.lowercased()
         
         // Direct title matching with some flexibility

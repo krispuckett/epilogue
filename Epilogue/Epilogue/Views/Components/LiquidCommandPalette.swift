@@ -17,6 +17,11 @@ struct LiquidCommandPalette: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var contentOffset: CGFloat = 0
     
+    // Book search integration
+    @StateObject private var googleBooksService = GoogleBooksService()
+    @State private var searchDebounceTask: Task<Void, Never>?
+    @State private var showingGoogleResults = false
+    
     // MARK: - Environment
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -112,8 +117,40 @@ struct LiquidCommandPalette: View {
                     
                     // Content area
                     VStack(spacing: 0) {
-                        // Show search results (including recent commands when empty)
-                        if !showQuickActions && (commandText.count >= 3 || commandText.isEmpty) {
+                        // Show Google Books results if searching for books
+                        if showingGoogleResults && !googleBooksService.searchResults.isEmpty {
+                            ScrollView {
+                                VStack(spacing: 12) {
+                                    Text("Add Book from Search")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.6))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    
+                                    ForEach(googleBooksService.searchResults.prefix(5)) { book in
+                                        LiquidBookSearchRow(book: book) {
+                                            // Add book to library
+                                            libraryViewModel.addBook(book)
+                                            HapticManager.shared.bookOpen()
+                                            
+                                            // Show success toast
+                                            NotificationCenter.default.post(
+                                                name: Notification.Name("ShowGlassToast"),
+                                                object: ["message": "Added \"\(book.title)\" to library"]
+                                            )
+                                            
+                                            dismissPalette()
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .frame(maxHeight: 300)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                            .transition(.smoothSlide)
+                        }
+                        // Show regular search results (including recent commands when empty)
+                        else if !showQuickActions && (commandText.count >= 3 || commandText.isEmpty) {
                             ScrollView {
                                 LiquidSearchResultsView(searchText: commandText)
                                     .environmentObject(libraryViewModel)
@@ -230,6 +267,36 @@ struct LiquidCommandPalette: View {
                     dismissPalette()
                 }
             )
+        }
+        .onChange(of: commandText) { _, newValue in
+            // Cancel previous search
+            searchDebounceTask?.cancel()
+            
+            // Detect if user is searching for a book
+            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            
+            // Natural language detection for book searches
+            let bookIndicators = [
+                "book ", "novel ", "by ", "author ", "read ", "reading ",
+                "add book", "find book", "search book"
+            ]
+            
+            let isLikelyBookSearch = bookIndicators.contains { indicator in
+                trimmed.lowercased().contains(indicator)
+            } || (trimmed.count > 3 && !trimmed.starts(with: "\"") && !trimmed.starts(with: "note:"))
+            
+            if isLikelyBookSearch && trimmed.count > 3 {
+                // Debounce search
+                searchDebounceTask = Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                    
+                    if !Task.isCancelled {
+                        await searchGoogleBooks(trimmed)
+                    }
+                }
+            } else {
+                showingGoogleResults = false
+            }
         }
         .onChange(of: voiceManager.transcribedText) { _, newValue in
             if !newValue.isEmpty {
@@ -623,6 +690,86 @@ struct LiquidCommandPalette: View {
             isPresented = false
             isFocused = false
         }
+    }
+    
+    // MARK: - Google Books Search
+    private func searchGoogleBooks(_ query: String) async {
+        // Clean up query - remove book indicators for cleaner search
+        var cleanQuery = query
+        let removeTerms = ["add book", "find book", "search book", "book:", "novel:", "read"]
+        for term in removeTerms {
+            cleanQuery = cleanQuery.replacingOccurrences(of: term, with: "", options: .caseInsensitive)
+        }
+        cleanQuery = cleanQuery.trimmingCharacters(in: .whitespaces)
+        
+        guard !cleanQuery.isEmpty else { return }
+        
+        await MainActor.run {
+            showingGoogleResults = true
+        }
+        
+        await googleBooksService.searchBooks(query: cleanQuery)
+    }
+}
+
+// MARK: - Liquid Book Search Result Row
+struct LiquidBookSearchRow: View {
+    let book: Book
+    let onSelect: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                // Cover image
+                if let coverURL = book.coverImageURL {
+                    AsyncImage(url: URL(string: coverURL)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.1))
+                    }
+                    .frame(width: 40, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                } else {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 40, height: 60)
+                }
+                
+                // Book info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(book.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    
+                    Text(book.author)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                    
+                    if let year = book.publishedYear {
+                        Text(year)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+                
+                Spacer()
+                
+                // Add button
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

@@ -154,6 +154,8 @@ struct ContentView: View {
                 }
             }
             .simplifiedAmbientPresentation()  // Only use simplified ambient mode
+            .environmentObject(libraryViewModel)
+            .environmentObject(notesViewModel)
             .onAppear {
                 // Defer cache cleaning to background after launch
                 Task {
