@@ -43,6 +43,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     @Published var recognitionState: RecognitionState = .idle
     @Published var confidenceScore: Float = 0.0
     @Published var whisperConfidence: Float = 0.0
+    @Published var isListeningInAmbientMode: Bool = false
     @Published var isProcessingWhisper = false
     @Published var detectedLanguage = "en"
     
@@ -634,6 +635,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         let text = result.bestTranscription.formattedString
         self.transcribedText = text
         
+        // Detect book mentions in ambient mode
+        if isListeningInAmbientMode {
+            detectBookFromSpeech(text)
+        }
+        
         // Update confidence score for debugging
         if let segment = result.bestTranscription.segments.last {
             self.confidenceScore = segment.confidence
@@ -954,6 +960,173 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 self.whisperTranscribedText = "Test error: \(error.localizedDescription)"
             }
         }
+    }
+    
+    // MARK: - Natural Book Detection
+    
+    func startAmbientListeningMode() {
+        isListeningInAmbientMode = true
+        startAmbientListening()
+    }
+    
+    func stopAmbientListeningMode() {
+        isListeningInAmbientMode = false
+        stopListening()
+    }
+    
+    private func detectBookFromSpeech(_ text: String) {
+        let lowercased = text.lowercased()
+        
+        // Natural patterns people use
+        let patterns = [
+            "i'm reading ",
+            "i am reading ",
+            "reading ",
+            "in the book ",
+            "from ",
+            "in ",
+            "the book ",
+            "this book ",
+            "my current book ",
+            "currently reading ",
+            "just finished reading ",
+            "started reading "
+        ]
+        
+        // Check for book mentions
+        for pattern in patterns {
+            if let range = lowercased.range(of: pattern) {
+                let afterPattern = String(text[range.upperBound...])
+                
+                // Try to match against library books
+                if let matchedBook = fuzzyMatchBook(afterPattern) {
+                    // Update coordinator
+                    SimplifiedAmbientCoordinator.shared.setBookContext(matchedBook)
+                    logger.info("Book detected from speech: \(matchedBook.title)")
+                    return
+                }
+            }
+        }
+        
+        // Also check for direct title mentions
+        if let matchedBook = fuzzyMatchBookTitle(in: text) {
+            SimplifiedAmbientCoordinator.shared.setBookContext(matchedBook)
+            logger.info("Book title detected: \(matchedBook.title)")
+        }
+    }
+    
+    private func fuzzyMatchBook(_ text: String) -> Book? {
+        // Get books from library
+        let libraryViewModel = LibraryViewModel()
+        let books = libraryViewModel.books
+        
+        let lowercasedText = text.lowercased()
+        
+        for book in books {
+            let bookTitle = book.title.lowercased()
+            let bookWords = bookTitle.split(separator: " ")
+            
+            // Check if enough title words appear in text
+            let matchingWords = bookWords.filter { word in
+                lowercasedText.contains(word)
+            }
+            
+            // 60% match threshold
+            if !bookWords.isEmpty && Double(matchingWords.count) / Double(bookWords.count) > 0.6 {
+                return book
+            }
+            
+            // Also check author name
+            let authorName = book.author.lowercased()
+            if authorName.count > 3 && lowercasedText.contains(authorName) {
+                return book
+            }
+        }
+        
+        return nil
+    }
+    
+    private func fuzzyMatchBookTitle(in text: String) -> Book? {
+        let libraryViewModel = LibraryViewModel()
+        let books = libraryViewModel.books
+        let lowercasedText = text.lowercased()
+        
+        // Direct title matching with some flexibility
+        for book in books {
+            let bookTitle = book.title.lowercased()
+            
+            // Check for exact title match
+            if lowercasedText.contains(bookTitle) {
+                return book
+            }
+            
+            // Check for title without articles
+            let titleWithoutArticles = bookTitle
+                .replacingOccurrences(of: "the ", with: "")
+                .replacingOccurrences(of: "a ", with: "")
+                .replacingOccurrences(of: "an ", with: "")
+            
+            if titleWithoutArticles.count > 3 && lowercasedText.contains(titleWithoutArticles) {
+                return book
+            }
+        }
+        
+        return nil
+    }
+    
+    // Voice commands for ambient mode
+    func processAmbientVoiceCommand(_ text: String) {
+        let lowercased = text.lowercased()
+        
+        // Switch book command
+        if lowercased.contains("switch to") || lowercased.contains("change to") {
+            for pattern in ["switch to ", "change to "] {
+                if let range = lowercased.range(of: pattern) {
+                    let bookName = String(text[range.upperBound...])
+                    if let book = fuzzyMatchBook(bookName) {
+                        SimplifiedAmbientCoordinator.shared.setBookContext(book)
+                        speakBookConfirmation(book)
+                    }
+                    return
+                }
+            }
+        }
+        
+        // What book am I reading?
+        if lowercased.contains("what book") || lowercased.contains("which book") {
+            if let currentBook = SimplifiedAmbientCoordinator.shared.currentBook {
+                speakBookConfirmation(currentBook)
+            } else {
+                speak("No book selected")
+            }
+            return
+        }
+        
+        // Clear book context
+        if lowercased.contains("clear book") || lowercased.contains("remove book") {
+            SimplifiedAmbientCoordinator.shared.clearBookContext()
+            speak("Book context cleared")
+            return
+        }
+        
+        // Done reading / exit
+        if lowercased.contains("i'm done") || lowercased.contains("done reading") || lowercased.contains("stop ambient") {
+            SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+            return
+        }
+    }
+    
+    private func speakBookConfirmation(_ book: Book) {
+        speak("Now reading \(book.title)")
+    }
+    
+    private func speak(_ text: String) {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = 0.5
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        
+        let synthesizer = AVSpeechSynthesizer()
+        synthesizer.speak(utterance)
     }
 }
 

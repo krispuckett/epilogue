@@ -13,15 +13,13 @@ struct ContentView: View {
     @State private var selectedDetent: PresentationDetent = .height(300)
     @Namespace private var animation
     @State private var showPrivacySettings = false
-    @State private var showAdvancedActions = false
-    @State private var quickActionScale: CGFloat = 1.0
-    @State private var isLongPressing = false
     @State private var showBookScanner = false
     @StateObject private var bookScanner = BookScannerService.shared
     @State private var showVoiceRecording = false
     @State private var showNoQuotesToast = false
-    @State private var showLiquidCommandPalette = false
     @State private var showingLibraryCommandPalette = false
+    @State private var showGlassToast = false
+    @State private var toastMessage = ""
     
     // Command processing
     @Environment(\.modelContext) private var modelContext
@@ -53,14 +51,10 @@ struct ContentView: View {
     var body: some View {
         mainContent
             .overlay(alignment: .bottom) {
-                advancedActionsOverlay
-            }
-            .overlay(alignment: .bottom) {
                 commandInputOverlay
             }
             .interruptibleAnimation(.snappy, value: showCommandInput)
             .interruptibleAnimation(.smooth, value: selectedTab)
-            .interruptibleAnimation(.bouncy, value: showAdvancedActions)
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showPrivacySettings) {
                 NavigationView {
@@ -111,6 +105,10 @@ struct ContentView: View {
                 isShowing: $showNoQuotesToast,
                 message: "No quotes to share yet"
             )
+            .glassToast(
+                isShowing: $showGlassToast,
+                message: toastMessage
+            )
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
                 if notification.object is Book {
                     selectedTab = 0  // Switch to library tab
@@ -140,11 +138,22 @@ struct ContentView: View {
                 showCommandInput = false
                 showingLibraryCommandPalette = false
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowLiquidCommandPalette"))) { _ in
-                showingLibraryCommandPalette = false
-                showLiquidCommandPalette = true
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowCommandInput"))) { _ in
+                showCommandInput = true
                 HapticManager.shared.commandPaletteOpen()
+                // Focus the input immediately
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isInputFocused = true
+                }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowGlassToast"))) { notification in
+                if let info = notification.object as? [String: Any],
+                   let message = info["message"] as? String {
+                    toastMessage = message
+                    showGlassToast = true
+                }
+            }
+            .simplifiedAmbientPresentation()  // Only use simplified ambient mode
             .onAppear {
                 // Defer cache cleaning to background after launch
                 Task {
@@ -242,57 +251,16 @@ struct ContentView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                // Quick Add button positioned right above tab bar
+                // Enhanced Quick Actions Bar with advanced gestures
                 if selectedTab != 2 && !showCommandInput && !notesViewModel.isEditingNote {
-                    // Quick Actions button
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .medium))
-                        Text("Quick Actions")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .scaleEffect(isLongPressing ? 0.95 : 1.0)
-                    .glassEffect(in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-                    }
-                    .matchedGeometryEffect(id: "quickActionsButton", in: animation)
-                    .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    .simultaneousGesture(
-                        TapGesture()
-                            .onEnded {
-                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                showCommandInput = true
-                            }
-                    )
-                    .onLongPressGesture(
-                        minimumDuration: 0.6,
-                        maximumDistance: .infinity,
-                        pressing: { pressing in
-                            withAnimation(SmoothAnimationType.snappy.animation) {
-                                isLongPressing = pressing
-                            }
-                            if pressing {
-                                print("🟡 Long press started")
-                            }
-                        },
-                        perform: {
-                            print("🔵 Long press detected! showAdvancedActions = true")
-                            HapticManager.shared.mediumTap()
-                            withAnimation(SmoothAnimationType.bouncy.animation) {
-                                showAdvancedActions = true
-                            }
-                        }
-                    )
-                    .padding(.bottom, 56) // 4-6px above tab bar
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.8).combined(with: .opacity)
-                    ))
+                    EnhancedQuickActionsBar()
+                        .environmentObject(libraryViewModel)
+                        .environmentObject(notesViewModel)
+                        .padding(.bottom, 56) // 4-6px above tab bar
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
                 }
             }
         }
@@ -319,60 +287,20 @@ struct ContentView: View {
     }
     
     @ViewBuilder
-    private var advancedActionsOverlay: some View {
-        if showAdvancedActions {
-            ZStack {
-                // Dark background
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(SmoothAnimationType.smooth.animation) {
-                            showAdvancedActions = false
-                        }
-                    }
-                
-                VStack {
-                    Spacer()
-                    AdvancedActionsMenu(
-                        showAdvancedActions: $showAdvancedActions,
-                        showBookScanner: $showBookScanner,
-                        notesViewModel: notesViewModel
-                    )
-                    .padding(.bottom, 180) // Position above Quick Actions button
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity),
-                        removal: .scale(scale: 0.95, anchor: .bottom).combined(with: .opacity)
-                    ))
-                    .onAppear {
-                        print("🟢 AdvancedActionsMenu appeared!")
-                    }
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
     private var commandInputOverlay: some View {
         if showCommandInput {
             ZStack(alignment: .bottom) {
-                // Backdrop
-                Color.black.opacity(0.3)
+                // Invisible tap catcher - no visual backdrop
+                Color.clear
+                    .contentShape(Rectangle())
                     .ignoresSafeArea()
                     .onTapGesture {
-                        if showingLibraryCommandPalette {
-                            showingLibraryCommandPalette = false
-                            // Ensure quick actions reappear after dismissing command palette
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                withAnimation(SmoothAnimationType.smooth.animation) {
-                                    showCommandInput = false
-                                }
-                            }
-                        } else {
-                            isInputFocused = false
-                            commandText = ""
-                            withAnimation(SmoothAnimationType.smooth.animation) {
-                                showCommandInput = false
-                            }
+                        // Dismiss on any tap outside
+                        isInputFocused = false
+                        commandText = ""
+                        showingLibraryCommandPalette = false
+                        withAnimation(SmoothAnimationType.smooth.animation) {
+                            showCommandInput = false
                         }
                     }
                 
@@ -459,150 +387,6 @@ struct ContentView: View {
     
     // MARK: - Helper Functions
     // Note: Command processing logic moved to CommandProcessingManager
-}
-
-// MARK: - Advanced Actions Menu
-
-struct AdvancedActionsMenu: View {
-    @Binding var showAdvancedActions: Bool
-    @Binding var showBookScanner: Bool
-    let notesViewModel: NotesViewModel
-    
-    @State private var actionOpacities: [Double] = [0, 0, 0]
-    @State private var actionScales: [CGFloat] = [0.8, 0.8, 0.8]
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Book Scan - Featured Action
-            AdvancedActionButton(
-                icon: "camera.viewfinder",
-                label: "Scan Book",
-                color: Color(red: 1.0, green: 0.55, blue: 0.26),
-                isFeatured: true,
-                action: {
-                    HapticManager.shared.mediumTap()
-                    showBookScanner = true
-                    showAdvancedActions = false
-                }
-            )
-            .opacity(actionOpacities[0])
-            .scaleEffect(actionScales[0])
-            
-            // Voice Note
-            AdvancedActionButton(
-                icon: "waveform",
-                label: "Voice Note",
-                color: .white.opacity(0.9),
-                action: {
-                    HapticManager.shared.lightTap()
-                    // Start voice recording
-                    NotificationCenter.default.post(name: Notification.Name("StartVoiceNote"), object: nil)
-                    showAdvancedActions = false
-                }
-            )
-            .opacity(actionOpacities[1])
-            .scaleEffect(actionScales[1])
-            
-            // Share Last Quote
-            AdvancedActionButton(
-                icon: "square.and.arrow.up",
-                label: "Share Quote",
-                color: .white.opacity(0.9),
-                action: {
-                    HapticManager.shared.lightTap()
-                    // Share most recent quote
-                    let quotes = notesViewModel.notes.filter { $0.type == .quote }
-                    if let lastQuote = quotes.last {
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ShareQuote"),
-                            object: lastQuote
-                        )
-                    } else {
-                        // No quotes to share
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ShowNoQuotesToast"),
-                            object: nil
-                        )
-                    }
-                    showAdvancedActions = false
-                }
-            )
-            .opacity(actionOpacities[2])
-            .scaleEffect(actionScales[2])
-        }
-        .padding(.horizontal, 16)
-        .onAppear {
-            // Staggered animations
-            for i in 0..<3 {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(i) * 0.05)) {
-                    actionOpacities[i] = 1.0
-                    actionScales[i] = 1.0
-                }
-            }
-        }
-    }
-}
-
-struct AdvancedActionButton: View {
-    let icon: String
-    let label: String
-    let color: Color
-    var isFeatured: Bool = false
-    let action: () -> Void
-    
-    @State private var isPressed = false
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: isFeatured ? 24 : 20, weight: .medium))
-                    .foregroundStyle(color)
-                    .frame(width: 44, height: 44)
-                    .background {
-                        if isFeatured {
-                            // Featured glow effect
-                            Circle()
-                                .fill(color.opacity(0.15))
-                                .blur(radius: 8)
-                                .scaleEffect(1.5)
-                        }
-                    }
-                
-                Text(label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(color)
-            }
-            .frame(width: 80)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 8)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(
-                        isFeatured ? color.opacity(0.3) : Color.white.opacity(0.1),
-                        lineWidth: 0.5
-                    )
-            }
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-            .shadow(
-                color: isFeatured ? color.opacity(0.2) : .black.opacity(0.1),
-                radius: isFeatured ? 12 : 8,
-                y: 4
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .onLongPressGesture(
-            minimumDuration: 0,
-            maximumDistance: .infinity,
-            pressing: { pressing in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isPressed = pressing
-                }
-            },
-            perform: {}
-        )
-    }
 }
 
 #Preview {

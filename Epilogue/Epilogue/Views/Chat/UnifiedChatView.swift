@@ -2,8 +2,22 @@ import SwiftUI
 import SwiftData
 
 struct UnifiedChatView: View {
+    let preSelectedBook: Book?
+    let startInVoiceMode: Bool
+    let isAmbientMode: Bool
+    
     @State private var currentBookContext: Book?
     @State private var messages: [UnifiedChatMessage] = []
+    @Environment(\.dismiss) private var dismiss
+    
+    init(preSelectedBook: Book? = nil, startInVoiceMode: Bool = false, isAmbientMode: Bool = false) {
+        self.preSelectedBook = preSelectedBook
+        self.startInVoiceMode = startInVoiceMode
+        self.isAmbientMode = isAmbientMode
+        
+        // SAFETY: Initialize showingBookStrip - NEVER show in ambient mode
+        self._showingBookStrip = State(initialValue: false)
+    }
     @State private var scrollProxy: ScrollViewProxy?
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
@@ -61,6 +75,20 @@ struct UnifiedChatView: View {
     }
     
     var body: some View {
+        mainContent
+            .overlay(alignment: .topLeading) {
+                if isAmbientMode {
+                    // Only show exit button, no book pill
+                    ambientModeExitButton
+                }
+            }
+            .ambientModeModifiers(isAmbientMode: isAmbientMode, dismiss: dismiss) { 
+                handleMicrophoneTap() 
+            }
+            .statusBarHidden(isAmbientMode)
+    }
+    
+    private var mainContent: some View {
         ZStack {
             // Tap to dismiss keyboard background
             Color.clear
@@ -74,34 +102,23 @@ struct UnifiedChatView: View {
             Group {
             if isRecording, let book = currentBookContext {
                 // Use the breathing gradient during recording with book context
-                ClaudeInspiredGradient(
-                    book: currentBookContext,
-                    colorPalette: colorPalette, // Pass existing palette
-                    audioLevel: $audioLevel,
-                    isListening: $isRecording,
-                    voiceFrequency: voiceManager.voiceFrequency,
-                    voiceIntensity: voiceManager.voiceIntensity,
-                    voiceRhythm: voiceManager.voiceRhythm
+                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                BookAtmosphericGradientView(
+                    colorPalette: palette, 
+                    intensity: 0.9 + Double(audioLevel) * 0.3 // Audio-reactive intensity
                 )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 .id("recording-\(book.localId)")
             } else if isRecording {
-                // Recording without book context - use ambient gradient
-                ClaudeInspiredGradient(
-                    book: nil,
-                    colorPalette: nil,
-                    audioLevel: $audioLevel,
-                    isListening: $isRecording,
-                    voiceFrequency: voiceManager.voiceFrequency,
-                    voiceIntensity: voiceManager.voiceIntensity,
-                    voiceRhythm: voiceManager.voiceRhythm
-                )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .transition(.opacity)
-                .id("recording-ambient")
+                // Recording without book context - use ambient gradient with audio reactivity
+                AmbientChatGradientView()
+                    .opacity(0.8 + Double(audioLevel) * 0.4) // Audio-reactive opacity
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .id("recording-ambient")
             } else if let book = currentBookContext {
                 // Use the same BookAtmosphericGradientView with extracted colors
                 let palette = colorPalette ?? generatePlaceholderPalette(for: book)
@@ -131,8 +148,22 @@ struct UnifiedChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        if filteredMessages.isEmpty {
-                            if showingBookStrip {
+                        // Check if we only have transcribing messages (not real content)
+                        let hasRealContent = filteredMessages.contains { msg in
+                            !msg.content.contains("[Transcribing]")
+                        }
+                        
+                        if !hasRealContent {
+                            if isAmbientMode && currentBookContext == nil && !isRecording {
+                                // Show elegant welcome prompt for ambient mode
+                                ambientWelcomeView
+                                    .padding(.top, 100)
+                                    .transition(.asymmetric(
+                                        insertion: .scale(scale: 0.98).combined(with: .opacity),
+                                        removal: .scale(scale: 1.02).combined(with: .opacity)
+                                    ))
+                            } else if showingBookStrip && !isAmbientMode {
+                                // SAFETY: Double-check - never show book grid in ambient mode
                                 bookGridView
                                     .padding(.top, 40)
                                     .transition(.asymmetric(
@@ -140,6 +171,7 @@ struct UnifiedChatView: View {
                                         removal: .scale(scale: 1.05).combined(with: .opacity)
                                     ))
                             } else {
+                                // Show empty state even when recording to keep book cover visible
                                 emptyStateView
                                     .padding(.top, 100)
                                     .transition(.asymmetric(
@@ -148,7 +180,10 @@ struct UnifiedChatView: View {
                                     ))
                                     .animation(.easeInOut(duration: 0.5), value: colorPalette)
                             }
-                        } else {
+                        }
+                        
+                        // Always show messages if they exist
+                        if !filteredMessages.isEmpty {
                             ForEach(filteredMessages) { message in
                                 ChatMessageView(
                                     message: message,
@@ -210,7 +245,8 @@ struct UnifiedChatView: View {
                         onSend: sendMessage,
                         onMicrophoneTap: handleMicrophoneTap,
                         isRecording: $isRecording,
-                        colorPalette: colorPalette
+                        colorPalette: colorPalette,
+                        isAmbientMode: isAmbientMode
                     )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
@@ -219,12 +255,59 @@ struct UnifiedChatView: View {
         }
         .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
         .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
+        
+        // Voice-responsive bottom gradient overlay - show in all recording modes
+        .overlay(alignment: .bottom) {
+            if isRecording {
+                // Bottom gradient that adapts to book colors (or amber) and responds to voice
+                VoiceResponsiveBottomGradient(
+                    colorPalette: colorPalette,
+                    audioLevel: audioLevel,
+                    isRecording: isRecording,
+                    bookContext: currentBookContext
+                )
+                .allowsHitTesting(false)
+                .ignoresSafeArea(.all)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .bottom)),
+                    removal: .opacity.combined(with: .move(edge: .bottom))
+                ))
+            }
+        }
         .onAppear {
+            // Set pre-selected book if provided
+            if let book = preSelectedBook {
+                currentBookContext = book
+                print("onAppear: Setting pre-selected book: \(book.title)")
+            }
+            
             // Extract colors for initial book context if present
             if let book = currentBookContext {
                 print("onAppear: Found initial book context: \(book.title)")
                 Task {
                     await extractColorsForBook(book)
+                }
+            }
+            
+            // SAFETY: Force book strip to false in ambient mode - multiple checks
+            if isAmbientMode {
+                showingBookStrip = false
+                print("🛡️ SAFETY: Forcing showingBookStrip = false in ambient mode")
+            }
+            
+            // Start in voice mode if requested or if ambient mode
+            if startInVoiceMode || isAmbientMode {
+                if isAmbientMode {
+                    // For ambient mode, start immediately with minimal delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        print("🎙️ Starting ambient session immediately")
+                        startAmbientSession()
+                    }
+                } else {
+                    // For regular voice mode, use standard delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        handleMicrophoneTap()
+                    }
                 }
             }
         }
@@ -289,30 +372,104 @@ struct UnifiedChatView: View {
             // Update audio level for gradient animation
             audioLevel = level
         }
-        } // End of ZStack
-        // Navigation setup with native blur
-        .navigationTitle(currentBookContext?.title ?? "Chat")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        showingBookStrip.toggle()
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientChatBookChanged"))) { notification in
+            if let book = notification.object as? Book {
+                currentBookContext = book
+                Task {
+                    await extractColorsForBook(book)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowAmbientBookSelector"))) { _ in
+            // SAFETY: Never show book selector in ambient mode
+            guard !isAmbientMode else {
+                print("🛡️ SAFETY: Blocked ShowAmbientBookSelector in ambient mode")
+                return
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showingBookStrip = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientSessionCleared"))) { _ in
+            messages.removeAll()
+            currentSession = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookDetected"))) { notification in
+            if let book = notification.object as? Book {
+                // Only update if it's a different book
+                guard currentBookContext?.id != book.id else { return }
+                
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    currentBookContext = book
+                    
+                    // Show subtle confirmation
+                    HapticManager.shared.lightTap()
+                    
+                    // Extract colors for the detected book
+                    Task {
+                        await extractColorsForBook(book)
                     }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Switch books")
-                            .font(.system(size: 16))
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    
+                    // Only add system message if in ambient mode
+                    if isAmbientMode {
+                        // Check if we already have a recent "Now reading" message for this book
+                        let recentMessages = messages.suffix(5)
+                        let alreadyAnnounced = recentMessages.contains { msg in
+                            msg.content.contains("Now reading: \(book.title)")
+                        }
                         
-                        Image(systemName: showingBookStrip ? "xmark.circle.fill" : "book.closed.circle")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        // Don't add system message - the book pill shows the context
+                        // This prevents duplicate book headers
                     }
                 }
             }
         }
-        .onChange(of: showingBookStrip) { _, _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookCleared"))) { _ in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                currentBookContext = nil
+                colorPalette = nil
+            }
+        }
+        } // End of ZStack
+        // Book context pill removed - showing in navigation area instead
+        // Navigation setup with native blur
+        .navigationTitle(isAmbientMode ? "" : (currentBookContext?.title ?? "Chat"))
+        .navigationBarTitleDisplayMode(isAmbientMode ? .inline : .large)
+        .navigationBarHidden(isAmbientMode)
+        .toolbar {
+            if !isAmbientMode {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        // SAFETY: Additional check before toggling book strip
+                        guard !isAmbientMode else {
+                            print("🛡️ SAFETY: Prevented book strip toggle in ambient mode")
+                            return
+                        }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showingBookStrip.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Switch books")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                            
+                            Image(systemName: showingBookStrip ? "xmark.circle.fill" : "book.closed.circle")
+                                .font(.system(size: 18))
+                                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        }
+                    }
+                }
+            }
+        }
+        .onChange(of: showingBookStrip) { oldValue, newValue in
+            // SAFETY: Continuously prevent book strip in ambient mode
+            if isAmbientMode && newValue {
+                print("🛡️ SAFETY: Blocking book strip activation in ambient mode")
+                showingBookStrip = false
+                return
+            }
+            
             if showingBookStrip {
                 // Dismiss keyboard if active
                 isInputFocused = false
@@ -349,7 +506,8 @@ struct UnifiedChatView: View {
                     onSuggestionTap: { suggestion in
                         messageText = suggestion
                         isInputFocused = true
-                    }
+                    },
+                    isAmbientMode: isAmbientMode
                 )
                 .environmentObject(notesViewModel)
             } else {
@@ -683,8 +841,8 @@ struct UnifiedChatView: View {
             book: currentBookContext
         )
         
-        // Start listening
-        voiceManager.startAmbientListening()
+        // Start listening in ambient mode (with book detection)
+        voiceManager.startAmbientListeningMode()
         
         // Ensure UI state updates on main thread
         Task { @MainActor in
@@ -1471,6 +1629,111 @@ struct LiveTranscriptionView: View {
     }
 }
 
+// MARK: - Voice-Responsive Bottom Gradient
+
+struct VoiceResponsiveBottomGradient: View {
+    let colorPalette: ColorPalette?
+    let audioLevel: Float
+    let isRecording: Bool
+    let bookContext: Book?
+    
+    @State private var pulsePhase: Double = 0
+    @State private var waveOffset: Double = 0
+    
+    private var gradientColors: [Color] {
+        guard let palette = colorPalette else {
+            // Fallback to warm amber gradient
+            return [
+                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
+                Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.4),
+                Color.warmAmber.opacity(0.2),
+                Color.clear
+            ]
+        }
+        
+        // Use enhanced colors from book palette with stronger opacity
+        return [
+            palette.primary.opacity(0.85),
+            palette.secondary.opacity(0.65), 
+            palette.accent.opacity(0.4),
+            Color.clear
+        ]
+    }
+    
+    private var gradientHeight: CGFloat {
+        let baseHeight: CGFloat = 240 // Slightly lower base
+        let audioBoost = CGFloat(audioLevel) * 160 // Still extreme but controlled
+        let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.40 // Cap at 40% of screen
+        return min(baseHeight + audioBoost, maxHeight)
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            VStack {
+                Spacer()
+                
+                // Voice-responsive gradient
+                LinearGradient(
+                    stops: [
+                        .init(color: gradientColors[0], location: 0.0),
+                        .init(color: gradientColors[1], location: 0.3),
+                        .init(color: gradientColors[2], location: 0.6),
+                        .init(color: gradientColors[3], location: 1.0)
+                    ],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+                .frame(height: gradientHeight)
+                .blur(radius: 20)
+                .opacity(isRecording ? 1.0 : 0.0)
+                .scaleEffect(y: 1.0 + Double(audioLevel) * 0.5, anchor: .bottom) // Voice-reactive scale
+                .animation(.easeInOut(duration: 0.1), value: audioLevel)
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isRecording)
+                
+                // Add subtle wave animation
+                .overlay(alignment: .bottom) {
+                    if isRecording {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        gradientColors[0].opacity(0.3),
+                                        gradientColors[1].opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(height: 60)
+                            .blur(radius: 15)
+                            .offset(y: sin(waveOffset) * 10)
+                            .animation(
+                                .easeInOut(duration: 2.0)
+                                .repeatForever(autoreverses: true),
+                                value: waveOffset
+                            )
+                    }
+                }
+            }
+        }
+        .onAppear {
+            // Start wave animation
+            withAnimation {
+                waveOffset = .pi
+            }
+        }
+        .onChange(of: audioLevel) { _, newLevel in
+            // Pulse effect on high audio levels
+            if newLevel > 0.3 {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    pulsePhase = pulsePhase + 0.5
+                }
+            }
+        }
+    }
+}
+
 
 // MARK: - Ambient Chat Gradient (Fallback)
 
@@ -1604,6 +1867,147 @@ struct SimplifiedUnifiedChatInputBar: View {
     }
 }
 
+// MARK: - Extensions for UnifiedChatView
+
+extension UnifiedChatView {
+    // MARK: - Ambient Welcome View
+    
+    private var ambientWelcomeView: some View {
+        VStack(spacing: 24) {
+            // Animated waveform visualization
+            HStack(spacing: 4) {
+                ForEach(0..<7) { index in
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.55, blue: 0.26),
+                                    Color(red: 1.0, green: 0.45, blue: 0.2)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 4, height: CGFloat.random(in: 20...60))
+                        .animation(
+                            .easeInOut(duration: 0.5)
+                            .repeatForever()
+                            .delay(Double(index) * 0.1),
+                            value: isRecording
+                        )
+                }
+            }
+            .frame(height: 60)
+            
+            Text("Listening...")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.white)
+            
+            Text("Just start talking about what you're reading")
+                .font(.system(size: 17))
+                .foregroundStyle(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+    
+    // MARK: - Book Context Pill
+    
+    private var bookContextPill: some View {
+        HStack(spacing: 6) {
+            if let book = currentBookContext {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                Text(book.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .glassEffect(in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+        .padding(.top, 60)
+        .transition(.asymmetric(
+            insertion: .scale(scale: 0.8).combined(with: .opacity),
+            removal: .scale(scale: 0.8).combined(with: .opacity)
+        ))
+    }
+    
+    // MARK: - Ambient Mode Exit Button
+    
+    private var ambientModeExitButton: some View {
+        Button {
+            // Stop voice if active
+            if isRecording {
+                handleMicrophoneTap()
+            }
+            
+            // Dismiss via coordinator
+            SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+            
+            // Also dismiss locally
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .frame(width: 36, height: 36)
+                .glassEffect(in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                }
+        }
+        .padding(.top, 20)
+        .padding(.leading, 20)
+        .transition(.asymmetric(
+            insertion: .scale(scale: 0.8).combined(with: .opacity),
+            removal: .scale(scale: 0.8).combined(with: .opacity)
+        ))
+    }
+}
+
+
+// MARK: - View Extension for Conditional Modifiers
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+    
+    @ViewBuilder
+    func ambientModeModifiers(isAmbientMode: Bool, dismiss: DismissAction, handleMicrophoneTap: @escaping () -> Void) -> some View {
+        if isAmbientMode {
+            self
+                .gesture(
+                    DragGesture()
+                        .onEnded { value in
+                            // Swipe down to dismiss
+                            if value.translation.height > 100 && abs(value.translation.width) < 100 {
+                                SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+                                dismiss()
+                            }
+                        }
+                )
+        } else {
+            self
+        }
+    }
+}
 
 // MARK: - Preview
 

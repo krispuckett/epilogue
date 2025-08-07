@@ -583,16 +583,39 @@ struct BookDetailView: View {
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
                         ))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    notesViewModel.deleteNote(quote)
+                        .iOS26SwipeActions([
+                            SwipeAction(
+                                icon: "pencil",
+                                backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                                handler: {
+                                    // Edit quote
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("EditNote"),
+                                        object: quote
+                                    )
+                                    HapticManager.shared.lightTap()
+                                }
+                            ),
+                            SwipeAction(
+                                icon: "square.and.arrow.up",
+                                backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                                handler: {
+                                    // Share quote
+                                    ShareQuoteService.shareQuote(quote)
                                     HapticManager.shared.success()
                                 }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+                            ),
+                            SwipeAction(
+                                icon: "trash.fill",
+                                backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                                isDestructive: true,
+                                handler: {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        notesViewModel.deleteNote(quote)
+                                    }
+                                }
+                            )
+                        ])
                 }
             }
         }
@@ -613,16 +636,54 @@ struct BookDetailView: View {
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
                         ))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    notesViewModel.deleteNote(note)
+                        .iOS26SwipeActions([
+                            SwipeAction(
+                                icon: "pencil",
+                                backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                                handler: {
+                                    // Edit note
+                                    NotificationCenter.default.post(
+                                        name: Notification.Name("EditNote"),
+                                        object: note
+                                    )
+                                    HapticManager.shared.lightTap()
+                                }
+                            ),
+                            SwipeAction(
+                                icon: "square.and.arrow.up",
+                                backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                                handler: {
+                                    // Share note as text
+                                    let shareText = """
+                                    \(note.content)
+                                    
+                                    — Note from "\(note.bookTitle ?? "Unknown Book")"
+                                    """
+                                    
+                                    let activityController = UIActivityViewController(
+                                        activityItems: [shareText],
+                                        applicationActivities: nil
+                                    )
+                                    
+                                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                       let rootViewController = windowScene.windows.first?.rootViewController {
+                                        rootViewController.present(activityController, animated: true)
+                                    }
+                                    
                                     HapticManager.shared.success()
                                 }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+                            ),
+                            SwipeAction(
+                                icon: "trash.fill",
+                                backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                                isDestructive: true,
+                                handler: {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        notesViewModel.deleteNote(note)
+                                    }
+                                }
+                            )
+                        ])
                 }
             }
         }

@@ -119,6 +119,7 @@ struct BookEmptyStateView: View {
     let book: Book
     let colorPalette: ColorPalette?
     let onSuggestionTap: (String) -> Void
+    var isAmbientMode: Bool = false
     
     @State private var coverOpacity: Double = 0
     @State private var coverScale: CGFloat = 0.8
@@ -154,7 +155,7 @@ struct BookEmptyStateView: View {
                     loadFullImage: false
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .opacity(0.3 * coverOpacity)
+                .opacity(1.0 * coverOpacity)
                 .scaleEffect(coverScale)
                 .shadow(
                     color: (colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26)).opacity(0.2),
@@ -181,28 +182,10 @@ struct BookEmptyStateView: View {
             }
             .opacity(contentOpacity)
             
-            // Example questions
-            VStack(spacing: 10) {
-                Text("Try asking:")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .textCase(.uppercase)
-                    .tracking(1)
-                
-                ForEach(Array(bookQuestions.prefix(3).enumerated()), id: \.offset) { index, question in
-                    QuestionChip(
-                        text: question,
-                        color: colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26),
-                        delay: Double(index) * 0.1
-                    ) {
-                        onSuggestionTap(question)
-                    }
-                }
-            }
-            .opacity(contentOpacity)
+            // Removed "Try asking" section
             
-            // Recent quotes as conversation starters
-            if !bookQuotes.isEmpty {
+            // Recent quotes as conversation starters - hide in ambient mode
+            if !bookQuotes.isEmpty && !isAmbientMode {
                 VStack(spacing: 12) {
                     Rectangle()
                         .fill(.white.opacity(0.1))

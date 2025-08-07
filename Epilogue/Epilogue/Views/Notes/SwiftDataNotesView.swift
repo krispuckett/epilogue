@@ -155,15 +155,47 @@ struct SwiftDataNotesView: View {
                                 // Handle note tap
                             }
                         )
-                        .swipeToDelete(
-                            onDelete: {
-                                deleteNote(note)
-                            },
-                            undoAction: {
-                                restoreNote(note.id)
-                            },
-                            itemDescription: note.type == .quote ? "quote" : "note"
-                        )
+                        .iOS26SwipeActions([
+                            SwipeAction(
+                                icon: "pencil",
+                                backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                                handler: {
+                                    // Edit note
+                                    editingNote = note
+                                    HapticManager.shared.lightTap()
+                                }
+                            ),
+                            SwipeAction(
+                                icon: "square.and.arrow.up",
+                                backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                                handler: {
+                                    // Share note
+                                    if note.type == .quote {
+                                        ShareQuoteService.shareQuote(note)
+                                    } else {
+                                        // Share as text for regular notes
+                                        let activityController = UIActivityViewController(
+                                            activityItems: [note.content],
+                                            applicationActivities: nil
+                                        )
+                                        
+                                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                           let rootViewController = windowScene.windows.first?.rootViewController {
+                                            rootViewController.present(activityController, animated: true)
+                                        }
+                                    }
+                                    HapticManager.shared.success()
+                                }
+                            ),
+                            SwipeAction(
+                                icon: "trash.fill",
+                                backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                                isDestructive: true,
+                                handler: {
+                                    deleteNote(note)
+                                }
+                            )
+                        ])
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.95).combined(with: .opacity),
                             removal: .scale(scale: 0.95).combined(with: .opacity)

@@ -43,6 +43,7 @@ struct UniversalInputBar: View {
     // State
     @Binding var isRecording: Bool
     let colorPalette: ColorPalette?
+    var isAmbientMode: Bool = false
     
     // Computed properties (exact same as UnifiedChatInputBar)
     private var placeholderText: String {
@@ -61,10 +62,10 @@ struct UniversalInputBar: View {
         HStack(spacing: 12) {
             // Main input bar - EXACT copy from UnifiedChatInputBar
             HStack(spacing: 0) {
-                // Command icon - matching search icon style
+                // Command icon - white in ambient mode
                 Image(systemName: "command")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(adaptiveUIColor)
+                    .foregroundStyle(isAmbientMode ? .white : adaptiveUIColor)
                     .frame(height: 36)
                     .padding(.leading, 12)
                     .padding(.trailing, 8)
@@ -81,12 +82,16 @@ struct UniversalInputBar: View {
                 ZStack(alignment: .leading) {
                     if messageText.isEmpty {
                         Text(placeholderText)
-                            .standardizedPlaceholderStyle()
+                            .foregroundColor(isAmbientMode ? .white.opacity(0.5) : .secondary)
+                            .font(.system(size: 16))
                             .lineLimit(1)
                     }
                     
                     TextField("", text: $messageText, axis: .vertical)
-                        .standardizedTextFieldStyle(isFocused: isInputFocused)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 16))
+                        .foregroundStyle(isAmbientMode ? .white : (Color.primary))
+                        .accentColor(isAmbientMode ? .white : Color(red: 1.0, green: 0.55, blue: 0.26))
                         .focused($isInputFocused)
                         .lineLimit(1...5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -110,9 +115,11 @@ struct UniversalInputBar: View {
                         Image(systemName: "waveform")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(
-                                isRecording ? 
-                                adaptiveUIColor : 
-                                adaptiveUIColor.opacity(0.7)
+                                isAmbientMode ? .white : (
+                                    isRecording ? 
+                                    adaptiveUIColor : 
+                                    adaptiveUIColor.opacity(0.7)
+                                )
                             )
                     }
                     .buttonStyle(.plain)
@@ -124,7 +131,7 @@ struct UniversalInputBar: View {
                         Button(action: onSend) {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 32))
-                                .foregroundStyle(.white, adaptiveUIColor)
+                                .foregroundStyle(.white, isAmbientMode ? .white : adaptiveUIColor)
                         }
                         .buttonStyle(.plain)
                         .transition(.asymmetric(
