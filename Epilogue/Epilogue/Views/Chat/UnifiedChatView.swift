@@ -29,7 +29,7 @@ struct UnifiedChatView: View {
     @State private var showingSessionSummary = false
     @State private var sessionStartTime: Date?
     @State private var sessionContent: [SessionContent] = []
-    @State private var showDebugOverlay = false
+    @State private var showDebugOverlay = false // Disabled in production
     
     // Real-time processing state
     @State private var detectionState: DetectionState = .idle
@@ -39,8 +39,12 @@ struct UnifiedChatView: View {
     @State private var editingContent: DetectedContent?
     @State private var lastProcessedText = ""
     
-    // Smart content buffer for intelligent fragment processing
-    @StateObject private var contentBuffer = SmartContentBuffer.shared
+    // Deduplication tracking
+    @State private var recentlyProcessedHashes = Set<Int>()
+    @State private var lastProcessedTime = Date()
+    
+    // Improved unified processor for all transcription processing
+    @StateObject private var processor = ImprovedUnifiedProcessor.shared
     
     enum DetectionState {
         case idle
@@ -167,13 +171,7 @@ struct UnifiedChatView: View {
             .overlay(alignment: .topLeading) {
                 if isAmbientMode { ambientModeExitButton }
             }
-            .overlay(alignment: .bottomTrailing) {
-                if isAmbientMode && showDebugOverlay {
-                    UnifiedProcessorDebugView()
-                        .frame(maxWidth: 350)
-                        .padding()
-                }
-            }
+            // Debug overlay removed for production
     }
     
     private var viewWithNavigation: some View {
@@ -207,32 +205,32 @@ struct UnifiedChatView: View {
     private func handleTranscribedText(_ text: String) {
         guard isRecording && !text.isEmpty else { return }
         
-        // Update buffer context with current book
-        if contentBuffer.currentBuffer.isEmpty {
-            contentBuffer.updateContext(book: currentBookContext)
-        }
+        // Process with improved processor
+        // Context is handled internally by the processor
         
         // Process incrementally through smart buffer
         if text != lastProcessedText {
             let newContent = String(text.dropFirst(lastProcessedText.count))
             if !newContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                contentBuffer.addFragment(
-                    newContent,
-                    confidence: 0.8, // Default confidence
-                    isFinal: false
-                )
+                Task {
+                    _ = await processor.process(
+                        newContent,
+                        confidence: 0.8,
+                        isFinal: false,
+                        bookContext: currentBookContext
+                    )
+                }
             }
             lastProcessedText = text
         }
         
-        // Show live content with smart buffer's processed version
-        liveTranscription = contentBuffer.currentBuffer.isEmpty ? text : contentBuffer.currentBuffer
+        // Show live transcription
+        liveTranscription = text
     }
     
-    private func handleSmartBufferProcessed(_ notification: Notification) {
-        guard let content = notification.object as? SmartContentBuffer.ProcessedContent else { return }
+    private func handleProcessorResult(_ result: ImprovedUnifiedProcessor.ProcessingResult) {
         Task {
-            await handleProcessedContent(content)
+            await handleProcessedResult(result)
         }
     }
     
@@ -246,9 +244,10 @@ struct UnifiedChatView: View {
             .statusBarHidden(isAmbientMode)
             .onAppear {
                 setupInitialState()
-                #if DEBUG
-                if isAmbientMode { showDebugOverlay = true }
-                #endif
+                // Debug overlay disabled for production
+                // #if DEBUG
+                // if isAmbientMode { showDebugOverlay = false }
+                // #endif
             }
             .onChange(of: currentBookContext) { oldBook, newBook in
                 handleBookContextChange(oldBook: oldBook, newBook: newBook)
@@ -259,8 +258,12 @@ struct UnifiedChatView: View {
             .overlay(alignment: .bottom) { commandPaletteOverlay }
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
             .onReceive(voiceManager.$transcribedText, perform: handleTranscribedText)
-            .onReceive(contentBuffer.$processingHint) { processingHint = $0 }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SmartBufferProcessed")), perform: handleSmartBufferProcessed)
+            // Processing hint now comes from improved processor
+            .onReceive(processor.$lastResult) { result in
+                if let result = result {
+                    handleProcessorResult(result)
+                }
+            }
             .onChange(of: showingBookStrip) { oldValue, newValue in
                 if isAmbientMode && newValue {
                     print("🛡️ SAFETY: Blocking book strip activation in ambient mode")
@@ -567,13 +570,14 @@ struct UnifiedChatView: View {
         
         // Force process any remaining content in buffer before clearing
         Task {
-            if let processedContent = await contentBuffer.forceProcess() {
-                await handleProcessedContent(processedContent)
+            // Force process any remaining fragments
+            if let processedContent = await processor.process("", confidence: 0.8, isFinal: true, bookContext: currentBookContext) {
+                await handleProcessedResult(processedContent)
             }
             
             // Clear the smart buffer
             await MainActor.run {
-                contentBuffer.clear()
+                // Buffer is cleared automatically by processor
                 lastProcessedText = ""
             }
         }
@@ -1185,23 +1189,29 @@ struct UnifiedChatView: View {
             }
         }
         
-        // Ensure UI state updates on main thread
+        // Save final transcription before clearing
+        let finalTranscription = liveTranscription
+        
+        // Ensure UI state updates immediately on main thread
         Task { @MainActor in
             print("🛑 Setting isRecording to false")
             isRecording = false
+            liveTranscription = ""  // Clear transcription immediately
+            detectionState = .idle
+            detectedEntities.removeAll()
         }
         
         // Update session with final transcription
         session.endTime = Date()
-        session.rawTranscriptions = [liveTranscription]
+        session.rawTranscriptions = [finalTranscription]
         
         // Process through intent detection
         Task {
             print("Starting ambient session processing...")
-            print("Raw transcription: \(liveTranscription)")
+            print("Raw transcription: \(finalTranscription)")
             
             // Process the transcription to extract quotes, notes, and questions
-            let processed = await processTranscription(liveTranscription)
+            let processed = await processTranscription(finalTranscription)
             session.processedData = processed
             currentSession = session
             
@@ -1350,14 +1360,12 @@ struct UnifiedChatView: View {
                     ))
                     
                     // If it seems conversational, offer an AI response
-                    if shouldOfferAIResponse(for: liveTranscription) {
+                    if shouldOfferAIResponse(for: finalTranscription) {
                         Task {
-                            await getAIResponse(for: liveTranscription)
+                            await getAIResponse(for: finalTranscription)
                         }
                     }
                 }
-                
-                liveTranscription = ""
                 
                 // Smooth scroll to bottom to show new messages
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -1375,25 +1383,59 @@ struct UnifiedChatView: View {
     
     // MARK: - Progressive Ambient Processing
     
-    private func handleProcessedContent(_ content: SmartContentBuffer.ProcessedContent) async {
+    private func saveToSession(_ result: ImprovedUnifiedProcessor.ProcessingResult) async {
+        await MainActor.run {
+            // Map content type to SessionContent.ContentType  
+            let sessionContentType: SessionContent.ContentType = {
+                switch result.type {
+                case .question: return .question
+                case .quote: return .quote
+                case .insight: return .insight
+                case .reflection: return .reflection
+                case .note, .unknown: return .insight // Default notes to insights
+                }
+            }()
+            
+            let content = SessionContent(
+                type: sessionContentType,
+                text: result.content,
+                timestamp: result.timestamp,
+                confidence: Float(result.confidence),
+                bookContext: result.bookContext?.title,
+                aiResponse: nil
+            )
+            
+            // Add to session content
+            sessionContent.append(content)
+            
+            // Update session if exists
+            if let session = ambientSession {
+                ambientSession?.allContent = sessionContent
+            }
+        }
+    }
+    
+    private func handleProcessedResult(_ result: ImprovedUnifiedProcessor.ProcessingResult) async {
+        // The improved processor already handles deduplication
+        
         // Update detection state based on content type
         await MainActor.run {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                switch content.type {
+                switch result.type {
                 case .question:
                     detectionState = .processingQuestion
                 case .quote:
                     detectionState = .detectingQuote
                 case .note, .insight:
                     detectionState = .savingNote
-                case .unknown:
+                case .reflection, .unknown:
                     detectionState = .idle
                 }
             }
             
             // Update detected entities for visual feedback
-            if content.confidence > 0.6 {
-                detectedEntities.append((text: content.text, confidence: content.confidence))
+            if result.confidence > 0.6 {
+                detectedEntities.append((text: result.content, confidence: Float(result.confidence)))
                 
                 // Keep only recent entities
                 if detectedEntities.count > 5 {
@@ -1403,57 +1445,25 @@ struct UnifiedChatView: View {
         }
         
         // Process based on content type
-        let processor = UnifiedTranscriptionProcessor.shared
-        let unifiedContent = UnifiedProcessedContent(
-            type: mapContentType(content.type),
-            text: content.text,
-            confidence: Double(content.confidence),
-            timestamp: Date(),
-            bookContext: currentBookContext,
-            pageContext: nil,
-            aiResponse: nil,
-            metadata: [:]
-        )
-        
-        // Process and save content with intelligence
-        _ = await processor.processWithIntelligence(content.text)
-        
-        // Update UI based on content type
-        await MainActor.run {
-            switch content.type {
-            case .question:
-                // Show question and get AI response
-                Task {
-                    await showQuestionImmediately(unifiedContent)
-                    let response = await getAIResponseForContent(content.text)
-                    await showAIResponse(response)
-                }
-                
-            case .quote:
-                // Show quote card
-                Task {
-                    await showQuoteCard(unifiedContent)
-                }
-                
-            case .note, .insight:
-                // Show note card
-                Task {
-                    await showNoteCard(unifiedContent)
-                }
-                
-            case .unknown:
-                // No special handling for unknown content
-                break
+        if result.requiresAIResponse {
+            Task {
+                let response = await getAIResponseForContent(result.content)
+                await showAIResponse(response)
             }
-            
-            // Reset detection state after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation {
-                    detectionState = .idle
-                }
+        }
+        
+        // Save the content to session
+        await saveToSession(result)
+        
+        // Reset detection state after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation {
+                self.detectionState = .idle
             }
         }
     }
+    
+    // Old handleProcessedContent removed - now using handleProcessedResult with ImprovedUnifiedProcessor
     
     private func mapContentType(_ type: SmartContentBuffer.ProcessedContent.ContentType) -> ContentType {
         switch type {
@@ -2359,60 +2369,31 @@ struct ProgressiveTranscriptView: View {
     var onCancel: (() -> Void)? = nil
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Confidence indicator
-            HStack {
-                Text("Confidence")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                
-                // Confidence bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.1))
-                        
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        confidenceColor(confidence),
-                                        confidenceColor(confidence).opacity(0.6)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width * CGFloat(confidence))
-                    }
-                }
-                .frame(width: 60, height: 4)
-                
-                Text("\(Int(confidence * 100))%")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(confidenceColor(confidence))
-                
-                Spacer()
-                
-                // Cancel button
-                if let onCancel = onCancel {
+        VStack(alignment: .leading, spacing: 4) {
+            // Simple header with just cancel button
+            if let onCancel = onCancel {
+                HStack {
+                    Spacer()
                     Button(action: onCancel) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white.opacity(0.3), .white.opacity(0.1))
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
             
             // Transcription with entity highlighting
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(highlightedTranscription)
                     .font(.system(size: 15, weight: .regular, design: .rounded))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    .padding(.vertical, 8)
             }
+            .frame(maxHeight: 50)
         }
         .frame(maxWidth: .infinity)
         .glassEffect(in: .rect(cornerRadius: 20))

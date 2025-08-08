@@ -29,12 +29,12 @@ struct ChatMessageView: View {
                     .transition(.scale.combined(with: .opacity))
             } else {
                 // Regular message layout
-                HStack(alignment: .bottom, spacing: 12) {
+                HStack(alignment: .bottom, spacing: 8) {
                     if message.isUser {
-                        Spacer(minLength: 40) // Reduced for wider bubbles
+                        Spacer(minLength: 20) // Reduced spacing for better balance
                     }
                     
-                    VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
+                    VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
                         // Message content
                         messageContent
                         
@@ -43,7 +43,7 @@ struct ChatMessageView: View {
                     }
                     
                     if !message.isUser {
-                        Spacer(minLength: 40) // Reduced for wider bubbles
+                        Spacer(minLength: 20) // Reduced spacing for better balance
                     }
                 }
             }
@@ -120,14 +120,14 @@ struct ChatMessageView: View {
         Text(message.content)
             .font(.system(size: 15))
             .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .trailing)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.8, alignment: .trailing)
             .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
-            .glassEffect(in: .rect(cornerRadius: 20))
+            .glassEffect(in: .rect(cornerRadius: 18))
             .overlay(alignment: .topTrailing) {
                 // Subtle border
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 18)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
@@ -157,7 +157,8 @@ struct ChatMessageView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.9))
         }
-        .padding(.horizontal, 4) // Minimal padding for clean look
+        .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .leading)
+        .padding(.horizontal, 8) // Increased padding for better readability
     }
     
     // MARK: - Whisper Transcription View

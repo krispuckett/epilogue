@@ -81,7 +81,7 @@ struct UnifiedProcessedContent: Identifiable {
 class RollingContextWindow {
     private var recentDetections: [UnifiedProcessedContent] = []
     private let maxSize = 10
-    private let duplicateWindow: TimeInterval = 5.0 // 5 seconds
+    private let duplicateWindow: TimeInterval = 10.0 // 10 seconds - increased to catch more duplicates
     
     func add(_ content: UnifiedProcessedContent) {
         recentDetections.append(content)
@@ -110,14 +110,27 @@ class RollingContextWindow {
         
         if s1Lower == s2Lower { return 1.0 }
         
-        // Simple Jaccard similarity
+        // Check for substring containment (handles partial matches)
+        if s1Lower.contains(s2Lower) || s2Lower.contains(s1Lower) {
+            let lengthRatio = Double(min(s1Lower.count, s2Lower.count)) / Double(max(s1Lower.count, s2Lower.count))
+            if lengthRatio > 0.7 { return 0.9 } // High similarity for substrings
+        }
+        
+        // Enhanced Jaccard similarity
         let s1Words = Set(s1Lower.split(separator: " ").map(String.init))
         let s2Words = Set(s2Lower.split(separator: " ").map(String.init))
         
         let intersection = s1Words.intersection(s2Words).count
         let union = s1Words.union(s2Words).count
         
-        return union > 0 ? Double(intersection) / Double(union) : 0.0
+        let jaccardSimilarity = union > 0 ? Double(intersection) / Double(union) : 0.0
+        
+        // Boost similarity if most words match (handles reordering)
+        if intersection > 0 && Double(intersection) / Double(min(s1Words.count, s2Words.count)) > 0.8 {
+            return max(jaccardSimilarity, 0.85)
+        }
+        
+        return jaccardSimilarity
     }
 }
 
@@ -479,6 +492,12 @@ class UnifiedTranscriptionProcessor: ObservableObject {
     // MARK: - Queue Management
     
     private func addToQueue(_ content: UnifiedProcessedContent) {
+        // Enhanced deduplication check
+        guard !contextWindow.isDuplicate(content.text) else {
+            print("⚠️ UnifiedProcessor: Skipping duplicate content")
+            return
+        }
+        
         processingQueue.append(content)
         contextWindow.add(content)
         currentState = .processing(type: content.type, content: content.text)
