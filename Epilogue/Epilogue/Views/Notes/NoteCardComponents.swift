@@ -30,30 +30,8 @@ struct NoteCard: View {
                 RegularNoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions)
             }
             
-            // Selection overlay
-            if isSelectionMode {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.black.opacity(isSelected ? 0.3 : 0.1))
-                    .overlay {
-                        HStack {
-                            Spacer()
-                            VStack {
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.6))
-                                    .padding(16)
-                                Spacer()
-                            }
-                        }
-                    }
-                    .allowsHitTesting(true)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            HapticManager.shared.lightTap()
-                            onSelectionToggle()
-                        }
-                    }
-            }
+            // Selection overlay - removed to prevent duplicate checkmarks
+            // Selection is now handled by SelectableNoteCard wrapper
         }
         .overlay(
             GeometryReader { geo in

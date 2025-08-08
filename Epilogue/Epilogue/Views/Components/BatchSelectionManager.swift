@@ -185,83 +185,92 @@ struct SelectionIndicator: View {
     }
 }
 
-// MARK: - Delete Confirmation Dialog
-struct BatchDeleteConfirmationDialog: View {
+// MARK: - iOS 26 Delete Confirmation Toast
+struct BatchDeleteConfirmationToast: View {
     @ObservedObject var selectionManager: BatchSelectionManager
     let onConfirm: () -> Void
+    @State private var scale: CGFloat = 0.9
+    @State private var opacity: Double = 0.0
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Handle
-            RoundedRectangle(cornerRadius: 2.5)
-                .fill(.white.opacity(0.3))
-                .frame(width: 36, height: 5)
-                .padding(.top, 12)
-                .padding(.bottom, 20)
-            
-            VStack(spacing: 20) {
-                // Icon
+        VStack(spacing: 24) {
+            // Icon and title
+            VStack(spacing: 16) {
                 Image(systemName: "trash.fill")
-                    .font(.system(size: 40))
+                    .font(.system(size: 50, weight: .regular))
                     .foregroundStyle(.red)
                 
-                // Title and message
                 VStack(spacing: 8) {
                     Text("Delete \(selectionManager.selectionCount) Notes")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.white)
                     
                     Text("This action cannot be undone. All selected notes and quotes will be permanently deleted.")
-                        .font(.system(size: 16))
+                        .font(.system(size: 17))
                         .foregroundStyle(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
-                        .lineLimit(3)
-                }
-                
-                // Buttons
-                VStack(spacing: 12) {
-                    // Delete button
-                    Button {
-                        selectionManager.showingDeleteConfirmation = false
-                        onConfirm()
-                    } label: {
-                        Text("Delete \(selectionManager.selectionCount) Notes")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.red)
-                            .cornerRadius(12)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Cancel button
-                    Button {
-                        selectionManager.showingDeleteConfirmation = false
-                    } label: {
-                        Text("Cancel")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(.white.opacity(0.1))
-                            .cornerRadius(12)
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 40)
+            
+            // Action buttons
+            VStack(spacing: 16) {
+                // Delete button - iOS 26 style
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        selectionManager.showingDeleteConfirmation = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        onConfirm()
+                    }
+                } label: {
+                    Text("Delete \(selectionManager.selectionCount) Notes")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(.red)
+                        }
+                }
+                .buttonStyle(.plain)
+                
+                // Cancel button - iOS 26 style
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        selectionManager.showingDeleteConfirmation = false
+                    }
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(.white.opacity(0.12))
+                        }
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(.black.opacity(0.95))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
-                )
-        )
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
+        .background {
+            RoundedRectangle(cornerRadius: 28)
+                .fill(.regularMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28)
+                        .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                }
+        }
+        .scaleEffect(scale)
+        .opacity(opacity)
+        .onAppear {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                scale = 1.0
+                opacity = 1.0
+            }
+        }
     }
 }
 

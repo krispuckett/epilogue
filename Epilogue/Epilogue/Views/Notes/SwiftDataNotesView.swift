@@ -286,12 +286,12 @@ struct SwiftDataNotesView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                Color.black.ignoresSafeArea()
-                
-                VStack(spacing: 0) {
+        ZStack {
+            NavigationStack {
+                ZStack {
+                    // Background
+                    Color.black.ignoresSafeArea()
+                    
                     ScrollViewReader { proxy in
                         ScrollView {
                             notesContent
@@ -320,20 +320,11 @@ struct SwiftDataNotesView: View {
                         }
                     }
                     
-                    // Batch selection toolbar with proper z-index
-                    BatchSelectionToolbar(
-                        selectionManager: selectionManager,
-                        allItems: allNotes,
-                        onDelete: batchDeleteNotes
-                    )
-                    .zIndex(999)
+                    contextMenuOverlay
+                    
+                    // Undo snackbar overlay
+                    UndoSnackbar()
                 }
-                
-                contextMenuOverlay
-                
-                // Undo snackbar overlay
-                UndoSnackbar()
-            }
             .navigationTitle(selectionManager.isSelectionMode ? "" : "Notes")
             .navigationBarTitleDisplayMode(selectionManager.isSelectionMode ? .inline : .large)
             .searchable(text: $searchText, prompt: "Search notes and quotes")
@@ -356,7 +347,7 @@ struct SwiftDataNotesView: View {
                     .environmentObject(notesViewModel)
             }
             .sheet(isPresented: $selectionManager.showingDeleteConfirmation) {
-                BatchDeleteConfirmationDialog(
+                BatchDeleteConfirmationToast(
                     selectionManager: selectionManager,
                     onConfirm: {
                         let selectedItems = selectionManager.selectedItems
@@ -364,14 +355,27 @@ struct SwiftDataNotesView: View {
                         selectionManager.performDelete()
                     }
                 )
-                .presentationDetents([.height(400)])
-                .presentationDragIndicator(.visible)
+                .presentationDetents([.height(380)])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(.clear)
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
                 if let note = notification.object as? Note {
                     editingNote = note
                 }
             }
+            
+            // Batch selection toolbar positioned above tab bar
+            VStack {
+                Spacer()
+                BatchSelectionToolbar(
+                    selectionManager: selectionManager,
+                    allItems: allNotes,
+                    onDelete: batchDeleteNotes
+                )
+                .padding(.bottom, 100) // Position above tab bar
+            }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
     }
 }
