@@ -227,9 +227,11 @@ struct SwiftDataNotesView: View {
     private func noteCardView(for note: Note) -> some View {
         NoteCard(
             note: note,
-            isSelectionMode: false,
-            isSelected: false,
-            onSelectionToggle: { },
+            isSelectionMode: selectionManager.isSelectionMode,
+            isSelected: selectionManager.isSelected(note.id),
+            onSelectionToggle: { 
+                selectionManager.toggleSelection(for: note.id)
+            },
             openOptionsNoteId: $openOptionsNoteId,
             onContextMenuRequest: { note, rect in
                 contextMenuNote = note
@@ -318,12 +320,13 @@ struct SwiftDataNotesView: View {
                         }
                     }
                     
-                    // Batch selection toolbar
+                    // Batch selection toolbar with proper z-index
                     BatchSelectionToolbar(
                         selectionManager: selectionManager,
                         allItems: allNotes,
                         onDelete: batchDeleteNotes
                     )
+                    .zIndex(999)
                 }
                 
                 contextMenuOverlay
@@ -356,8 +359,9 @@ struct SwiftDataNotesView: View {
                 BatchDeleteConfirmationDialog(
                     selectionManager: selectionManager,
                     onConfirm: {
+                        let selectedItems = selectionManager.selectedItems
+                        batchDeleteNotes(selectedItems)
                         selectionManager.performDelete()
-                        batchDeleteNotes(selectionManager.selectedItems)
                     }
                 )
                 .presentationDetents([.height(400)])

@@ -124,7 +124,12 @@ struct BatchSelectionToolbar: View {
                     
                     // Delete button
                     Button {
-                        selectionManager.deleteSelected()
+                        if selectionManager.needsConfirmation {
+                            selectionManager.showingDeleteConfirmation = true
+                        } else {
+                            onDelete(selectionManager.selectedItems)
+                            selectionManager.performDelete()
+                        }
                     } label: {
                         Image(systemName: "trash")
                             .font(.system(size: 16, weight: .medium))
