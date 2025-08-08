@@ -225,6 +225,11 @@ struct BookDetailView: View {
                             .padding(.top, 24)
                     }
                     
+                    // Session History Card
+                    BookSessionHistoryCard(book: book)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 24)
+                    
                     // Content sections
                     contentView
                         .padding(.horizontal, 24)

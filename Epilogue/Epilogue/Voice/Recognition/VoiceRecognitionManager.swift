@@ -641,6 +641,17 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // Detect book mentions in ambient mode
         if isListeningInAmbientMode {
             detectBookFromSpeech(text)
+            
+            // Real-time question detection for immediate AI response
+            if let lastSegment = result.bestTranscription.segments.last {
+                let segmentText = lastSegment.substring
+                if isQuestion(segmentText) && result.isFinal {
+                    // Trigger immediate AI response for detected question
+                    Task {
+                        await triggerImmediateAIResponse(for: segmentText)
+                    }
+                }
+            }
         }
         
         // Update confidence score for debugging
@@ -742,7 +753,47 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
     }
     
+    private func isQuestion(_ text: String) -> Bool {
+        let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check for question mark
+        if text.hasSuffix("?") {
+            return true
+        }
+        
+        // Check for question words at the beginning
+        let questionStarters = [
+            "what", "why", "how", "when", "where", "who", "which",
+            "can you", "could you", "would you", "will you",
+            "is it", "is this", "is that", "are these", "are those",
+            "do you", "does", "did", "should", "shall"
+        ]
+        
+        for starter in questionStarters {
+            if lowercased.hasPrefix(starter) {
+                return true
+            }
+        }
+        
+        // Check for question patterns anywhere in the text
+        let questionPatterns = [
+            "what does", "what is", "what are",
+            "can you explain", "could you explain",
+            "tell me about", "tell me more"
+        ]
+        
+        for pattern in questionPatterns {
+            if lowercased.contains(pattern) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
     private func triggerImmediateAIResponse(for question: String) async {
+        logger.info("🤖 Triggering immediate AI response for question: \(question)")
+        
         // Post notification for immediate AI processing
         NotificationCenter.default.post(
             name: Notification.Name("ImmediateQuestionDetected"),

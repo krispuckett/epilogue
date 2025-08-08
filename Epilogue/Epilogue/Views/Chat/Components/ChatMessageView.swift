@@ -31,7 +31,7 @@ struct ChatMessageView: View {
                 // Regular message layout
                 HStack(alignment: .bottom, spacing: 12) {
                     if message.isUser {
-                        Spacer(minLength: 100) // Increased to keep bubbles narrower
+                        Spacer(minLength: 40) // Reduced for wider bubbles
                     }
                     
                     VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
@@ -43,12 +43,12 @@ struct ChatMessageView: View {
                     }
                     
                     if !message.isUser {
-                        Spacer(minLength: 60)
+                        Spacer(minLength: 40) // Reduced for wider bubbles
                     }
                 }
             }
         }
-        .padding(.horizontal, message.isUser ? 16 : 20) // Less padding for user messages
+        .padding(.horizontal, 16) // Equal padding for all messages
         .scaleEffect(isAnimatingIn ? 1 : 0.95)
         .opacity(isAnimatingIn ? 1 : 0)
         .onAppear {
@@ -89,7 +89,7 @@ struct ChatMessageView: View {
                         object: note
                     )
                 }
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.75)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
             case .noteWithContext(let note, let context):
                 NoteWithContextBubble(note: note, context: context) {
                     // Navigation will be handled by parent view
@@ -98,7 +98,7 @@ struct ChatMessageView: View {
                         object: note
                     )
                 }
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.75)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
             case .quote(let quote):
                 MiniQuoteCard(quote: quote) {
                     // Navigation will be handled by parent view
@@ -107,7 +107,7 @@ struct ChatMessageView: View {
                         object: quote
                     )
                 }
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.75)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
             default:
                 aiMessageContent
             }
@@ -117,33 +117,29 @@ struct ChatMessageView: View {
     // MARK: - User Message Bubble
     
     private var userMessageBubble: some View {
-        HStack {
-            Spacer(minLength: 80) // Ensure right alignment
-            
-            Text(message.content)
-                .font(.system(size: 15))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: .trailing)
-                .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
-                .glassEffect(in: .rect(cornerRadius: 20))
-                .overlay(alignment: .topTrailing) {
-                    // Subtle border
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    .white.opacity(0.15),
-                                    .white.opacity(0.05)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.5
-                        )
-                }
-        }
+        Text(message.content)
+            .font(.system(size: 15))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .trailing)
+            .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
+            .glassEffect(in: .rect(cornerRadius: 20))
+            .overlay(alignment: .topTrailing) {
+                // Subtle border
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.15),
+                                .white.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
+                    )
+            }
     }
     
     // MARK: - AI Message Content

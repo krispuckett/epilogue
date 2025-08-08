@@ -271,22 +271,20 @@ struct LiquidCommandPalette: View {
         .onChange(of: commandText) { _, newValue in
             // Cancel previous search
             searchDebounceTask?.cancel()
+            showingGoogleResults = false
             
-            // Detect if user is searching for a book
+            // The inline Google search is now optional - we'll mostly rely on
+            // the smart command processing that opens BookSearchSheet
+            // Only show inline results if explicitly searching with "search" prefix
             let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+            let lowercased = trimmed.lowercased()
             
-            // Natural language detection for book searches
-            let bookIndicators = [
-                "book ", "novel ", "by ", "author ", "read ", "reading ",
-                "add book", "find book", "search book"
-            ]
-            
-            let isLikelyBookSearch = bookIndicators.contains { indicator in
-                trimmed.lowercased().contains(indicator)
-            } || (trimmed.count > 3 && !trimmed.starts(with: "\"") && !trimmed.starts(with: "note:"))
-            
-            if isLikelyBookSearch && trimmed.count > 3 {
-                // Debounce search
+            // Only show inline Google results for explicit search commands
+            if (lowercased.starts(with: "search book") || 
+                lowercased.starts(with: "find book") ||
+                lowercased.starts(with: "add book")) && trimmed.count > 10 {
+                
+                // Debounce search for inline results
                 searchDebounceTask = Task {
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
                     
@@ -294,8 +292,6 @@ struct LiquidCommandPalette: View {
                         await searchGoogleBooks(trimmed)
                     }
                 }
-            } else {
-                showingGoogleResults = false
             }
         }
         .onChange(of: voiceManager.transcribedText) { _, newValue in
@@ -355,8 +351,10 @@ struct LiquidCommandPalette: View {
         case .createQuote(let quoteText):
             createQuote(from: quoteText)
         case .addBook(let query):
-            // Search for book using the query
-            searchAndAddBook(query: query)
+            // Open BookSearchSheet with the query (the smart way!)
+            bookSearchQuery = query
+            showBookSearch = true
+            dismissPalette()
         case .searchLibrary(let query), .searchNotes(let query), .searchAll(let query):
             // Navigate to search with query
             performSearch(query: query, intent: intent)
@@ -376,15 +374,19 @@ struct LiquidCommandPalette: View {
             dismissPalette()
         case .unknown:
             // If unknown, try to be helpful based on content
-            if trimmed.contains("\"") || trimmed.contains("“") || trimmed.contains("”") {
+            if trimmed.contains("\"") || trimmed.contains("\u{201C}") || trimmed.contains("\u{201D}") {
                 // Contains quotes, likely a quote
                 createQuote(from: trimmed)
             } else if trimmed.count < 50 && !trimmed.contains(" ") {
-                // Short single word might be a book title
-                searchAndAddBook(query: trimmed)
+                // Short single word might be a book title - open search sheet
+                bookSearchQuery = trimmed
+                showBookSearch = true
+                dismissPalette()
             } else if trimmed.count < 100 {
-                // Medium length text could be book search
-                searchAndAddBook(query: trimmed)
+                // Medium length text could be book search - open search sheet
+                bookSearchQuery = trimmed
+                showBookSearch = true
+                dismissPalette()
             } else {
                 // Long text defaults to note
                 createNote(from: trimmed)

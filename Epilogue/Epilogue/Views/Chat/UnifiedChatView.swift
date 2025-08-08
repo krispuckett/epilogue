@@ -24,6 +24,12 @@ struct UnifiedChatView: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     @ObservedObject private var syncManager = NotesSyncManager.shared
     
+    // Ambient session tracking
+    @State private var ambientSession: OptimizedAmbientSession?
+    @State private var showingSessionSummary = false
+    @State private var sessionStartTime: Date?
+    @State private var sessionContent: [SessionContent] = []
+    
     // Filter messages for current context
     private var filteredMessages: [UnifiedChatMessage] {
         let baseMessages: [UnifiedChatMessage]
@@ -48,6 +54,17 @@ struct UnifiedChatView: View {
     
     // Color extraction state - reuse from BookDetailView
     @State private var colorPalette: ColorPalette?
+    
+    // Session detection
+    private var sessionDuration: TimeInterval {
+        guard let start = sessionStartTime else { return 0 }
+        return Date().timeIntervalSince(start)
+    }
+    
+    private var shouldShowSessionSummary: Bool {
+        // Show summary after 5+ minutes with 3+ interactions
+        return isAmbientMode && sessionDuration > 300 && sessionContent.count >= 3
+    }
     @State private var coverImage: UIImage?
     
     // Input state
@@ -86,6 +103,21 @@ struct UnifiedChatView: View {
                 handleMicrophoneTap() 
             }
             .statusBarHidden(isAmbientMode)
+            .sheet(isPresented: $showingSessionSummary) {
+                if let session = ambientSession {
+                    AmbientSessionSummaryView(session: session)
+                        .onDisappear {
+                            // Save any remaining session data before clearing
+                            if let session = ambientSession, !sessionContent.isEmpty {
+                                autoSaveShortSession(session)
+                            }
+                            // Reset for next session
+                            ambientSession = nil
+                            sessionContent.removeAll()
+                            sessionStartTime = nil
+                        }
+                }
+            }
     }
     
     private var mainContent: some View {
@@ -147,7 +179,7 @@ struct UnifiedChatView: View {
             // 2. ScrollView as direct child of ZStack (exactly like LibraryView)
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 16) {
                         // Check if we only have transcribing messages (not real content)
                         let hasRealContent = filteredMessages.contains { msg in
                             !msg.content.contains("[Transcribing]")
@@ -433,6 +465,83 @@ struct UnifiedChatView: View {
                 colorPalette = nil
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIResponseComplete"))) { notification in
+            // Handle AI response completion in ambient mode
+            guard isAmbientMode, let aiResponse = notification.object as? AIResponse else { return }
+            
+            // Add AI response to chat
+            let responseMessage = UnifiedChatMessage(
+                content: aiResponse.answer,
+                isUser: false,
+                timestamp: Date(),
+                bookContext: currentBookContext
+            )
+            messages.append(responseMessage)
+            
+            // Track for session summary
+            if isAmbientMode {
+                let aiSessionResponse = AISessionResponse(
+                    question: aiResponse.question,
+                    answer: aiResponse.answer,
+                    model: aiResponse.model.rawValue,
+                    confidence: aiResponse.confidence,
+                    responseTime: aiResponse.responseTime,
+                    timestamp: aiResponse.timestamp,
+                    isStreamed: aiResponse.isStreaming,
+                    wasFromCache: !aiResponse.isStreaming
+                )
+                
+                // Find the question in sessionContent and update it with the AI response
+                if let lastQuestionIndex = sessionContent.lastIndex(where: { $0.type == .question && $0.text == aiResponse.question }) {
+                    var updatedContent = sessionContent[lastQuestionIndex]
+                    sessionContent[lastQuestionIndex] = SessionContent(
+                        type: updatedContent.type,
+                        text: updatedContent.text,
+                        timestamp: updatedContent.timestamp,
+                        confidence: updatedContent.confidence,
+                        bookContext: updatedContent.bookContext,
+                        aiResponse: aiSessionResponse
+                    )
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ImmediateQuestionDetected"))) { notification in
+            // Handle immediate questions detected by voice recognition in ambient mode
+            guard isAmbientMode, let data = notification.object as? [String: Any],
+                  let question = data["question"] as? String else { return }
+            
+            let bookContext = data["bookContext"] as? Book
+            
+            // Add question to chat immediately
+            let questionMessage = UnifiedChatMessage(
+                content: question,
+                isUser: true,
+                timestamp: Date(),
+                bookContext: bookContext ?? currentBookContext
+            )
+            messages.append(questionMessage)
+            
+            // Scroll to show new message
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation {
+                    if let lastMessage = messages.last {
+                        scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+            
+            // Trigger AI response using optimized service for ambient mode
+            if isAmbientMode {
+                Task {
+                    // Use the optimized AI service for faster responses
+                    await OptimizedAIResponseService.shared.processImmediateQuestion(question, bookContext: currentBookContext)
+                }
+            } else {
+                Task {
+                    await getAIResponse(for: question)
+                }
+            }
+        }
         } // End of ZStack
         // Book context pill removed - showing in navigation area instead
         // Navigation setup with native blur
@@ -522,7 +631,8 @@ struct UnifiedChatView: View {
                     },
                     onSelectBook: {
                         showingBookStrip = true
-                    }
+                    },
+                    isAmbientMode: isAmbientMode
                 )
             }
         }
@@ -838,7 +948,18 @@ struct UnifiedChatView: View {
     }
     
     private func startAmbientSession() {
-        // Create new session
+        // Track session start for auto-save
+        sessionStartTime = Date()
+        sessionContent.removeAll()
+        
+        // Create optimized session for summary
+        ambientSession = OptimizedAmbientSession(
+            startTime: Date(),
+            bookContext: currentBookContext,
+            metadata: SessionMetadata()
+        )
+        
+        // Create old session for compatibility
         currentSession = AmbientSession(
             startTime: Date(),
             book: currentBookContext
@@ -846,6 +967,9 @@ struct UnifiedChatView: View {
         
         // Start listening in ambient mode (with book detection)
         voiceManager.startAmbientListeningMode()
+        
+        // Check for resumable session
+        checkForResumableSession()
         
         // Ensure UI state updates on main thread
         Task { @MainActor in
@@ -872,6 +996,21 @@ struct UnifiedChatView: View {
         
         // Stop listening
         voiceManager.stopListening()
+        
+        // Complete the optimized session
+        if var optimizedSession = ambientSession {
+            optimizedSession.endTime = Date()
+            optimizedSession.allContent = sessionContent
+            
+            // Auto-show summary if session was meaningful
+            if shouldShowSessionSummary {
+                self.ambientSession = optimizedSession
+                showingSessionSummary = true
+            } else {
+                // Still auto-save even short sessions
+                autoSaveShortSession(optimizedSession)
+            }
+        }
         
         // Ensure UI state updates on main thread
         Task { @MainActor in
@@ -1000,67 +1139,19 @@ struct UnifiedChatView: View {
                 await MainActor.run {
                     messages.append(questionMessage)
                     print("Added question to chat messages")
+                    
+                    // Scroll to show new message
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation {
+                            if let lastMessage = self.messages.last {
+                                self.scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
                 }
                 
                 // Get AI response immediately
-                do {
-                    let aiService = AICompanionService.shared
-                    print("Getting AI response...")
-                    print("   - Service configured: \(aiService.isConfigured())")
-                    print("   - Book context: \(currentBookContext?.title ?? "None")")
-                    
-                    // Only pass filtered history for this book
-                    let bookHistory = await MainActor.run {
-                        if let bookId = currentBookContext?.id {
-                            return messages.filter { $0.bookContext?.id == bookId }
-                        } else {
-                            return messages.filter { $0.bookContext == nil }
-                        }
-                    }
-                    
-                    print("   - History messages: \(bookHistory.count)")
-                    
-                    let answer = try await aiService.processMessage(
-                        question.text,
-                        bookContext: currentBookContext,
-                        conversationHistory: bookHistory
-                    )
-                    
-                    print("AI Response received:")
-                    print("   - Length: \(answer.count) characters")
-                    print("   - Preview: \(answer.prefix(100))...")
-                    
-                    // Add AI response
-                    let answerMessage = UnifiedChatMessage(
-                        content: answer,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext
-                    )
-                    
-                    await MainActor.run {
-                        messages.append(answerMessage)
-                        print("Added AI response to chat messages")
-                    }
-                    
-                } catch {
-                    print("AI Error Details:")
-                    print("   - Error type: \(type(of: error))")
-                    print("   - Error description: \(error)")
-                    print("   - Localized: \(error.localizedDescription)")
-                    
-                    // Add detailed error message
-                    let errorMessage = UnifiedChatMessage(
-                        content: "I couldn't answer that question. Error: \(error.localizedDescription)",
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext
-                    )
-                    await MainActor.run {
-                        messages.append(errorMessage)
-                        print("Added error message to chat")
-                    }
-                }
+                await getAIResponse(for: question.text)
             }
             
             // Final summary and cleanup
@@ -1076,22 +1167,31 @@ struct UnifiedChatView: View {
                         bookContext: currentBookContext,
                         messageType: .system
                     ))
-                } else if !liveTranscription.isEmpty {
-                    // If no structured content was extracted, add the raw transcription
+                } else if !liveTranscription.isEmpty && liveTranscription.count > 10 {
+                    // If no structured content was extracted but we have substantial text, add as user message
                     messages.append(UnifiedChatMessage(
                         content: liveTranscription,
                         isUser: true,
                         timestamp: Date(),
                         bookContext: currentBookContext
                     ))
+                    
+                    // If it seems conversational, offer an AI response
+                    if shouldOfferAIResponse(for: liveTranscription) {
+                        Task {
+                            await getAIResponse(for: liveTranscription)
+                        }
+                    }
                 }
                 
                 liveTranscription = ""
                 
-                // Scroll to bottom to show new messages
-                if let lastMessage = messages.last {
-                    withAnimation {
-                        scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                // Smooth scroll to bottom to show new messages
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if let lastMessage = self.messages.last {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -1167,6 +1267,10 @@ struct UnifiedChatView: View {
                                 context: "User reaction: \(phrase)",
                                 timestamp: Date()
                             ))
+                            // Track for session summary
+                            if isAmbientMode {
+                                trackSessionContent(type: .quote, text: quoteText)
+                            }
                             detectedReactionQuote = true
                             isQuote = true
                             break
@@ -1210,6 +1314,10 @@ struct UnifiedChatView: View {
                         context: nil,
                         timestamp: Date()
                     ))
+                    // Track for session summary
+                    if isAmbientMode {
+                        trackSessionContent(type: .quote, text: quoteText)
+                    }
                 }
             }
             // Check for quotation marks (but only if not already marked as quote)
@@ -1224,6 +1332,10 @@ struct UnifiedChatView: View {
                         context: nil,
                         timestamp: Date()
                     ))
+                    // Track for session summary
+                    if isAmbientMode {
+                        trackSessionContent(type: .quote, text: quotedContent)
+                    }
                 }
             }
             
@@ -1294,6 +1406,10 @@ struct UnifiedChatView: View {
                     context: nil,
                     timestamp: Date()
                 ))
+                // Track for session summary
+                if isAmbientMode {
+                    trackSessionContent(type: .question, text: trimmed)
+                }
             }
             
             // NOTE detection (including reflections)
@@ -1336,6 +1452,19 @@ struct UnifiedChatView: View {
                     type: noteType,
                     timestamp: Date()
                 ))
+                // Track for session summary
+                if isAmbientMode {
+                    let contentType: SessionContent.ContentType
+                    switch noteType {
+                    case .reflection:
+                        contentType = .reflection
+                    case .insight:
+                        contentType = .insight
+                    case .connection:
+                        contentType = .connection
+                    }
+                    trackSessionContent(type: contentType, text: noteText)
+                }
             }
         }  // End of if !trimmed.isEmpty
         
@@ -1407,6 +1536,22 @@ struct UnifiedChatView: View {
         
         let lowercased = thought.lowercased()
         return contextTriggers.contains { trigger in
+            lowercased.contains(trigger)
+        }
+    }
+    
+    private func shouldOfferAIResponse(for text: String) -> Bool {
+        let lowercased = text.lowercased()
+        
+        // Check for conversational patterns that might benefit from AI response
+        let conversationalTriggers = [
+            "i think", "i feel", "i wonder", "what do you think",
+            "this makes me", "this reminds me", "i don't understand",
+            "this is interesting", "this is confusing", "help me",
+            "can you", "what does", "why does", "how does"
+        ]
+        
+        return conversationalTriggers.contains { trigger in
             lowercased.contains(trigger)
         }
     }
@@ -1876,7 +2021,7 @@ extension UnifiedChatView {
     // MARK: - Ambient Welcome View
     
     private var ambientWelcomeView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
             // Animated waveform visualization
             HStack(spacing: 4) {
                 ForEach(0..<7) { index in
@@ -1902,18 +2047,20 @@ extension UnifiedChatView {
             }
             .frame(height: 60)
             
-            Text("Listening...")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.white)
-            
-            Text("Just start talking about what you're reading")
-                .font(.system(size: 17))
-                .foregroundStyle(.white.opacity(0.6))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+            VStack(spacing: 12) {
+                Text("Listening...")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(.white)
+                
+                Text("Just start talking about what you're reading")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 60)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.vertical, 80)
     }
     
     // MARK: - Book Context Pill
@@ -1949,6 +2096,18 @@ extension UnifiedChatView {
     
     private var ambientModeExitButton: some View {
         Button {
+            // Save session before closing
+            if let session = ambientSession {
+                var updatedSession = session
+                updatedSession.endTime = Date()
+                updatedSession.allContent = sessionContent
+                
+                // Auto-save session data
+                if !sessionContent.isEmpty {
+                    autoSaveShortSession(updatedSession)
+                }
+            }
+            
             // Stop voice if active
             if isRecording {
                 handleMicrophoneTap()
@@ -1976,6 +2135,92 @@ extension UnifiedChatView {
             insertion: .scale(scale: 0.8).combined(with: .opacity),
             removal: .scale(scale: 0.8).combined(with: .opacity)
         ))
+    }
+    
+    // MARK: - Session Management Helpers
+    
+    private func checkForResumableSession() {
+        // Check for recent incomplete session for this book
+        if let book = currentBookContext {
+            let recentSessions = SessionHistoryData.loadForBook(book.id)
+            if let lastSession = recentSessions.last,
+               Date().timeIntervalSince(lastSession.endTime) < 3600 { // Within last hour
+                // Offer to resume
+                let resumeMessage = UnifiedChatMessage(
+                    content: "Welcome back! Continuing from your last session \(formatTimeAgo(lastSession.endTime)) ago.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: book,
+                    messageType: .system
+                )
+                messages.append(resumeMessage)
+            }
+        }
+    }
+    
+    private func autoSaveShortSession(_ session: OptimizedAmbientSession) {
+        // Auto-save even short sessions for continuity
+        Task {
+            let sessionData = SessionHistoryData(
+                id: session.id,
+                bookId: session.bookContext?.id,
+                bookTitle: session.bookContext?.title ?? "General Reading",
+                startTime: session.startTime,
+                endTime: session.endTime ?? Date(),
+                duration: session.duration,
+                questionCount: session.totalQuestions,
+                quoteCount: session.allContent.filter { $0.type == .quote }.count,
+                insightCount: session.allContent.filter { $0.type == .insight }.count,
+                mood: session.metadata.mood.rawValue,
+                clusters: [],
+                allContent: session.allContent.map { 
+                    SessionHistoryData.ContentSummary(
+                        type: $0.type.rawValue,
+                        text: $0.text,
+                        timestamp: $0.timestamp
+                    )
+                }
+            )
+            
+            var sessions = SessionHistoryData.loadAll()
+            sessions.append(sessionData)
+            
+            // Keep only last 50 sessions
+            if sessions.count > 50 {
+                sessions = Array(sessions.suffix(50))
+            }
+            
+            SessionHistoryData.saveAll(sessions)
+        }
+    }
+    
+    private func formatTimeAgo(_ date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        let minutes = Int(interval / 60)
+        
+        if minutes < 1 {
+            return "moments"
+        } else if minutes < 60 {
+            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
+        } else {
+            let hours = minutes / 60
+            return "\(hours) hour\(hours == 1 ? "" : "s")"
+        }
+    }
+    
+    private func trackSessionContent(type: SessionContent.ContentType, text: String, aiResponse: AISessionResponse? = nil) {
+        let content = SessionContent(
+            type: type,
+            text: text,
+            timestamp: Date(),
+            confidence: 0.8,
+            bookContext: currentBookContext?.title,
+            aiResponse: aiResponse
+        )
+        sessionContent.append(content)
+        
+        // Update session
+        ambientSession?.allContent = sessionContent
     }
 }
 

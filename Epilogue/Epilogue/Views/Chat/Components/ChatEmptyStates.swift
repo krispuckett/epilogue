@@ -4,6 +4,7 @@ import SwiftUI
 struct InitialEmptyStateView: View {
     let onSuggestionTap: (String) -> Void
     let onSelectBook: () -> Void
+    var isAmbientMode: Bool = false
     
     @State private var iconOffset: CGFloat = 0
     @State private var iconOpacity: Double = 0
@@ -17,92 +18,109 @@ struct InitialEmptyStateView: View {
     ]
     
     var body: some View {
-        VStack(spacing: 32) {
-            // Floating icon
-            Image("glass-msgs")
-                .renderingMode(.template)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 1.0, green: 0.55, blue: 0.26),
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+        VStack(spacing: isAmbientMode ? 20 : 32) {
+            if !isAmbientMode {
+                // Floating icon - only show in regular mode
+                Image("glass-msgs")
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.55, blue: 0.26),
+                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .offset(y: iconOffset)
-                .opacity(iconOpacity)
-                .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 20, y: 10)
+                    .offset(y: iconOffset)
+                    .opacity(iconOpacity)
+                    .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 20, y: 10)
+            }
             
             // Welcome message
             VStack(spacing: 8) {
-                Text("Welcome to your reading companion")
-                    .font(.system(size: 24, weight: .semibold, design: .serif))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                
-                Text("Let's explore your library together")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .multilineTextAlignment(.center)
+                if isAmbientMode {
+                    Text("Listening...")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(.white)
+                    
+                    Text("Just start talking about what you're reading")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("Welcome to your reading companion")
+                        .font(.system(size: 24, weight: .semibold, design: .serif))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("Let's explore your library together")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
             }
             .opacity(contentOpacity)
             
-            // Suggestion chips
-            VStack(spacing: 12) {
-                ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
-                    SuggestionChip(
-                        emoji: suggestion.0,
-                        text: suggestion.1,
-                        delay: Double(index) * 0.1
-                    ) {
-                        onSuggestionTap(suggestion.1)
+            // Only show suggestions and book selector in regular mode
+            if !isAmbientMode {
+                VStack(spacing: 12) {
+                    ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
+                        SuggestionChip(
+                            emoji: suggestion.0,
+                            text: suggestion.1,
+                            delay: Double(index) * 0.1
+                        ) {
+                            onSuggestionTap(suggestion.1)
+                        }
                     }
+                    
+                    // Divider
+                    Rectangle()
+                        .fill(.white.opacity(0.1))
+                        .frame(width: 60, height: 1)
+                        .padding(.vertical, 8)
+                    
+                    // Select book button
+                    Button(action: onSelectBook) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "books.vertical")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Select a specific book")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background {
+                            Capsule()
+                                .fill(.white.opacity(0.08))
+                                .overlay {
+                                    Capsule()
+                                        .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+                                }
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
-                
-                // Divider
-                Rectangle()
-                    .fill(.white.opacity(0.1))
-                    .frame(width: 60, height: 1)
-                    .padding(.vertical, 8)
-                
-                // Select book button
-                Button(action: onSelectBook) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "books.vertical")
-                            .font(.system(size: 16, weight: .medium))
-                        Text("Select a specific book")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background {
-                        Capsule()
-                            .fill(.white.opacity(0.08))
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
-                            }
-                    }
-                }
-                .buttonStyle(.plain)
+                .offset(y: suggestionsOffset)
+                .opacity(contentOpacity)
             }
-            .offset(y: suggestionsOffset)
-            .opacity(contentOpacity)
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, isAmbientMode ? 60 : 40)
         .onAppear {
-            // Animate icon floating
-            withAnimation(.easeOut(duration: 0.8)) {
-                iconOpacity = 1
-            }
-            withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
-                iconOffset = -10
+            if !isAmbientMode {
+                // Animate icon floating
+                withAnimation(.easeOut(duration: 0.8)) {
+                    iconOpacity = 1
+                }
+                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+                    iconOffset = -10
+                }
             }
             
             // Animate content
