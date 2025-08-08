@@ -59,10 +59,33 @@ struct EpilogueTranscriptionTimings {
 }
 
 // Custom error types
-enum EpilogueWhisperError: Error {
+enum EpilogueWhisperError: LocalizedError {
     case modelNotLoaded
     case audioProcessingFailed
     case transcriptionFailed
+    case invalidAudioBuffer
+    case audioTooQuiet(String)
+    case fallbackUnavailable
+    case processingFailed(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .modelNotLoaded:
+            return "Whisper model not loaded"
+        case .audioProcessingFailed:
+            return "Audio processing failed"
+        case .transcriptionFailed:
+            return "Transcription failed"
+        case .invalidAudioBuffer:
+            return "Invalid audio buffer"
+        case .audioTooQuiet(let message):
+            return message
+        case .fallbackUnavailable:
+            return "Speech recognition fallback unavailable"
+        case .processingFailed(let reason):
+            return "Processing failed: \(reason)"
+        }
+    }
 }
 
 // TranscriptionResult - result from WhisperKit transcription

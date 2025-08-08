@@ -5,6 +5,7 @@ import CoreML
 import Combine
 import WhisperKit
 import Accelerate
+import Speech
 
 private let logger = Logger(subsystem: "com.epilogue", category: "OptimizedWhisperProcessor")
 
@@ -12,25 +13,38 @@ private let logger = Logger(subsystem: "com.epilogue", category: "OptimizedWhisp
 @MainActor
 class OptimizedWhisperProcessor: ObservableObject {
     @Published var isProcessing = false
-    @Published var currentModel: String = "base"
+    @Published var currentModel: String = "tiny"
     @Published var processingTime: TimeInterval = 0
     @Published var confidence: Float = 0
     @Published var isModelLoaded = false
     @Published var availableModels: [EpilogueWhisperModel] = EpilogueWhisperModel.allCases
+    @Published var audioQualityStatus: AudioQualityStatus = .good
     
     private var whisperKit: WhisperKit?
     private var modelCache: [String: WhisperKit] = [:]
     private let audioPreprocessor = AudioPreprocessor()
+    private var fallbackRecognizer: SFSpeechRecognizer?
     
     // Configuration
-    private let chunkDuration: TimeInterval = 10.0
+    private let chunkDuration: TimeInterval = 5.0  // Reduced to 5 seconds for faster processing
     private let overlapDuration: TimeInterval = 1.0
     private var processedChunks: [TranscriptionChunk] = []
     
     // Performance monitoring
     private var recentProcessingTimes: [TimeInterval] = []
     private let performanceWindowSize = 5
-    private let performanceThreshold: TimeInterval = 3.0 // Switch models if avg > 3 seconds
+    private let performanceThreshold: TimeInterval = 2.0 // Switch models if avg > 2 seconds
+    
+    // Audio quality thresholds
+    private let minConfidenceThreshold: Float = 0.5
+    private let blankAudioThreshold: Float = 0.01
+    
+    enum AudioQualityStatus {
+        case good
+        case low
+        case noVoice
+        case tooQuiet
+    }
     
     struct TranscriptionChunk {
         let text: String
@@ -49,7 +63,10 @@ class OptimizedWhisperProcessor: ObservableObject {
     // MARK: - Initialization
     
     func initialize() async throws {
-        // Pre-warm the model
+        // Initialize fallback recognizer
+        fallbackRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        
+        // Pre-warm the model with adaptive selection
         try await loadOptimalModel()
     }
     
@@ -59,19 +76,28 @@ class OptimizedWhisperProcessor: ObservableObject {
     }
     
     private func loadOptimalModel() async throws {
-        // Determine optimal model based on device
+        // Determine optimal model based on device capabilities
         let deviceModel = await getDeviceCapabilities()
         let optimalModel = selectOptimalModel(for: deviceModel)
         
         logger.info("Loading optimal Whisper model: \(optimalModel)")
         
+        // Check cache first
+        if let cachedKit = modelCache[optimalModel] {
+            whisperKit = cachedKit
+            currentModel = optimalModel
+            isModelLoaded = true
+            logger.info("Using cached WhisperKit model: \(optimalModel)")
+            return
+        }
+        
         // Create WhisperKit configuration
         let config = WhisperKitConfig(
             model: optimalModel,
-            modelRepo: "argmaxinc/whisperkit-coreml" // Official repo
+            modelRepo: "argmaxinc/whisperkit-coreml"
         )
         
-        logger.info("Creating WhisperKit with config: model=\(optimalModel), repo=argmaxinc/whisperkit-coreml")
+        logger.info("Creating WhisperKit with config: model=\(optimalModel)")
         
         do {
             // Load WhisperKit with configuration
@@ -83,295 +109,324 @@ class OptimizedWhisperProcessor: ObservableObject {
             isModelLoaded = true
         } catch {
             logger.error("Failed to initialize WhisperKit: \(error)")
-            logger.error("Error details: \(error.localizedDescription)")
-            throw error
+            
+            // Try fallback to tiny model if optimal model fails
+            if optimalModel != "tiny" {
+                logger.info("Falling back to tiny model")
+                currentModel = "tiny"
+                let fallbackConfig = WhisperKitConfig(
+                    model: "tiny",
+                    modelRepo: "argmaxinc/whisperkit-coreml"
+                )
+                whisperKit = try await WhisperKit(fallbackConfig)
+                modelCache["tiny"] = whisperKit
+                isModelLoaded = true
+            } else {
+                throw error
+            }
         }
     }
     
-    // MARK: - Optimized Transcription
+    // MARK: - Optimized Transcription with Quality Detection
     
     func transcribe(audioBuffer: AVAudioPCMBuffer) async throws -> TranscriptionResult {
         guard isModelLoaded else {
             throw EpilogueWhisperError.modelNotLoaded
         }
         
-        logger.info("transcribe called with buffer: \(audioBuffer.frameLength) frames")
-        
-        // Try direct transcription first for debugging
-        let directResult = try await transcribeDirect(audioBuffer: audioBuffer)
-        logger.info("Direct transcription result: '\(directResult.text)'")
-        
-        if !directResult.text.isEmpty {
-            return directResult
-        }
-        
-        // Fall back to optimized transcription
-        let result = try await transcribeOptimized(audioBuffer: audioBuffer)
-        
-        // Convert to TranscriptionResult for compatibility
-        return TranscriptionResult(
-            text: result.text,
-            segments: result.segments,
-            language: result.language,
-            languageProbability: result.languageProbability,
-            timings: result.timings
-        )
-    }
-    
-    // Direct transcription for debugging
-    private func transcribeDirect(audioBuffer: AVAudioPCMBuffer) async throws -> TranscriptionResult {
-        guard let whisperKit = whisperKit else {
-            throw EpilogueWhisperError.modelNotLoaded
-        }
-        
-        // Convert buffer to float array directly
-        guard let channelData = audioBuffer.floatChannelData else {
-            logger.error("No channel data in audio buffer")
-            return TranscriptionResult(text: "", segments: [], language: "en", languageProbability: 0, timings: nil)
-        }
-        
-        let frameLength = Int(audioBuffer.frameLength)
-        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-        
-        // Get format early
-        let format = audioBuffer.format
-        
-        // Resample to 16kHz if needed
-        let processedSamples: [Float]
-        if format.sampleRate != 16000 {
-            logger.info("Resampling audio from \(format.sampleRate) Hz to 16000 Hz")
-            processedSamples = resampleAudio(samples: samples, 
-                                           fromSampleRate: Float(format.sampleRate), 
-                                           toSampleRate: 16000)
-        } else {
-            processedSamples = samples
-        }
-        
-        // Normalize audio properly for WhisperKit
-        let normalizedSamples = normalizeAudio(processedSamples)
-        
-        // Check buffer format details
-        logger.info("Audio format: original \(format.sampleRate) Hz → resampled to 16000 Hz, \(format.channelCount) channels")
-        logger.info("Direct transcription: \(normalizedSamples.count) samples (resampled), non-zero: \(normalizedSamples.filter { $0 != 0 }.count)")
-        
-        // Check amplitude range
-        let minSample = normalizedSamples.min() ?? 0
-        let maxSample = normalizedSamples.max() ?? 0
-        logger.info("Audio sample range after resampling: min=\(minSample), max=\(maxSample)")
-        
-        // Decoding options optimized for speech (not music/sounds)
-        let options = DecodingOptions(
-            verbose: true, // Enable verbose for debugging
-            task: DecodingTask.transcribe,
-            language: "en", // Use ISO code
-            temperature: 0.0, // Start with deterministic
-            temperatureIncrementOnFallback: 0.2,
-            temperatureFallbackCount: 3, // Try harder with different temps
-            sampleLength: 224, // Standard sample length
-            topK: 5,
-            usePrefillPrompt: true, // Enable prefill for better results
-            usePrefillCache: true,
-            detectLanguage: false, // Force English
-            skipSpecialTokens: true,
-            withoutTimestamps: false,
-            wordTimestamps: false,
-            promptTokens: nil,
-            prefixTokens: nil,
-            suppressBlank: true,
-            supressTokens: nil,
-            compressionRatioThreshold: 2.4,
-            logProbThreshold: -1.0, // More lenient
-            firstTokenLogProbThreshold: -1.0,
-            noSpeechThreshold: 0.3 // Lower threshold for speech detection
-        )
-        
-        logger.info("Calling WhisperKit transcribe with \(normalizedSamples.count) samples")
-        
-        do {
-            let results = try await whisperKit.transcribe(
-                audioArray: normalizedSamples,
-                decodeOptions: options,
-                callback: nil
-            )
-            
-            logger.info("WhisperKit transcribe returned \(results.count) results")
-            
-            // Log all results for debugging
-            for (index, result) in results.enumerated() {
-                logger.info("Result \(index): '\(result.text)' (segments: \(result.segments.count), avgLogprob: \(result.segments.first?.avgLogprob ?? 0))")
-                // Log segment details
-                for (segIndex, segment) in result.segments.enumerated() {
-                    logger.info("  Segment \(segIndex): '\(segment.text)' [start: \(segment.start), end: \(segment.end), avgLogprob: \(segment.avgLogprob)]")
-                    // Log tokens if available - tokens is an array of Ints (token IDs)
-                    if !segment.tokens.isEmpty {
-                        logger.info("    Token IDs: \(segment.tokens)")
-                    }
-                }
-            }
-            
-            guard let firstResult = results.first else {
-                logger.warning("WhisperKit returned empty results array")
-                return TranscriptionResult(text: "", segments: [], language: "en", languageProbability: 0, timings: nil)
-            }
-            
-            logger.info("First result: text='\(firstResult.text)', segments=\(firstResult.segments.count)")
-            
-            // Convert segments
-            let segments = firstResult.segments.map { seg in
-                TranscriptionSegment(
-                    text: seg.text,
-                    start: TimeInterval(seg.start),
-                    end: TimeInterval(seg.end),
-                    probability: exp(seg.avgLogprob)
-                )
-            }
-            
-            return TranscriptionResult(
-                text: firstResult.text,
-                segments: segments,
-                language: firstResult.language,
-                languageProbability: 0.95,
-                timings: nil
-            )
-            
-        } catch {
-            logger.error("WhisperKit transcribe error: \(error)")
-            logger.error("Error type: \(type(of: error))")
-            if let localizedError = error as? LocalizedError {
-                logger.error("Localized description: \(localizedError.localizedDescription)")
-            }
-            throw error
-        }
-    }
-    
-    func transcribeOptimized(audioBuffer: AVAudioPCMBuffer) async throws -> EpilogueTranscriptionResult {
         let startTime = Date()
+        logger.info("Starting transcription with buffer: \(audioBuffer.frameLength) frames")
         
-        logger.info("Starting optimized transcription with buffer: \(audioBuffer.frameLength) frames, format: \(audioBuffer.format)")
+        // 1. Pre-process audio correctly
+        let processedAudio = try preprocessAudio(audioBuffer)
         
-        // 1. Preprocess audio
-        guard let processedAudio = await audioPreprocessor.processAudioBuffer(audioBuffer) else {
-            logger.warning("Audio preprocessing returned nil - no voice detected")
-            return EpilogueTranscriptionResult(
-                text: "",
-                segments: [],
-                language: "en",
-                languageProbability: 0,
-                timings: EpilogueTranscriptionTimings(
-                    fullPipeline: 0,
-                    vad: 0,
-                    audioProcessing: 0,
-                    whisperProcessing: 0
-                ),
-                modelUsed: currentModel
+        // 2. Check audio quality
+        let quality = analyzeAudioQuality(processedAudio)
+        audioQualityStatus = quality
+        
+        // Log audio statistics for debugging
+        logAudioStatistics(processedAudio)
+        
+        // 3. Handle poor quality audio
+        switch quality {
+        case .tooQuiet:
+            logger.warning("Audio too quiet, requesting user to speak louder")
+            throw EpilogueWhisperError.audioTooQuiet("Please speak louder for better recognition")
+            
+        case .noVoice:
+            logger.warning("No voice detected, falling back to Apple Speech")
+            return try await fallbackToAppleSpeech(audioBuffer)
+            
+        case .low:
+            logger.info("Low quality audio detected, using enhanced processing")
+            // Continue with enhanced processing options
+            break
+            
+        case .good:
+            logger.info("Good audio quality detected")
+            break
+        }
+        
+        // 4. Process in chunks with parallel processing
+        let result = try await processChunkedAudio(processedAudio)
+        
+        // 5. Monitor performance and adapt model
+        let processingTime = Date().timeIntervalSince(startTime)
+        await updatePerformanceMetrics(processingTime)
+        
+        // 6. Check if we need to switch models
+        if shouldSwitchModel() {
+            Task {
+                try await adaptModelBasedOnPerformance()
+            }
+        }
+        
+        return result
+    }
+    
+    // MARK: - Audio Pre-processing
+    
+    private func preprocessAudio(_ buffer: AVAudioPCMBuffer) throws -> [Float] {
+        guard let channelData = buffer.floatChannelData else {
+            throw EpilogueWhisperError.invalidAudioBuffer
+        }
+        
+        let frameLength = Int(buffer.frameLength)
+        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+        let format = buffer.format
+        
+        // 1. Resample to 16kHz if needed
+        let resampledSamples: [Float]
+        if format.sampleRate != 16000 {
+            logger.info("Resampling from \(format.sampleRate)Hz to 16000Hz")
+            resampledSamples = resampleAudioHighQuality(
+                samples: samples,
+                fromSampleRate: Float(format.sampleRate),
+                toSampleRate: 16000
             )
-        }
-        
-        logger.info("Preprocessed audio: \(processedAudio.samples.count) samples, hasVoice: \(processedAudio.hasVoice), confidence: \(processedAudio.confidence)")
-        
-        // 2. Configure decoding options for reading companion - using WhisperKit's DecodingOptions
-        let decodingOptions = DecodingOptions(
-            verbose: false,
-            task: DecodingTask.transcribe,
-            language: "en",
-            temperature: 0.0,
-            temperatureIncrementOnFallback: 0.2,
-            temperatureFallbackCount: 3,
-            sampleLength: 224,
-            topK: 5,
-            usePrefillPrompt: true,
-            usePrefillCache: true,
-            detectLanguage: false,
-            skipSpecialTokens: true,
-            withoutTimestamps: false,
-            wordTimestamps: false,
-            promptTokens: nil,
-            prefixTokens: nil,
-            suppressBlank: true,
-            supressTokens: nil,
-            compressionRatioThreshold: 2.4,
-            logProbThreshold: -1.0,
-            firstTokenLogProbThreshold: -1.0,
-            noSpeechThreshold: 0.3
-        )
-        
-        // 3. Process in chunks with overlap
-        let chunks = createOverlappingChunks(processedAudio.samples)
-        var allSegments: [TranscriptionSegment] = []
-        
-        // Process chunks in parallel for better performance
-        if chunks.count > 1 {
-            logger.info("Processing \(chunks.count) chunks in parallel")
-            
-            // Process chunks concurrently
-            let chunkResults = await withTaskGroup(of: (Int, EpilogueTranscriptionResult?).self) { group in
-                for (index, chunk) in chunks.enumerated() {
-                    group.addTask {
-                        do {
-                            let result = try await self.processChunk(chunk, options: decodingOptions, index: index)
-                            return (index, result)
-                        } catch {
-                            await logger.error("Failed to process chunk \(index): \(error)")
-                            return (index, nil)
-                        }
-                    }
-                }
-                
-                // Collect results in order
-                var results: [(Int, EpilogueTranscriptionResult?)] = []
-                for await result in group {
-                    results.append(result)
-                }
-                return results.sorted { $0.0 < $1.0 }
-            }
-            
-            // Combine segments in order
-            for (_, result) in chunkResults {
-                if let result = result {
-                    allSegments.append(contentsOf: result.segments)
-                }
-            }
         } else {
-            // Single chunk - process normally
-            for (index, chunk) in chunks.enumerated() {
-                do {
-                    let chunkResult = try await processChunk(chunk, options: decodingOptions, index: index)
-                    allSegments.append(contentsOf: chunkResult.segments)
-                } catch {
-                    logger.error("Failed to process chunk \(index): \(error)")
+            resampledSamples = samples
+        }
+        
+        // 2. Normalize to [-1, 1] range properly
+        let normalizedSamples = normalizeAudioProperly(resampledSamples)
+        
+        // 3. Apply Voice Activity Detection (VAD)
+        let vadSamples = applyVAD(normalizedSamples)
+        
+        return vadSamples
+    }
+    
+    private func normalizeAudioProperly(_ samples: [Float]) -> [Float] {
+        guard !samples.isEmpty else { return samples }
+        
+        // Calculate statistics
+        var sum: Float = 0
+        var sumSquares: Float = 0
+        vDSP_sve(samples, 1, &sum, vDSP_Length(samples.count))
+        vDSP_svesq(samples, 1, &sumSquares, vDSP_Length(samples.count))
+        
+        let mean = sum / Float(samples.count)
+        let rms = sqrt(sumSquares / Float(samples.count))
+        
+        // Find peak amplitude
+        var maxValue: Float = 0
+        vDSP_maxmgv(samples, 1, &maxValue, vDSP_Length(samples.count))
+        
+        logger.info("Audio stats - Mean: \(mean), RMS: \(rms), Peak: \(maxValue)")
+        
+        // Remove DC offset
+        var centeredSamples = samples
+        var negativeMean = -mean
+        vDSP_vsadd(samples, 1, &negativeMean, &centeredSamples, 1, vDSP_Length(samples.count))
+        
+        // Normalize based on peak or RMS
+        var normalizedSamples = centeredSamples
+        
+        if maxValue > 0.001 {
+            // Use peak normalization with headroom
+            let targetPeak: Float = 0.95 // Leave some headroom
+            var scaleFactor = targetPeak / maxValue
+            
+            // Apply scaling
+            vDSP_vsmul(centeredSamples, 1, &scaleFactor, &normalizedSamples, 1, vDSP_Length(samples.count))
+            
+            logger.info("Applied peak normalization with factor: \(scaleFactor)")
+        } else if rms > 0.001 {
+            // Use RMS normalization for very quiet audio
+            let targetRMS: Float = 0.2
+            var scaleFactor = targetRMS / rms
+            
+            // Apply scaling with limiting
+            vDSP_vsmul(centeredSamples, 1, &scaleFactor, &normalizedSamples, 1, vDSP_Length(samples.count))
+            
+            // Apply soft limiting to prevent clipping
+            normalizedSamples = normalizedSamples.map { sample in
+                if abs(sample) > 0.95 {
+                    return 0.95 * (sample > 0 ? 1 : -1) * (1.0 - exp(-abs(sample)))
+                }
+                return sample
+            }
+            
+            logger.info("Applied RMS normalization with factor: \(scaleFactor)")
+        }
+        
+        return normalizedSamples
+    }
+    
+    private func resampleAudioHighQuality(samples: [Float], fromSampleRate: Float, toSampleRate: Float) -> [Float] {
+        let ratio = toSampleRate / fromSampleRate
+        let outputLength = Int(Float(samples.count) * ratio)
+        var output = [Float](repeating: 0, count: outputLength)
+        
+        // Use Lanczos resampling for better quality
+        let a = 3 // Lanczos parameter
+        
+        for i in 0..<outputLength {
+            let inputPosition = Float(i) / ratio
+            let inputIndex = Int(inputPosition)
+            let fraction = inputPosition - Float(inputIndex)
+            
+            var sum: Float = 0
+            var weightSum: Float = 0
+            
+            // Apply Lanczos kernel
+            for j in -a+1...a {
+                let sampleIndex = inputIndex + j
+                if sampleIndex >= 0 && sampleIndex < samples.count {
+                    let x = Float(j) - fraction
+                    let weight = lanczosKernel(x, a: Float(a))
+                    sum += samples[sampleIndex] * weight
+                    weightSum += weight
+                }
+            }
+            
+            output[i] = weightSum > 0 ? sum / weightSum : 0
+        }
+        
+        return output
+    }
+    
+    private func lanczosKernel(_ x: Float, a: Float) -> Float {
+        if x == 0 { return 1 }
+        if abs(x) >= a { return 0 }
+        
+        let piX = Float.pi * x
+        let piXOverA = piX / a
+        return (sin(piX) / piX) * (sin(piXOverA) / piXOverA)
+    }
+    
+    private func applyVAD(_ samples: [Float]) -> [Float] {
+        // Simple energy-based VAD with adaptive threshold
+        let windowSize = 160 // 10ms at 16kHz
+        let hopSize = 80 // 5ms hop
+        
+        var vadFlags = [Bool](repeating: false, count: samples.count)
+        var energyValues: [Float] = []
+        
+        // Calculate energy for each window
+        for i in stride(from: 0, to: samples.count - windowSize, by: hopSize) {
+            let window = Array(samples[i..<i+windowSize])
+            var energy: Float = 0
+            vDSP_svesq(window, 1, &energy, vDSP_Length(windowSize))
+            energyValues.append(energy / Float(windowSize))
+        }
+        
+        // Calculate adaptive threshold
+        let sortedEnergies = energyValues.sorted()
+        let percentile20 = sortedEnergies[Int(Float(sortedEnergies.count) * 0.2)]
+        let percentile80 = sortedEnergies[Int(Float(sortedEnergies.count) * 0.8)]
+        let threshold = percentile20 + 0.1 * (percentile80 - percentile20)
+        
+        // Apply VAD flags
+        for (i, energy) in energyValues.enumerated() {
+            if energy > threshold {
+                let startIdx = i * hopSize
+                let endIdx = min(startIdx + windowSize, samples.count)
+                for j in startIdx..<endIdx {
+                    vadFlags[j] = true
                 }
             }
         }
         
-        // 4. Merge chunks intelligently
-        let mergedResult = mergeTranscriptionChunks(allSegments)
+        // Apply morphological operations to clean up VAD
+        vadFlags = applyMorphologicalOperations(vadFlags)
         
-        // 5. Calculate metrics
-        let endTime = Date()
-        processingTime = endTime.timeIntervalSince(startTime)
-        confidence = calculateConfidence(from: mergedResult)
+        // Extract voice segments with context
+        var processedSamples = samples
+        for i in 0..<samples.count {
+            if !vadFlags[i] {
+                processedSamples[i] *= 0.1 // Attenuate non-voice regions
+            }
+        }
         
-        logger.info("Transcription completed in \(String(format: "%.2f", self.processingTime))s with confidence: \(self.confidence)")
+        return processedSamples
+    }
+    
+    private func applyMorphologicalOperations(_ flags: [Bool]) -> [Bool] {
+        var result = flags
         
-        // Monitor performance and switch models if needed
-        await monitorPerformanceAndAdaptModel(processingTime: processingTime)
+        // Closing operation (dilation followed by erosion)
+        let kernelSize = 80 // 5ms at 16kHz
         
-        return EpilogueTranscriptionResult(
+        // Dilation
+        for i in 0..<flags.count {
+            if flags[i] {
+                for j in max(0, i-kernelSize)...min(flags.count-1, i+kernelSize) {
+                    result[j] = true
+                }
+            }
+        }
+        
+        // Erosion
+        var eroded = result
+        for i in kernelSize..<(flags.count-kernelSize) {
+            var allTrue = true
+            for j in (i-kernelSize)...(i+kernelSize) {
+                if !result[j] {
+                    allTrue = false
+                    break
+                }
+            }
+            eroded[i] = allTrue
+        }
+        
+        return eroded
+    }
+    
+    // MARK: - Chunked Processing
+    
+    private func processChunkedAudio(_ samples: [Float]) async throws -> TranscriptionResult {
+        let chunks = createOverlappingChunks(samples)
+        
+        logger.info("Processing \(chunks.count) chunks")
+        
+        // Process chunks in parallel for speed
+        let transcriptionTasks = chunks.enumerated().map { index, chunk in
+            Task {
+                try await transcribeChunk(chunk, index: index)
+            }
+        }
+        
+        // Wait for all chunks to complete
+        var allSegments: [TranscriptionSegment] = []
+        for task in transcriptionTasks {
+            if let result = try await task.value {
+                allSegments.append(contentsOf: result.segments)
+            }
+        }
+        
+        // Merge results intelligently
+        let mergedResult = mergeTranscriptionSegments(allSegments)
+        
+        return TranscriptionResult(
             text: mergedResult.text,
             segments: mergedResult.segments,
             language: "en",
-            languageProbability: 0.95,
-            timings: EpilogueTranscriptionTimings(
-                fullPipeline: processingTime,
-                vad: audioPreprocessor.getAudioStatistics().voiceActivity > 0 ? 0.1 : 0,
-                audioProcessing: 0.05,
-                whisperProcessing: processingTime * 0.9
-            ),
-            modelUsed: currentModel
+            languageProbability: calculateOverallConfidence(mergedResult.segments),
+            timings: nil
         )
     }
-    
-    // MARK: - Chunk Processing
     
     private func createOverlappingChunks(_ samples: [Float]) -> [[Float]] {
         let sampleRate = 16000
@@ -386,355 +441,25 @@ class OptimizedWhisperProcessor: ObservableObject {
             let endIndex = min(startIndex + chunkSize, samples.count)
             let chunk = Array(samples[startIndex..<endIndex])
             
-            // Pad if necessary
-            if chunk.count < chunkSize {
-                var paddedChunk = chunk
-                paddedChunk.append(contentsOf: Array(repeating: 0, count: chunkSize - chunk.count))
-                chunks.append(paddedChunk)
-            } else {
+            // Only add chunks with sufficient length
+            if chunk.count >= sampleRate { // At least 1 second
                 chunks.append(chunk)
             }
             
             startIndex += stepSize
-            
-            // Stop if we've processed everything
-            if endIndex == samples.count {
-                break
-            }
         }
         
         return chunks
     }
     
-    private func processChunk(_ samples: [Float], options: DecodingOptions, index: Int) async throws -> EpilogueTranscriptionResult {
+    private func transcribeChunk(_ chunk: [Float], index: Int) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else {
             throw EpilogueWhisperError.modelNotLoaded
         }
         
-        // Convert to audio array format expected by WhisperKit
-        let audioArray = samples
-        
-        // Process with WhisperKit - it returns an array of results
-        logger.debug("Processing chunk \(index) with \(audioArray.count) samples")
-        
-        // Validate audio samples
-        let nonZeroSamples = audioArray.filter { $0 != 0 }.count
-        logger.info("Chunk \(index): \(nonZeroSamples) non-zero samples out of \(audioArray.count) total")
-        
-        // Check sample range
-        let minSample = audioArray.min() ?? 0
-        let maxSample = audioArray.max() ?? 0
-        logger.info("Chunk \(index) audio range: min=\(minSample), max=\(maxSample)")
-        
-        // Create WhisperKit DecodingOptions - just pass through since we're already using WhisperKit's type
-        let whisperOptions = options
-        
-        logger.info("Starting WhisperKit transcribe for chunk \(index)...")
-        let results = try await whisperKit.transcribe(
-            audioArray: audioArray,
-            decodeOptions: whisperOptions,
-            callback: nil
-        )
-        logger.info("WhisperKit returned \(results.count) results for chunk \(index)")
-        
-        // Get the first result (WhisperKit returns an array)
-        guard let firstResult = results.first else {
-            logger.warning("No results from WhisperKit for chunk \(index)")
-            return EpilogueTranscriptionResult(
-                text: "",
-                segments: [],
-                language: "en",
-                languageProbability: 0,
-                timings: EpilogueTranscriptionTimings(
-                    fullPipeline: 0,
-                    vad: 0,
-                    audioProcessing: 0,
-                    whisperProcessing: 0
-                ),
-                modelUsed: currentModel
-            )
-        }
-        
-        logger.debug("WhisperKit result for chunk \(index): text='\(firstResult.text)', segments=\(firstResult.segments.count)")
-        
-        // Check if we got a result
-        guard !firstResult.text.isEmpty else {
-            logger.warning("Empty result from WhisperKit for chunk \(index)")
-            return EpilogueTranscriptionResult(
-                text: "",
-                segments: [],
-                language: "en",
-                languageProbability: 0,
-                timings: EpilogueTranscriptionTimings(
-                    fullPipeline: 0,
-                    vad: 0,
-                    audioProcessing: 0,
-                    whisperProcessing: 0
-                ),
-                modelUsed: currentModel
-            )
-        }
-        
-        // Convert WhisperKit segments to our segments
-        let ourSegments = firstResult.segments.map { whkSegment in
-            TranscriptionSegment(
-                text: whkSegment.text,
-                start: TimeInterval(whkSegment.start),
-                end: TimeInterval(whkSegment.end),
-                probability: exp(whkSegment.avgLogprob) // Convert log probability to probability
-            )
-        }
-        
-        // Store chunk for later reference
-        let chunk = TranscriptionChunk(
-            text: firstResult.text,
-            startTime: Double(index) * (chunkDuration - overlapDuration),
-            endTime: Double(index) * (chunkDuration - overlapDuration) + chunkDuration,
-            confidence: calculateSegmentConfidence(ourSegments),
-            tokens: [] // We'll skip token extraction for now
-        )
-        
-        processedChunks.append(chunk)
-        
-        // Convert timings if available
-        let timings: EpilogueTranscriptionTimings
-        let whkTimings = firstResult.timings // This is not optional
-        timings = EpilogueTranscriptionTimings(
-            fullPipeline: whkTimings.fullPipeline,
-            vad: 0.0, // VAD is handled separately in our pipeline
-            audioProcessing: whkTimings.audioProcessing,
-            whisperProcessing: whkTimings.encoding + whkTimings.decodingLoop // Combine encoding and decoding time
-        )
-        
-        // Convert to EpilogueTranscriptionResult
-        return EpilogueTranscriptionResult(
-            text: firstResult.text,
-            segments: ourSegments,
-            language: firstResult.language,
-            languageProbability: 0.95, // WhisperKit doesn't expose this directly
-            timings: timings,
-            modelUsed: currentModel
-        )
-    }
-    
-    // MARK: - Intelligent Merging
-    
-    private func mergeTranscriptionChunks(_ segments: [TranscriptionSegment]) -> (text: String, segments: [TranscriptionSegment]) {
-        // Remove duplicates from overlapping regions
-        var mergedSegments: [TranscriptionSegment] = []
-        var processedText = Set<String>()
-        
-        for segment in segments.sorted(by: { $0.start < $1.start }) {
-            let segmentText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Skip if we've already processed similar text
-            if !processedText.contains(segmentText) && !segmentText.isEmpty {
-                processedText.insert(segmentText)
-                mergedSegments.append(segment)
-            }
-        }
-        
-        // Build final text
-        let finalText = mergedSegments
-            .map { $0.text }
-            .joined(separator: " ")
-            .replacingOccurrences(of: "  ", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        return (finalText, mergedSegments)
-    }
-    
-    // MARK: - Confidence Scoring
-    
-    private func calculateConfidence(from result: (text: String, segments: [TranscriptionSegment])) -> Float {
-        guard !result.segments.isEmpty else { return 0 }
-        
-        // Average probability
-        let avgProb = result.segments
-            .map { $0.probability }
-            .reduce(0, +) / Float(result.segments.count)
-        
-        return avgProb
-    }
-    
-    private func calculateSegmentConfidence(_ segments: [TranscriptionSegment]) -> Float {
-        guard !segments.isEmpty else { return 0 }
-        
-        let probabilities = segments.map { $0.probability }
-        return probabilities.reduce(0, +) / Float(probabilities.count)
-    }
-    
-    private func extractTokens(from segments: [TranscriptionSegment]) -> [WhisperToken] {
-        // Extract token-level information if available
-        return segments.flatMap { segment in
-            // Convert segment words to tokens
-            let words = segment.text.split(separator: " ")
-            return words.map { word in
-                WhisperToken(
-                    text: String(word),
-                    probability: segment.probability,
-                    timestamp: segment.start
-                )
-            }
-        }
-    }
-    
-    // MARK: - Device Optimization
-    
-    private func getDeviceCapabilities() async -> DeviceCapabilities {
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let cpuCount = ProcessInfo.processInfo.processorCount
-        
-        // Check for Neural Engine
-        let hasNeuralEngine = true // All modern iOS devices have ANE
-        
-        return DeviceCapabilities(
-            memoryGB: Int(totalMemory / 1_073_741_824),
-            cpuCores: cpuCount,
-            hasNeuralEngine: hasNeuralEngine
-        )
-    }
-    
-    private func selectOptimalModel(for device: DeviceCapabilities) -> String {
-        // Dynamic model selection based on device capabilities
-        logger.info("Device capabilities: \(device.memoryGB)GB RAM, \(device.cpuCores) cores, Neural Engine: \(device.hasNeuralEngine)")
-        
-        // Note: Medium and Large models are typically too resource-intensive for mobile devices
-        // Only use them if explicitly requested by the user
-        
-        // For high-end devices (iPhone 15 Pro, iPad Pro, etc.)
-        if device.memoryGB >= 8 && device.cpuCores >= 8 {
-            logger.info("High-end device detected, using base model for better accuracy")
-            return "base"
-        }
-        // For mid-range devices (iPhone 14, iPhone 13, etc.)
-        else if device.memoryGB >= 6 {
-            logger.info("Mid-range device detected, using small model for balance")
-            return "small"
-        }
-        // For lower-end devices or when conserving resources
-        else {
-            logger.info("Lower-end device detected, using tiny model for performance")
-            return "tiny"
-        }
-    }
-    
-    // MARK: - Performance Monitoring
-    
-    func monitorPerformanceAndAdaptModel(processingTime: TimeInterval) async {
-        // Add to recent processing times
-        recentProcessingTimes.append(processingTime)
-        if recentProcessingTimes.count > performanceWindowSize {
-            recentProcessingTimes.removeFirst()
-        }
-        
-        // Calculate average processing time
-        let avgProcessingTime = recentProcessingTimes.reduce(0, +) / Double(recentProcessingTimes.count)
-        
-        logger.info("Average processing time: \(String(format: "%.2f", avgProcessingTime))s (threshold: \(self.performanceThreshold)s)")
-        
-        // Switch to a lighter model if performance is poor
-        if avgProcessingTime > performanceThreshold && recentProcessingTimes.count >= performanceWindowSize {
-            let currentModelEnum = EpilogueWhisperModel(rawValue: currentModel) ?? .base
-            
-            switch currentModelEnum {
-            case .large:
-                logger.warning("Performance is slow with large model, switching to medium")
-                try? await loadModel(.medium)
-                recentProcessingTimes.removeAll()
-            case .medium:
-                logger.warning("Performance is slow with medium model, switching to base")
-                try? await loadModel(.base)
-                recentProcessingTimes.removeAll()
-            case .base:
-                logger.warning("Performance is slow with base model, switching to small")
-                try? await loadModel(.small)
-                recentProcessingTimes.removeAll() // Reset after model switch
-            case .small:
-                logger.warning("Performance is slow with small model, switching to tiny")
-                try? await loadModel(.tiny)
-                recentProcessingTimes.removeAll()
-            case .tiny:
-                logger.info("Already using tiny model, cannot downgrade further")
-            }
-        } else if avgProcessingTime < performanceThreshold / 2 && recentProcessingTimes.count >= performanceWindowSize {
-            // Consider upgrading if performance is very good
-            let currentModelEnum = EpilogueWhisperModel(rawValue: currentModel) ?? .tiny
-            
-            switch currentModelEnum {
-            case .tiny:
-                logger.info("Performance is excellent with tiny model, considering upgrade to small")
-                // Only upgrade if device has sufficient resources
-                let device = await getDeviceCapabilities()
-                if device.memoryGB >= 6 {
-                    try? await loadModel(.small)
-                    recentProcessingTimes.removeAll()
-                }
-            case .small:
-                logger.info("Performance is excellent with small model, considering upgrade to base")
-                let device = await getDeviceCapabilities()
-                if device.memoryGB >= 8 {
-                    try? await loadModel(.base)
-                    recentProcessingTimes.removeAll()
-                }
-            case .base:
-                logger.info("Performance is excellent with base model, considering upgrade to medium")
-                let device = await getDeviceCapabilities()
-                if device.memoryGB >= 12 {
-                    try? await loadModel(.medium)
-                    recentProcessingTimes.removeAll()
-                }
-            case .medium:
-                logger.info("Performance is excellent with medium model, considering upgrade to large")
-                let device = await getDeviceCapabilities()
-                if device.memoryGB >= 16 {
-                    try? await loadModel(.large)
-                    recentProcessingTimes.removeAll()
-                }
-            case .large:
-                logger.info("Already using best model")
-            }
-        }
-    }
-    
-    // MARK: - Cache Management
-    
-    func preloadModel(_ model: String) async throws {
-        guard modelCache[model] == nil else { return }
-        
-        logger.info("Preloading \(model) model")
-        
-        let config = WhisperKitConfig(
-            model: model,
-            modelRepo: "argmaxinc/whisperkit-coreml"
-        )
-        
-        let whisperInstance = try await WhisperKit(config)
-        modelCache[model] = whisperInstance
-    }
-    
-    func clearCache() {
-        modelCache.removeAll()
-        processedChunks.removeAll()
-    }
-    
-    // MARK: - Testing
-    
-    func testTranscription() async throws -> String {
-        guard let whisperKit = whisperKit else {
-            throw EpilogueWhisperError.modelNotLoaded
-        }
-        
-        logger.info("Running WhisperKit test transcription...")
-        
-        // Generate test speech-like audio (not a pure tone)
-        let testAudio = generateTestSpeech()
-        
-        logger.info("Test audio: \(testAudio.count) samples at 16000 Hz")
-        
-        // Use the same options as regular transcription
+        // Configure decoding options for optimal quality
         let options = DecodingOptions(
-            verbose: true,
+            verbose: false,
             task: DecodingTask.transcribe,
             language: "en",
             temperature: 0.0,
@@ -747,7 +472,7 @@ class OptimizedWhisperProcessor: ObservableObject {
             detectLanguage: false,
             skipSpecialTokens: true,
             withoutTimestamps: false,
-            wordTimestamps: false,
+            wordTimestamps: true, // Enable word-level timestamps
             promptTokens: nil,
             prefixTokens: nil,
             suppressBlank: true,
@@ -758,232 +483,339 @@ class OptimizedWhisperProcessor: ObservableObject {
             noSpeechThreshold: 0.3
         )
         
-        let results = try await whisperKit.transcribe(
-            audioArray: testAudio,
-            decodeOptions: options
-        )
-        
-        logger.info("Test results: \(results.count) results")
-        
-        if let firstResult = results.first {
-            logger.info("Test transcription: '\(firstResult.text)'")
+        do {
+            let results = try await whisperKit.transcribe(
+                audioArray: chunk,
+                decodeOptions: options,
+                callback: nil
+            )
             
-            if firstResult.text == "[BLANK_AUDIO]" {
-                logger.error("ERROR: Whisper still returning blank for test audio")
-                // Try with different parameters
-                logger.info("Trying with different decoding parameters...")
-                
-                let altOptions = DecodingOptions(
-                    verbose: true,
-                    task: DecodingTask.transcribe,
-                    language: "en",
-                    temperature: 0.8,
-                    noSpeechThreshold: 0.1
+            guard let firstResult = results.first, !firstResult.text.isEmpty else {
+                logger.info("Empty result for chunk \(index)")
+                return nil
+            }
+            
+            // Calculate chunk offset
+            let chunkOffset = Double(index) * (chunkDuration - overlapDuration)
+            
+            // Convert segments with proper timestamps
+            let segments = firstResult.segments.map { seg in
+                TranscriptionSegment(
+                    text: seg.text,
+                    start: TimeInterval(seg.start) + chunkOffset,
+                    end: TimeInterval(seg.end) + chunkOffset,
+                    probability: exp(seg.avgLogprob)
                 )
-                
-                let altResults = try await whisperKit.transcribe(
-                    audioArray: testAudio,
-                    decodeOptions: altOptions
-                )
-                
-                if let altResult = altResults.first {
-                    logger.info("Alternative test transcription: '\(altResult.text)'")
-                    return altResult.text
+            }
+            
+            // Store chunk for quality analysis
+            let chunkInfo = TranscriptionChunk(
+                text: firstResult.text,
+                startTime: chunkOffset,
+                endTime: chunkOffset + chunkDuration,
+                confidence: calculateSegmentConfidence(segments),
+                tokens: []
+            )
+            processedChunks.append(chunkInfo)
+            
+            return TranscriptionResult(
+                text: firstResult.text,
+                segments: segments,
+                language: firstResult.language,
+                languageProbability: 0.95,
+                timings: nil
+            )
+            
+        } catch {
+            logger.error("Error transcribing chunk \(index): \(error)")
+            return nil
+        }
+    }
+    
+    private func mergeTranscriptionSegments(_ segments: [TranscriptionSegment]) -> (text: String, segments: [TranscriptionSegment]) {
+        // Remove duplicates from overlapping regions
+        var mergedSegments: [TranscriptionSegment] = []
+        var processedRanges: [(start: TimeInterval, end: TimeInterval)] = []
+        
+        for segment in segments.sorted(by: { $0.start < $1.start }) {
+            // Check if this segment overlaps with already processed segments
+            var isOverlapping = false
+            for range in processedRanges {
+                if segment.start >= range.start && segment.start < range.end {
+                    isOverlapping = true
+                    break
                 }
             }
             
-            return firstResult.text
+            if !isOverlapping {
+                mergedSegments.append(segment)
+                processedRanges.append((start: segment.start, end: segment.end))
+            }
         }
         
-        return "No transcription"
+        // Build final text
+        let finalText = mergedSegments
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        
+        return (finalText, mergedSegments)
     }
     
-    // Generate speech-like test audio
-    private func generateTestSpeech() -> [Float] {
-        let sampleRate: Float = 16000
-        let duration: Float = 3.0
-        let sampleCount = Int(sampleRate * duration)
+    // MARK: - Quality Detection
+    
+    private func analyzeAudioQuality(_ samples: [Float]) -> AudioQualityStatus {
+        // Calculate RMS and peak levels
+        var sumSquares: Float = 0
+        vDSP_svesq(samples, 1, &sumSquares, vDSP_Length(samples.count))
+        let rms = sqrt(sumSquares / Float(samples.count))
         
-        var testAudio = [Float](repeating: 0, count: sampleCount)
+        var maxValue: Float = 0
+        vDSP_maxmgv(samples, 1, &maxValue, vDSP_Length(samples.count))
         
-        // Generate speech-like patterns with multiple formants
-        let fundamentalFreq: Float = 125.0 // Male voice fundamental
-        let formants: [(freq: Float, amp: Float)] = [
-            (700, 0.3),   // F1
-            (1220, 0.2),  // F2
-            (2600, 0.1)   // F3
-        ]
+        logger.info("Audio quality - RMS: \(rms), Peak: \(maxValue)")
         
-        for i in 0..<sampleCount {
-            var sample: Float = 0
+        // Check for blank audio
+        if rms < blankAudioThreshold {
+            return .noVoice
+        }
+        
+        // Check if too quiet
+        if rms < 0.05 {
+            return .tooQuiet
+        }
+        
+        // Check signal quality
+        let snr = calculateSNR(samples)
+        if snr < 10 { // Less than 10dB SNR
+            return .low
+        }
+        
+        return .good
+    }
+    
+    private func calculateSNR(_ samples: [Float]) -> Float {
+        // Simple SNR estimation using high-pass filter
+        let windowSize = 1600 // 100ms at 16kHz
+        var signalPower: Float = 0
+        var noisePower: Float = 0
+        
+        for i in stride(from: 0, to: samples.count - windowSize, by: windowSize) {
+            let window = Array(samples[i..<i+windowSize])
             
-            // Add fundamental frequency
-            sample += 0.2 * sin(2.0 * Float.pi * fundamentalFreq * Float(i) / sampleRate)
+            var energy: Float = 0
+            vDSP_svesq(window, 1, &energy, vDSP_Length(windowSize))
+            energy /= Float(windowSize)
             
-            // Add formants
-            for formant in formants {
-                sample += formant.amp * sin(2.0 * Float.pi * formant.freq * Float(i) / sampleRate)
-            }
-            
-            // Add some noise for realism
-            sample += 0.02 * Float.random(in: -1...1)
-            
-            // Apply envelope (fade in/out)
-            let envelope: Float
-            if i < sampleCount / 10 {
-                envelope = Float(i) / Float(sampleCount / 10)
-            } else if i > sampleCount * 9 / 10 {
-                envelope = Float(sampleCount - i) / Float(sampleCount / 10)
+            // Assume lowest 20% is noise
+            if energy < 0.01 {
+                noisePower += energy
             } else {
-                envelope = 1.0
+                signalPower += energy
             }
-            
-            testAudio[i] = sample * envelope
         }
         
-        // Normalize
-        return normalizeAudio(testAudio)
+        guard noisePower > 0 else { return 40 } // High SNR if no noise detected
+        
+        return 10 * log10(signalPower / noisePower)
     }
     
-    // MARK: - Post-Processing
-    
-    func applyReadingContextPostProcessing(_ text: String, bookContext: BookContext?) -> String {
-        var processedText = text
+    private func logAudioStatistics(_ samples: [Float]) {
+        var sum: Float = 0
+        var sumSquares: Float = 0
+        var maxValue: Float = 0
+        var minValue: Float = 0
         
-        // Add custom vocabulary if available
-        if let customTerms = bookContext?.customVocabulary {
-            for term in customTerms {
-                // Case-insensitive replacement with proper casing
-                let pattern = "\\b\(term.lowercased())\\b"
-                processedText = processedText.replacingOccurrences(
-                    of: pattern,
-                    with: term,
-                    options: [.regularExpression, .caseInsensitive]
+        vDSP_sve(samples, 1, &sum, vDSP_Length(samples.count))
+        vDSP_svesq(samples, 1, &sumSquares, vDSP_Length(samples.count))
+        vDSP_maxv(samples, 1, &maxValue, vDSP_Length(samples.count))
+        vDSP_minv(samples, 1, &minValue, vDSP_Length(samples.count))
+        
+        let mean = sum / Float(samples.count)
+        let rms = sqrt(sumSquares / Float(samples.count))
+        let variance = (sumSquares / Float(samples.count)) - (mean * mean)
+        
+        logger.info("""
+            Audio Statistics:
+            - Samples: \(samples.count)
+            - Mean: \(mean)
+            - RMS: \(rms)
+            - Variance: \(variance)
+            - Peak: \(maxValue)
+            - Min: \(minValue)
+            - Non-zero samples: \(samples.filter { $0 != 0 }.count)
+            """)
+    }
+    
+    // MARK: - Fallback to Apple Speech
+    
+    private func fallbackToAppleSpeech(_ buffer: AVAudioPCMBuffer) async throws -> TranscriptionResult {
+        logger.info("Falling back to Apple Speech Recognition")
+        
+        guard let recognizer = fallbackRecognizer,
+              recognizer.isAvailable else {
+            throw EpilogueWhisperError.fallbackUnavailable
+        }
+        
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = false
+        request.requiresOnDeviceRecognition = true
+        
+        request.append(buffer)
+        request.endAudio()
+        
+        do {
+            let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SFSpeechRecognitionResult, Error>) in
+                recognizer.recognitionTask(with: request) { result, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else if let result = result, result.isFinal {
+                        continuation.resume(returning: result)
+                    }
+                }
+            }
+            
+            // Convert to TranscriptionResult
+            let segments = result.bestTranscription.segments.map { segment in
+                TranscriptionSegment(
+                    text: segment.substring,
+                    start: segment.timestamp,
+                    end: segment.timestamp + segment.duration,
+                    probability: Float(segment.confidence)
                 )
             }
+            
+            return TranscriptionResult(
+                text: result.bestTranscription.formattedString,
+                segments: segments,
+                language: "en",
+                languageProbability: 0.9,
+                timings: nil
+            )
+            
+        } catch {
+            logger.error("Apple Speech fallback failed: \(error)")
+            throw error
         }
-        
-        // Fix common transcription errors for reading
-        let corrections = [
-            "gonna": "going to",
-            "wanna": "want to",
-            "gotta": "got to",
-            "[BLANK_AUDIO]": "",
-            "[INAUDIBLE]": "..."
-        ]
-        
-        for (wrong, right) in corrections {
-            processedText = processedText.replacingOccurrences(of: wrong, with: right)
-        }
-        
-        return processedText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    // MARK: - Audio Resampling
+    // MARK: - Model Optimization
     
-    private func resampleAudio(samples: [Float], fromSampleRate: Float, toSampleRate: Float) -> [Float] {
-        let ratio = toSampleRate / fromSampleRate
-        let outputLength = Int(Float(samples.count) * ratio)
-        var output = [Float](repeating: 0, count: outputLength)
+    private func calculateSegmentConfidence(_ segments: [TranscriptionSegment]) -> Float {
+        guard !segments.isEmpty else { return 0 }
         
-        // Use vDSP for high-quality resampling
-        var inputPointer: Float = 0.0
-        let increment = 1.0 / ratio
+        let probabilities = segments.map { $0.probability }
+        return probabilities.reduce(0, +) / Float(probabilities.count)
+    }
+    
+    private func calculateOverallConfidence(_ segments: [TranscriptionSegment]) -> Float {
+        guard !segments.isEmpty else { return 0 }
         
-        for i in 0..<outputLength {
-            let inputIndex = Int(inputPointer)
-            let fraction = inputPointer - Float(inputIndex)
-            
-            if inputIndex < samples.count - 1 {
-                // Linear interpolation between samples
-                output[i] = samples[inputIndex] * (1.0 - fraction) + samples[inputIndex + 1] * fraction
-            } else if inputIndex < samples.count {
-                output[i] = samples[inputIndex]
+        // Weighted average based on segment length
+        var totalWeight: Float = 0
+        var weightedSum: Float = 0
+        
+        for segment in segments {
+            let duration = Float(segment.end - segment.start)
+            weightedSum += segment.probability * duration
+            totalWeight += duration
+        }
+        
+        return totalWeight > 0 ? weightedSum / totalWeight : 0
+    }
+    
+    private func updatePerformanceMetrics(_ time: TimeInterval) async {
+        recentProcessingTimes.append(time)
+        if recentProcessingTimes.count > performanceWindowSize {
+            recentProcessingTimes.removeFirst()
+        }
+        
+        processingTime = time
+        logger.info("Processing completed in \(String(format: "%.2f", time))s")
+    }
+    
+    private func shouldSwitchModel() -> Bool {
+        guard recentProcessingTimes.count >= performanceWindowSize else { return false }
+        
+        let avgTime = recentProcessingTimes.reduce(0, +) / Double(recentProcessingTimes.count)
+        
+        // Switch to smaller model if too slow
+        if avgTime > performanceThreshold && currentModel != "tiny" {
+            return true
+        }
+        
+        // Switch to larger model if very fast and not at max
+        if avgTime < 0.5 && currentModel == "tiny" {
+            return true
+        }
+        
+        return false
+    }
+    
+    private func adaptModelBasedOnPerformance() async throws {
+        let avgTime = recentProcessingTimes.reduce(0, +) / Double(recentProcessingTimes.count)
+        
+        if avgTime > performanceThreshold {
+            // Switch to smaller model
+            if currentModel == "base" {
+                logger.info("Switching to tiny model for better performance")
+                currentModel = "tiny"
             }
-            
-            inputPointer += increment
-        }
-        
-        // Apply a low-pass filter to prevent aliasing
-        if ratio < 1.0 {
-            // Downsampling - apply anti-aliasing filter
-            let cutoffFrequency = toSampleRate * 0.45 // Nyquist frequency with margin
-            output = applyLowPassFilter(samples: output, sampleRate: toSampleRate, cutoffFrequency: cutoffFrequency)
-        }
-        
-        logger.info("Resampled \(samples.count) samples at \(fromSampleRate)Hz to \(output.count) samples at \(toSampleRate)Hz")
-        return output
-    }
-    
-    private func applyLowPassFilter(samples: [Float], sampleRate: Float, cutoffFrequency: Float) -> [Float] {
-        // Simple Butterworth low-pass filter
-        let RC = 1.0 / (2.0 * Float.pi * cutoffFrequency)
-        let dt = 1.0 / sampleRate
-        let alpha = dt / (RC + dt)
-        
-        var filtered = [Float](repeating: 0, count: samples.count)
-        filtered[0] = samples[0]
-        
-        for i in 1..<samples.count {
-            filtered[i] = filtered[i-1] + alpha * (samples[i] - filtered[i-1])
-        }
-        
-        return filtered
-    }
-    
-    // MARK: - Audio Normalization
-    
-    private func normalizeAudio(_ samples: [Float]) -> [Float] {
-        // Calculate RMS (Root Mean Square) for more accurate level detection
-        let squaredSum = samples.reduce(0) { $0 + $1 * $1 }
-        let rms = sqrt(squaredSum / Float(samples.count))
-        let maxAmplitude = samples.map { abs($0) }.max() ?? 0.0001
-        
-        logger.info("Audio normalization: RMS = \(rms), max amplitude = \(maxAmplitude)")
-        
-        // Use RMS-based normalization for better results
-        if rms < 0.01 {
-            // Very quiet audio - scale based on RMS
-            let targetRMS: Float = 0.1
-            let scaleFactor = targetRMS / max(rms, 0.0001)
-            logger.info("Scaling up quiet audio (RMS-based) by factor: \(scaleFactor)")
-            
-            // Apply scaling with soft limiting to prevent clipping
-            return samples.map { sample in
-                let scaled = sample * scaleFactor
-                // Soft limiting using tanh to prevent harsh clipping
-                return tanh(scaled * 0.7) / 0.7
+        } else if avgTime < 0.5 {
+            // Switch to larger model
+            if currentModel == "tiny" {
+                logger.info("Switching to base model for better quality")
+                currentModel = "base"
             }
-        } else if maxAmplitude > 0.95 {
-            // Only scale down if clipping
-            let scaleFactor = 0.9 / maxAmplitude
-            logger.info("Scaling down loud audio by factor: \(scaleFactor)")
-            return samples.map { $0 * scaleFactor }
-        } else if rms > 0.3 {
-            // Audio might be too loud (even if not clipping)
-            let targetRMS: Float = 0.2
-            let scaleFactor = targetRMS / rms
-            logger.info("Scaling down loud audio (RMS-based) by factor: \(scaleFactor)")
-            return samples.map { $0 * scaleFactor }
         }
         
-        // Otherwise, leave audio as-is
-        logger.info("Audio levels are good, no normalization needed")
-        return samples
+        try await loadOptimalModel()
+    }
+    
+    // MARK: - Device Optimization
+    
+    private func getDeviceCapabilities() async -> DeviceCapabilities {
+        let totalMemory = ProcessInfo.processInfo.physicalMemory
+        let cpuCount = ProcessInfo.processInfo.processorCount
+        
+        // Check for Neural Engine (all modern iOS devices have it)
+        let hasNeuralEngine = true
+        
+        // Check available memory
+        let availableMemory = os_proc_available_memory()
+        
+        return DeviceCapabilities(
+            memoryGB: Int(totalMemory / 1_073_741_824),
+            cpuCores: cpuCount,
+            hasNeuralEngine: hasNeuralEngine,
+            availableMemoryMB: Int(availableMemory / 1_048_576)
+        )
+    }
+    
+    private func selectOptimalModel(for device: DeviceCapabilities) -> String {
+        // Start with tiny for initial load
+        if !isModelLoaded {
+            return "tiny"
+        }
+        
+        // Dynamic model selection based on available resources
+        if device.availableMemoryMB < 500 {
+            return "tiny"
+        } else if device.availableMemoryMB < 1000 || device.cpuCores < 6 {
+            return "tiny"
+        } else if device.memoryGB >= 6 && device.cpuCores >= 8 {
+            return "base"
+        } else {
+            return "tiny"
+        }
+    }
+    
+    struct DeviceCapabilities {
+        let memoryGB: Int
+        let cpuCores: Int
+        let hasNeuralEngine: Bool
+        let availableMemoryMB: Int
     }
 }
 
-// MARK: - Supporting Types
-
-struct DeviceCapabilities {
-    let memoryGB: Int
-    let cpuCores: Int
-    let hasNeuralEngine: Bool
-}
-
-struct BookContext {
-    let title: String
-    let author: String
-    let genre: String
-    let customVocabulary: [String]?
-}
+// Error cases are defined in EpilogueWhisperKit.swift

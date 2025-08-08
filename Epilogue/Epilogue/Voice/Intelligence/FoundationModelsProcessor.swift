@@ -138,7 +138,7 @@ class FoundationModelsProcessor: ObservableObject {
     
     func classifyIntent(
         from transcription: String,
-        bookContext: BookContext? = nil
+        bookContext: Book? = nil
     ) async throws -> IntentResult {
         // Check cache first
         if let cached = recentClassifications[transcription],
@@ -176,7 +176,7 @@ class FoundationModelsProcessor: ObservableObject {
         return result
     }
     
-    private func extractFeatures(from text: String, context: BookContext?) -> [String: Float] {
+    private func extractFeatures(from text: String, context: Book?) -> [String: Float] {
         var features: [String: Float] = [:]
         
         let lowercased = text.lowercased()
@@ -199,8 +199,9 @@ class FoundationModelsProcessor: ObservableObject {
         
         // Context features
         if let context = context {
-            features["is_fiction"] = context.genre.lowercased().contains("fiction") ? 1.0 : 0.0
-            features["is_academic"] = context.genre.lowercased().contains("academic") ? 1.0 : 0.0
+            // Book genre is not available in the current model
+            // Could be determined from book metadata or ML classification
+            features["has_book_context"] = 1.0
         }
         
         return features
@@ -209,7 +210,7 @@ class FoundationModelsProcessor: ObservableObject {
     private func performIntentClassification(
         text: String,
         features: [String: Float],
-        context: BookContext?
+        context: Book?
     ) async -> (ReadingIntent, Float) {
         // Rule-based classification with confidence scores
         let patterns: [(ReadingIntent, [String], Float)] = [

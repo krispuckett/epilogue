@@ -222,7 +222,21 @@ class AmbientIntelligencePipeline: ObservableObject {
         let startTime = Date()
         
         do {
-            let result = try await optimizedWhisperProcessor.transcribeOptimized(audioBuffer: buffer)
+            let transcriptionResult = try await optimizedWhisperProcessor.transcribe(audioBuffer: buffer)
+            // Convert to EpilogueTranscriptionResult
+            let result = EpilogueTranscriptionResult(
+                text: transcriptionResult.text,
+                segments: transcriptionResult.segments,
+                language: transcriptionResult.language ?? "en",
+                languageProbability: transcriptionResult.languageProbability ?? 0.95,
+                timings: transcriptionResult.timings ?? EpilogueTranscriptionTimings(
+                    fullPipeline: 0,
+                    vad: 0,
+                    audioProcessing: 0,
+                    whisperProcessing: 0
+                ),
+                modelUsed: optimizedWhisperProcessor.currentModel
+            )
             processingMetrics.whisperLatency = Date().timeIntervalSince(startTime)
             return result
         } catch {
@@ -432,7 +446,7 @@ class AmbientIntelligencePipeline: ObservableObject {
         entities: [FoundationModelsProcessor.ExtractedEntity],
         sentiment: FoundationModelsProcessor.SentimentScore,
         soundEvents: [SoundEvent],
-        bookContext: BookContext?
+        bookContext: Book?
     ) -> IntelligenceContext {
         return IntelligenceContext(
             intent: intent,
@@ -511,14 +525,10 @@ class AmbientIntelligencePipeline: ObservableObject {
         return min(weightedSum, 1.0)
     }
     
-    private func getCurrentBookContext() -> BookContext? {
-        // Get from reading session
-        return BookContext(
-            title: "The Nature of Reality",
-            author: "Unknown",
-            genre: "Philosophy",
-            customVocabulary: ["quantum", "consciousness", "phenomenology"]
-        )
+    private func getCurrentBookContext() -> Book? {
+        // Get from reading session - placeholder for now
+        // TODO: Get actual book from SimplifiedAmbientCoordinator
+        return nil
     }
     
     private func determineUserMood(
@@ -562,7 +572,7 @@ struct IntelligenceContext {
     let entities: [FoundationModelsProcessor.ExtractedEntity]
     let sentiment: FoundationModelsProcessor.SentimentScore
     let soundEvents: [SoundEvent]
-    let bookContext: BookContext?
+    let bookContext: Book?
     let userMood: UserMood
     let readingPace: ReadingPace
 }

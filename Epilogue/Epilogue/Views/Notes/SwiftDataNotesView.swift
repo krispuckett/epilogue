@@ -36,10 +36,8 @@ struct SwiftDataNotesView: View {
         items += notes.map { $0.toNote() }
         items += quotes.map { $0.toNote() }
         
-        print("📚 SwiftDataNotesView - Notes count: \(notes.count), Quotes count: \(quotes.count)")
-        if !quotes.isEmpty {
-            print("   First quote: \(quotes[0].text.prefix(50))...")
-        }
+        // Debug logging removed to prevent state modification during view update
+        // Use onAppear or onChange for logging if needed
         
         // Filter by search text
         if !searchText.isEmpty {
@@ -143,8 +141,7 @@ struct SwiftDataNotesView: View {
                     }
                 }
             } else {
-                // Reset initial load when we have content
-                let _ = isInitialLoad = false
+                // Content is available, show the grid
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
                     ForEach(allNotes) { note in
                         SelectableNoteCard(
@@ -212,6 +209,14 @@ struct SwiftDataNotesView: View {
                     }
                 }
                 .padding(.horizontal)
+                .onAppear {
+                    // Reset initial load flag when content appears
+                    if isInitialLoad {
+                        DispatchQueue.main.async {
+                            isInitialLoad = false
+                        }
+                    }
+                }
             }
         }
         .padding(.top, 8)

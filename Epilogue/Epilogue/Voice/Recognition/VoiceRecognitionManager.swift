@@ -638,20 +638,14 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         let text = result.bestTranscription.formattedString
         self.transcribedText = text
         
-        // Detect book mentions in ambient mode
+        // In ambient mode, let SmartContentBuffer handle all processing
         if isListeningInAmbientMode {
+            // Still detect book mentions for context
             detectBookFromSpeech(text)
             
-            // Real-time question detection for immediate AI response
-            if let lastSegment = result.bestTranscription.segments.last {
-                let segmentText = lastSegment.substring
-                if isQuestion(segmentText) && result.isFinal {
-                    // Trigger immediate AI response for detected question
-                    Task {
-                        await triggerImmediateAIResponse(for: segmentText)
-                    }
-                }
-            }
+            // SmartContentBuffer in UnifiedChatView will handle all processing
+            // We just update transcribedText for UI display
+            print("🎤 Ambient mode: Transcription updated, SmartContentBuffer will process complete thoughts")
         }
         
         // Update confidence score for debugging
@@ -753,7 +747,10 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
     }
     
+    // Deprecated - now handled by UnifiedTranscriptionProcessor
     private func isQuestion(_ text: String) -> Bool {
+        // This is now handled by UnifiedTranscriptionProcessor
+        // Keeping for backward compatibility temporarily
         let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Check for question mark
@@ -791,10 +788,13 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         return false
     }
     
+    // Deprecated - now handled by UnifiedTranscriptionProcessor
     private func triggerImmediateAIResponse(for question: String) async {
-        logger.info("🤖 Triggering immediate AI response for question: \(question)")
+        // This is now handled by UnifiedTranscriptionProcessor
+        // The processor will automatically trigger AI responses for questions
+        logger.info("🤖 [Deprecated] Question detection moved to UnifiedTranscriptionProcessor")
         
-        // Post notification for immediate AI processing
+        // For backward compatibility, still post the notification
         NotificationCenter.default.post(
             name: Notification.Name("ImmediateQuestionDetected"),
             object: [
@@ -1094,12 +1094,13 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 }
             }
             
-            let result = try await self.whisperProcessor.testTranscription()
-            logger.info("WhisperKit test result: '\(result)'")
+            // Test method removed - use transcribe() directly
+            // let result = try await self.whisperProcessor.testTranscription()
+            // logger.info("WhisperKit test result: '\(result)'")
             
             // Update UI
             await MainActor.run {
-                self.whisperTranscribedText = "Test: \(result)"
+                self.whisperTranscribedText = "WhisperKit loaded successfully"
             }
         } catch {
             logger.error("WhisperKit test error: \(error)")

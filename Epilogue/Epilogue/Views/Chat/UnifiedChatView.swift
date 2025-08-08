@@ -29,6 +29,68 @@ struct UnifiedChatView: View {
     @State private var showingSessionSummary = false
     @State private var sessionStartTime: Date?
     @State private var sessionContent: [SessionContent] = []
+    @State private var showDebugOverlay = false
+    
+    // Real-time processing state
+    @State private var detectionState: DetectionState = .idle
+    @State private var detectedEntities: [(text: String, confidence: Float)] = []
+    @State private var processingHint: String = ""
+    @State private var showQuickActions = false
+    @State private var editingContent: DetectedContent?
+    @State private var lastProcessedText = ""
+    
+    // Smart content buffer for intelligent fragment processing
+    @StateObject private var contentBuffer = SmartContentBuffer.shared
+    
+    enum DetectionState {
+        case idle
+        case detectingQuote
+        case processingQuestion
+        case savingNote
+        case saved
+        
+        var icon: String {
+            switch self {
+            case .idle: return "waveform"
+            case .detectingQuote: return "quote.bubble.fill"
+            case .processingQuestion: return "questionmark.circle.fill"
+            case .savingNote: return "note.text"
+            case .saved: return "checkmark.circle.fill"
+            }
+        }
+        
+        var hint: String {
+            switch self {
+            case .idle: return ""
+            case .detectingQuote: return "I heard a quote, keep talking..."
+            case .processingQuestion: return "Processing your question..."
+            case .savingNote: return "Saving your reflection..."
+            case .saved: return "Saved successfully"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .idle: return .white.opacity(0.6)
+            case .detectingQuote: return .green
+            case .processingQuestion: return .blue
+            case .savingNote: return .orange
+            case .saved: return .green
+            }
+        }
+    }
+    
+    struct DetectedContent: Identifiable {
+        let id = UUID()
+        var text: String
+        let type: ContentType
+        let confidence: Float
+        var isEditing: Bool = false
+        
+        enum ContentType {
+            case quote, question, note
+        }
+    }
     
     // Filter messages for current context
     private var filteredMessages: [UnifiedChatMessage] {
@@ -91,93 +153,258 @@ struct UnifiedChatView: View {
         }
     }
     
-    var body: some View {
+    // MARK: - Body Components
+    
+    private var baseView: some View {
         mainContent
+            .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
+            .animation(.easeInOut(duration: 0.8), value: isRecording)
+    }
+    
+    private var viewWithOverlays: some View {
+        baseView
+            .overlay(alignment: .bottom) { voiceGradientOverlay }
             .overlay(alignment: .topLeading) {
-                if isAmbientMode {
-                    // Only show exit button, no book pill
-                    ambientModeExitButton
+                if isAmbientMode { ambientModeExitButton }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if isAmbientMode && showDebugOverlay {
+                    UnifiedProcessorDebugView()
+                        .frame(maxWidth: 350)
+                        .padding()
                 }
             }
-            .ambientModeModifiers(isAmbientMode: isAmbientMode, dismiss: dismiss) { 
-                handleMicrophoneTap() 
-            }
-            .statusBarHidden(isAmbientMode)
+    }
+    
+    private var viewWithNavigation: some View {
+        viewWithOverlays
+            .navigationTitle(isAmbientMode ? "" : (currentBookContext?.title ?? "Chat"))
+            .navigationBarTitleDisplayMode(isAmbientMode ? .inline : .large)
+            .navigationBarHidden(isAmbientMode)
+    }
+    
+    private var viewWithSheet: some View {
+        viewWithNavigation
             .sheet(isPresented: $showingSessionSummary) {
                 if let session = ambientSession {
                     AmbientSessionSummaryView(session: session)
                         .onDisappear {
-                            // Save any remaining session data before clearing
-                            if let session = ambientSession, !sessionContent.isEmpty {
-                                autoSaveShortSession(session)
-                            }
-                            // Reset for next session
-                            ambientSession = nil
-                            sessionContent.removeAll()
-                            sessionStartTime = nil
+                            handleSessionSummaryDismiss()
                         }
                 }
             }
     }
     
-    private var mainContent: some View {
-        ZStack {
-            // Tap to dismiss keyboard background
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    isInputFocused = false
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
-            
-            // 1. Gradient background (exactly like LibraryView)
-            Group {
-            if isRecording, let book = currentBookContext {
-                // Use the breathing gradient during recording with book context
-                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-                BookAtmosphericGradientView(
-                    colorPalette: palette, 
-                    intensity: 0.9 + Double(audioLevel) * 0.3 // Audio-reactive intensity
+    private func handleSessionSummaryDismiss() {
+        if let session = ambientSession, !sessionContent.isEmpty {
+            autoSaveShortSession(session)
+        }
+        ambientSession = nil
+        sessionContent.removeAll()
+        sessionStartTime = nil
+    }
+    
+    private func handleTranscribedText(_ text: String) {
+        guard isRecording && !text.isEmpty else { return }
+        
+        // Update buffer context with current book
+        if contentBuffer.currentBuffer.isEmpty {
+            contentBuffer.updateContext(book: currentBookContext)
+        }
+        
+        // Process incrementally through smart buffer
+        if text != lastProcessedText {
+            let newContent = String(text.dropFirst(lastProcessedText.count))
+            if !newContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                contentBuffer.addFragment(
+                    newContent,
+                    confidence: 0.8, // Default confidence
+                    isFinal: false
                 )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                .id("recording-\(book.localId)")
-            } else if isRecording {
-                // Recording without book context - use ambient gradient with audio reactivity
-                AmbientChatGradientView()
-                    .opacity(0.8 + Double(audioLevel) * 0.4) // Audio-reactive opacity
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-                    .id("recording-ambient")
-            } else if let book = currentBookContext {
-                // Use the same BookAtmosphericGradientView with extracted colors
-                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-                BookAtmosphericGradientView(colorPalette: palette, intensity: 0.85)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-                    .id(book.localId) // Simplify ID to just book ID
-                    .onAppear {
-                        print("BookAtmosphericGradientView appeared for: \(book.title)")
-                        print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
-                        if let cp = colorPalette {
-                            print("Primary: \(cp.primary)")
-                            print("Secondary: \(cp.secondary)")
-                            print("Accent: \(cp.accent)")
+            }
+            lastProcessedText = text
+        }
+        
+        // Show live content with smart buffer's processed version
+        liveTranscription = contentBuffer.currentBuffer.isEmpty ? text : contentBuffer.currentBuffer
+    }
+    
+    private func handleSmartBufferProcessed(_ notification: Notification) {
+        guard let content = notification.object as? SmartContentBuffer.ProcessedContent else { return }
+        Task {
+            await handleProcessedContent(content)
+        }
+    }
+    
+    // MARK: - Body
+    
+    var body: some View {
+        viewWithSheet
+            .ambientModeModifiers(isAmbientMode: isAmbientMode, dismiss: dismiss) { 
+                handleMicrophoneTap() 
+            }
+            .statusBarHidden(isAmbientMode)
+            .onAppear {
+                setupInitialState()
+                #if DEBUG
+                if isAmbientMode { showDebugOverlay = true }
+                #endif
+            }
+            .onChange(of: currentBookContext) { oldBook, newBook in
+                handleBookContextChange(oldBook: oldBook, newBook: newBook)
+            }
+            .onChange(of: voiceManager.currentAmplitude) { _, newAmplitude in
+                audioLevel = newAmplitude
+            }
+            .overlay(alignment: .bottom) { commandPaletteOverlay }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
+            .onReceive(voiceManager.$transcribedText, perform: handleTranscribedText)
+            .onReceive(contentBuffer.$processingHint) { processingHint = $0 }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SmartBufferProcessed")), perform: handleSmartBufferProcessed)
+            .onChange(of: showingBookStrip) { oldValue, newValue in
+                if isAmbientMode && newValue {
+                    print("🛡️ SAFETY: Blocking book strip activation in ambient mode")
+                    showingBookStrip = false
+                    return
+                }
+                if showingBookStrip {
+                    isInputFocused = false
+                }
+            }
+            .toolbar {
+                if !isAmbientMode {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            // SAFETY: Additional check before toggling book strip
+                            guard !isAmbientMode else {
+                                print("🛡️ SAFETY: Prevented book strip toggle in ambient mode")
+                                return
+                            }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showingBookStrip.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("Switch books")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                                
+                                Image(systemName: showingBookStrip ? "xmark.circle.fill" : "book.closed.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                            }
                         }
                     }
-            } else {
-                // Use existing ambient gradient for empty state
-                AmbientChatGradientView()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
+                }
             }
-            
-            // 2. ScrollView as direct child of ZStack (exactly like LibraryView)
-            ScrollViewReader { proxy in
+            // Notification handlers
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientChatBookChanged"))) { notification in
+                if let book = notification.object as? Book {
+                    currentBookContext = book
+                    Task {
+                        await extractColorsForBook(book)
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowAmbientBookSelector"))) { _ in
+                guard !isAmbientMode else {
+                    print("🛡️ SAFETY: Blocked ShowAmbientBookSelector in ambient mode")
+                    return
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showingBookStrip = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientSessionCleared"))) { _ in
+                messages.removeAll()
+                currentSession = nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookDetected"))) { notification in
+                if let book = notification.object as? Book {
+                    guard currentBookContext?.id != book.id else { return }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        currentBookContext = book
+                        HapticManager.shared.lightTap()
+                        Task {
+                            await extractColorsForBook(book)
+                        }
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookCleared"))) { _ in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    currentBookContext = nil
+                    colorPalette = nil
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIResponseComplete"))) { notification in
+                handleAIResponseComplete(notification: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UnifiedProcessorDetection"))) { notification in
+                guard isAmbientMode, let content = notification.object as? UnifiedProcessedContent else { return }
+                Task {
+                    await processAmbientChunk(content.text)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UnifiedProcessorSaved"))) { notification in
+                guard let content = notification.object as? UnifiedProcessedContent else { return }
+                print("💾 Content saved: \(content.type) - \(content.text.prefix(50))...")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ImmediateQuestionDetected"))) { notification in
+                handleImmediateQuestion(notification: notification)
+            }
+    }
+    
+    @ViewBuilder
+    private var gradientBackground: some View {
+        if isRecording, let book = currentBookContext {
+            // Use the breathing gradient during recording with book context
+            let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+            BookAtmosphericGradientView(
+                colorPalette: palette, 
+                intensity: 0.9 + Double(audioLevel) * 0.3 // Audio-reactive intensity
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .id("recording-\(book.localId)")
+        } else if isRecording {
+            // Recording without book context - use ambient gradient with audio reactivity
+            AmbientChatGradientView()
+                .opacity(0.8 + Double(audioLevel) * 0.4) // Audio-reactive opacity
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .id("recording-ambient")
+        } else if let book = currentBookContext {
+            // Use the same BookAtmosphericGradientView with extracted colors
+            let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+            BookAtmosphericGradientView(colorPalette: palette, intensity: 0.85)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .id(book.localId) // Simplify ID to just book ID
+                .onAppear {
+                    print("BookAtmosphericGradientView appeared for: \(book.title)")
+                    print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
+                    if let cp = colorPalette {
+                        print("Primary: \(cp.primary)")
+                        print("Secondary: \(cp.secondary)")
+                        print("Accent: \(cp.accent)")
+                    }
+                }
+        } else {
+            // Use existing ambient gradient for empty state
+            AmbientChatGradientView()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
+    }
+    
+    @ViewBuilder
+    private var mainScrollContent: some View {
+        ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         // Check if we only have transcribing messages (not real content)
@@ -215,16 +442,7 @@ struct UnifiedChatView: View {
                         }
                         
                         // Always show messages if they exist
-                        if !filteredMessages.isEmpty {
-                            ForEach(filteredMessages) { message in
-                                ChatMessageView(
-                                    message: message,
-                                    currentBookContext: currentBookContext,
-                                    colorPalette: colorPalette
-                                )
-                                    .id(message.id)
-                            }
-                        }
+                        messagesListView
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16) // Top padding for content
@@ -240,351 +458,306 @@ struct UnifiedChatView: View {
                     scrollProxy = proxy
                 }
             }
-            // Native navigation setup
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 0) {
-                    // Live transcription preview during recording
-                    if isRecording && !liveTranscription.isEmpty {
-                        LiveTranscriptionView(
-                            transcription: liveTranscription, 
-                            adaptiveUIColor: adaptiveUIColor,
-                            isTranscribing: isRecording,
-                            onCancel: {
-                                // Cancel the transcription
-                                voiceManager.stopListening()
-                                isRecording = false
-                                liveTranscription = ""
-                                
-                                // Remove temporary transcription message
-                                if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
-                                    messages.remove(at: lastIndex)
-                                }
-                                
-                                HapticManager.shared.lightTap()
-                            }
-                        )
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                    
-                    // Universal input bar (same design as Quick Actions)
-                    UniversalInputBar(
-                        messageText: $messageText,
-                        showingCommandPalette: $showingCommandPalette,
-                        isInputFocused: $isInputFocused,
-                        context: .chat(book: currentBookContext),
-                        onSend: sendMessage,
-                        onMicrophoneTap: handleMicrophoneTap,
-                        isRecording: $isRecording,
-                        colorPalette: colorPalette,
-                        isAmbientMode: isAmbientMode
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
-                }
-            }
-        }
-        .animation(.easeInOut(duration: 0.5), value: currentBookContext?.localId)
-        .animation(.easeInOut(duration: 0.8), value: isRecording) // Slower transition for recording state
-        
-        // Voice-responsive bottom gradient overlay - show in all recording modes
-        .overlay(alignment: .bottom) {
-            if isRecording {
-                // Bottom gradient that adapts to book colors (or amber) and responds to voice
-                VoiceResponsiveBottomGradient(
+    }
+    
+    @ViewBuilder
+    private var messagesListView: some View {
+        if !filteredMessages.isEmpty {
+            ForEach(filteredMessages) { message in
+                MessageWithQuickActions(
+                    message: message,
+                    currentBookContext: currentBookContext,
                     colorPalette: colorPalette,
-                    audioLevel: audioLevel,
-                    isRecording: isRecording,
-                    bookContext: currentBookContext
+                    onEdit: { editedText in
+                        handleContentEdit(message: message, newText: editedText)
+                    },
+                    onRefine: {
+                        refineQuestion(message: message)
+                    },
+                    onExpand: {
+                        expandNote(message: message)
+                    }
                 )
-                .allowsHitTesting(false)
-                .ignoresSafeArea(.all)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .bottom)),
-                    removal: .opacity.combined(with: .move(edge: .bottom))
-                ))
+                .id(message.id)
             }
         }
-        .onAppear {
-            // Set pre-selected book if provided
-            if let book = preSelectedBook {
-                currentBookContext = book
-                print("onAppear: Setting pre-selected book: \(book.title)")
+    }
+    
+    @ViewBuilder
+    private var keyboardDismissBackground: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isInputFocused = false
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
-            
-            // Extract colors for initial book context if present
-            if let book = currentBookContext {
-                print("onAppear: Found initial book context: \(book.title)")
-                Task {
-                    await extractColorsForBook(book)
-                }
-            }
-            
-            // SAFETY: Force book strip to false in ambient mode - multiple checks
-            if isAmbientMode {
-                showingBookStrip = false
-                print("🛡️ SAFETY: Forcing showingBookStrip = false in ambient mode")
-            }
-            
-            // Start in voice mode if requested or if ambient mode
-            if startInVoiceMode || isAmbientMode {
-                if isAmbientMode {
-                    // Update VoiceRecognitionManager with library books for detection
-                    voiceManager.updateLibraryBooks(libraryViewModel.books)
-                    
-                    // For ambient mode, start immediately with minimal delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        print("🎙️ Starting ambient session immediately")
-                        startAmbientSession()
-                    }
-                } else {
-                    // For regular voice mode, use standard delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        handleMicrophoneTap()
-                    }
-                }
-            }
-        }
-        // Remove animation modifiers from here since they're on the Group now
-        .onChange(of: currentBookContext) { oldBook, newBook in
-            print("Book context changed from \(oldBook?.title ?? "none") to \(newBook?.title ?? "none")")
-            print("New book ID: \(newBook?.localId.uuidString ?? "none")")
-            print("Cover URL: \(newBook?.coverImageURL ?? "none")")
-            
-            // Extract colors when book context changes
-            if let book = newBook {
-                print("Extracting colors for: \(book.title)")
-                // Don't clear palette immediately - let the transition handle it
-                Task {
-                    await extractColorsForBook(book)
-                }
-            } else {
-                print("Clearing color palette")
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    colorPalette = nil
-                    coverImage = nil
-                }
-            }
-        }
-        // Sync audio level from voice manager
-        .onChange(of: voiceManager.currentAmplitude) { _, newAmplitude in
-            audioLevel = newAmplitude
-        }
-        .overlay(alignment: .bottom) {
-            if showingCommandPalette {
-                // Tap outside backdrop
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingCommandPalette = false
-                    }
-                    .ignoresSafeArea()
-                
-                ChatCommandPalette(
-                    isPresented: $showingCommandPalette,
-                    selectedBook: $currentBookContext,
-                    commandText: $messageText
-                )
-                .environmentObject(libraryViewModel)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 80) // Above input bar with safe area
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
-                    removal: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
-                ))
-                .zIndex(100)
-            }
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
-        .onReceive(voiceManager.$transcribedText) { text in
-            // Update live transcription
-            if isRecording && !text.isEmpty {
-                liveTranscription = text
-            }
-        }
-        .onReceive(voiceManager.$currentAmplitude) { level in
-            // Update audio level for gradient animation
-            audioLevel = level
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientChatBookChanged"))) { notification in
-            if let book = notification.object as? Book {
-                currentBookContext = book
-                Task {
-                    await extractColorsForBook(book)
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowAmbientBookSelector"))) { _ in
-            // SAFETY: Never show book selector in ambient mode
-            guard !isAmbientMode else {
-                print("🛡️ SAFETY: Blocked ShowAmbientBookSelector in ambient mode")
-                return
-            }
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                showingBookStrip = true
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientSessionCleared"))) { _ in
-            messages.removeAll()
-            currentSession = nil
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookDetected"))) { notification in
-            if let book = notification.object as? Book {
-                // Only update if it's a different book
-                guard currentBookContext?.id != book.id else { return }
-                
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    currentBookContext = book
-                    
-                    // Show subtle confirmation
-                    HapticManager.shared.lightTap()
-                    
-                    // Extract colors for the detected book
-                    Task {
-                        await extractColorsForBook(book)
-                    }
-                    
-                    // Only add system message if in ambient mode
-                    if isAmbientMode {
-                        // Check if we already have a recent "Now reading" message for this book
-                        let recentMessages = messages.suffix(5)
-                        let alreadyAnnounced = recentMessages.contains { msg in
-                            msg.content.contains("Now reading: \(book.title)")
-                        }
+    }
+    
+    @ViewBuilder
+    private var recordingIndicators: some View {
+        if isRecording {
+            VStack(spacing: 12) {
+                // Detection indicator and hint
+                if detectionState != .idle {
+                    HStack(spacing: 12) {
+                        DetectionIndicator(
+                            state: detectionState,
+                            adaptiveUIColor: adaptiveUIColor
+                        )
                         
-                        // Don't add system message - the book pill shows the context
-                        // This prevents duplicate book headers
+                        Text(detectionState.hint)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(detectionState.color)
+                            .transition(.asymmetric(
+                                insertion: .push(from: .leading).combined(with: .opacity),
+                                removal: .push(from: .trailing).combined(with: .opacity)
+                            ))
+                        
+                        Spacer()
                     }
+                    .padding(.horizontal, 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                
+                // Progressive transcript
+                if !liveTranscription.isEmpty {
+                    ProgressiveTranscriptView(
+                        transcription: liveTranscription,
+                        detectedEntities: detectedEntities,
+                        adaptiveUIColor: adaptiveUIColor,
+                        confidence: voiceManager.confidenceScore,
+                        isTranscribing: isRecording,
+                        onCancel: cancelTranscription
+                    )
+                    .padding(.horizontal, 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .padding(.bottom, 8)
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookCleared"))) { _ in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                currentBookContext = nil
-                colorPalette = nil
+    }
+    
+    @ViewBuilder
+    private var bottomInputArea: some View {
+        VStack(spacing: 0) {
+            recordingIndicators
+            
+            UniversalInputBar(
+                messageText: $messageText,
+                showingCommandPalette: $showingCommandPalette,
+                isInputFocused: $isInputFocused,
+                context: .chat(book: currentBookContext),
+                onSend: sendMessage,
+                onMicrophoneTap: handleMicrophoneTap,
+                isRecording: $isRecording,
+                colorPalette: colorPalette,
+                isAmbientMode: isAmbientMode
+            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+        }
+    }
+    
+    private func cancelTranscription() {
+        voiceManager.stopListening()
+        isRecording = false
+        liveTranscription = ""
+        detectionState = .idle
+        detectedEntities.removeAll()
+        
+        // Force process any remaining content in buffer before clearing
+        Task {
+            if let processedContent = await contentBuffer.forceProcess() {
+                await handleProcessedContent(processedContent)
+            }
+            
+            // Clear the smart buffer
+            await MainActor.run {
+                contentBuffer.clear()
+                lastProcessedText = ""
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIResponseComplete"))) { notification in
-            // Handle AI response completion in ambient mode
-            guard isAmbientMode, let aiResponse = notification.object as? AIResponse else { return }
-            
-            // Add AI response to chat
-            let responseMessage = UnifiedChatMessage(
-                content: aiResponse.answer,
-                isUser: false,
-                timestamp: Date(),
+        
+        if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
+            messages.remove(at: lastIndex)
+        }
+        
+        HapticManager.shared.lightTap()
+    }
+    
+    private var mainContent: some View {
+        ZStack {
+            keyboardDismissBackground
+            gradientBackground
+            mainScrollContent
+                .safeAreaInset(edge: .bottom) {
+                    bottomInputArea
+                }
+        }
+    }
+    
+    @ViewBuilder
+    private var voiceGradientOverlay: some View {
+        if isRecording {
+            VoiceResponsiveBottomGradient(
+                colorPalette: colorPalette,
+                audioLevel: audioLevel,
+                isRecording: isRecording,
                 bookContext: currentBookContext
             )
-            messages.append(responseMessage)
-            
-            // Track for session summary
-            if isAmbientMode {
-                let aiSessionResponse = AISessionResponse(
-                    question: aiResponse.question,
-                    answer: aiResponse.answer,
-                    model: aiResponse.model.rawValue,
-                    confidence: aiResponse.confidence,
-                    responseTime: aiResponse.responseTime,
-                    timestamp: aiResponse.timestamp,
-                    isStreamed: aiResponse.isStreaming,
-                    wasFromCache: !aiResponse.isStreaming
-                )
-                
-                // Find the question in sessionContent and update it with the AI response
-                if let lastQuestionIndex = sessionContent.lastIndex(where: { $0.type == .question && $0.text == aiResponse.question }) {
-                    var updatedContent = sessionContent[lastQuestionIndex]
-                    sessionContent[lastQuestionIndex] = SessionContent(
-                        type: updatedContent.type,
-                        text: updatedContent.text,
-                        timestamp: updatedContent.timestamp,
-                        confidence: updatedContent.confidence,
-                        bookContext: updatedContent.bookContext,
-                        aiResponse: aiSessionResponse
-                    )
+            .allowsHitTesting(false)
+            .ignoresSafeArea(.all)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .move(edge: .bottom)),
+                removal: .opacity.combined(with: .move(edge: .bottom))
+            ))
+        }
+    }
+    
+    @ViewBuilder
+    private var commandPaletteOverlay: some View {
+        if showingCommandPalette {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    showingCommandPalette = false
                 }
+                .ignoresSafeArea()
+            
+            ChatCommandPalette(
+                isPresented: $showingCommandPalette,
+                selectedBook: $currentBookContext,
+                commandText: $messageText
+            )
+            .environmentObject(libraryViewModel)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 80)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
+                removal: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity)
+            ))
+            .zIndex(100)
+        }
+    }
+    
+    private func setupInitialState() {
+        if let book = preSelectedBook {
+            currentBookContext = book
+            print("onAppear: Setting pre-selected book: \(book.title)")
+        }
+        
+        if let book = currentBookContext {
+            print("onAppear: Found initial book context: \(book.title)")
+            Task {
+                await extractColorsForBook(book)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ImmediateQuestionDetected"))) { notification in
-            // Handle immediate questions detected by voice recognition in ambient mode
-            guard isAmbientMode, let data = notification.object as? [String: Any],
-                  let question = data["question"] as? String else { return }
-            
-            let bookContext = data["bookContext"] as? Book
-            
-            // Add question to chat immediately
-            let questionMessage = UnifiedChatMessage(
-                content: question,
-                isUser: true,
-                timestamp: Date(),
-                bookContext: bookContext ?? currentBookContext
-            )
-            messages.append(questionMessage)
-            
-            // Scroll to show new message
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation {
-                    if let lastMessage = messages.last {
-                        scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
-                }
-            }
-            
-            // Trigger AI response using optimized service for ambient mode
+        
+        if isAmbientMode {
+            showingBookStrip = false
+            print("🛡️ SAFETY: Forcing showingBookStrip = false in ambient mode")
+        }
+        
+        if startInVoiceMode || isAmbientMode {
             if isAmbientMode {
-                Task {
-                    // Use the optimized AI service for faster responses
-                    await OptimizedAIResponseService.shared.processImmediateQuestion(question, bookContext: currentBookContext)
+                voiceManager.updateLibraryBooks(libraryViewModel.books)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    print("🎙️ Starting ambient session immediately")
+                    startAmbientSession()
                 }
             } else {
-                Task {
-                    await getAIResponse(for: question)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    handleMicrophoneTap()
                 }
             }
         }
-        } // End of ZStack
-        // Book context pill removed - showing in navigation area instead
-        // Navigation setup with native blur
-        .navigationTitle(isAmbientMode ? "" : (currentBookContext?.title ?? "Chat"))
-        .navigationBarTitleDisplayMode(isAmbientMode ? .inline : .large)
-        .navigationBarHidden(isAmbientMode)
-        .toolbar {
-            if !isAmbientMode {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        // SAFETY: Additional check before toggling book strip
-                        guard !isAmbientMode else {
-                            print("🛡️ SAFETY: Prevented book strip toggle in ambient mode")
-                            return
-                        }
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showingBookStrip.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("Switch books")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                            
-                            Image(systemName: showingBookStrip ? "xmark.circle.fill" : "book.closed.circle")
-                                .font(.system(size: 18))
-                                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                        }
-                    }
-                }
+    }
+    
+    private func handleBookContextChange(oldBook: Book?, newBook: Book?) {
+        print("Book context changed from \(oldBook?.title ?? "none") to \(newBook?.title ?? "none")")
+        print("New book ID: \(newBook?.localId.uuidString ?? "none")")
+        print("Cover URL: \(newBook?.coverImageURL ?? "none")")
+        
+        if let book = newBook {
+            print("Extracting colors for: \(book.title)")
+            Task {
+                await extractColorsForBook(book)
+            }
+        } else {
+            print("Clearing color palette")
+            withAnimation(.easeInOut(duration: 0.5)) {
+                colorPalette = nil
+                coverImage = nil
             }
         }
-        .onChange(of: showingBookStrip) { oldValue, newValue in
-            // SAFETY: Continuously prevent book strip in ambient mode
-            if isAmbientMode && newValue {
-                print("🛡️ SAFETY: Blocking book strip activation in ambient mode")
-                showingBookStrip = false
-                return
-            }
+    }
+    
+    private func handleAIResponseComplete(notification: Notification) {
+        guard isAmbientMode, let aiResponse = notification.object as? AIResponse else { return }
+        
+        let responseMessage = UnifiedChatMessage(
+            content: aiResponse.answer,
+            isUser: false,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        messages.append(responseMessage)
+        
+        if isAmbientMode {
+            let aiSessionResponse = AISessionResponse(
+                question: aiResponse.question,
+                answer: aiResponse.answer,
+                model: aiResponse.model.rawValue,
+                confidence: aiResponse.confidence,
+                responseTime: aiResponse.responseTime,
+                timestamp: aiResponse.timestamp,
+                isStreamed: aiResponse.isStreaming,
+                wasFromCache: !aiResponse.isStreaming
+            )
             
-            if showingBookStrip {
-                // Dismiss keyboard if active
-                isInputFocused = false
+            if let lastQuestionIndex = sessionContent.lastIndex(where: { $0.type == .question && $0.text == aiResponse.question }) {
+                var updatedContent = sessionContent[lastQuestionIndex]
+                sessionContent[lastQuestionIndex] = SessionContent(
+                    type: updatedContent.type,
+                    text: updatedContent.text,
+                    timestamp: updatedContent.timestamp,
+                    confidence: updatedContent.confidence,
+                    bookContext: updatedContent.bookContext,
+                    aiResponse: aiSessionResponse
+                )
+            }
+        }
+    }
+    
+    private func handleImmediateQuestion(notification: Notification) {
+        guard isAmbientMode, let data = notification.object as? [String: Any],
+              let question = data["question"] as? String else { return }
+        
+        let bookContext = data["bookContext"] as? Book
+        
+        let questionMessage = UnifiedChatMessage(
+            content: question,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: bookContext ?? currentBookContext
+        )
+        messages.append(questionMessage)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation {
+                if let lastMessage = messages.last {
+                    scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            }
+        }
+        
+        if isAmbientMode {
+            Task {
+                await OptimizedAIResponseService.shared.processImmediateQuestion(question, bookContext: currentBookContext)
+            }
+        } else {
+            Task {
+                await getAIResponse(for: question)
             }
         }
     }
@@ -1126,7 +1299,7 @@ struct UnifiedChatView: View {
             print("Processing \(processed.questions.count) questions from ambient session")
             
             for (index, question) in processed.questions.enumerated() {
-                print("\nQuestion \(index + 1) of \(processed.questions.count): \(question.text)")
+                print("Question \(index + 1) of \(processed.questions.count): \(question.text)")
                 
                 // Add question to chat
                 let questionMessage = UnifiedChatMessage(
@@ -1200,7 +1373,387 @@ struct UnifiedChatView: View {
         HapticManager.shared.lightTap()
     }
     
-    // MARK: - Transcription Processing
+    // MARK: - Progressive Ambient Processing
+    
+    private func handleProcessedContent(_ content: SmartContentBuffer.ProcessedContent) async {
+        // Update detection state based on content type
+        await MainActor.run {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                switch content.type {
+                case .question:
+                    detectionState = .processingQuestion
+                case .quote:
+                    detectionState = .detectingQuote
+                case .note, .insight:
+                    detectionState = .savingNote
+                case .unknown:
+                    detectionState = .idle
+                }
+            }
+            
+            // Update detected entities for visual feedback
+            if content.confidence > 0.6 {
+                detectedEntities.append((text: content.text, confidence: content.confidence))
+                
+                // Keep only recent entities
+                if detectedEntities.count > 5 {
+                    detectedEntities.removeFirst()
+                }
+            }
+        }
+        
+        // Process based on content type
+        let processor = UnifiedTranscriptionProcessor.shared
+        let unifiedContent = UnifiedProcessedContent(
+            type: mapContentType(content.type),
+            text: content.text,
+            confidence: Double(content.confidence),
+            timestamp: Date(),
+            bookContext: currentBookContext,
+            pageContext: nil,
+            aiResponse: nil,
+            metadata: [:]
+        )
+        
+        // Process and save content with intelligence
+        _ = await processor.processWithIntelligence(content.text)
+        
+        // Update UI based on content type
+        await MainActor.run {
+            switch content.type {
+            case .question:
+                // Show question and get AI response
+                Task {
+                    await showQuestionImmediately(unifiedContent)
+                    let response = await getAIResponseForContent(content.text)
+                    await showAIResponse(response)
+                }
+                
+            case .quote:
+                // Show quote card
+                Task {
+                    await showQuoteCard(unifiedContent)
+                }
+                
+            case .note, .insight:
+                // Show note card
+                Task {
+                    await showNoteCard(unifiedContent)
+                }
+                
+            case .unknown:
+                // No special handling for unknown content
+                break
+            }
+            
+            // Reset detection state after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation {
+                    detectionState = .idle
+                }
+            }
+        }
+    }
+    
+    private func mapContentType(_ type: SmartContentBuffer.ProcessedContent.ContentType) -> ContentType {
+        switch type {
+        case .quote: return .quote
+        case .note: return .note
+        case .question: return .question
+        case .insight: return .insight
+        case .unknown: return .unknown
+        }
+    }
+    
+    func processAmbientChunk(_ text: String) async {
+        let processor = UnifiedTranscriptionProcessor.shared
+        let content = await processor.detectContent(text)
+        
+        await MainActor.run {
+            // Update detection state with animation
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                switch content.type {
+                case .question:
+                    detectionState = .processingQuestion
+                    
+                case .quote:
+                    detectionState = .detectingQuote
+                    
+                case .note, .insight, .reflection:
+                    detectionState = .savingNote
+                    
+                case .unknown:
+                    detectionState = .idle
+                }
+            }
+            
+            // Extract entities for highlighting
+            if content.confidence > 0.6 {
+                detectedEntities.append((text: content.text, confidence: Float(content.confidence)))
+                
+                // Keep only recent entities
+                if detectedEntities.count > 5 {
+                    detectedEntities.removeFirst()
+                }
+            }
+        }
+        
+        // Process based on content type
+        switch content.type {
+        case .question:
+            await showQuestionImmediately(content)
+            let response = await getAIResponseForContent(content.text)
+            await showAIResponse(response)
+            
+        case .quote:
+            await saveQuote(content)
+            await showQuoteCard(content)
+            
+        case .note, .insight, .reflection:
+            await saveNote(content)
+            await showNoteCard(content)
+            
+        case .unknown:
+            // Handle unknown content type
+            break
+        }
+    }
+    
+    // MARK: - Real-time Content Display Methods
+    
+    private func showQuestionImmediately(_ content: UnifiedProcessedContent) async {
+        await MainActor.run {
+            // Remove processing indicator
+            if let lastMessage = messages.last, lastMessage.content == "Processing question..." {
+                messages.removeLast()
+            }
+            
+            // Add the actual question
+            let questionMessage = UnifiedChatMessage(
+                content: content.text,
+                isUser: true,
+                timestamp: content.timestamp,
+                bookContext: content.bookContext ?? currentBookContext
+            )
+            messages.append(questionMessage)
+            
+            // Track in session
+            trackSessionContent(type: .question, text: content.text)
+            
+            // Scroll to show question
+            withAnimation {
+                scrollProxy?.scrollTo(questionMessage.id, anchor: .bottom)
+            }
+        }
+    }
+    
+    private func getAIResponseForContent(_ text: String) async -> String {
+        let aiService = AICompanionService.shared
+        
+        guard aiService.isConfigured() else {
+            return "Please configure your AI service."
+        }
+        
+        do {
+            let response = try await aiService.processMessage(
+                text,
+                bookContext: currentBookContext,
+                conversationHistory: filteredMessages
+            )
+            return response
+        } catch {
+            return "Sorry, I couldn't process your question."
+        }
+    }
+    
+    private func showAIResponse(_ response: String) async {
+        await MainActor.run {
+            let aiMessage = UnifiedChatMessage(
+                content: response,
+                isUser: false,
+                timestamp: Date(),
+                bookContext: currentBookContext
+            )
+            messages.append(aiMessage)
+            
+            // Scroll to show response
+            withAnimation {
+                scrollProxy?.scrollTo(aiMessage.id, anchor: .bottom)
+            }
+        }
+    }
+    
+    private func saveQuote(_ content: UnifiedProcessedContent) async {
+        await MainActor.run {
+            // Remove processing indicator
+            if let lastMessage = messages.last, lastMessage.content == "Capturing quote..." {
+                messages.removeLast()
+            }
+            
+            // Create BookModel if needed
+            var bookModel: BookModel? = nil
+            if let book = content.bookContext ?? currentBookContext {
+                bookModel = BookModel(from: book)
+                modelContext.insert(bookModel!)
+            }
+            
+            // Create and save quote
+            let capturedQuote = CapturedQuote(
+                text: content.text,
+                book: bookModel,
+                timestamp: content.timestamp,
+                source: .ambient
+            )
+            
+            modelContext.insert(capturedQuote)
+            
+            do {
+                try modelContext.save()
+                print("✅ Quote saved: \(content.text)")
+                
+                // Track in session
+                trackSessionContent(type: .quote, text: content.text)
+            } catch {
+                print("❌ Failed to save quote: \(error)")
+            }
+        }
+    }
+    
+    private func showQuoteCard(_ content: UnifiedProcessedContent) async {
+        await MainActor.run {
+            // Find the saved quote
+            let searchText = content.text
+            let quotes = try? modelContext.fetch(
+                FetchDescriptor<CapturedQuote>(
+                    predicate: #Predicate { quote in
+                        quote.text == searchText
+                    },
+                    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+                )
+            )
+            
+            if let capturedQuote = quotes?.first {
+                // Add quote card with quick actions
+                let quoteMessage = UnifiedChatMessage(
+                    content: "\"\(content.text)\"",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: currentBookContext,
+                    messageType: .quote(capturedQuote)
+                )
+                messages.append(quoteMessage)
+                
+                // Update detection state to saved
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    detectionState = .saved
+                }
+                
+                // Reset after delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation {
+                        self.detectionState = .idle
+                    }
+                }
+                
+                // Haptic feedback
+                HapticManager.shared.success()
+                
+                // Scroll to show quote
+                withAnimation {
+                    scrollProxy?.scrollTo(quoteMessage.id, anchor: .bottom)
+                }
+            }
+        }
+    }
+    
+    private func saveNote(_ content: UnifiedProcessedContent) async {
+        await MainActor.run {
+            // Remove processing indicator
+            if let lastMessage = messages.last, lastMessage.content == "Saving note..." {
+                messages.removeLast()
+            }
+            
+            // Create BookModel if needed
+            var bookModel: BookModel? = nil
+            if let book = content.bookContext ?? currentBookContext {
+                bookModel = BookModel(from: book)
+                modelContext.insert(bookModel!)
+            }
+            
+            // Create and save note
+            let capturedNote = CapturedNote(
+                content: content.text,
+                book: bookModel,
+                timestamp: content.timestamp,
+                source: .ambient
+            )
+            
+            modelContext.insert(capturedNote)
+            
+            do {
+                try modelContext.save()
+                print("✅ Note saved: \(content.text)")
+                
+                // Track in session
+                trackSessionContent(type: content.type == .insight ? .insight : .reflection, text: content.text)
+            } catch {
+                print("❌ Failed to save note: \(error)")
+            }
+        }
+    }
+    
+    private func showNoteCard(_ content: UnifiedProcessedContent) async {
+        await MainActor.run {
+            // Find the saved note
+            let searchText = content.text
+            let notes = try? modelContext.fetch(
+                FetchDescriptor<CapturedNote>(
+                    predicate: #Predicate { note in
+                        note.content == searchText
+                    },
+                    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+                )
+            )
+            
+            if let capturedNote = notes?.first {
+                // Check if we should provide context
+                if shouldProvideContext(for: content.text),
+                   let context = generateContextualInfo(for: content.text, book: currentBookContext) {
+                    // Add note with context
+                    let noteMessage = UnifiedChatMessage(
+                        content: content.text,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .noteWithContext(capturedNote, context: context)
+                    )
+                    messages.append(noteMessage)
+                } else {
+                    // Add regular note
+                    let noteMessage = UnifiedChatMessage(
+                        content: content.text,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .note(capturedNote)
+                    )
+                    messages.append(noteMessage)
+                }
+                
+                // Haptic feedback
+                HapticManager.shared.success()
+                
+                // Scroll to show note
+                withAnimation {
+                    if let lastMessage = messages.last {
+                        scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Legacy Transcription Processing (for backward compatibility)
     
     private func processTranscription(_ transcription: String) async -> ProcessedAmbientSession {
         print("\nTRANSCRIPTION PROCESSING:")
@@ -1589,6 +2142,56 @@ struct UnifiedChatView: View {
         return nil
     }
     
+    // MARK: - Quick Action Handlers
+    
+    private func handleContentEdit(message: UnifiedChatMessage, newText: String) {
+        // Update the content based on message type
+        switch message.messageType {
+        case .quote(let quote):
+            // Update quote in SwiftData
+            quote.text = newText
+            do {
+                try modelContext.save()
+                HapticManager.shared.success()
+            } catch {
+                print("Failed to update quote: \(error)")
+            }
+            
+        case .note(let note), .noteWithContext(let note, _):
+            // Update note in SwiftData
+            note.content = newText
+            do {
+                try modelContext.save()
+                HapticManager.shared.success()
+            } catch {
+                print("Failed to update note: \(error)")
+            }
+            
+        default:
+            break
+        }
+    }
+    
+    private func refineQuestion(message: UnifiedChatMessage) {
+        // Create a refined version of the question
+        let refinedPrompt = "Can you help me refine this question for clarity: \(message.content)"
+        
+        Task {
+            await getAIResponse(for: refinedPrompt)
+        }
+    }
+    
+    private func expandNote(message: UnifiedChatMessage) {
+        // Expand on the note with AI assistance
+        if case .note(let note) = message.messageType {
+            let expandPrompt = "Can you help me expand on this thought: \(note.content)"
+            
+            Task {
+                await getAIResponse(for: expandPrompt)
+            }
+        }
+    }
+    
     // MARK: - Color Extraction (Reused from BookDetailView)
     
     private func extractColorsForBook(_ book: Book) async {
@@ -1702,7 +2305,164 @@ struct UnifiedChatMessage: Identifiable {
 }
 
 
-// MARK: - Live Transcription View
+// MARK: - Detection Indicator
+
+struct DetectionIndicator: View {
+    let state: UnifiedChatView.DetectionState
+    let adaptiveUIColor: Color
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ZStack {
+            // Pulsing background
+            Circle()
+                .fill(state.color.opacity(0.2))
+                .frame(width: 32, height: 32)
+                .scaleEffect(isAnimating ? 1.2 : 1.0)
+                .opacity(isAnimating ? 0.0 : 1.0)
+                .animation(
+                    .easeInOut(duration: 1.0)
+                    .repeatForever(autoreverses: false),
+                    value: isAnimating
+                )
+            
+            // Icon
+            Image(systemName: state.icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(state.color)
+                .scaleEffect(isAnimating ? 1.05 : 1.0)
+                .animation(
+                    .easeInOut(duration: 0.6)
+                    .repeatForever(autoreverses: true),
+                    value: isAnimating
+                )
+        }
+        .onAppear {
+            if state != .idle && state != .saved {
+                isAnimating = true
+            }
+        }
+        .onChange(of: state) { _, newState in
+            isAnimating = (newState != .idle && newState != .saved)
+        }
+    }
+}
+
+// MARK: - Progressive Transcript View
+
+struct ProgressiveTranscriptView: View {
+    let transcription: String
+    let detectedEntities: [(text: String, confidence: Float)]
+    let adaptiveUIColor: Color
+    let confidence: Float
+    var isTranscribing: Bool = true
+    var onCancel: (() -> Void)? = nil
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Confidence indicator
+            HStack {
+                Text("Confidence")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                
+                // Confidence bar
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.1))
+                        
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        confidenceColor(confidence),
+                                        confidenceColor(confidence).opacity(0.6)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * CGFloat(confidence))
+                    }
+                }
+                .frame(width: 60, height: 4)
+                
+                Text("\(Int(confidence * 100))%")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(confidenceColor(confidence))
+                
+                Spacer()
+                
+                // Cancel button
+                if let onCancel = onCancel {
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.3), .white.opacity(0.1))
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            
+            // Transcription with entity highlighting
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(highlightedTranscription)
+                    .font(.system(size: 15, weight: .regular, design: .rounded))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .glassEffect(in: .rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            adaptiveUIColor.opacity(0.2),
+                            adaptiveUIColor.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        }
+        .shadow(color: Color.black.opacity(0.2), radius: 10, y: 5)
+    }
+    
+    private var highlightedTranscription: AttributedString {
+        var attributed = AttributedString(transcription)
+        
+        // Highlight detected entities
+        for entity in detectedEntities {
+            if let range = attributed.range(of: entity.text) {
+                attributed[range].foregroundColor = confidenceColor(entity.confidence)
+                attributed[range].font = .system(size: 15, weight: .semibold, design: .rounded)
+                attributed[range].backgroundColor = confidenceColor(entity.confidence).opacity(0.15)
+            }
+        }
+        
+        // Default styling for non-highlighted text
+        attributed.foregroundColor = .white.opacity(0.9)
+        
+        return attributed
+    }
+    
+    private func confidenceColor(_ confidence: Float) -> Color {
+        if confidence > 0.8 {
+            return .green
+        } else if confidence > 0.6 {
+            return .yellow
+        } else {
+            return .orange
+        }
+    }
+}
+
+// MARK: - Live Transcription View (Legacy)
 
 struct LiveTranscriptionView: View {
     let transcription: String
@@ -1712,9 +2472,8 @@ struct LiveTranscriptionView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Listening indicator (no controls)
+            // Listening indicator
             ZStack {
-                // Static subtle glow behind icon
                 Circle()
                     .fill(
                         RadialGradient(
@@ -1730,21 +2489,18 @@ struct LiveTranscriptionView: View {
                     .frame(width: 36, height: 36)
                     .blur(radius: 6)
                 
-                // Simple waveform indicator (no animation, just shows we're listening)
                 Image(systemName: "waveform")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(adaptiveUIColor)
             }
             .frame(width: 36, height: 36)
             
-            // Transcription text with elegant styling
             Text(transcription)
                 .font(.system(size: 16, weight: .regular, design: .rounded))
                 .foregroundStyle(.white.opacity(0.95))
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            // Elegant cancel button (only if onCancel is provided)
             if let onCancel = onCancel {
                 Button(action: onCancel) {
                     Image(systemName: "xmark.circle.fill")
@@ -1759,7 +2515,6 @@ struct LiveTranscriptionView: View {
         .padding(.vertical, 16)
         .glassEffect(in: .rect(cornerRadius: 24))
         .overlay {
-            // Refined border with gradient
             RoundedRectangle(cornerRadius: 24)
                 .strokeBorder(
                     LinearGradient(
@@ -1774,6 +2529,200 @@ struct LiveTranscriptionView: View {
                 )
         }
         .shadow(color: Color.black.opacity(0.2), radius: 10, y: 5)
+    }
+}
+
+// MARK: - Message With Quick Actions
+
+struct MessageWithQuickActions: View {
+    let message: UnifiedChatMessage
+    let currentBookContext: Book?
+    let colorPalette: ColorPalette?
+    let onEdit: (String) -> Void
+    let onRefine: () -> Void
+    let onExpand: () -> Void
+    
+    @State private var showActions = false
+    @State private var isEditing = false
+    @State private var editedText = ""
+    
+    var body: some View {
+        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
+            // Original message view
+            ChatMessageView(
+                message: message,
+                currentBookContext: currentBookContext,
+                colorPalette: colorPalette
+            )
+            .onLongPressGesture {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showActions.toggle()
+                    HapticManager.shared.lightTap()
+                }
+            }
+            
+            // Quick actions overlay
+            if showActions {
+                HStack(spacing: 12) {
+                    // Edit action (for quotes and notes)
+                    if case .text = message.messageType {
+                        QuickActionButton(
+                            icon: "pencil.circle.fill",
+                            label: "Edit",
+                            color: .blue
+                        ) {
+                            isEditing = true
+                            editedText = message.content
+                        }
+                    }
+                    
+                    // Refine action (for questions)
+                    if message.isUser && message.content.contains("?") {
+                        QuickActionButton(
+                            icon: "arrow.triangle.2.circlepath",
+                            label: "Refine",
+                            color: .purple
+                        ) {
+                            onRefine()
+                        }
+                    }
+                    
+                    // Expand action (for notes)
+                    if case .note = message.messageType {
+                        QuickActionButton(
+                            icon: "arrow.up.left.and.arrow.down.right",
+                            label: "Expand",
+                            color: .orange
+                        ) {
+                            onExpand()
+                        }
+                    }
+                    
+                    // Dismiss actions
+                    QuickActionButton(
+                        icon: "xmark.circle.fill",
+                        label: "Close",
+                        color: .gray
+                    ) {
+                        withAnimation {
+                            showActions = false
+                        }
+                    }
+                }
+                .padding(.horizontal, message.isUser ? 0 : 20)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8, anchor: message.isUser ? .topTrailing : .topLeading)
+                        .combined(with: .opacity),
+                    removal: .scale(scale: 0.8, anchor: message.isUser ? .topTrailing : .topLeading)
+                        .combined(with: .opacity)
+                ))
+            }
+        }
+        .sheet(isPresented: $isEditing) {
+            EditContentSheet(
+                originalText: message.content,
+                editedText: $editedText,
+                onSave: {
+                    onEdit(editedText)
+                    isEditing = false
+                    showActions = false
+                },
+                onCancel: {
+                    isEditing = false
+                }
+            )
+        }
+    }
+}
+
+struct QuickActionButton: View {
+    let icon: String
+    let label: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                    .foregroundStyle(color)
+                
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .frame(width: 50, height: 50)
+            .glassEffect(in: .rect(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(color.opacity(0.3), lineWidth: 0.5)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct EditContentSheet: View {
+    let originalText: String
+    @Binding var editedText: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Edit Content")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                // Text editor
+                TextEditor(text: $editedText)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .scrollContentBackground(.hidden)
+                    .padding(12)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                    }
+                    .focused($isFocused)
+                    .frame(minHeight: 150)
+                
+                // Action buttons
+                HStack(spacing: 16) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Capsule())
+                    
+                    Button("Save") {
+                        onSave()
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.white)
+                    .clipShape(Capsule())
+                }
+                
+                Spacer()
+            }
+            .padding(24)
+            .background(Color.black)
+            .onAppear {
+                isFocused = true
+            }
+        }
     }
 }
 
