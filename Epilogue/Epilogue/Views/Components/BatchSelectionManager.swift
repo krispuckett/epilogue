@@ -255,13 +255,10 @@ struct BatchDeleteConfirmationToast: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 32)
-        .background {
+        .glassEffect(in: .rect(cornerRadius: 28))
+        .overlay {
             RoundedRectangle(cornerRadius: 28)
-                .fill(.regularMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28)
-                        .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
-                }
+                .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
         }
         .scaleEffect(scale)
         .opacity(opacity)

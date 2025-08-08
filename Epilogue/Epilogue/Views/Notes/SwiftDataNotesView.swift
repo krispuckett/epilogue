@@ -346,18 +346,31 @@ struct SwiftDataNotesView: View {
                 NoteEditSheet(note: note)
                     .environmentObject(notesViewModel)
             }
-            .sheet(isPresented: $selectionManager.showingDeleteConfirmation) {
-                BatchDeleteConfirmationToast(
-                    selectionManager: selectionManager,
-                    onConfirm: {
-                        let selectedItems = selectionManager.selectedItems
-                        batchDeleteNotes(selectedItems)
-                        selectionManager.performDelete()
+            .overlay {
+                if selectionManager.showingDeleteConfirmation {
+                    ZStack {
+                        // Backdrop
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectionManager.showingDeleteConfirmation = false
+                                }
+                            }
+                        
+                        // Toast
+                        BatchDeleteConfirmationToast(
+                            selectionManager: selectionManager,
+                            onConfirm: {
+                                let selectedItems = selectionManager.selectedItems
+                                batchDeleteNotes(selectedItems)
+                                selectionManager.performDelete()
+                            }
+                        )
+                        .padding(.horizontal, 20)
                     }
-                )
-                .presentationDetents([.height(380)])
-                .presentationDragIndicator(.hidden)
-                .presentationBackground(.clear)
+                    .zIndex(1000)
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
                 if let note = notification.object as? Note {
