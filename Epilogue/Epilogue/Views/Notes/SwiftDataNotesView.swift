@@ -364,8 +364,9 @@ struct SwiftDataNotesView: View {
                     editingNote = note
                 }
             }
+            } // End NavigationStack
             
-            // Batch selection toolbar positioned above tab bar
+            // Batch selection toolbar positioned above tab bar  
             VStack {
                 Spacer()
                 BatchSelectionToolbar(
