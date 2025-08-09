@@ -84,8 +84,8 @@ class OptimizedAIResponseService: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Process immediate question with streaming response
-    func processImmediateQuestion(_ question: String, bookContext: Book? = nil) async {
+    /// Process immediate question with streaming response - FIXED to return response directly
+    func processImmediateQuestion(_ question: String, bookContext: Book? = nil) async -> AIResponse? {
         let startTime = Date()
         
         // Check cache first for instant response
@@ -105,12 +105,12 @@ class OptimizedAIResponseService: ObservableObject {
             
             addToHistory(aiResponse)
             
-            // Post immediate response
+            // Post immediate response (for backward compatibility)
             NotificationCenter.default.post(
                 name: Notification.Name("AIResponseReady"),
                 object: aiResponse
             )
-            return
+            return aiResponse
         }
         
         // Determine optimal model based on question complexity
@@ -197,6 +197,7 @@ class OptimizedAIResponseService: ObservableObject {
             
             logger.info("✅ Streaming response completed in \(String(format: "%.2f", responseTime))s")
             
+            return aiResponse
         } catch {
             logger.error("❌ Streaming response failed: \(error)")
             
@@ -220,6 +221,7 @@ class OptimizedAIResponseService: ObservableObject {
             )
             
             activeStreams.removeValue(forKey: streamId)
+            return errorResponse
         }
     }
     

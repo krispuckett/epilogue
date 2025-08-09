@@ -632,21 +632,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
     }
     
-    // MARK: - Process Transcription
+    // MARK: - Process Transcription - SINGLE SOURCE ROUTING
     @MainActor
     private func processTranscriptionResult(_ result: SFSpeechRecognitionResult) async {
         let text = result.bestTranscription.formattedString
         self.transcribedText = text
-        
-        // In ambient mode, let SmartContentBuffer handle all processing
-        if isListeningInAmbientMode {
-            // Still detect book mentions for context
-            detectBookFromSpeech(text)
-            
-            // SmartContentBuffer in UnifiedChatView will handle all processing
-            // We just update transcribedText for UI display
-            print("🎤 Ambient mode: Transcription updated, SmartContentBuffer will process complete thoughts")
-        }
         
         // Update confidence score for debugging
         if let segment = result.bestTranscription.segments.last {
@@ -654,9 +644,21 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             logger.debug("Transcription confidence: \(segment.confidence) - '\(segment.substring)'")
         }
         
-        // Real-time question detection for immediate AI responses
+        // CRITICAL: Route ONLY to SingleSourceProcessor - eliminates competing systems
         if isListeningInAmbientMode {
-            await detectAndProcessQuestions(in: text, confidence: self.confidenceScore, isFinal: result.isFinal)
+            // Still detect book mentions for context
+            detectBookFromSpeech(text)
+            
+            // Route to SingleSourceProcessor - THE ONLY PROCESSOR
+            let processor = SingleSourceProcessor.shared
+            _ = await processor.process(
+                text,
+                confidence: Double(self.confidenceScore),
+                isFinal: result.isFinal,
+                bookContext: nil  // TODO: Add book context management
+            )
+            
+            logger.info("🎯 SingleSourceProcessor: Processing '\(text.prefix(50))...' (final: \(result.isFinal))")
         }
         
         // Check for reaction phrases that might precede quotes
@@ -671,12 +673,15 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
     }
     
-    // MARK: - Real-time Question Detection
+    // MARK: - DEPRECATED Real-time Question Detection - Now handled by SingleSourceProcessor
     private var detectedQuestions: [String] = []
     private var questionDetectionTimer: Timer?
     private let questionConfidenceThreshold: Float = 0.6
     
+    // DEPRECATED - now handled by SingleSourceProcessor
     private func detectAndProcessQuestions(in text: String, confidence: Float, isFinal: Bool) async {
+        // This method is deprecated - SingleSourceProcessor now handles all content detection
+        return
         let lowercased = text.lowercased()
         
         // Question detection patterns
@@ -747,9 +752,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
     }
     
-    // Deprecated - now handled by UnifiedTranscriptionProcessor
+    // DEPRECATED - now handled by SingleSourceProcessor
     private func isQuestion(_ text: String) -> Bool {
-        // This is now handled by UnifiedTranscriptionProcessor
+        // This is now handled by SingleSourceProcessor - DO NOT USE
         // Keeping for backward compatibility temporarily
         let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -788,11 +793,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         return false
     }
     
-    // Deprecated - now handled by UnifiedTranscriptionProcessor
+    // DEPRECATED - now handled by SingleSourceProcessor
     private func triggerImmediateAIResponse(for question: String) async {
-        // This is now handled by UnifiedTranscriptionProcessor
+        // This is now handled by SingleSourceProcessor - DO NOT USE
         // The processor will automatically trigger AI responses for questions
-        logger.info("🤖 [Deprecated] Question detection moved to UnifiedTranscriptionProcessor")
+        logger.info("🤖 [Deprecated] Question detection moved to SingleSourceProcessor")
         
         // For backward compatibility, still post the notification
         NotificationCenter.default.post(

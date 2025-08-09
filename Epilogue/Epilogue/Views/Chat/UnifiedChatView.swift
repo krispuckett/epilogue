@@ -43,8 +43,8 @@ struct UnifiedChatView: View {
     @State private var recentlyProcessedHashes = Set<Int>()
     @State private var lastProcessedTime = Date()
     
-    // Improved unified processor for all transcription processing
-    @StateObject private var processor = ImprovedUnifiedProcessor.shared
+    // THE SINGLE SOURCE PROCESSOR - replaces all competing systems
+    @StateObject private var processor = SingleSourceProcessor.shared
     
     enum DetectionState {
         case idle
@@ -228,7 +228,7 @@ struct UnifiedChatView: View {
         liveTranscription = text
     }
     
-    private func handleProcessorResult(_ result: ImprovedUnifiedProcessor.ProcessingResult) {
+    private func handleProcessorResult(_ result: SingleSourceProcessor.ProcessingResult) {
         Task {
             await handleProcessedResult(result)
         }
@@ -522,7 +522,7 @@ struct UnifiedChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
-                // Progressive transcript
+                // Progressive transcript with real-time processing indicator
                 if !liveTranscription.isEmpty {
                     ProgressiveTranscriptView(
                         transcription: liveTranscription,
@@ -530,10 +530,19 @@ struct UnifiedChatView: View {
                         adaptiveUIColor: adaptiveUIColor,
                         confidence: voiceManager.confidenceScore,
                         isTranscribing: isRecording,
-                        onCancel: cancelTranscription
+                        onCancel: cancelTranscription,
+                        detectionState: detectionState  // Pass current detection state for visual feedback
                     )
                     .padding(.horizontal, 20)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .overlay(alignment: .topTrailing) {
+                        // Real-time processing indicator
+                        if detectionState != .idle {
+                            ProcessingIndicator(state: detectionState)
+                                .padding(8)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                 }
             }
             .padding(.bottom, 8)
@@ -1205,41 +1214,27 @@ struct UnifiedChatView: View {
         session.endTime = Date()
         session.rawTranscriptions = [finalTranscription]
         
-        // Process through intent detection
+        // REMOVED BATCH PROCESSING - Now handled in real-time by SingleSourceProcessor
         Task {
-            print("Starting ambient session processing...")
-            print("Raw transcription: \(finalTranscription)")
+            logger.info("✅ Ambient session ended - all content already processed in real-time!")
             
-            // Process the transcription to extract quotes, notes, and questions
-            let processed = await processTranscription(finalTranscription)
-            session.processedData = processed
+            // Session already has all processed content from real-time processing
             currentSession = session
             
-            print("Processing session with:")
-            print("   - \(processed.quotes.count) quotes")
-            print("   - \(processed.notes.count) notes")
-            print("   - \(processed.questions.count) questions")
+            // Just log what was already processed
+            logger.info("Session summary: \(sessionContent.count) items processed in real-time")
             
-            // Remove temporary transcription message
+            // Remove temporary transcription message (if any)
             await MainActor.run {
                 if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
                     messages.remove(at: lastIndex)
                 }
             }
             
-            // Process quotes and notes first
-            await MainActor.run {
-                // Create BookModel from current book context if available
-                let bookModel: BookModel? = if let book = currentBookContext {
-                    BookModel(from: book)
-                } else {
-                    nil
-                }
-                
-                // Add quotes
-                for quote in processed.quotes {
-                    // Create and save Quote to SwiftData
-                    let quoteModel = CapturedQuote(
+            // ALL CONTENT ALREADY PROCESSED AND DISPLAYED IN REAL-TIME
+            // No batch processing needed!
+            
+            // Clean up the old batch processing code below this comment - TODO: Remove legacy code
                         text: quote.text,
                         book: bookModel,
                         timestamp: quote.timestamp,
@@ -1381,9 +1376,135 @@ struct UnifiedChatView: View {
         HapticManager.shared.lightTap()
     }
     
+    // MARK: - Real-Time Progressive Processing
+    
+    /// Process and display content immediately - no waiting for session end!
+    private func processAndDisplayImmediately(_ result: SingleSourceProcessor.ProcessingResult) async {
+        await MainActor.run {
+            logger.info("📱 Displaying \(result.type) immediately: \(result.content.prefix(30))...")
+            
+            // Create appropriate message based on content type
+            switch result.type {
+            case .quote:
+                // Create and save Quote to SwiftData IMMEDIATELY
+                let bookModel: BookModel? = if let book = result.bookContext {
+                    BookModel(from: book)
+                } else {
+                    nil
+                }
+                
+                let quoteModel = CapturedQuote(
+                    text: result.content,
+                    book: bookModel,
+                    timestamp: result.timestamp,
+                    source: .ambient
+                )
+                
+                // Insert into SwiftData immediately
+                modelContext.insert(quoteModel)
+                
+                // Add to messages with quote type - USER SEES IT IMMEDIATELY
+                messages.append(UnifiedChatMessage(
+                    content: "\"\(result.content)\"",
+                    isUser: false,
+                    timestamp: result.timestamp,
+                    bookContext: result.bookContext,
+                    messageType: .quote(quoteModel)
+                ))
+                
+                // Visual feedback - green checkmark animation
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    // Could trigger a temporary overlay here
+                    logger.info("✅ Quote saved and displayed immediately!")
+                }
+                
+            case .question:
+                // Show question immediately
+                messages.append(UnifiedChatMessage(
+                    content: result.content,
+                    isUser: true,
+                    timestamp: result.timestamp,
+                    bookContext: result.bookContext
+                ))
+                
+                // AI response is handled separately by SingleSourceProcessor
+                logger.info("❓ Question displayed, awaiting AI response...")
+                
+            case .insight, .reflection:
+                // Create note with special type
+                let bookModel: BookModel? = if let book = result.bookContext {
+                    BookModel(from: book)
+                } else {
+                    nil
+                }
+                
+                let noteModel = Note(
+                    content: result.content,
+                    book: bookModel,
+                    timestamp: result.timestamp,
+                    type: result.type == .insight ? .insight : .reflection
+                )
+                
+                modelContext.insert(noteModel)
+                
+                // Show as note message
+                messages.append(UnifiedChatMessage(
+                    content: result.content,
+                    isUser: false,
+                    timestamp: result.timestamp,
+                    bookContext: result.bookContext,
+                    messageType: .note(noteModel)
+                ))
+                
+                logger.info("💭 \(result.type) saved and displayed!")
+                
+            case .note:
+                // Simple note - save and show
+                if result.content.count > 10 { // Filter out trivial notes
+                    let bookModel: BookModel? = if let book = result.bookContext {
+                        BookModel(from: book)
+                    } else {
+                        nil
+                    }
+                    
+                    let noteModel = Note(
+                        content: result.content,
+                        book: bookModel,
+                        timestamp: result.timestamp,
+                        type: .general
+                    )
+                    
+                    modelContext.insert(noteModel)
+                    
+                    messages.append(UnifiedChatMessage(
+                        content: result.content,
+                        isUser: false,
+                        timestamp: result.timestamp,
+                        bookContext: result.bookContext,
+                        messageType: .note(noteModel)
+                    ))
+                    
+                    logger.info("📝 Note saved and displayed!")
+                }
+                
+            case .unknown:
+                // Don't display unknown content
+                logger.debug("Unknown content type, not displaying")
+            }
+            
+            // Try to save context immediately (non-blocking)
+            do {
+                try modelContext.save()
+                logger.info("💾 SwiftData saved immediately")
+            } catch {
+                logger.error("Failed to save immediately: \(error)")
+            }
+        }
+    }
+    
     // MARK: - Progressive Ambient Processing
     
-    private func saveToSession(_ result: ImprovedUnifiedProcessor.ProcessingResult) async {
+    private func saveToSession(_ result: SingleSourceProcessor.ProcessingResult) async {
         await MainActor.run {
             // Map content type to SessionContent.ContentType  
             let sessionContentType: SessionContent.ContentType = {
@@ -1415,19 +1536,23 @@ struct UnifiedChatView: View {
         }
     }
     
-    private func handleProcessedResult(_ result: ImprovedUnifiedProcessor.ProcessingResult) async {
-        // The improved processor already handles deduplication
+    private func handleProcessedResult(_ result: SingleSourceProcessor.ProcessingResult) async {
+        // REAL-TIME PROGRESSIVE PROCESSING - Process and show immediately
+        logger.info("🚀 Real-time processing: \(result.type) - \(result.content.prefix(50))...")
         
-        // Update detection state based on content type
+        // Update detection state with visual feedback
         await MainActor.run {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 switch result.type {
                 case .question:
                     detectionState = .processingQuestion
+                    HapticManager.shared.lightTap() // Immediate feedback
                 case .quote:
                     detectionState = .detectingQuote
+                    HapticManager.shared.mediumTap() // Quote detected
                 case .note, .insight:
                     detectionState = .savingNote
+                    HapticManager.shared.lightTap()
                 case .reflection, .unknown:
                     detectionState = .idle
                 }
@@ -1443,6 +1568,9 @@ struct UnifiedChatView: View {
                 }
             }
         }
+        
+        // IMMEDIATE PROCESSING - Don't wait for session end!
+        await processAndDisplayImmediately(result)
         
         // Process based on content type
         if result.requiresAIResponse {
@@ -1463,25 +1591,14 @@ struct UnifiedChatView: View {
         }
     }
     
-    // Old handleProcessedContent removed - now using handleProcessedResult with ImprovedUnifiedProcessor
+    // DEPRECATED - SmartContentBuffer and ImprovedUnifiedProcessor replaced by SingleSourceProcessor
     
-    private func mapContentType(_ type: SmartContentBuffer.ProcessedContent.ContentType) -> ContentType {
-        switch type {
-        case .quote: return .quote
-        case .note: return .note
-        case .question: return .question
-        case .insight: return .insight
-        case .unknown: return .unknown
-        }
-    }
-    
+    // DEPRECATED - now handled by SingleSourceProcessor in VoiceRecognitionManager
     func processAmbientChunk(_ text: String) async {
-        let processor = UnifiedTranscriptionProcessor.shared
-        let content = await processor.detectContent(text)
-        
-        await MainActor.run {
-            // Update detection state with animation
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        // This method is deprecated - SingleSourceProcessor now handles all processing
+        // VoiceRecognitionManager routes directly to SingleSourceProcessor
+        logger.warning("⚠️ processAmbientChunk is deprecated - processing now handled by SingleSourceProcessor")
+        return
                 switch content.type {
                 case .question:
                     detectionState = .processingQuestion
@@ -1576,20 +1693,29 @@ struct UnifiedChatView: View {
         }
     }
     
-    private func showAIResponse(_ response: String) async {
+    private func showAIResponse(_ response: AIResponse) async {
         await MainActor.run {
+            logger.info("🤖 Displaying AI response in real-time: \(response.answer.prefix(50))...")
+            
             let aiMessage = UnifiedChatMessage(
-                content: response,
+                content: response.answer,
                 isUser: false,
                 timestamp: Date(),
-                bookContext: currentBookContext
+                bookContext: currentBookContext,
+                metadata: ["question": response.question, "confidence": response.confidence]
             )
             messages.append(aiMessage)
             
-            // Scroll to show response
-            withAnimation {
+            // Visual feedback for AI response
+            HapticManager.shared.successTap()
+            
+            // Smooth scroll to show response
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 scrollProxy?.scrollTo(aiMessage.id, anchor: .bottom)
             }
+            
+            // Clear processing state
+            detectionState = .idle
         }
     }
     
@@ -2358,6 +2484,40 @@ struct DetectionIndicator: View {
     }
 }
 
+// MARK: - Real-Time Processing Indicator
+
+struct ProcessingIndicator: View {
+    let state: UnifiedChatView.DetectionState
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: state.icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(state.color)
+                .scaleEffect(isAnimating ? 1.2 : 1.0)
+                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isAnimating)
+            
+            Text(state.text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(state.color)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(state.color.opacity(0.15))
+                .overlay(
+                    Capsule()
+                        .strokeBorder(state.color.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .onAppear {
+            isAnimating = true
+        }
+    }
+}
+
 // MARK: - Progressive Transcript View
 
 struct ProgressiveTranscriptView: View {
@@ -2367,6 +2527,7 @@ struct ProgressiveTranscriptView: View {
     let confidence: Float
     var isTranscribing: Bool = true
     var onCancel: (() -> Void)? = nil
+    var detectionState: UnifiedChatView.DetectionState = .idle
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
