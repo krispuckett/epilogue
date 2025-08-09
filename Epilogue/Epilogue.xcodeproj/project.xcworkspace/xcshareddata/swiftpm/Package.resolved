@@ -1,13 +1,13 @@
 {
-  "originHash" : "fc1d4b814a02a50ba412816dfc0c3b6152112633c0060a2c1946018c10a05c5a",
+  "originHash" : "74745c80908dab63f4846b00bbdfe41acb2e6132a9ced31d7d63c68e535782f5",
   "pins" : [
     {
       "identity" : "jinja",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/johnmai-dev/Jinja",
       "state" : {
-        "revision" : "fc1233dea1142897d474bda2f1f9a6c3fe7acab6",
-        "version" : "1.2.1"
+        "revision" : "bb238dd96fbe4c18014f3107c00edd6edb15428e",
+        "version" : "1.2.4"
       }
     },
     {

@@ -273,12 +273,15 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         reactionPhraseDetected = nil
         textBeforePause = ""
         
-        // Process any remaining audio with Whisper before clearing
+        // DON'T BLOCK UI - Process Whisper in background if needed
+        // But don't wait for it - the UI should be responsive immediately
         if !audioBufferForWhisper.isEmpty {
-            logger.info("Processing final \(self.audioBufferForWhisper.count) buffers with Whisper before stopping")
-            Task {
-                await processWithWhisper()
-            }
+            let bufferCount = audioBufferForWhisper.count
+            logger.info("Discarding \(bufferCount) unprocessed buffers for instant UI response")
+            // Clear buffers immediately - don't process on exit
+            audioBufferForWhisper.removeAll()
+            // If critical processing is needed, do it in detached task
+            // But NEVER block the UI
         }
         
         logger.info("Stopped listening")

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 struct UnifiedChatView: View {
     let preSelectedBook: Book?
@@ -63,6 +64,16 @@ struct UnifiedChatView: View {
             }
         }
         
+        var text: String {
+            switch self {
+            case .idle: return "Listening..."
+            case .detectingQuote: return "Capturing Quote"
+            case .processingQuestion: return "Processing Question"
+            case .savingNote: return "Saving Note"
+            case .saved: return "Saved!"
+            }
+        }
+        
         var hint: String {
             switch self {
             case .idle: return ""
@@ -84,6 +95,8 @@ struct UnifiedChatView: View {
         }
     }
     
+    private let logger = Logger(subsystem: "com.epilogue", category: "UnifiedChatView")
+    
     struct DetectedContent: Identifiable {
         let id = UUID()
         var text: String
@@ -96,8 +109,17 @@ struct UnifiedChatView: View {
         }
     }
     
-    // Filter messages for current context
+    // Filter messages for current context - NOW PERSISTENT IN AMBIENT MODE
     private var filteredMessages: [UnifiedChatMessage] {
+        // In ambient mode, show ALL messages in a persistent thread
+        if isAmbientMode {
+            // Show all messages regardless of book context - persistent chat thread
+            return messages.filter { message in
+                !message.isDeleted()
+            }
+        }
+        
+        // Non-ambient mode: filter by book context
         let baseMessages: [UnifiedChatMessage]
         
         if let currentBook = currentBookContext {
@@ -251,6 +273,24 @@ struct UnifiedChatView: View {
             }
             .onChange(of: currentBookContext) { oldBook, newBook in
                 handleBookContextChange(oldBook: oldBook, newBook: newBook)
+                
+                // Clear transcription when switching books
+                if oldBook != newBook {
+                    liveTranscription = ""
+                    detectionState = .idle
+                    detectedEntities.removeAll()
+                    
+                    // Force re-render of transcription view to restart animations
+                    if isRecording {
+                        // Briefly toggle to restart animation
+                        withAnimation(.none) {
+                            liveTranscription = " " // Force update
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            liveTranscription = ""
+                        }
+                    }
+                }
             }
             .onChange(of: voiceManager.currentAmplitude) { _, newAmplitude in
                 audioLevel = newAmplitude
@@ -446,6 +486,23 @@ struct UnifiedChatView: View {
                         
                         // Always show messages if they exist
                         messagesListView
+                        
+                        // Show persistent thread indicator in ambient mode
+                        if isAmbientMode && !filteredMessages.isEmpty {
+                            HStack {
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.3))
+                                Text("Chat thread persists across books")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.3))
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(Capsule())
+                            .padding(.top, 12)
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16) // Top padding for content
@@ -1178,202 +1235,31 @@ struct UnifiedChatView: View {
     }
     
     private func endAmbientSession() {
-        guard var session = currentSession else { return }
+        // INSTANT UI update - absolutely no waiting
+        isRecording = false
+        liveTranscription = ""
+        detectionState = .idle
+        detectedEntities.removeAll()
         
-        // Stop listening
+        // Stop voice immediately
         voiceManager.stopListening()
         
-        // Complete the optimized session
-        if var optimizedSession = ambientSession {
-            optimizedSession.endTime = Date()
-            optimizedSession.allContent = sessionContent
-            
-            // Auto-show summary if session was meaningful
-            if shouldShowSessionSummary {
-                self.ambientSession = optimizedSession
-                showingSessionSummary = true
-            } else {
-                // Still auto-save even short sessions
-                autoSaveShortSession(optimizedSession)
-            }
-        }
-        
-        // Save final transcription before clearing
-        let finalTranscription = liveTranscription
-        
-        // Ensure UI state updates immediately on main thread
-        Task { @MainActor in
-            print("🛑 Setting isRecording to false")
-            isRecording = false
-            liveTranscription = ""  // Clear transcription immediately
-            detectionState = .idle
-            detectedEntities.removeAll()
-        }
-        
-        // Update session with final transcription
-        session.endTime = Date()
-        session.rawTranscriptions = [finalTranscription]
-        
-        // REMOVED BATCH PROCESSING - Now handled in real-time by SingleSourceProcessor
-        Task {
-            logger.info("✅ Ambient session ended - all content already processed in real-time!")
-            
-            // Session already has all processed content from real-time processing
-            currentSession = session
-            
-            // Just log what was already processed
-            logger.info("Session summary: \(sessionContent.count) items processed in real-time")
-            
-            // Remove temporary transcription message (if any)
-            await MainActor.run {
-                if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
-                    messages.remove(at: lastIndex)
-                }
-            }
-            
-            // ALL CONTENT ALREADY PROCESSED AND DISPLAYED IN REAL-TIME
-            // No batch processing needed!
-            
-            // Clean up the old batch processing code below this comment - TODO: Remove legacy code
-                        text: quote.text,
-                        book: bookModel,
-                        timestamp: quote.timestamp,
-                        source: .ambient
-                    )
-                    
-                    // Insert into SwiftData
-                    modelContext.insert(quoteModel)
-                    
-                    // Add to messages with quote type
-                    messages.append(UnifiedChatMessage(
-                        content: "\"\(quote.text)\"",
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext,
-                        messageType: .quote(quoteModel)
-                    ))
-                }
-                
-                // Add notes
-                for note in processed.notes {
-                    // Create and save Note to SwiftData
-                    let noteModel = CapturedNote(
-                        content: note.text,
-                        book: bookModel,
-                        timestamp: note.timestamp,
-                        source: .ambient
-                    )
-                    
-                    // Insert into SwiftData
-                    modelContext.insert(noteModel)
-                    
-                    // Check if we should provide context for this reflection
-                    if shouldProvideContext(for: note.text),
-                       let context = generateContextualInfo(for: note.text, book: currentBookContext) {
-                        // Add note with context
-                        messages.append(UnifiedChatMessage(
-                            content: note.text,
-                            isUser: false,
-                            timestamp: Date(),
-                            bookContext: currentBookContext,
-                            messageType: .noteWithContext(noteModel, context: context)
-                        ))
-                    } else {
-                        // Add regular note
-                        messages.append(UnifiedChatMessage(
-                            content: note.text,
-                            isUser: false,
-                            timestamp: Date(),
-                            bookContext: currentBookContext,
-                            messageType: .note(noteModel)
-                        ))
-                    }
-                }
-                
-                // Save the context after inserting all items
-                do {
-                    try modelContext.save()
-                    print("Successfully saved \(processed.quotes.count) quotes and \(processed.notes.count) notes to SwiftData")
-                } catch {
-                    print("Failed to save to SwiftData: \(error)")
-                }
-            }
-            
-            // Process questions with AI responses
-            print("\nQUESTION PROCESSING:")
-            print("Processing \(processed.questions.count) questions from ambient session")
-            
-            for (index, question) in processed.questions.enumerated() {
-                print("Question \(index + 1) of \(processed.questions.count): \(question.text)")
-                
-                // Add question to chat
-                let questionMessage = UnifiedChatMessage(
-                    content: question.text,
-                    isUser: true,
-                    timestamp: Date(),
-                    bookContext: currentBookContext
-                )
-                
-                await MainActor.run {
-                    messages.append(questionMessage)
-                    print("Added question to chat messages")
-                    
-                    // Scroll to show new message
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation {
-                            if let lastMessage = self.messages.last {
-                                self.scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-                
-                // Get AI response immediately
-                await getAIResponse(for: question.text)
-            }
-            
-            // Final summary and cleanup
-            await MainActor.run {
-                let totalItems = processed.quotes.count + processed.notes.count + processed.questions.count
-                
-                if totalItems > 0 {
-                    let summary = buildSessionSummary(processed)
-                    messages.append(UnifiedChatMessage(
-                        content: summary,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext,
-                        messageType: .system
-                    ))
-                } else if !liveTranscription.isEmpty && liveTranscription.count > 10 {
-                    // If no structured content was extracted but we have substantial text, add as user message
-                    messages.append(UnifiedChatMessage(
-                        content: liveTranscription,
-                        isUser: true,
-                        timestamp: Date(),
-                        bookContext: currentBookContext
-                    ))
-                    
-                    // If it seems conversational, offer an AI response
-                    if shouldOfferAIResponse(for: finalTranscription) {
-                        Task {
-                            await getAIResponse(for: finalTranscription)
-                        }
-                    }
-                }
-                
-                // Smooth scroll to bottom to show new messages
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    if let lastMessage = self.messages.last {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-        }
-        
+        // Quick haptic
         HapticManager.shared.lightTap()
+        
+        // Remove transcription message immediately if present
+        if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
+            messages.remove(at: lastIndex)
+        }
+        
+        // INSTANT dismiss - NO DELAYS, NO PROCESSING, NO WAITING
+        if isAmbientMode {
+            // Just dismiss immediately - don't wait for anything
+            dismiss()
+        }
+        
+        // DON'T do any processing here - it causes the 20-second delay
+        // All processing should happen in real-time, not on exit
     }
     
     // MARK: - Real-Time Progressive Processing
@@ -1381,7 +1267,18 @@ struct UnifiedChatView: View {
     /// Process and display content immediately - no waiting for session end!
     private func processAndDisplayImmediately(_ result: SingleSourceProcessor.ProcessingResult) async {
         await MainActor.run {
-            logger.info("📱 Displaying \(result.type) immediately: \(result.content.prefix(30))...")
+            logger.info("📱 Displaying \(String(describing: result.type)) immediately: \(result.content.prefix(30))...")
+            
+            // Scroll to bottom after adding message to keep chat thread visible
+            let scrollToBottom = {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        if let lastMessage = messages.last {
+                            scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
             
             // Create appropriate message based on content type
             switch result.type {
@@ -1396,6 +1293,8 @@ struct UnifiedChatView: View {
                 let quoteModel = CapturedQuote(
                     text: result.content,
                     book: bookModel,
+                    author: result.bookContext?.author ?? bookModel?.author,  // Use book's author
+                    pageNumber: result.pageNumber,  // Use extracted page number
                     timestamp: result.timestamp,
                     source: .ambient
                 )
@@ -1418,6 +1317,9 @@ struct UnifiedChatView: View {
                     logger.info("✅ Quote saved and displayed immediately!")
                 }
                 
+                // Scroll to show the new message
+                scrollToBottom()
+                
             case .question:
                 // Show question immediately
                 messages.append(UnifiedChatMessage(
@@ -1426,6 +1328,9 @@ struct UnifiedChatView: View {
                     timestamp: result.timestamp,
                     bookContext: result.bookContext
                 ))
+                
+                // Scroll to show the question
+                scrollToBottom()
                 
                 // AI response is handled separately by SingleSourceProcessor
                 logger.info("❓ Question displayed, awaiting AI response...")
@@ -1438,11 +1343,11 @@ struct UnifiedChatView: View {
                     nil
                 }
                 
-                let noteModel = Note(
+                let noteModel = CapturedNote(
                     content: result.content,
                     book: bookModel,
                     timestamp: result.timestamp,
-                    type: result.type == .insight ? .insight : .reflection
+                    source: .ambient
                 )
                 
                 modelContext.insert(noteModel)
@@ -1456,7 +1361,10 @@ struct UnifiedChatView: View {
                     messageType: .note(noteModel)
                 ))
                 
-                logger.info("💭 \(result.type) saved and displayed!")
+                logger.info("💭 \(String(describing: result.type)) saved and displayed!")
+                
+                // Scroll to show the new message
+                scrollToBottom()
                 
             case .note:
                 // Simple note - save and show
@@ -1467,11 +1375,11 @@ struct UnifiedChatView: View {
                         nil
                     }
                     
-                    let noteModel = Note(
+                    let noteModel = CapturedNote(
                         content: result.content,
                         book: bookModel,
                         timestamp: result.timestamp,
-                        type: .general
+                        source: .ambient
                     )
                     
                     modelContext.insert(noteModel)
@@ -1485,6 +1393,9 @@ struct UnifiedChatView: View {
                     ))
                     
                     logger.info("📝 Note saved and displayed!")
+                    
+                    // Scroll to show the new message
+                    scrollToBottom()
                 }
                 
             case .unknown:
@@ -1538,7 +1449,7 @@ struct UnifiedChatView: View {
     
     private func handleProcessedResult(_ result: SingleSourceProcessor.ProcessingResult) async {
         // REAL-TIME PROGRESSIVE PROCESSING - Process and show immediately
-        logger.info("🚀 Real-time processing: \(result.type) - \(result.content.prefix(50))...")
+        logger.info("🚀 Real-time processing: \(String(describing: result.type)) - \(result.content.prefix(50))...")
         
         // Update detection state with visual feedback
         await MainActor.run {
@@ -1575,8 +1486,19 @@ struct UnifiedChatView: View {
         // Process based on content type
         if result.requiresAIResponse {
             Task {
-                let response = await getAIResponseForContent(result.content)
-                await showAIResponse(response)
+                let responseText = await getAIResponseForContent(result.content)
+                // Create an AIResponse object from the text response
+                let aiResponse = AIResponse(
+                    question: result.content,
+                    answer: responseText,
+                    confidence: 0.85,
+                    timestamp: Date(),
+                    bookContext: currentBookContext,
+                    model: .sonar,
+                    responseTime: 0.5,
+                    isStreaming: false
+                )
+                await showAIResponse(aiResponse)
             }
         }
         
@@ -1599,51 +1521,6 @@ struct UnifiedChatView: View {
         // VoiceRecognitionManager routes directly to SingleSourceProcessor
         logger.warning("⚠️ processAmbientChunk is deprecated - processing now handled by SingleSourceProcessor")
         return
-                switch content.type {
-                case .question:
-                    detectionState = .processingQuestion
-                    
-                case .quote:
-                    detectionState = .detectingQuote
-                    
-                case .note, .insight, .reflection:
-                    detectionState = .savingNote
-                    
-                case .unknown:
-                    detectionState = .idle
-                }
-            }
-            
-            // Extract entities for highlighting
-            if content.confidence > 0.6 {
-                detectedEntities.append((text: content.text, confidence: Float(content.confidence)))
-                
-                // Keep only recent entities
-                if detectedEntities.count > 5 {
-                    detectedEntities.removeFirst()
-                }
-            }
-        }
-        
-        // Process based on content type
-        switch content.type {
-        case .question:
-            await showQuestionImmediately(content)
-            let response = await getAIResponseForContent(content.text)
-            await showAIResponse(response)
-            
-        case .quote:
-            await saveQuote(content)
-            await showQuoteCard(content)
-            
-        case .note, .insight, .reflection:
-            await saveNote(content)
-            await showNoteCard(content)
-            
-        case .unknown:
-            // Handle unknown content type
-            break
-        }
     }
     
     // MARK: - Real-time Content Display Methods
@@ -1701,13 +1578,12 @@ struct UnifiedChatView: View {
                 content: response.answer,
                 isUser: false,
                 timestamp: Date(),
-                bookContext: currentBookContext,
-                metadata: ["question": response.question, "confidence": response.confidence]
+                bookContext: currentBookContext
             )
             messages.append(aiMessage)
             
             // Visual feedback for AI response
-            HapticManager.shared.successTap()
+            HapticManager.shared.mediumTap()
             
             // Smooth scroll to show response
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -1921,6 +1797,7 @@ struct UnifiedChatView: View {
             
             // Check for reaction phrase followed by more text (indicating a quote)
             var detectedReactionQuote = false
+            var extractedQuoteText: String? = nil
             for phrase in reactionPhrases {
                 if lowercased.contains(phrase) {
                     // Find where the phrase ends and extract everything after it
@@ -2518,6 +2395,14 @@ struct ProcessingIndicator: View {
     }
 }
 
+// MARK: - ViewHeightKey for auto-expanding text
+struct ViewHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 // MARK: - Progressive Transcript View
 
 struct ProgressiveTranscriptView: View {
@@ -2529,50 +2414,160 @@ struct ProgressiveTranscriptView: View {
     var onCancel: (() -> Void)? = nil
     var detectionState: UnifiedChatView.DetectionState = .idle
     
+    @State private var textHeight: CGFloat = 44
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Simple header with just cancel button
-            if let onCancel = onCancel {
-                HStack {
-                    Spacer()
-                    Button(action: onCancel) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.3), .white.opacity(0.1))
-                    }
+        HStack(alignment: .center, spacing: 14) {
+            // Refined mic indicator with subtle animation
+            ZStack {
+                // Outer ring animation
+                Circle()
+                    .stroke(adaptiveUIColor.opacity(0.3), lineWidth: 1.5)
+                    .frame(width: 36, height: 36)
+                    .scaleEffect(isTranscribing ? 1.1 : 1.0)
+                    .opacity(isTranscribing ? 0.8 : 0.4)
+                    .animation(
+                        isTranscribing ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true) : .default,
+                        value: isTranscribing
+                    )
+                
+                // Inner filled circle
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                adaptiveUIColor.opacity(0.2),
+                                adaptiveUIColor.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 30, height: 30)
+                
+                // Mic icon
+                Image(systemName: isTranscribing ? "mic.fill" : "mic")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(
+                        isTranscribing ? adaptiveUIColor : .white.opacity(0.6)
+                    )
+                    .symbolEffect(.variableColor.iterative, options: .repeating.speed(0.5), value: isTranscribing)
+            }
+            .frame(width: 36, height: 36)
+            
+            // Refined text display
+            VStack(alignment: .leading, spacing: 4) {
+                if transcription.isEmpty {
+                    Text("Listening...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .italic()
+                } else {
+                    Text(highlightedTranscription)
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .lineSpacing(3)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
+                
+                // Detection indicator
+                if detectionState != .idle {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(detectionStateColor)
+                            .frame(width: 5, height: 5)
+                            .overlay {
+                                Circle()
+                                    .fill(detectionStateColor)
+                                    .frame(width: 5, height: 5)
+                                    .scaleEffect(1.8)
+                                    .opacity(0.3)
+                                    .animation(.easeOut(duration: 1.0).repeatForever(autoreverses: false), value: detectionState)
+                            }
+                        
+                        Text(detectionStateText)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(detectionStateColor.opacity(0.9))
+                    }
+                    .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ViewHeightKey.self,
+                        value: geometry.size.height
+                    )
+                }
+            )
+            .onPreferenceChange(ViewHeightKey.self) { height in
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                    self.textHeight = max(52, height + 28)
+                }
             }
             
-            // Transcription with entity highlighting
-            ScrollView(.horizontal, showsIndicators: false) {
-                Text(highlightedTranscription)
-                    .font(.system(size: 15, weight: .regular, design: .rounded))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+            // Refined cancel button
+            if let onCancel = onCancel {
+                Button(action: {
+                    HapticManager.shared.lightTap()
+                    onCancel()
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 30, height: 30)
+                        
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
             }
-            .frame(maxHeight: 50)
         }
-        .frame(maxWidth: .infinity)
-        .glassEffect(in: .rect(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            adaptiveUIColor.opacity(0.2),
-                            adaptiveUIColor.opacity(0.1)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
-        }
-        .shadow(color: Color.black.opacity(0.2), radius: 10, y: 5)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: textHeight)
+        .background(
+            ZStack {
+                // Cleaner glass effect
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.black.opacity(0.05),
+                                        Color.black.opacity(0.02)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+                
+                // Subtle animated border
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                adaptiveUIColor.opacity(isTranscribing ? 0.25 : 0.15),
+                                adaptiveUIColor.opacity(isTranscribing ? 0.15 : 0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.75
+                    )
+                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isTranscribing)
+            }
+        )
+        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 3)
+        .shadow(color: adaptiveUIColor.opacity(0.05), radius: 12, x: 0, y: 4)
     }
     
     private var highlightedTranscription: AttributedString {
@@ -2600,6 +2595,36 @@ struct ProgressiveTranscriptView: View {
             return .yellow
         } else {
             return .orange
+        }
+    }
+    
+    private var detectionStateColor: Color {
+        switch detectionState {
+        case .idle:
+            return .clear
+        case .detectingQuote:
+            return Color(red: 1.0, green: 0.55, blue: 0.26)
+        case .processingQuestion:
+            return .blue
+        case .savingNote:
+            return Color(red: 0.6, green: 0.4, blue: 1.0)
+        case .saved:
+            return .green
+        }
+    }
+    
+    private var detectionStateText: String {
+        switch detectionState {
+        case .idle:
+            return ""
+        case .detectingQuote:
+            return "Quote detected"
+        case .processingQuestion:
+            return "Processing question"
+        case .savingNote:
+            return "Saving note"
+        case .saved:
+            return "Saved"
         }
     }
 }

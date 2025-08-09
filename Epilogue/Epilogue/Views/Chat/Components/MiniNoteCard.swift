@@ -8,7 +8,7 @@ struct MiniNoteCard: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 // Header
                 HStack {
                     Image(systemName: "note.text")
@@ -22,7 +22,7 @@ struct MiniNoteCard: View {
                     Spacer()
                     
                     Text(note.timestamp, style: .time)
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.4))
                 }
                 
@@ -31,35 +31,36 @@ struct MiniNoteCard: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(2)
                 
                 // Book context if available
                 if let book = note.book {
                     HStack(spacing: 4) {
-                        Image(systemName: "book.closed.fill")
-                            .font(.system(size: 10))
+                        Text("re:")
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.4))
                         
                         Text(book.title)
-                            .font(.system(size: 11))
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.5))
+                            .textCase(.uppercase)
                         
                         if let pageNumber = note.pageNumber {
-                            Text("• p.\(pageNumber)")
-                                .font(.system(size: 11))
+                            Text("• PAGE \(pageNumber)")
+                                .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.4))
+                                .textCase(.uppercase)
                         }
                     }
                 }
             }
-            .padding(12)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.08))
-            )
+            .glassEffect(in: .rect(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                    .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -75,48 +76,52 @@ struct MiniQuoteCard: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Small quotation mark
+            VStack(alignment: .leading, spacing: 10) {
+                // Small quotation mark like original design
                 Text("\u{201C}")
-                    .font(.custom("Georgia", size: 24))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
-                    .frame(height: 12)
-                    .offset(y: 4)
+                    .font(.custom("Georgia", size: 36))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4))
+                    .frame(height: 16)
+                    .offset(y: 8)
                 
-                // Quote text
+                // Quote text - mini version of original
                 Text(quote.text)
                     .font(.custom("Georgia", size: 14))
+                    .italic()
                     .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(3)
                 
                 // Attribution
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let author = quote.author ?? quote.book?.author {
+                        Text("— \(author)")
+                            .font(.system(size: 12, weight: .medium, design: .serif))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                    }
+                    
                     if let book = quote.book {
-                        Text("— \(quote.author ?? book.author)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                        
                         HStack(spacing: 4) {
                             Text(book.title)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .textCase(.uppercase)
                             
                             if let pageNumber = quote.pageNumber {
-                                Text("• p.\(pageNumber)")
-                                    .font(.system(size: 11))
+                                Text("• PAGE \(pageNumber)")
+                                    .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.white.opacity(0.4))
+                                    .textCase(.uppercase)
                             }
                         }
                     }
                 }
                 .padding(.top, 4)
             }
-            .padding(12)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.8))
-            )
+            .glassEffect(in: .rect(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), lineWidth: 0.5)

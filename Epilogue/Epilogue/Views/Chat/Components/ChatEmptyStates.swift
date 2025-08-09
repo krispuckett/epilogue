@@ -164,6 +164,21 @@ struct BookEmptyStateView: View {
     
     var body: some View {
         VStack(spacing: 24) {
+            // Book title moved higher - no "Start discussing" copy
+            VStack(spacing: 8) {
+                Text(book.title)
+                    .font(.system(size: 28, weight: .semibold, design: .serif))
+                    .foregroundStyle(colorPalette?.primary ?? .white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                
+                Text("by \(book.author)")
+                    .font(.system(size: 16, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .opacity(contentOpacity)
+            .padding(.top, -20) // Move higher
+            
             // Faded book cover
             if let coverURL = book.coverImageURL {
                 SharedBookCoverView(
@@ -181,24 +196,6 @@ struct BookEmptyStateView: View {
                     y: 15
                 )
             }
-            
-            // Book title and prompt
-            VStack(spacing: 12) {
-                Text("Start discussing")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.white.opacity(0.7))
-                
-                Text(book.title)
-                    .font(.system(size: 24, weight: .semibold, design: .serif))
-                    .foregroundStyle(colorPalette?.primary ?? .white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                
-                Text("by \(book.author)")
-                    .font(.system(size: 16, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-            .opacity(contentOpacity)
             
             // Removed "Try asking" section
             
