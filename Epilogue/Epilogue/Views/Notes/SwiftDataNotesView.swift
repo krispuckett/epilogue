@@ -329,8 +329,17 @@ struct SwiftDataNotesView: View {
             .navigationBarTitleDisplayMode(selectionManager.isSelectionMode ? .inline : .large)
             .searchable(text: $searchText, prompt: "Search notes and quotes")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if !selectionManager.isSelectionMode {
+                if selectionManager.isSelectionMode {
+                    // Replace entire toolbar with selection navigation bar
+                    ToolbarItem(placement: .principal) {
+                        BatchSelectionNavigationBar(
+                            selectionManager: selectionManager,
+                            allItems: allNotes,
+                            onDelete: batchDeleteNotes
+                        )
+                    }
+                } else {
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         // Selection mode button
                         Button {
                             selectionManager.enterSelectionMode()
@@ -379,17 +388,7 @@ struct SwiftDataNotesView: View {
             }
             } // End NavigationStack
             
-            // Batch selection toolbar positioned above tab bar  
-            VStack {
-                Spacer()
-                BatchSelectionToolbar(
-                    selectionManager: selectionManager,
-                    allItems: allNotes,
-                    onDelete: batchDeleteNotes
-                )
-                .padding(.bottom, 100) // Position above tab bar
-            }
-            .ignoresSafeArea(.keyboard, edges: .bottom)
+            // Batch selection now handled in navigation bar
         }
     }
 }

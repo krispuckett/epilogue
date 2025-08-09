@@ -84,73 +84,66 @@ final class BatchSelectionManager: ObservableObject {
     }
 }
 
-// MARK: - Batch Selection Toolbar
-struct BatchSelectionToolbar: View {
+// MARK: - Batch Selection Navigation Bar
+struct BatchSelectionNavigationBar: View {
     @ObservedObject var selectionManager: BatchSelectionManager
     let allItems: [Note]
     let onDelete: (Set<UUID>) -> Void
     
     var body: some View {
-        if selectionManager.isSelectionMode {
-            HStack(spacing: 0) {
-                // Cancel button
-                Button("Cancel") {
+        HStack {
+            // Cancel button (leading)
+            Button("Cancel") {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     selectionManager.exitSelectionMode()
                 }
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                
-                Spacer()
-                
-                // Selection count
-                Text("\(selectionManager.selectionCount) selected")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
-                    .animation(.easeInOut(duration: 0.2), value: selectionManager.selectionCount)
-                
-                Spacer()
-                
-                // Action buttons
-                HStack(spacing: 20) {
-                    // Select All / Deselect All
-                    Button(selectionManager.selectionCount == allItems.count ? "Deselect All" : "Select All") {
+            }
+            .font(.system(size: 17))
+            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            
+            Spacer()
+            
+            // Selection count (center)
+            Text("\(selectionManager.selectionCount) Selected")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .animation(.easeInOut(duration: 0.2), value: selectionManager.selectionCount)
+            
+            Spacer()
+            
+            // Action buttons (trailing)
+            HStack(spacing: 16) {
+                // Select All / Deselect All
+                Button(selectionManager.selectionCount == allItems.count ? "Deselect All" : "Select All") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         if selectionManager.selectionCount == allItems.count {
                             selectionManager.deselectAll()
                         } else {
                             selectionManager.selectAll(items: allItems)
                         }
                     }
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.8))
-                    
-                    // Delete button
-                    Button {
-                        if selectionManager.needsConfirmation {
-                            selectionManager.showingDeleteConfirmation = true
-                        } else {
-                            onDelete(selectionManager.selectedItems)
-                            selectionManager.performDelete()
-                        }
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(selectionManager.hasSelection ? .red : .white.opacity(0.3))
-                    }
-                    .disabled(!selectionManager.hasSelection)
                 }
+                .font(.system(size: 17))
+                .foregroundStyle(.white.opacity(0.8))
+                
+                // Delete button
+                Button {
+                    if selectionManager.needsConfirmation {
+                        selectionManager.showingDeleteConfirmation = true
+                    } else {
+                        onDelete(selectionManager.selectedItems)
+                        selectionManager.performDelete()
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(selectionManager.hasSelection ? .red : .white.opacity(0.3))
+                }
+                .disabled(!selectionManager.hasSelection)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(
-                .black.opacity(0.9)
-            )
-            .overlay(
-                Rectangle()
-                    .frame(height: 0.5)
-                    .foregroundStyle(.white.opacity(0.1)),
-                alignment: .top
-            )
-            .animation(.easeInOut(duration: 0.3), value: selectionManager.isSelectionMode)
         }
+        .padding(.horizontal, 20)
+        .frame(height: 44)
     }
 }
 
