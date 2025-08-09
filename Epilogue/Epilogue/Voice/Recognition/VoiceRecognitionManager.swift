@@ -48,9 +48,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     @Published var detectedLanguage = "en"
     
     // Advanced voice pattern analysis
-    @Published var voiceFrequency: CGFloat = 0.5  // 0.0 = low pitch, 1.0 = high pitch
-    @Published var voiceIntensity: CGFloat = 0.0  // 0.0 = silent, 1.0 = loud
-    @Published var voiceRhythm: CGFloat = 0.0     // 0.0 = steady, 1.0 = variable
+    @Published var voiceFrequency: Double = 0.5   // 0.0 = low pitch, 1.0 = high pitch
+    @Published var voiceIntensity: Double = 0.0   // 0.0 = silent, 1.0 = loud
+    @Published var voiceRhythm: Double = 0.0      // 0.0 = steady, 1.0 = variable
+    @Published var wordsPerMinute: Double = 150.0 // Average speaking speed in WPM
+    @Published var audioLevel: Double = 0.0       // Current audio level for visualization
     
     // MARK: - Private Properties
     private var speechRecognizer: SFSpeechRecognizer?
@@ -106,6 +108,107 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         case idle = "Idle"
         case listening = "Listening..."
         case processing = "Processing voice"
+    }
+    
+    // MARK: - Voice Characteristics Analysis
+    
+    /// WPM tracking
+    private var wordTimestamps: [(word: String, time: Date)] = []
+    private let wpmWindowSize: TimeInterval = 10.0 // Calculate WPM over 10 second windows
+    
+    /// Analyze voice characteristics from audio buffer
+    private func analyzeVoiceCharacteristics(_ buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData else { return }
+        
+        let frameLength = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        
+        // Analyze amplitude (intensity)
+        var sum: Float = 0
+        var maxAmplitude: Float = 0
+        
+        for frame in 0..<frameLength {
+            let sample = abs(channelData[0][frame])
+            sum += sample
+            maxAmplitude = max(maxAmplitude, sample)
+        }
+        
+        let averageAmplitude = sum / Float(frameLength)
+        
+        // Update voice intensity (normalized to 0-1)
+        DispatchQueue.main.async {
+            self.voiceIntensity = Double(min(1.0, averageAmplitude * 50))
+            self.audioLevel = Double(min(1.0, averageAmplitude * 50))
+        }
+        
+        // Analyze frequency using zero-crossing rate (simple pitch detection)
+        var zeroCrossings = 0
+        for i in 1..<frameLength {
+            let current = channelData[0][i]
+            let previous = channelData[0][i-1]
+            if (current >= 0 && previous < 0) || (current < 0 && previous >= 0) {
+                zeroCrossings += 1
+            }
+        }
+        
+        // Estimate frequency from zero-crossing rate
+        let sampleRate = buffer.format.sampleRate
+        let estimatedFrequency = Double(zeroCrossings) * sampleRate / Double(frameLength * 2)
+        
+        // Normalize frequency to 0-1 range (100Hz - 500Hz typical speech range)
+        let normalizedFrequency = min(1.0, max(0.0, (estimatedFrequency - 100) / 400))
+        
+        DispatchQueue.main.async {
+            self.voiceFrequency = normalizedFrequency
+        }
+        
+        // Analyze rhythm (variation in amplitude over time)
+        amplitudeBuffer.append(averageAmplitude)
+        if amplitudeBuffer.count > amplitudeBufferSize {
+            amplitudeBuffer.removeFirst()
+        }
+        
+        if amplitudeBuffer.count >= 10 {
+            // Calculate standard deviation of amplitude
+            let mean = amplitudeBuffer.reduce(0, +) / Float(amplitudeBuffer.count)
+            let variance = amplitudeBuffer.map { pow($0 - mean, 2) }.reduce(0, +) / Float(amplitudeBuffer.count)
+            let stdDev = sqrt(variance)
+            
+            // Normalize rhythm to 0-1 range
+            let normalizedRhythm = min(1.0, Double(stdDev * 10))
+            
+            DispatchQueue.main.async {
+                self.voiceRhythm = normalizedRhythm
+            }
+        }
+    }
+    
+    /// Update words per minute based on transcription
+    private func updateWordsPerMinute(from text: String) {
+        let words = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        let now = Date()
+        
+        // Add new words with timestamps
+        for word in words {
+            wordTimestamps.append((word: word, time: now))
+        }
+        
+        // Remove old words outside the window
+        let cutoffTime = now.addingTimeInterval(-wpmWindowSize)
+        wordTimestamps.removeAll { $0.time < cutoffTime }
+        
+        // Calculate WPM
+        if wordTimestamps.count > 5 {
+            let timeSpan = now.timeIntervalSince(wordTimestamps.first!.time)
+            if timeSpan > 0 {
+                let wpm = Double(wordTimestamps.count) * 60.0 / timeSpan
+                
+                DispatchQueue.main.async {
+                    // Smooth the WPM value
+                    self.wordsPerMinute = self.wordsPerMinute * 0.7 + wpm * 0.3
+                }
+            }
+        }
     }
     
     // MARK: - Initialization
@@ -335,6 +438,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 
                 // Update amplitude for visualization
                 self.updateAmplitude(from: buffer)
+                
+                // NEW: Analyze voice characteristics for ambient mode
+                self.analyzeVoiceCharacteristics(buffer)
                 
                 // Always append to recognition request (Apple needs continuous audio)
                 self.recognitionRequest?.append(buffer)
@@ -640,6 +746,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private func processTranscriptionResult(_ result: SFSpeechRecognitionResult) async {
         let text = result.bestTranscription.formattedString
         self.transcribedText = text
+        
+        // Update words per minute tracking
+        updateWordsPerMinute(from: text)
         
         // Update confidence score for debugging
         if let segment = result.bestTranscription.segments.last {
