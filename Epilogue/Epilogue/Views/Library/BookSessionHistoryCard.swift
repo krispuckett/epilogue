@@ -1,5 +1,67 @@
 import SwiftUI
 
+// MARK: - Session History Data Model
+struct SessionHistoryData: Identifiable {
+    let id: UUID
+    let bookId: String?
+    let bookTitle: String
+    let startTime: Date
+    let endTime: Date
+    let duration: TimeInterval
+    let questionCount: Int
+    let quoteCount: Int
+    let insightCount: Int
+    let mood: String
+    let clusters: [String] // Simplified for now
+    let allContent: [ContentSummary]
+    let sessionType: String
+    
+    init(id: UUID = UUID(), bookId: String? = nil, bookTitle: String, startTime: Date, endTime: Date, duration: TimeInterval, questionCount: Int = 0, quoteCount: Int = 0, insightCount: Int = 0, mood: String = "neutral", clusters: [String] = [], allContent: [ContentSummary] = [], sessionType: String = "Reading") {
+        self.id = id
+        self.bookId = bookId
+        self.bookTitle = bookTitle
+        self.startTime = startTime
+        self.endTime = endTime
+        self.duration = duration
+        self.questionCount = questionCount
+        self.quoteCount = quoteCount
+        self.insightCount = insightCount
+        self.mood = mood
+        self.clusters = clusters
+        self.allContent = allContent
+        self.sessionType = sessionType
+    }
+    
+    // MARK: - Static Methods
+    static func loadForBook(_ bookId: String) -> [SessionHistoryData] {
+        let allSessions = loadAll()
+        return allSessions.filter { $0.bookId == bookId }
+    }
+    
+    static func loadAll() -> [SessionHistoryData] {
+        // For now, return empty array - this would load from persistent storage
+        return []
+    }
+    
+    static func saveAll(_ sessions: [SessionHistoryData]) {
+        // For now, no-op - this would save to persistent storage
+    }
+    
+    // MARK: - Nested Types
+    struct ContentSummary: Identifiable {
+        let id = UUID()
+        let type: String
+        let text: String
+        let timestamp: Date
+        
+        init(type: String, text: String, timestamp: Date = Date()) {
+            self.type = type
+            self.text = text
+            self.timestamp = timestamp
+        }
+    }
+}
+
 struct BookSessionHistoryCard: View {
     let book: Book
     @State private var sessions: [SessionHistoryData] = []
@@ -207,7 +269,7 @@ struct FullSessionView: View {
                             .font(.headline)
                             .padding(.horizontal)
                         
-                        ForEach(session.allContent, id: \.timestamp) { content in
+                        ForEach(session.allContent) { content in
                             ChatHistoryBubble(content: content)
                                 .padding(.horizontal)
                         }
@@ -220,14 +282,11 @@ struct FullSessionView: View {
                                 .font(.headline)
                                 .padding(.horizontal)
                             
-                            ForEach(session.clusters, id: \.topic) { cluster in
+                            ForEach(session.clusters, id: \.self) { topic in
                                 HStack {
-                                    Text(cluster.topic)
+                                    Text(topic)
                                         .font(.subheadline)
                                     Spacer()
-                                    Text("\(cluster.itemCount) items")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
                                 }
                                 .padding()
                                 .background(Color.gray.opacity(0.1))

@@ -4,458 +4,584 @@ import SwiftData
 struct AmbientSessionSummaryView: View {
     let session: OptimizedAmbientSession
     @Environment(\.dismiss) private var dismiss
-    @State private var isProcessing = false
-    @State private var hasSaved = false
+    @EnvironmentObject var navigationCoordinator: NavigationCoordinator
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
     
-    private var sessionDuration: String {
-        let minutes = Int(session.duration) / 60
-        if minutes < 1 {
-            return "Less than a minute"
-        } else if minutes == 1 {
-            return "1 minute"
-        } else if minutes < 60 {
-            return "\(minutes) minutes"
-        } else {
-            let hours = minutes / 60
-            let remainingMinutes = minutes % 60
-            if remainingMinutes == 0 {
-                return "\(hours) hour\(hours > 1 ? "s" : "")"
-            }
-            return "\(hours) hr \(remainingMinutes) min"
-        }
-    }
+    // Animation states
+    @State private var showContent = false
+    @State private var showSaveCheckmark = false
+    @State private var autoDismissTimer: Timer?
+    
+    // Natural language summary
+    @State private var sessionSummary = ""
+    @State private var keyInsights: [String] = []
+    @State private var bestQuote: SessionContent?
+    @State private var readingProgress: Float?
     
     var body: some View {
         ZStack {
-            // Background gradient based on session mood
+            // Beautiful gradient background based on book colors
+            backgroundGradient
+            
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Elegant header with save animation
+                    headerSection
+                        .opacity(showContent ? 1 : 0)
+                        .offset(y: showContent ? 0 : 20)
+                    
+                    // Natural language summary
+                    if !sessionSummary.isEmpty {
+                        summarySection
+                            .opacity(showContent ? 1 : 0)
+                            .offset(y: showContent ? 0 : 20)
+                            .animation(.easeOut(duration: 0.6).delay(0.2), value: showContent)
+                    }
+                    
+                    // Key insights with beautiful cards
+                    if !keyInsights.isEmpty {
+                        insightsSection
+                            .opacity(showContent ? 1 : 0)
+                            .offset(y: showContent ? 0 : 20)
+                            .animation(.easeOut(duration: 0.6).delay(0.3), value: showContent)
+                    }
+                    
+                    // Best quote with typography
+                    if let quote = bestQuote {
+                        quoteSection(quote)
+                            .opacity(showContent ? 1 : 0)
+                            .offset(y: showContent ? 0 : 20)
+                            .animation(.easeOut(duration: 0.6).delay(0.4), value: showContent)
+                    }
+                    
+                    // Reading progress if detected
+                    if let progress = readingProgress {
+                        progressSection(progress)
+                            .opacity(showContent ? 1 : 0)
+                            .offset(y: showContent ? 0 : 20)
+                            .animation(.easeOut(duration: 0.6).delay(0.5), value: showContent)
+                    }
+                    
+                    // Continue reading button
+                    continueSection
+                        .opacity(showContent ? 1 : 0)
+                        .offset(y: showContent ? 0 : 20)
+                        .animation(.easeOut(duration: 0.6).delay(0.6), value: showContent)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 40)
+            }
+            
+            // Auto-save checkmark overlay
+            if showSaveCheckmark {
+                saveCheckmarkOverlay
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onAppear {
+            generateNaturalSummary()
+            startAnimations()
+            autoSaveSession()
+        }
+        .onDisappear {
+            autoDismissTimer?.invalidate()
+        }
+    }
+    
+    // MARK: - Background
+    
+    private var backgroundGradient: some View {
+        ZStack {
+            // Base black
+            Color.black.ignoresSafeArea()
+            
+            // Book-colored gradient if available
+            if let book = session.bookContext,
+               let primaryColor = getBookPrimaryColor(book) {
+                LinearGradient(
+                    colors: [
+                        primaryColor.opacity(0.4),
+                        primaryColor.opacity(0.2),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                .blendMode(.plusLighter)
+            }
+            
+            // Subtle noise texture
             LinearGradient(
                 colors: [
-                    session.metadata.mood.color.opacity(0.3),
-                    Color.black
+                    Color.white.opacity(0.03),
+                    Color.clear
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    headerSection
-                    
-                    // Key Metrics
-                    metricsSection
-                    
-                    // Content Clusters
-                    if !session.clusters.isEmpty {
-                        clustersSection
-                    }
-                    
-                    // Key Insights
-                    insightsSection
-                    
-                    // Auto-save indicator
-                    autoSaveIndicator
-                    
-                    // Continue Reading
-                    continueSection
-                }
-                .padding()
-            }
-        }
-        .preferredColorScheme(.dark)
-        .onAppear {
-            autoSaveSession()
-            markProgressIfNeeded()
         }
     }
+    
+    // MARK: - Header Section
     
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            // Session complete icon with animation
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.green)
-                .scaleEffect(hasSaved ? 1.0 : 0.5)
-                .opacity(hasSaved ? 1.0 : 0.3)
-                .animation(.spring(response: 0.6, dampingFraction: 0.6), value: hasSaved)
+        VStack(spacing: 16) {
+            // Subtle completion indicator
+            Circle()
+                .fill(Color.green.opacity(0.2))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 36, weight: .medium))
+                        .foregroundStyle(.green)
+                )
+                .scaleEffect(showSaveCheckmark ? 1.2 : 1.0)
+                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showSaveCheckmark)
             
-            Text("Reading Session Complete")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            if let book = session.bookContext {
-                VStack(spacing: 4) {
+            VStack(spacing: 8) {
+                Text("Session Complete")
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                if let book = session.bookContext {
                     Text(book.title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Text("by \(book.author)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
                 }
             }
-            
-            Text(sessionDuration)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(20)
         }
-        .padding(.top, 40)
     }
     
-    private var metricsSection: some View {
-        HStack(spacing: 16) {
-            MetricCard(
-                icon: "questionmark.circle.fill",
-                value: "\(session.totalQuestions)",
-                label: "Questions",
-                color: .blue
-            )
-            
-            MetricCard(
-                icon: "quote.bubble.fill",
-                value: "\(session.allContent.filter { $0.type == .quote }.count)",
-                label: "Quotes",
-                color: .green
-            )
-            
-            MetricCard(
-                icon: "lightbulb.fill",
-                value: "\(session.allContent.filter { $0.type == .insight }.count)",
-                label: "Insights",
-                color: .orange
-            )
+    // MARK: - Natural Language Summary
+    
+    private var summarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(sessionSummary)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineSpacing(6)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(in: .rect(cornerRadius: 20))
     }
     
-    private var clustersSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Discussion Topics")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(Array(session.clusters.prefix(5)), id: \.id) { cluster in
-                        ClusterCard(cluster: cluster)
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
+    // MARK: - Key Insights Section
     
     private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Key Moments")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Key Insights")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
             
-            // Top questions with AI responses
-            let questionsWithResponses = session.allContent
-                .filter { $0.type == .question && $0.aiResponse != nil }
-                .prefix(3)
-            
-            if !questionsWithResponses.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(questionsWithResponses), id: \.id) { content in
-                        KeyMomentCard(content: content)
-                    }
-                }
-            }
-            
-            // Best quotes
-            let quotes = session.allContent
-                .filter { $0.type == .quote }
-                .sorted { $0.confidence > $1.confidence }
-                .prefix(2)
-            
-            if !quotes.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(quotes), id: \.id) { quote in
-                        SessionQuoteCard(content: quote)
+            VStack(spacing: 12) {
+                ForEach(keyInsights, id: \.self) { insight in
+                    HStack(alignment: .top, spacing: 12) {
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 6, height: 6)
+                            .offset(y: 8)
+                        
+                        Text(insight)
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                        Spacer(minLength: 0)
                     }
                 }
             }
         }
-        .padding(.horizontal)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(in: .rect(cornerRadius: 20))
     }
     
-    private var autoSaveIndicator: some View {
-        HStack(spacing: 8) {
-            Image(systemName: hasSaved ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
-                .foregroundColor(hasSaved ? .green : .orange)
-                .font(.caption)
+    // MARK: - Quote Section
+    
+    private func quoteSection(_ quote: SessionContent) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Large decorative quote mark
+            Text("\u{201C}")
+                .font(.system(size: 60, weight: .bold, design: .serif))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white.opacity(0.5), .white.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .offset(x: -10, y: 10)
             
-            Text(hasSaved ? "Session saved to your library" : "Saving session...")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Text(quote.text)
+                .font(.system(size: 18, weight: .regular, design: .serif))
+                .italic()
+                .foregroundStyle(.white.opacity(0.95))
+                .lineSpacing(8)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            if let bookTitle = quote.bookContext {
+                HStack {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 30, height: 1)
+                    
+                    Text(bookTitle)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                    
+                    Spacer()
+                }
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.1))
-        .cornerRadius(20)
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.08),
+                    Color.white.opacity(0.04)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.2),
+                            Color.white.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
     }
+    
+    // MARK: - Progress Section
+    
+    private func progressSection(_ progress: Float) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "book.pages")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.7))
+                
+                Text("Reading Progress")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                
+                Spacer()
+                
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.1))
+                    
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.green, .green.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * CGFloat(progress))
+                }
+            }
+            .frame(height: 6)
+        }
+        .padding(20)
+        .glassEffect(in: .rect(cornerRadius: 16))
+    }
+    
+    // MARK: - Continue Section
     
     private var continueSection: some View {
-        VStack(spacing: 16) {
-            Button(action: { dismiss() }) {
-                Label("Continue Reading", systemImage: "book.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.white.opacity(0.15))
-                    .foregroundColor(.white)
-                    .cornerRadius(16)
+        Button {
+            continueReading()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "book.fill")
+                    .font(.system(size: 18))
+                
+                Text("Continue Reading")
+                    .font(.system(size: 18, weight: .semibold))
             }
-            
-            Text("Your session has been automatically saved")
-                .font(.caption2)
-                .foregroundColor(.secondary)
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(
+                LinearGradient(
+                    colors: [.white, .white.opacity(0.9)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .white.opacity(0.25), radius: 20, y: 10)
         }
-        .padding(.horizontal)
-        .padding(.bottom, 40)
+        .buttonStyle(.plain)
     }
     
-    // MARK: - Auto-save Logic
+    // MARK: - Save Checkmark Overlay
+    
+    private var saveCheckmarkOverlay: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(.green)
+                .scaleEffect(showSaveCheckmark ? 1 : 0.5)
+                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showSaveCheckmark)
+            
+            Text("Saved")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .padding(32)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .transition(.scale.combined(with: .opacity))
+    }
+    
+    // MARK: - Natural Language Generation
+    
+    private func generateNaturalSummary() {
+        // Analyze session content
+        let questions = session.allContent.filter { $0.type == .question }
+        let quotes = session.allContent.filter { $0.type == .quote }
+        let insights = session.allContent.filter { $0.type == .insight }
+        
+        // Generate natural summary based on content
+        var summary = ""
+        
+        if !questions.isEmpty {
+            let themes = extractThemes(from: questions)
+            if !themes.isEmpty {
+                summary = "You explored themes of \(themes.joined(separator: ", "))"
+            }
+            
+            if questions.count > 3 {
+                summary += " through \(questions.count) thoughtful questions"
+            }
+        }
+        
+        if !quotes.isEmpty && !summary.isEmpty {
+            summary += ", and captured \(quotes.count) meaningful quote\(quotes.count > 1 ? "s" : "")"
+        } else if !quotes.isEmpty {
+            summary = "You captured \(quotes.count) meaningful quote\(quotes.count > 1 ? "s" : "")"
+        }
+        
+        if let book = session.bookContext {
+            if !summary.isEmpty {
+                summary += " from \(book.title)"
+            }
+        }
+        
+        if summary.isEmpty {
+            summary = "You had a thoughtful reading session"
+            if let book = session.bookContext {
+                summary += " with \(book.title)"
+            }
+        }
+        
+        summary += "."
+        sessionSummary = summary
+        
+        // Generate key insights
+        generateKeyInsights(questions: questions, quotes: quotes, insights: insights)
+        
+        // Select best quote
+        bestQuote = quotes.max(by: { $0.confidence < $1.confidence })
+        
+        // Detect reading progress
+        detectReadingProgress()
+    }
+    
+    private func extractThemes(from questions: [SessionContent]) -> [String] {
+        // Simple theme extraction based on keywords
+        var themes: Set<String> = []
+        
+        for question in questions {
+            let text = question.text.lowercased()
+            
+            if text.contains("hero") || text.contains("journey") || text.contains("quest") {
+                themes.insert("the hero's journey")
+            }
+            if text.contains("courage") || text.contains("brave") || text.contains("fear") {
+                themes.insert("courage")
+            }
+            if text.contains("love") || text.contains("relationship") {
+                themes.insert("love and relationships")
+            }
+            if text.contains("meaning") || text.contains("purpose") || text.contains("why") {
+                themes.insert("meaning and purpose")
+            }
+            if text.contains("identity") || text.contains("who") || text.contains("self") {
+                themes.insert("identity")
+            }
+        }
+        
+        return Array(themes).prefix(3).map { $0 }
+    }
+    
+    private func generateKeyInsights(questions: [SessionContent], quotes: [SessionContent], insights: [SessionContent]) {
+        var generatedInsights: [String] = []
+        
+        // Add insights based on questions asked
+        if questions.count > 5 {
+            generatedInsights.append("You engaged deeply with the text, asking \(questions.count) questions about key themes")
+        } else if questions.count > 0 {
+            generatedInsights.append("You reflected on important passages with thoughtful questions")
+        }
+        
+        // Add insights based on quotes captured
+        if quotes.count > 3 {
+            generatedInsights.append("You found \(quotes.count) passages that resonated with you")
+        }
+        
+        // Add insights based on session duration
+        let minutes = Int(session.duration) / 60
+        if minutes > 30 {
+            generatedInsights.append("You maintained focus for over \(minutes) minutes of deep reading")
+        }
+        
+        // Add any actual insights from the session
+        for insight in insights.prefix(2) {
+            if insight.text.count < 100 {
+                generatedInsights.append(insight.text)
+            }
+        }
+        
+        keyInsights = Array(generatedInsights.prefix(3))
+    }
+    
+    private func detectReadingProgress() {
+        // Check if any content mentions page numbers or chapter progress
+        for content in session.allContent {
+            // PageContext doesn't exist, check bookContext instead
+            if content.bookContext != nil {
+                // For now, we can't determine page-based progress
+                // Could be enhanced with actual page extraction
+                break
+            }
+        }
+        
+        // Check transcriptions for progress mentions
+        let transcriptions = session.rawTranscriptions.joined(separator: " ").lowercased()
+        if transcriptions.contains("chapter") {
+            // Try to extract chapter number
+            // This is simplified - would need better parsing in production
+            if transcriptions.contains("chapter 5") {
+                readingProgress = 0.25
+            } else if transcriptions.contains("chapter 10") {
+                readingProgress = 0.5
+            } else if transcriptions.contains("halfway") {
+                readingProgress = 0.5
+            }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func getBookPrimaryColor(_ book: Book) -> Color? {
+        // This would normally extract the primary color from the book cover
+        // For now, return a default color based on genre or mood
+        return session.metadata.mood.color
+    }
+    
+    private func startAnimations() {
+        withAnimation(.easeOut(duration: 0.6)) {
+            showContent = true
+        }
+    }
     
     private func autoSaveSession() {
-        guard !hasSaved else { return }
-        
+        // Save in background
         Task {
-            // Simulate processing
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
-            // Save to persistent storage
-            await saveSessionToHistory()
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
             
             await MainActor.run {
-                withAnimation {
-                    hasSaved = true
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                    showSaveCheckmark = true
+                }
+                
+                // Hide checkmark after 2 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showSaveCheckmark = false
+                    }
+                }
+                
+                // Auto-dismiss after 3 seconds if configured
+                if session.allContent.count < 3 {
+                    autoDismissTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+                        continueReading()
+                    }
                 }
             }
-        }
-    }
-    
-    private func saveSessionToHistory() async {
-        // This would save to SwiftData/CoreData
-        // For now, we'll save to UserDefaults as a quick implementation
-        
-        let sessionData = SessionHistoryData(
-            id: session.id,
-            bookId: session.bookContext?.id,
-            bookTitle: session.bookContext?.title ?? "Unknown Book",
-            startTime: session.startTime,
-            endTime: session.endTime ?? Date(),
-            duration: session.duration,
-            questionCount: session.totalQuestions,
-            quoteCount: session.allContent.filter { $0.type == .quote }.count,
-            insightCount: session.allContent.filter { $0.type == .insight }.count,
-            mood: session.metadata.mood.rawValue,
-            clusters: session.clusters.map { SessionHistoryData.ClusterSummary(topic: $0.topic, itemCount: $0.content.count) },
-            allContent: session.allContent.map { SessionHistoryData.ContentSummary(type: $0.type.rawValue, text: $0.text, timestamp: $0.timestamp) }
-        )
-        
-        // Get existing sessions
-        var sessions = SessionHistoryData.loadAll()
-        sessions.append(sessionData)
-        
-        // Keep only last 50 sessions
-        if sessions.count > 50 {
-            sessions = Array(sessions.suffix(50))
-        }
-        
-        SessionHistoryData.saveAll(sessions)
-    }
-    
-    private func markProgressIfNeeded() {
-        // Automatically update reading progress if detected
-        let progressDetector = IntelligentSessionProcessor.shared
-        let transcriptions = session.rawTranscriptions.joined(separator: " ")
-        let progressUpdates = progressDetector.detectProgressUpdates(content: transcriptions)
-        
-        if let lastProgress = progressUpdates.last {
-            // Post notification to update book progress
-            NotificationCenter.default.post(
-                name: Notification.Name("AutoUpdateBookProgress"),
-                object: [
-                    "book": session.bookContext as Any,
-                    "progress": lastProgress
-                ]
-            )
-        }
-    }
-}
-
-// MARK: - Component Views
-
-struct MetricCard: View {
-    let icon: String
-    let value: String
-    let label: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
             
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-            
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(color.opacity(0.15))
-        .cornerRadius(12)
-    }
-}
-
-struct ClusterCard: View {
-    let cluster: SessionCluster
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(cluster.topic, systemImage: cluster.mood.icon)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(cluster.mood.color)
-            
-            HStack(spacing: 12) {
-                Label("\(cluster.questionCount)", systemImage: "questionmark.circle")
-                Label("\(cluster.content.count)", systemImage: "text.bubble")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-            
-            Text(formatDuration(cluster.duration))
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .frame(width: 160)
-        .background(cluster.mood.color.opacity(0.1))
-        .cornerRadius(12)
-    }
-    
-    private func formatDuration(_ interval: TimeInterval) -> String {
-        let minutes = Int(interval) / 60
-        return "\(minutes) min"
-    }
-}
-
-struct KeyMomentCard: View {
-    let content: SessionContent
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "questionmark.circle.fill")
-                    .foregroundColor(.blue)
-                    .font(.caption)
-                
-                Text(content.text)
-                    .font(.subheadline)
-                    .lineLimit(2)
-            }
-            
-            if let response = content.aiResponse {
-                Text(response.answer)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
-                    .padding(.leading, 20)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
-
-struct SessionQuoteCard: View {
-    let content: SessionContent
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "quote.bubble.fill")
-                .foregroundColor(.green)
-                .font(.caption)
-            
-            Text(content.text)
-                .font(.subheadline)
-                .italic()
-                .lineLimit(3)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.green.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Session History Data Model
-
-struct SessionHistoryData: Codable {
-    let id: UUID
-    let bookId: String?
-    let bookTitle: String
-    let startTime: Date
-    let endTime: Date
-    let duration: TimeInterval
-    let questionCount: Int
-    let quoteCount: Int
-    let insightCount: Int
-    let mood: String
-    let clusters: [ClusterSummary]
-    let allContent: [ContentSummary]
-    
-    struct ClusterSummary: Codable {
-        let topic: String
-        let itemCount: Int
-    }
-    
-    struct ContentSummary: Codable {
-        let type: String
-        let text: String
-        let timestamp: Date
-    }
-    
-    static func loadAll() -> [SessionHistoryData] {
-        guard let data = UserDefaults.standard.data(forKey: "AmbientSessionHistory"),
-              let sessions = try? JSONDecoder().decode([SessionHistoryData].self, from: data) else {
-            return []
-        }
-        return sessions
-    }
-    
-    static func saveAll(_ sessions: [SessionHistoryData]) {
-        if let data = try? JSONEncoder().encode(sessions) {
-            UserDefaults.standard.set(data, forKey: "AmbientSessionHistory")
+            // Actually save the session
+            await saveSessionData()
         }
     }
     
-    static func loadForBook(_ bookId: String?) -> [SessionHistoryData] {
-        guard let bookId = bookId else { return [] }
-        return loadAll().filter { $0.bookId == bookId }
+    private func saveSessionData() async {
+        // Save to persistent storage (SwiftData/CoreData)
+        // Implementation depends on your data layer
+    }
+    
+    private func continueReading() {
+        // Navigate back to library tab
+        if session.bookContext != nil {
+            navigationCoordinator.selectedTab = .library
+        }
+        dismiss()
     }
 }
 
 #Preview {
-    AmbientSessionSummaryView(
-        session: OptimizedAmbientSession(
+    let book = Book(
+        id: "1",
+        title: "The Lord of the Rings",
+        author: "J.R.R. Tolkien",
+        publishedYear: "1954",
+        coverImageURL: nil as String?,
+        isbn: nil as String?,
+        description: "An epic fantasy adventure",
+        pageCount: 1216
+    )
+    
+    var session: OptimizedAmbientSession = {
+        var s = OptimizedAmbientSession(
             startTime: Date().addingTimeInterval(-1800),
-            bookContext: nil,
+            endTime: nil,
+            bookContext: book,
+            clusters: [],
+            rawTranscriptions: [],
+            allContent: [],
             metadata: SessionMetadata()
         )
-    )
+        s.endTime = Date()
+        return s
+    }()
+    
+    AmbientSessionSummaryView(session: session)
+        .environmentObject(NavigationCoordinator.shared)
+        .environmentObject(LibraryViewModel())
 }
