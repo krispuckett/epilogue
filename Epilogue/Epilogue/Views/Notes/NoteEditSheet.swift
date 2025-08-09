@@ -5,6 +5,7 @@ struct NoteEditSheet: View {
     @State private var editedContent: String
     @FocusState private var isTextFocused: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var notesViewModel: NotesViewModel
     
     init(note: Note) {
@@ -71,7 +72,7 @@ struct NoteEditSheet: View {
     }
     
     private func saveAndDismiss() {
-        // Create updated note with new content
+        // Since Note is a struct with immutable properties, we need to update through the view model
         let updatedNote = Note(
             type: note.type,
             content: editedContent,
@@ -85,6 +86,12 @@ struct NoteEditSheet: View {
         
         // Update through view model
         notesViewModel.updateNote(updatedNote)
+        
+        // Also post a notification so SwiftDataNotesView can update if needed
+        NotificationCenter.default.post(
+            name: Notification.Name("NoteUpdated"),
+            object: updatedNote
+        )
         
         dismiss()
     }

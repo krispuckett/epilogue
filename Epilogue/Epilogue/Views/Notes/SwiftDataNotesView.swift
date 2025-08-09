@@ -386,6 +386,18 @@ struct SwiftDataNotesView: View {
                     editingNote = note
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NoteUpdated"))) { notification in
+                if let updatedNote = notification.object as? Note {
+                    // Force refresh by triggering SwiftUI update
+                    Task {
+                        // This will cause the view to re-query from NotesViewModel
+                        await MainActor.run {
+                            // Trigger a view update
+                            _ = notesViewModel.notes
+                        }
+                    }
+                }
+            }
             } // End NavigationStack
             
             // Batch selection now handled in navigation bar
