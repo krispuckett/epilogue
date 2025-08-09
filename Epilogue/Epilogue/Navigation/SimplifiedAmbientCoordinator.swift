@@ -27,10 +27,10 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Open ambient mode - always starts with voice
-    func openAmbientMode() {
-        logger.info("🎙️ Opening ambient mode via SimplifiedAmbientCoordinator")
-        print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientMode() called")
+    /// Open ambient reading - always starts with voice
+    func openAmbientReading() {
+        logger.info("🎙️ Opening ambient reading via SimplifiedAmbientCoordinator")
+        print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientReading() called")
         print("🎙️ DEBUG: isPresented before = \(isPresented)")
         
         // Haptic feedback
@@ -43,9 +43,9 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         }
     }
     
-    /// Close ambient mode
-    func closeAmbientMode() {
-        logger.info("Closing ambient mode")
+    /// Close ambient reading
+    func closeAmbientReading() {
+        logger.info("Closing ambient reading")
         
         // Light haptic feedback
         HapticManager.shared.lightTap()
@@ -107,19 +107,15 @@ struct SimplifiedAmbientPresentationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: $coordinator.isPresented) {
-                UnifiedChatView(
-                    preSelectedBook: nil,  // Always start with no book
-                    startInVoiceMode: true,  // Always start with voice
-                    isAmbientMode: true
-                )
-                .environmentObject(libraryViewModel)
-                .environmentObject(notesViewModel)
-                .environmentObject(NavigationCoordinator.shared)
-                .preferredColorScheme(.dark)
-                .statusBarHidden(true)
-                .onAppear {
-                    print("🚀 DEBUG: UnifiedChatView appeared in ambient mode")
-                }
+                SophisticatedAmbientReadingView()
+                    .environmentObject(libraryViewModel)
+                    .environmentObject(notesViewModel)
+                    .environmentObject(NavigationCoordinator.shared)
+                    .preferredColorScheme(.dark)
+                    .statusBarHidden(true)
+                    .onAppear {
+                        print("🚀 DEBUG: SophisticatedAmbientReadingView appeared in ambient reading mode")
+                    }
             }
     }
 }

@@ -159,7 +159,7 @@ struct EnhancedQuickActionsBar: View {
         
         // Open simplified ambient mode
         print("🎯 DEBUG: About to call SimplifiedAmbientCoordinator.shared.openAmbientMode()")
-        SimplifiedAmbientCoordinator.shared.openAmbientMode()
+        SimplifiedAmbientCoordinator.shared.openAmbientReading()
         print("🎯 DEBUG: Called SimplifiedAmbientCoordinator.shared.openAmbientMode()")
     }
     
@@ -167,7 +167,7 @@ struct EnhancedQuickActionsBar: View {
         HapticManager.shared.success()
         
         // Double tap also opens simplified ambient mode
-        SimplifiedAmbientCoordinator.shared.openAmbientMode()
+        SimplifiedAmbientCoordinator.shared.openAmbientReading()
     }
     
     private func handleSwipeGesture(_ translation: CGSize) {
@@ -326,7 +326,7 @@ struct EnhancedQuickActionsBar: View {
         dismissRadialMenu()
         
         // Open simplified ambient mode (book will be detected from speech)
-        SimplifiedAmbientCoordinator.shared.openAmbientMode()
+        SimplifiedAmbientCoordinator.shared.openAmbientReading()
     }
     
     private func dismissRadialMenu() {

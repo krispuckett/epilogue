@@ -579,16 +579,13 @@ struct UnifiedChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
-                // Progressive transcript with real-time processing indicator
+                // Live transcription view for chat mode
                 if !liveTranscription.isEmpty {
-                    ProgressiveTranscriptView(
+                    LiveTranscriptionView(
                         transcription: liveTranscription,
-                        detectedEntities: detectedEntities,
                         adaptiveUIColor: adaptiveUIColor,
-                        confidence: voiceManager.confidenceScore,
                         isTranscribing: isRecording,
-                        onCancel: cancelTranscription,
-                        detectionState: detectionState  // Pass current detection state for visual feedback
+                        onCancel: cancelTranscription
                     )
                     .padding(.horizontal, 20)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -2403,231 +2400,6 @@ struct ViewHeightKey: PreferenceKey {
     }
 }
 
-// MARK: - Progressive Transcript View
-
-struct ProgressiveTranscriptView: View {
-    let transcription: String
-    let detectedEntities: [(text: String, confidence: Float)]
-    let adaptiveUIColor: Color
-    let confidence: Float
-    var isTranscribing: Bool = true
-    var onCancel: (() -> Void)? = nil
-    var detectionState: UnifiedChatView.DetectionState = .idle
-    
-    @State private var textHeight: CGFloat = 44
-    
-    var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            // Refined mic indicator with subtle animation
-            ZStack {
-                // Outer ring animation
-                Circle()
-                    .stroke(adaptiveUIColor.opacity(0.3), lineWidth: 1.5)
-                    .frame(width: 36, height: 36)
-                    .scaleEffect(isTranscribing ? 1.1 : 1.0)
-                    .opacity(isTranscribing ? 0.8 : 0.4)
-                    .animation(
-                        isTranscribing ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true) : .default,
-                        value: isTranscribing
-                    )
-                
-                // Inner filled circle
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                adaptiveUIColor.opacity(0.2),
-                                adaptiveUIColor.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 30, height: 30)
-                
-                // Mic icon
-                Image(systemName: isTranscribing ? "mic.fill" : "mic")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(
-                        isTranscribing ? adaptiveUIColor : .white.opacity(0.6)
-                    )
-                    .symbolEffect(.variableColor.iterative, options: .repeating.speed(0.5), value: isTranscribing)
-            }
-            .frame(width: 36, height: 36)
-            
-            // Refined text display
-            VStack(alignment: .leading, spacing: 4) {
-                if transcription.isEmpty {
-                    Text("Listening...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .italic()
-                } else {
-                    Text(highlightedTranscription)
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .lineSpacing(3)
-                }
-                
-                // Detection indicator
-                if detectionState != .idle {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(detectionStateColor)
-                            .frame(width: 5, height: 5)
-                            .overlay {
-                                Circle()
-                                    .fill(detectionStateColor)
-                                    .frame(width: 5, height: 5)
-                                    .scaleEffect(1.8)
-                                    .opacity(0.3)
-                                    .animation(.easeOut(duration: 1.0).repeatForever(autoreverses: false), value: detectionState)
-                            }
-                        
-                        Text(detectionStateText)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(detectionStateColor.opacity(0.9))
-                    }
-                    .padding(.top, 2)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                GeometryReader { geometry in
-                    Color.clear.preference(
-                        key: ViewHeightKey.self,
-                        value: geometry.size.height
-                    )
-                }
-            )
-            .onPreferenceChange(ViewHeightKey.self) { height in
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                    self.textHeight = max(52, height + 28)
-                }
-            }
-            
-            // Refined cancel button
-            if let onCancel = onCancel {
-                Button(action: {
-                    HapticManager.shared.lightTap()
-                    onCancel()
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .frame(width: 30, height: 30)
-                        
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                }
-                .buttonStyle(.plain)
-                .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: textHeight)
-        .background(
-            ZStack {
-                // Cleaner glass effect
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.black.opacity(0.05),
-                                        Color.black.opacity(0.02)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                
-                // Subtle animated border
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                adaptiveUIColor.opacity(isTranscribing ? 0.25 : 0.15),
-                                adaptiveUIColor.opacity(isTranscribing ? 0.15 : 0.08)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.75
-                    )
-                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isTranscribing)
-            }
-        )
-        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 3)
-        .shadow(color: adaptiveUIColor.opacity(0.05), radius: 12, x: 0, y: 4)
-    }
-    
-    private var highlightedTranscription: AttributedString {
-        var attributed = AttributedString(transcription)
-        
-        // Highlight detected entities
-        for entity in detectedEntities {
-            if let range = attributed.range(of: entity.text) {
-                attributed[range].foregroundColor = confidenceColor(entity.confidence)
-                attributed[range].font = .system(size: 15, weight: .semibold, design: .rounded)
-                attributed[range].backgroundColor = confidenceColor(entity.confidence).opacity(0.15)
-            }
-        }
-        
-        // Default styling for non-highlighted text
-        attributed.foregroundColor = .white.opacity(0.9)
-        
-        return attributed
-    }
-    
-    private func confidenceColor(_ confidence: Float) -> Color {
-        if confidence > 0.8 {
-            return .green
-        } else if confidence > 0.6 {
-            return .yellow
-        } else {
-            return .orange
-        }
-    }
-    
-    private var detectionStateColor: Color {
-        switch detectionState {
-        case .idle:
-            return .clear
-        case .detectingQuote:
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
-        case .processingQuestion:
-            return .blue
-        case .savingNote:
-            return Color(red: 0.6, green: 0.4, blue: 1.0)
-        case .saved:
-            return .green
-        }
-    }
-    
-    private var detectionStateText: String {
-        switch detectionState {
-        case .idle:
-            return ""
-        case .detectingQuote:
-            return "Quote detected"
-        case .processingQuestion:
-            return "Processing question"
-        case .savingNote:
-            return "Saving note"
-        case .saved:
-            return "Saved"
-        }
-    }
-}
 
 // MARK: - Live Transcription View (Legacy)
 
@@ -3230,7 +3002,7 @@ extension UnifiedChatView {
             }
             
             // Dismiss via coordinator
-            SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+            SimplifiedAmbientCoordinator.shared.closeAmbientReading()
             
             // Also dismiss locally
             dismiss()
@@ -3362,7 +3134,7 @@ extension View {
                         .onEnded { value in
                             // Swipe down to dismiss
                             if value.translation.height > 100 && abs(value.translation.width) < 100 {
-                                SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+                                SimplifiedAmbientCoordinator.shared.closeAmbientReading()
                                 dismiss()
                             }
                         }

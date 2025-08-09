@@ -25,16 +25,16 @@ struct QuickActionsSheet: View {
             case addBook
             case scanBook
             case search
-            case ambientChat
+            case ambientReading
         }
     }
     
     let quickCommands = [
         Command(
             icon: "mic.circle",
-            title: "Ambient Chat",
-            description: "Start voice-powered chat session",
-            action: .ambientChat
+            title: "Ambient Reading",
+            description: "Start voice-powered reading session",
+            action: .ambientReading
         ),
         Command(
             icon: "note.text",
@@ -356,9 +356,9 @@ struct QuickActionsSheet: View {
         case .search:
             onActionSelected("search")
             dismiss()
-        case .ambientChat:
-            // Start ambient chat with voice mode using simplified coordinator
-            SimplifiedAmbientCoordinator.shared.openAmbientMode()
+        case .ambientReading:
+            // Start ambient reading with voice mode using simplified coordinator
+            SimplifiedAmbientCoordinator.shared.openAmbientReading()
             dismiss()
         }
     }

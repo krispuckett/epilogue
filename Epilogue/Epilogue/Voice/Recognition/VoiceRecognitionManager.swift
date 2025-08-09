@@ -46,6 +46,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     @Published var isListeningInAmbientMode: Bool = false
     @Published var isProcessingWhisper = false
     @Published var detectedLanguage = "en"
+    @Published var currentTranscription: String = ""
     
     // Advanced voice pattern analysis
     @Published var voiceFrequency: Double = 0.5   // 0.0 = low pitch, 1.0 = high pitch
@@ -736,6 +737,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             if timeSinceLastSpeech > silenceThreshold * 2 {
                 DispatchQueue.main.async { [weak self] in
                     self?.transcribedText = ""
+                    self?.currentTranscription = ""
                 }
             }
         }
@@ -746,6 +748,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private func processTranscriptionResult(_ result: SFSpeechRecognitionResult) async {
         let text = result.bestTranscription.formattedString
         self.transcribedText = text
+        self.currentTranscription = text
         
         // Update words per minute tracking
         updateWordsPerMinute(from: text)
@@ -1381,7 +1384,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         // Done reading / exit
         if lowercased.contains("i'm done") || lowercased.contains("done reading") || lowercased.contains("stop ambient") {
-            SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+            SimplifiedAmbientCoordinator.shared.closeAmbientReading()
             return
         }
     }
