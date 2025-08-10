@@ -1381,7 +1381,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         // Done reading / exit
         if lowercased.contains("i'm done") || lowercased.contains("done reading") || lowercased.contains("stop ambient") {
-            SimplifiedAmbientCoordinator.shared.closeAmbientMode()
+            SimplifiedAmbientCoordinator.shared.closeAmbientReading()
             return
         }
     }
