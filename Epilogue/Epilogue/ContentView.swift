@@ -298,12 +298,12 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: $ambientCoordinator.isActive) {
-            // Use beautiful gradient ambient mode
-            AmbientModeView()
+            // Use original AmbientReadingView from before refactor
+            AmbientReadingView()
                 .environmentObject(libraryViewModel)
                 .interactiveDismissDisabled()
                 .onAppear {
-                    print("🎨 GRADIENT MODE: AmbientModeView launched with voice-responsive gradients!")
+                    print("🎯 ORIGINAL: AmbientReadingView from before major refactor!")
                 }
         }
         .onChange(of: selectedTab) { oldValue, newValue in

@@ -159,16 +159,16 @@ struct SimplifiedAmbientPresentationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: $coordinator.isPresented) {
-                // Use the beautiful gradient ambient mode
-                AmbientModeView()
+                // Use the original AmbientReadingView from before refactor
+                AmbientReadingView()
                     .environmentObject(libraryViewModel)
                     .environmentObject(notesViewModel)
                     .environmentObject(NavigationCoordinator.shared)
                     .preferredColorScheme(.dark)
                     .statusBarHidden(true)
                     .onAppear {
-                        print("🎨 GRADIENT AMBIENT MODE: AmbientModeView with voice-responsive gradients is showing!")
-                        print("🎨 Beautiful gradients and live transcription restored")
+                        print("🎯 ORIGINAL: AmbientReadingView from before major refactor!")
+                        print("🎯 Restored from commit e7285bc")
                     }
             }
     }

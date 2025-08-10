@@ -1,61 +1,16 @@
 import SwiftUI
 
 /// Apple Music-style atmospheric gradient background for book views
-/// Enhanced with voice-responsive parameters for ambient mode
 struct BookAtmosphericGradientView: View {
-    // Core parameters
-    let book: Book?
-    let colorPalette: ColorPalette?
-    var intensity: Double = 0.85
+    let colorPalette: ColorPalette
+    let intensity: Double
     
-    // NEW: Voice-responsive parameters
-    var frequency: Double = 0.0      // 0-1 normalized from voice frequency
-    var rhythm: Double = 0.0         // Speaking rhythm/cadence
-    var speakingSpeed: Double = 0.0  // Words per minute
-    
+    @State private var gradientOffset: CGFloat = 0
     @State private var displayedPalette: ColorPalette?
-    @State private var gradientRotation: Double = 0
-    @State private var colorShift: Double = 0
-    @State private var breathingScale: Double = 1.0
-    @State private var pulseOpacity: Double = 0.8
     
-    // Computed animation based on speaking speed
-    private var gradientAnimation: Animation {
-        // Faster animation for faster speech, slower for slower speech
-        let baseDuration = 30.0
-        let speedFactor = max(0.5, min(2.0, speakingSpeed / 150.0))
-        return Animation.easeInOut(duration: baseDuration / speedFactor)
-            .repeatForever(autoreverses: true)
-    }
-    
-    // Color shift based on voice frequency
-    private var frequencyColorModifier: Color {
-        // Higher frequency = warmer tones (more red/orange)
-        // Lower frequency = cooler tones (more blue/purple)
-        if frequency > 0.6 {
-            // High frequency - warm shift
-            return Color(red: 0.2, green: 0.1, blue: 0.0).opacity(0.3)
-        } else if frequency < 0.4 {
-            // Low frequency - cool shift
-            return Color(red: 0.0, green: 0.1, blue: 0.2).opacity(0.3)
-        } else {
-            // Mid frequency - neutral
-            return Color.clear
-        }
-    }
-    
-    init(book: Book? = nil, 
-         colorPalette: ColorPalette? = nil, 
-         intensity: Double = 0.85,
-         frequency: Double = 0.0,
-         rhythm: Double = 0.0,
-         speakingSpeed: Double = 0.0) {
-        self.book = book
+    init(colorPalette: ColorPalette, intensity: Double = 1.0) {
         self.colorPalette = colorPalette
         self.intensity = intensity
-        self.frequency = frequency
-        self.rhythm = rhythm
-        self.speakingSpeed = speakingSpeed
     }
     
     var body: some View {
@@ -65,9 +20,8 @@ struct BookAtmosphericGradientView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                // Primary gradient - voice-responsive
-                if let palette = displayedPalette ?? colorPalette {
-                    // Main gradient with voice-responsive modifications
+                // Single direction gradient - no mirroring, with intensity control
+                if let palette = displayedPalette {
                     LinearGradient(
                         stops: [
                             .init(color: palette.primary.opacity(intensity), location: 0.0),
@@ -79,100 +33,25 @@ struct BookAtmosphericGradientView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .blur(radius: 40 + rhythm * 10) // Blur responds to speaking rhythm
-                    .rotationEffect(.degrees(gradientRotation))
-                    .scaleEffect(breathingScale)
-                    .opacity(pulseOpacity)
+                    .blur(radius: 40)
                     .ignoresSafeArea()
-                    .overlay {
-                        // Frequency-based color overlay
-                        frequencyColorModifier
-                            .blendMode(.overlay)
-                            .ignoresSafeArea()
-                            .animation(.easeInOut(duration: 0.5), value: frequency)
-                    }
-                    
-                    // Secondary animated gradient for voice dynamics
-                    if rhythm > 0.3 {
-                        RadialGradient(
-                            colors: [
-                                palette.primary.opacity(rhythm * 0.3),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 50,
-                            endRadius: 200 + rhythm * 100
-                        )
-                        .scaleEffect(1.0 + rhythm * 0.2)
-                        .ignoresSafeArea()
-                        .blendMode(.plusLighter)
-                        .animation(.easeOut(duration: 0.3), value: rhythm)
-                    }
                 }
                 
-                // Subtle noise texture overlay (keeping at 3% as requested)
+                // Subtle noise texture overlay
                 Rectangle()
                     .fill(.ultraThinMaterial)
-                    .opacity(0.03) // 3% opacity for subtle texture depth
+                    .opacity(0.05) // Very subtle texture
                     .ignoresSafeArea()
                     .blendMode(.plusLighter)
             }
         }
         .onAppear {
-            displayedPalette = processColors(colorPalette ?? getDefaultPalette())
-            
-            // Start breathing animation for ambient feel
-            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
-                breathingScale = 1.05
-                pulseOpacity = 0.9
-            }
-            
-            // Start gradient rotation animation
-            withAnimation(.linear(duration: 30).repeatForever(autoreverses: false)) {
-                gradientRotation = 360
-            }
-            
-            // Start gradient animation if speaking
-            if speakingSpeed > 0 {
-                withAnimation(gradientAnimation) {
-                    gradientRotation = 5
-                }
-            }
+            displayedPalette = processColors(colorPalette)
+            startSubtleAnimation()
         }
         .onChange(of: colorPalette) { _, newPalette in
-            displayedPalette = processColors(newPalette ?? getDefaultPalette())
+            displayedPalette = processColors(newPalette)
         }
-        .onChange(of: speakingSpeed) { _, newSpeed in
-            // Adjust animation based on speaking speed
-            if newSpeed > 0 {
-                withAnimation(gradientAnimation) {
-                    gradientRotation = 5 * (newSpeed / 150.0)
-                }
-            } else {
-                withAnimation(.easeOut(duration: 2.0)) {
-                    gradientRotation = 0
-                }
-            }
-        }
-        .onChange(of: frequency) { _, newFrequency in
-            // Subtle color shift based on frequency
-            withAnimation(.easeInOut(duration: 0.3)) {
-                colorShift = newFrequency
-            }
-        }
-    }
-    
-    private func getDefaultPalette() -> ColorPalette {
-        ColorPalette(
-            primary: Color(red: 1.0, green: 0.55, blue: 0.26),
-            secondary: Color(red: 0.8, green: 0.3, blue: 0.4),
-            accent: Color(red: 0.6, green: 0.2, blue: 0.5),
-            background: Color.black,
-            textColor: Color.white,
-            luminance: 0.5,
-            isMonochromatic: false,
-            extractionQuality: 1.0
-        )
     }
     
     /// Create gradient stops with non-linear distribution
@@ -298,6 +177,12 @@ struct BookAtmosphericGradientView: View {
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
     
+    /// Start subtle 30-second animation
+    private func startSubtleAnimation() {
+        withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
+            gradientOffset = 0.1 // Subtle movement
+        }
+    }
 }
 
 // MARK: - Convenience Transition
