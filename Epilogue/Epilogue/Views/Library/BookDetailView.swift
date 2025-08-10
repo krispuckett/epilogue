@@ -243,13 +243,25 @@ struct BookDetailView: View {
         .toolbarBackground(.automatic, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Edit Book") {
-                    editedTitle = book.title
-                    showingBookSearch = true
-                    HapticManager.shared.lightTap()
+                HStack(spacing: 16) {
+                    Button {
+                        EpilogueAmbientCoordinator.shared.launch(
+                            from: .bookDetail,
+                            book: book
+                        )
+                    } label: {
+                        Image(systemName: "waveform.circle")
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    
+                    Button("Edit Book") {
+                        editedTitle = book.title
+                        showingBookSearch = true
+                        HapticManager.shared.lightTap()
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.primary)
                 }
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.primary)
             }
         }
         .sheet(isPresented: $showingBookSearch) {

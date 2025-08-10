@@ -3,145 +3,39 @@ import SwiftData
 import AVFoundation
 import Combine
 
-// MARK: - Display States
-enum AmbientDisplayState {
-    case listening
-    case thinking
-    case responding
-    case complete
-    
-    var gradientIntensity: Double {
-        switch self {
-        case .listening:
-            return 0.9
-        case .thinking:
-            return 0.7
-        case .responding:
-            return 1.0
-        case .complete:
-            return 0.85
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .listening:
-            return "Listening..."
-        case .thinking:
-            return "Thinking..."
-        case .responding:
-            return "Speaking..."
-        case .complete:
-            return "Complete"
-        }
-    }
-}
-
 // MARK: - Main Sophisticated Ambient Reading View
+// NOTE: This view is deprecated - using AmbientModeView instead
 struct SophisticatedAmbientReadingView: View {
-    // Core services
-    @StateObject private var processor = SingleSourceProcessor.shared
-    @StateObject private var voiceManager = VoiceRecognitionManager.shared
-    @StateObject private var libraryViewModel = LibraryViewModel()
-    @Namespace private var animationNamespace
-    
-    // Display state
-    @State private var displayState: AmbientDisplayState = .listening
-    @State private var isListening: Bool = true
-    @State private var showSettings: Bool = false
-    
-    // Book and gradient
-    @State private var selectedBook: Book?
-    @State private var bookPalette: ColorPalette?
-    @State private var gradientIntensity: Double = 0.9
-    
-    // Voice parameters for gradient
-    @State private var voiceFrequency: Double = 0.0
-    @State private var voiceRhythm: Double = 0.0
-    @State private var speakingSpeed: Double = 150.0
-    
-    // UI state
-    @State private var showBookSelector: Bool = false
-    @State private var showCommandPalette: Bool = false
-    @State private var lastProcessedText: String = ""
-    
-    // Transcript and entity detection
-    @State private var currentTranscription: String = ""
-    @State private var detectedEntities: [DetectedEntity] = []
-    @State private var transcriptionConfidence: Float = 0.9
-    @State private var isProcessing: Bool = false
-    
-    // Session tracking
-    @State private var currentSession: OptimizedAmbientSession?
-    @State private var sessionStartTime: Date?
-    @State private var capturedContent: [SessionContent] = []
-    @State private var showSessionSummary: Bool = false
-    @State private var processedResults: [SingleSourceProcessor.ProcessingResult] = []
-    
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    
-    // Default palette for when no book is selected
-    private var ambientDefaultPalette: ColorPalette {
-        ColorPalette(
-            primary: Color(red: 1.0, green: 0.55, blue: 0.26),
-            secondary: Color(red: 0.8, green: 0.3, blue: 0.4),
-            accent: Color(red: 0.6, green: 0.2, blue: 0.5),
-            background: Color.black,
-            textColor: Color.white,
-            luminance: 0.5,
-            isMonochromatic: false,
-            extractionQuality: 1.0
-        )
-    }
     
     var body: some View {
+        // SIMPLIFIED: This view is deprecated - use NewEpilogueAmbientView
         ZStack {
-            // MARK: - Ambient Gradient Background
-            ambientGradientBackground
+            Color.black.ignoresSafeArea()
             
-            // MARK: - Main Content
-            VStack(spacing: 0) {
-                // Header with controls
-                ambientHeader
-                    .padding(.top, 60)
+            VStack(spacing: 20) {
+                Text("Loading Ambient Mode...")
+                    .foregroundStyle(.white)
+                    .font(.title2)
                 
-                Spacer()
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
                 
-                // Central content area
-                if !processedResults.isEmpty {
-                    processedContentDisplay
-                        .padding(.horizontal, 24)
-                } else if !currentTranscription.isEmpty || isProcessing {
-                    transcriptDisplay
-                        .padding(.horizontal, 24)
-                } else {
-                    listeningIndicator
+                Button("Dismiss") {
+                    dismiss()
                 }
-                
-                Spacer()
-                
-                // Voice visualization
-                voiceVisualization
-                    .padding(.bottom, 100)
-            }
-            
-            // MARK: - Overlays
-            if showBookSelector {
-                bookSelectorOverlay
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
-            }
-            
-            // Command palette hint
-            if !showCommandPalette {
-                commandPaletteHint
+                .foregroundStyle(.white)
+                .padding()
             }
         }
         .statusBarHidden()
-        .persistentSystemOverlays(.hidden)
-        .onAppear { startAmbientMode() }
-        .onDisappear { stopAmbientMode() }
-        .sheet(isPresented: $showCommandPalette) {
+        .preferredColorScheme(.dark)
+    }
+}
+
+// REST OF FILE COMMENTED OUT TO AVOID COMPILATION ISSUES
+/*
             LiquidCommandPalettePresentation(
                 isPresented: $showCommandPalette,
                 animationNamespace: animationNamespace,
@@ -179,7 +73,6 @@ struct SophisticatedAmbientReadingView: View {
                     }
                 }
         )
-    }
     
     // MARK: - Ambient Gradient Background
     
@@ -325,27 +218,25 @@ struct SophisticatedAmbientReadingView: View {
     // MARK: - Listening Indicator
     
     private var listeningIndicator: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "waveform")
-                .font(.system(size: 48, weight: .thin))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            (bookPalette?.primary ?? ambientDefaultPalette.primary).opacity(0.8),
-                            (bookPalette?.secondary ?? ambientDefaultPalette.secondary).opacity(0.6)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .symbolEffect(.variableColor.iterative, options: .repeating.speed(0.5), value: isListening)
+        VStack(spacing: 20) {
+            // Simplified orb visualization
+            AdvancedOrbVisualization(
+                audioLevel: voiceManager.currentAmplitude,
+                voiceFrequency: Float(voiceFrequency),
+                isListening: isListening,
+                isProcessing: isProcessing,
+                bookPalette: bookPalette ?? ambientDefaultPalette,
+                displayState: displayState
+            )
+            .frame(width: 300, height: 300)
+            .scaleEffect(isListening ? 1.0 : 0.9)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: isListening)
             
+            // Status text below orb
             Text(displayState.description)
                 .font(.system(size: 18, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.7))
         }
-        .padding(32)
-        .glassEffect(in: .rect(cornerRadius: 24))
     }
     
     // MARK: - Voice Visualization
@@ -851,9 +742,144 @@ struct WaveformVisualization: View {
     }
 }
 
+// MARK: - Advanced Orb Visualization
+
+struct AdvancedOrbVisualization: View {
+    let audioLevel: Float
+    let voiceFrequency: Float
+    let isListening: Bool
+    let isProcessing: Bool
+    let bookPalette: ColorPalette
+    let displayState: AmbientDisplayState
+    
+    @State private var phase: Double = 0
+    @State private var breathingScale: CGFloat = 1.0
+    
+    var body: some View {
+        ZStack {
+            // Layer 1: Background glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            bookPalette.primary.opacity(0.3),
+                            bookPalette.secondary.opacity(0.2),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 150
+                    )
+                )
+                .scaleEffect(breathingScale * 1.2)
+                .blur(radius: 20)
+            
+            // Layer 2: Main orb with mesh gradient effect
+            ZStack {
+                ForEach(0..<3) { index in
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    orbColor(for: index).opacity(0.6),
+                                    orbColor(for: index).opacity(0.3),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: CGFloat(30 + index * 10),
+                                endRadius: CGFloat(100 + index * 20)
+                            )
+                        )
+                        .scaleEffect(1.0 + CGFloat(audioLevel) * 0.3)
+                        .rotationEffect(.degrees(phase * Double(60 * (index + 1))))
+                        .blendMode(.plusLighter)
+                }
+            }
+            .scaleEffect(breathingScale)
+            
+            // Layer 3: Inner core
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            bookPalette.primary,
+                            bookPalette.secondary
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 80, height: 80)
+                .scaleEffect(0.8 + CGFloat(audioLevel) * 0.4)
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.6), Color.white.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+            
+            // Layer 4: Processing indicator
+            if isProcessing {
+                ForEach(0..<8) { index in
+                    Circle()
+                        .fill(bookPalette.accent.opacity(0.6))
+                        .frame(width: 4, height: 4)
+                        .offset(y: -60)
+                        .rotationEffect(.degrees(Double(index) * 45))
+                        .rotationEffect(.degrees(phase * 360))
+                }
+            }
+            
+            // Layer 5: Audio reactive rings
+            if isListening {
+                ForEach(0..<3) { ring in
+                    Circle()
+                        .stroke(
+                            bookPalette.primary.opacity(0.3 - Double(ring) * 0.1),
+                            lineWidth: 2
+                        )
+                        .scaleEffect(1.0 + CGFloat(ring) * 0.2 + CGFloat(audioLevel) * CGFloat(ring) * 0.1)
+                        .animation(
+                            .easeInOut(duration: 1.5)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(ring) * 0.2),
+                            value: audioLevel
+                        )
+                }
+            }
+        }
+        .onAppear {
+            // Start breathing animation
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                breathingScale = 1.1
+            }
+            
+            // Start rotation animation
+            withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
+                phase = 1.0
+            }
+        }
+    }
+    
+    private func orbColor(for index: Int) -> Color {
+        switch index {
+        case 0: return bookPalette.primary
+        case 1: return bookPalette.secondary
+        case 2: return bookPalette.accent
+        default: return bookPalette.primary
+        }
+    }
+}
+
+*/
+
 // MARK: - Preview
 
 #Preview {
     SophisticatedAmbientReadingView()
-        .modelContainer(for: [CapturedNote.self, CapturedQuote.self])
 }
