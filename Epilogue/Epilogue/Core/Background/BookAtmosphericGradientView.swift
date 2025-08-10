@@ -16,6 +16,8 @@ struct BookAtmosphericGradientView: View {
     @State private var displayedPalette: ColorPalette?
     @State private var gradientRotation: Double = 0
     @State private var colorShift: Double = 0
+    @State private var breathingScale: Double = 1.0
+    @State private var pulseOpacity: Double = 0.8
     
     // Computed animation based on speaking speed
     private var gradientAnimation: Animation {
@@ -79,6 +81,8 @@ struct BookAtmosphericGradientView: View {
                     )
                     .blur(radius: 40 + rhythm * 10) // Blur responds to speaking rhythm
                     .rotationEffect(.degrees(gradientRotation))
+                    .scaleEffect(breathingScale)
+                    .opacity(pulseOpacity)
                     .ignoresSafeArea()
                     .overlay {
                         // Frequency-based color overlay
@@ -116,6 +120,17 @@ struct BookAtmosphericGradientView: View {
         }
         .onAppear {
             displayedPalette = processColors(colorPalette ?? getDefaultPalette())
+            
+            // Start breathing animation for ambient feel
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                breathingScale = 1.05
+                pulseOpacity = 0.9
+            }
+            
+            // Start gradient rotation animation
+            withAnimation(.linear(duration: 30).repeatForever(autoreverses: false)) {
+                gradientRotation = 360
+            }
             
             // Start gradient animation if speaking
             if speakingSpeed > 0 {
