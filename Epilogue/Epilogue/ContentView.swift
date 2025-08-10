@@ -298,12 +298,12 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: $ambientCoordinator.isActive) {
-            // Force new implementation with proper orb
-            ProperEpilogueAmbientView()
+            // Use beautiful gradient ambient mode
+            AmbientModeView()
                 .environmentObject(libraryViewModel)
                 .interactiveDismissDisabled()
                 .onAppear {
-                    print("🔥🎯 NEW ORB: ProperEpilogueAmbientView launched from floating button!")
+                    print("🎨 GRADIENT MODE: AmbientModeView launched with voice-responsive gradients!")
                 }
         }
         .onChange(of: selectedTab) { oldValue, newValue in
