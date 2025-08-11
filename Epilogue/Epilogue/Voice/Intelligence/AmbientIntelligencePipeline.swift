@@ -67,7 +67,7 @@ class AmbientIntelligencePipeline: ObservableObject {
     private let cacheExpiration: TimeInterval = 300 // 5 minutes
     
     struct IntelligenceResult {
-        let transcription: TranscriptionResult
+        let transcription: PipelineTranscriptionResult
         let intent: ReadingIntent
         let entities: [FoundationModelsProcessor.ExtractedEntity]
         let sentiment: FoundationModelsProcessor.SentimentScore
