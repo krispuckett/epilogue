@@ -77,7 +77,7 @@ class AmbientIntelligencePipeline: ObservableObject {
         let timestamp: Date
     }
     
-    struct TranscriptionResult {
+    struct PipelineTranscriptionResult {
         let whisperText: String
         let appleText: String
         let finalText: String
@@ -398,7 +398,7 @@ class AmbientIntelligencePipeline: ObservableObject {
     private func combineTranscriptions(
         whisper: TranscriptionResult?,
         apple: String?
-    ) -> TranscriptionResult {
+    ) -> PipelineTranscriptionResult {
         // Use Whisper as primary, Apple as fallback
         let whisperText = whisper?.text ?? ""
         let appleText = apple ?? ""
@@ -418,7 +418,7 @@ class AmbientIntelligencePipeline: ObservableObject {
             confidence = 0
         }
         
-        return TranscriptionResult(
+        return PipelineTranscriptionResult(
             whisperText: whisperText,
             appleText: appleText,
             finalText: finalText,
