@@ -272,7 +272,7 @@ class AmbientIntelligencePipeline: ObservableObject {
     // MARK: - Stage 3: Intelligence Layer
     
     private func applyIntelligence(
-        transcription: TranscriptionResult,
+        transcription: PipelineTranscriptionResult,
         soundEvents: [SoundEvent]
     ) async {
         let startTime = Date()
