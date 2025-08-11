@@ -218,7 +218,7 @@ class AmbientIntelligencePipeline: ObservableObject {
         )
     }
     
-    private func processWithWhisper(_ buffer: AVAudioPCMBuffer) async -> EpilogueTranscriptionResult? {
+    private func processWithWhisper(_ buffer: AVAudioPCMBuffer) async -> TranscriptionResult? {
         let startTime = Date()
         
         do {
@@ -293,7 +293,7 @@ class AmbientIntelligencePipeline: ObservableObject {
         // Run Foundation Models in parallel
         async let intentTask = foundationModelsProcessor.classifyIntent(
             from: transcription.finalText,
-            bookContext: bookContext
+            bookContext: nil  // TODO: Convert BookContext to Book if needed
         )
         async let entitiesTask = foundationModelsProcessor.extractEntities(
             from: transcription.finalText
@@ -396,7 +396,7 @@ class AmbientIntelligencePipeline: ObservableObject {
     }
     
     private func combineTranscriptions(
-        whisper: EpilogueTranscriptionResult?,
+        whisper: TranscriptionResult?,
         apple: String?
     ) -> TranscriptionResult {
         // Use Whisper as primary, Apple as fallback
