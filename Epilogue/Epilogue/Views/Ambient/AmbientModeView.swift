@@ -83,12 +83,8 @@ struct AmbientModeView: View {
         ZStack {
             // MARK: - Enhanced Gradient Background (Your Signature)
             BookAtmosphericGradientView(
-                book: currentBook,
                 colorPalette: bookPalette ?? ambientDefaultPalette,
-                intensity: gradientIntensity + Double(voiceManager.audioLevel) * 0.3,
-                frequency: mapFrequency(voiceFrequency),
-                rhythm: voiceRhythm,
-                speakingSpeed: speakingSpeed
+                intensity: gradientIntensity + Double(voiceManager.audioLevel) * 0.3
             )
             .ignoresSafeArea()
             .animation(.smooth(duration: 0.3), value: gradientIntensity)
