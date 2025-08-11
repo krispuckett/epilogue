@@ -268,34 +268,6 @@ struct ContentView: View {
                 }
             }
             
-            // Floating ambient button (always accessible)
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    
-                    Button {
-                        ambientCoordinator.launch(from: .quickActions)
-                    } label: {
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.system(size: 56))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.0, green: 0.55, blue: 0.26),
-                                        Color(red: 0.9, green: 0.3, blue: 0.4)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .shadow(radius: 10)
-                    }
-                    .glassEffect(.regular, in: Circle())
-                    .padding(24)
-                }
-            }
         }
         .fullScreenCover(isPresented: $ambientCoordinator.isActive) {
             // Use UnifiedChatView in ambient mode for beautiful gradient interface
