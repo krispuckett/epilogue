@@ -428,66 +428,52 @@ struct AmbientReadingProgressDemo: View {
             
             ScrollView {
                 VStack(spacing: 50) {
-                    // Compact version
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Compact Timeline")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        
-                        AmbientReadingProgressView(
-                            book: sampleBook,
-                            width: 300,
-                            showDetailed: false,
-                            colorPalette: nil
-                        )
-                        .padding(20)
-                        .background(Color.white.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    }
+                    // Simplified preview - just show one version
+                    compactVersionView
+                    detailedVersionView
                     
-                    // Detailed version
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Detailed Timeline")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        
-                        AmbientReadingProgressView(
-                            book: sampleBook,
-                            width: 320,
-                            showDetailed: true,
-                            colorPalette: nil
-                        )
-                        .padding(30)
-                        .background(Color.white.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                    }
-                    
-                    // Progress controls
-                    VStack(spacing: 16) {
-                        Text("Test Progress")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        
-                        HStack(spacing: 12) {
-                            ForEach([0, 25, 50, 75, 100], id: \.self) { percentage in
-                                Button("\(percentage)%") {
-                                    withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                                        sampleBook.currentPage = Int(Double(sampleBook.pageCount ?? 320) * Double(percentage) / 100.0)
-                                    }
-                                }
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.white.opacity(0.1))
-                                .clipShape(Capsule())
-                            }
-                        }
-                    }
                 }
                 .padding(40)
             }
         }
         .environmentObject(LibraryViewModel())
+    }
+    
+    // Extract complex views into computed properties
+    private var compactVersionView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Compact Timeline")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+            
+            AmbientReadingProgressView(
+                book: sampleBook,
+                width: 300,
+                showDetailed: false,
+                colorPalette: nil
+            )
+            .padding(20)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+    }
+    
+    private var detailedVersionView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Detailed Timeline")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+            
+            AmbientReadingProgressView(
+                book: sampleBook,
+                width: 320,
+                showDetailed: true,
+                colorPalette: nil
+            )
+            .padding(30)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+        }
     }
 }
 

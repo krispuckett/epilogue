@@ -7,6 +7,18 @@ import NaturalLanguage
 class ContentIntelligence {
     static let shared = ContentIntelligence()
     
+    // MARK: - Content Types
+    enum ContentType {
+        case quote
+        case note
+        case question
+        case thought
+        case ambient
+        case unknown
+        case reflection
+        case insight
+    }
+    
     // MARK: - Detection Result
     struct DetectionResult {
         let type: ContentType
@@ -518,10 +530,10 @@ class ContentIntelligence {
 }
 
 // MARK: - ContentType Extension for Intelligence
-extension ContentType {
+extension ContentIntelligence.ContentType {
     var requiresContext: Bool {
         switch self {
-        case .insight, .reflection:
+        case .thought, .insight, .reflection:
             return true
         default:
             return false
@@ -533,10 +545,10 @@ extension ContentType {
         case .question: return 100
         case .quote: return 90
         case .insight: return 80
-        // connection removed
         case .reflection: return 70
-        // reaction removed
+        case .thought: return 60
         case .note: return 50
+        case .ambient: return 30
         case .unknown: return 0
         }
     }

@@ -6,7 +6,7 @@ struct SessionContentCardsView: View {
     let bookTitle: String?
     let bookAuthor: String?
     
-    @StateObject private var processor = IntelligentSessionProcessor.shared
+    @StateObject private var processor = TrueAmbientProcessor.shared
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     
     private enum ContentType {
@@ -320,10 +320,11 @@ struct ChatQuestionCard: View {
 
 struct IntelligentSuggestionsSection: View {
     let session: ProcessedAmbientSession
-    let processor: IntelligentSessionProcessor
+    let processor: TrueAmbientProcessor
     let library: [Book]
     
-    @State private var suggestions: [SessionSuggestion] = []
+    // Suggestions temporarily disabled - was SessionSuggestion
+    @State private var suggestions: [String] = []
     @State private var showingSuggestions = true
     
     var body: some View {
@@ -347,7 +348,7 @@ struct IntelligentSuggestionsSection: View {
                     }
                 }
                 
-                ForEach(suggestions) { suggestion in
+                ForEach(suggestions, id: \.self) { suggestion in
                     SuggestionCard(suggestion: suggestion)
                 }
             }
@@ -367,39 +368,33 @@ struct IntelligentSuggestionsSection: View {
                 ambientSession.endTime = Date()
                 ambientSession.processedData = session
                 
-                suggestions = processor.generateActionableSuggestions(
-                    session: ambientSession,
-                    library: library
-                )
+                // Suggestions temporarily disabled
+                suggestions = []
             }
         }
     }
 }
 
 struct SuggestionCard: View {
-    let suggestion: SessionSuggestion
+    // Suggestion temporarily disabled - using string for now
+    let suggestion: String
     @State private var isPressed = false
     
     var body: some View {
         Button {
             HapticManager.shared.lightTap()
-            suggestion.action()
+            // Action disabled for now
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: suggestion.icon)
+                Image(systemName: "sparkles")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color.warmAmber)
                     .frame(width: 32, height: 32)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(suggestion.title)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
-                    
-                    Text(suggestion.description)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
+                Text(suggestion)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
                 
                 Spacer()
                 
@@ -431,9 +426,10 @@ struct SuggestionCard: View {
 
 struct ProgressUpdatesSection: View {
     let content: String
-    let processor: IntelligentSessionProcessor
+    let processor: TrueAmbientProcessor
     
-    @State private var progressUpdates: [ProgressUpdate] = []
+    // Progress updates temporarily disabled
+    @State private var progressUpdates: [String] = []
     
     var body: some View {
         if !progressUpdates.isEmpty {
@@ -442,19 +438,21 @@ struct ProgressUpdatesSection: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.warmAmber.opacity(0.8))
                 
-                ForEach(progressUpdates, id: \.position) { update in
+                ForEach(progressUpdates, id: \.self) { update in
                     ProgressUpdateCard(update: update)
                 }
             }
             .onAppear {
-                progressUpdates = processor.detectProgressUpdates(content: content)
+                // Progress updates temporarily disabled
+                progressUpdates = []
             }
         }
     }
 }
 
 struct ProgressUpdateCard: View {
-    let update: ProgressUpdate
+    // Update temporarily disabled - using string for now
+    let update: String
     
     var body: some View {
         HStack(spacing: 12) {
@@ -463,11 +461,11 @@ struct ProgressUpdateCard: View {
                 .foregroundStyle(Color.warmAmber.opacity(0.6))
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(update.type.displayText)
+                Text("Progress Update")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)
                 
-                Text("From: \"\(update.rawText)\"")
+                Text(update)
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
@@ -477,10 +475,7 @@ struct ProgressUpdateCard: View {
             
             Button {
                 HapticManager.shared.lightTap()
-                NotificationCenter.default.post(
-                    name: Notification.Name("UpdateBookProgress"),
-                    object: update
-                )
+                // Action disabled for now
             } label: {
                 Text("Update")
                     .font(.system(size: 12, weight: .medium))
@@ -504,10 +499,11 @@ struct ProgressUpdateCard: View {
 
 struct BookReferencesSection: View {
     let content: String
-    let processor: IntelligentSessionProcessor
+    let processor: TrueAmbientProcessor
     let library: [Book]
     
-    @State private var bookReferences: [BookReference] = []
+    // Book references temporarily disabled
+    @State private var bookReferences: [String] = []
     
     var body: some View {
         if !bookReferences.isEmpty {
@@ -516,47 +512,31 @@ struct BookReferencesSection: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.warmAmber.opacity(0.8))
                 
-                ForEach(bookReferences, id: \.bookTitle) { reference in
+                ForEach(bookReferences, id: \.self) { reference in
                     BookReferenceCard(reference: reference)
                 }
             }
             .onAppear {
-                bookReferences = processor.detectBookReferences(
-                    content: content,
-                    library: library
-                )
+                // Book references temporarily disabled
+                bookReferences = []
             }
         }
     }
 }
 
 struct BookReferenceCard: View {
-    let reference: BookReference
+    // Reference temporarily disabled - using string for now
+    let reference: String
     
     var body: some View {
         HStack(spacing: 12) {
-            if let book = reference.matchedBook,
-               let coverURLString = book.coverImageURL,
-               let coverURL = URL(string: coverURLString) {
-                AsyncImage(url: coverURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.warmAmber.opacity(0.1))
-                }
+            Image(systemName: "book.fill")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.warmAmber.opacity(0.6))
                 .frame(width: 40, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            } else {
-                Image(systemName: "book.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(Color.warmAmber.opacity(0.6))
-                    .frame(width: 40, height: 60)
-            }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(reference.bookTitle)
+                Text(reference)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -566,27 +546,13 @@ struct BookReferenceCard: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.green)
                     
-                    Text("Confidence: \(Int(reference.confidence * 100))%")
+                    Text("Book Reference")
                         .font(.system(size: 12))
                         .foregroundStyle(.white.opacity(0.6))
                 }
             }
             
             Spacer()
-            
-            if reference.matchedBook != nil {
-                Button {
-                    HapticManager.shared.lightTap()
-                    NotificationCenter.default.post(
-                        name: Notification.Name("NavigateToBook"),
-                        object: reference.matchedBook
-                    )
-                } label: {
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Color.warmAmber.opacity(0.6))
-                }
-            }
         }
         .padding(12)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))

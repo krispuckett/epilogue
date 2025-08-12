@@ -90,8 +90,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private let rhythmBufferSize = 30
     private var lastRhythmUpdate = Date()
     
-    // Advanced pipeline integration
-    private let intelligencePipeline = AmbientIntelligencePipeline()
+    // WhisperKit integration
     private let whisperProcessor = OptimizedWhisperProcessor()
     private var audioBufferForWhisper: [AVAudioPCMBuffer] = []
     private var whisperProcessingTimer: Timer?
@@ -406,6 +405,48 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             recognitionRequest.requiresOnDeviceRecognition = true
             recognitionRequest.addsPunctuation = true
             
+            // Add contextual hints for better book-related recognition
+            if #available(iOS 17.0, *) {
+                // Add common fantasy/book character names and enhanced context
+                var contextualStrings = [
+                    // Lord of the Rings characters
+                    "Frodo", "Baggins", "Gandalf", "Aragorn", "Legolas",
+                    "Bilbo", "Samwise", "Merry", "Pippin", "Boromir",
+                    "Gollum", "Sauron", "Saruman", "Elrond", "Galadriel",
+                    "Gimli", "Faramir", "Éowyn", "Théoden", "Sméagol",
+                    
+                    // The Odyssey & Classic Literature
+                    "Odysseus", "Telemachus", "Penelope", "Athena", "Poseidon",
+                    "Polyphemus", "Circe", "Calypso", "Ithaca", "Achilles",
+                    
+                    // Common book terms
+                    "chapter", "paragraph", "quote", "passage", "author",
+                    "protagonist", "antagonist", "character", "plot", "theme",
+                    "symbolism", "metaphor", "foreshadowing", "climax", "resolution",
+                    
+                    // Enhanced question patterns (critical for AI response)
+                    "Who is", "What is", "Why did", "How does", "When did",
+                    "Where is", "Tell me about", "Explain", "What happens",
+                    "Could you", "Can you", "Would you", "Should I",
+                    "What do you think", "What if", "Remember when",
+                    "The part where", "When he said", "When she said",
+                    
+                    // Frequently misheard book titles/authors
+                    "Silmarillion", "Tolkien", "Homer", "Iliad", "Aeneid",
+                    "Love Wins", "Rob Bell"
+                ]
+                
+                // Add book titles from detected book if available
+                if let detectedBook = AmbientBookDetector.shared.detectedBook {
+                    contextualStrings.append(detectedBook.title)
+                    // Author is not optional in Book struct
+                    contextualStrings.append(detectedBook.author)
+                }
+                
+                recognitionRequest.contextualStrings = contextualStrings
+                logger.info("Added \(contextualStrings.count) contextual hints for transcription")
+            }
+            
             if #available(iOS 26.0, *) {
                 // iOS 26: Enable continuous recognition without time limits
                 // This is the key setting for unlimited recognition
@@ -454,10 +495,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                     self.handleSilence()
                 }
                 
-                // Send to advanced pipeline for processing
-                Task {
-                    await self.intelligencePipeline.analyzeAudioStream(buffer)
-                }
+                // Advanced pipeline processing removed - using TrueAmbientProcessor
                 
                 // Buffer for Whisper whenever we're actively listening (not just when voice detected)
                 // This ensures we capture all audio that Apple is transcribing
@@ -761,14 +799,10 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             // Still detect book mentions for context
             detectBookFromSpeech(text)
             
-            // Route to SingleSourceProcessor - THE ONLY PROCESSOR
-            let processor = SingleSourceProcessor.shared
-            _ = await processor.process(
-                text,
-                confidence: Double(self.confidenceScore),
-                isFinal: result.isFinal,
-                bookContext: nil  // TODO: Add book context management
-            )
+            // Route to TrueAmbientProcessor - THE ONLY PROCESSOR
+            let processor = TrueAmbientProcessor.shared
+            // TrueAmbientProcessor expects audio buffer, not text
+            // For now, skip processing here since it's handled via audio buffer
             
             logger.info("🎯 SingleSourceProcessor: Processing '\(text.prefix(50))...' (final: \(result.isFinal))")
         }

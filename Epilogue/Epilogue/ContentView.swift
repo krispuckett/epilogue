@@ -270,18 +270,16 @@ struct ContentView: View {
             
         }
         .fullScreenCover(isPresented: $ambientCoordinator.isActive) {
-            // Use UnifiedChatView in ambient mode for beautiful gradient interface
-            UnifiedChatView(
-                preSelectedBook: ambientCoordinator.preSelectedBook,
-                startInVoiceMode: true,
-                isAmbientMode: true
-            )
-            .environmentObject(libraryViewModel)
-            .environmentObject(notesViewModel)
-            .interactiveDismissDisabled()
-            .onAppear {
-                print("🎨 UNIFIED CHAT: Beautiful gradient ambient mode launched!")
-            }
+            // Use the NEW AmbientModeView with beautiful chat interface
+            AmbientModeView()
+                .environmentObject(libraryViewModel)
+                .environmentObject(notesViewModel)
+                .preferredColorScheme(.dark)
+                .statusBarHidden(true)
+                .interactiveDismissDisabled()
+                .onAppear {
+                    print("🎨 AMBIENT MODE: Beautiful gradient experience launched!")
+                }
         }
         .onChange(of: selectedTab) { oldValue, newValue in
             // Haptic feedback on tab change

@@ -547,21 +547,24 @@ class SmartContentBuffer: ObservableObject {
     // MARK: - Content Saving
     
     private func saveProcessedContent(_ content: ProcessedContent) async {
-        // Send to UnifiedTranscriptionProcessor for saving
-        let processor = UnifiedTranscriptionProcessor.shared
+        // Send to TrueAmbientProcessor for saving
+        let processor = TrueAmbientProcessor.shared
         
-        let unifiedContent = UnifiedProcessedContent(
-            type: mapToUnifiedType(content.type),
+        // Convert to AmbientProcessedContent and save
+        let ambientContent = AmbientProcessedContent(
             text: content.text,
-            confidence: Double(content.confidence),
+            type: mapToAmbientType(content.type),
             timestamp: Date(),
-            bookContext: currentContext?.book,
-            pageContext: nil,
-            aiResponse: nil,
-            metadata: [:]
+            confidence: content.confidence,
+            response: nil,
+            bookTitle: currentContext?.book?.title,
+            bookAuthor: currentContext?.book?.author
         )
         
-        _ = await processor.processWithIntelligence(content.text)
+        // Add to processor's detected content
+        await MainActor.run {
+            processor.detectedContent.append(ambientContent)
+        }
         
         // Post notification for UI update
         await MainActor.run {
@@ -572,12 +575,12 @@ class SmartContentBuffer: ObservableObject {
         }
     }
     
-    private func mapToUnifiedType(_ type: ProcessedContent.ContentType) -> ContentType {
+    private func mapToAmbientType(_ type: ProcessedContent.ContentType) -> AmbientProcessedContent.ContentType {
         switch type {
         case .quote: return .quote
         case .note: return .note
         case .question: return .question
-        case .insight: return .insight
+        case .insight: return .thought
         case .unknown: return .unknown
         }
     }

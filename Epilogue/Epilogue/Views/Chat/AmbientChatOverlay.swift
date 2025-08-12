@@ -11,6 +11,10 @@ struct AmbientSession: Identifiable {
     var rawTranscriptions: [String] = []
     var processedData: ProcessedAmbientSession?
     
+    init(startTime: Date) {
+        self.startTime = startTime
+    }
+    
     var duration: TimeInterval {
         let end = endTime ?? Date()
         return end.timeIntervalSince(startTime)
@@ -507,7 +511,7 @@ struct AmbientChatOverlay: View {
     
     @State private var pulseAnimation = false
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
-    @StateObject private var pipeline = AmbientIntelligencePipeline()
+    @StateObject private var processor = TrueAmbientProcessor.shared
     @State private var audioLevel: Float = 0
     @State private var isRecording = false
     @State private var showProcessingView = false
@@ -824,7 +828,9 @@ struct AmbientChatOverlay: View {
     
     private func startListening() {
         // Create new session
-        session = AmbientSession(startTime: Date(), book: selectedBook)
+        var newSession = AmbientSession(startTime: Date())
+        newSession.book = selectedBook
+        session = newSession
         
         // Start listening
         voiceManager.startAmbientListening()

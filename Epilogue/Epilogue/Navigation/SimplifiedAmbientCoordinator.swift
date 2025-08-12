@@ -82,14 +82,14 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     func openAmbientReading() {
         logger.info("🎙️ Opening ambient reading via SimplifiedAmbientCoordinator")
         print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientReading() called")
-        print("🎙️ DEBUG: isPresented before = \(isPresented)")
         
         // Haptic feedback
         HapticManager.shared.voiceModeStart()
         
-        // Present fullscreen
+        // Use EpilogueAmbientCoordinator which ContentView observes
+        // This will present the NEW AmbientModeView
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            isPresented = true
+            EpilogueAmbientCoordinator.shared.isActive = true
             print("🎙️ DEBUG: isPresented set to true")
         }
     }

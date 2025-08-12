@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct UnifiedProcessorDebugView: View {
-    @StateObject private var processor = UnifiedTranscriptionProcessor.shared
+    @ObservedObject private var processor = TrueAmbientProcessor.shared
     @State private var isExpanded = false
     
     var body: some View {

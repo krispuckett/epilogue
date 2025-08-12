@@ -182,6 +182,52 @@ struct SettingsView: View {
                     Text("Reading Preferences")
                 }
                 
+                // MARK: - Ambient Mode Settings
+                Section {
+                    Toggle(isOn: .init(
+                        get: { 
+                            // Default to true for real-time questions
+                            UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true
+                        },
+                        set: { UserDefaults.standard.set($0, forKey: "realTimeQuestions") }
+                    )) {
+                        Label("Real-time Questions", systemImage: "questionmark.bubble")
+                    }
+                    .tint(.orange)
+                    
+                    Toggle(isOn: .init(
+                        get: { UserDefaults.standard.bool(forKey: "audioFeedback") },
+                        set: { UserDefaults.standard.set($0, forKey: "audioFeedback") }
+                    )) {
+                        Label("Audio Responses", systemImage: "speaker.wave.2")
+                    }
+                    .tint(.orange)
+                    
+                    HStack {
+                        Label("Processing", systemImage: "cpu")
+                        Spacer()
+                        Text(UserDefaults.standard.bool(forKey: "realTimeQuestions") ? "Immediate" : "Post-Session")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                    
+                    if UserDefaults.standard.bool(forKey: "audioFeedback") {
+                        HStack {
+                            Label("Voice", systemImage: "person.wave.2")
+                            Spacer()
+                            Text("System Default")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                } header: {
+                    Text("Ambient Mode")
+                } footer: {
+                    Text("Real-time questions process immediately with AI responses. Audio feedback speaks responses aloud.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
                 // MARK: - Privacy & Data
                 Section {
                     Button {
