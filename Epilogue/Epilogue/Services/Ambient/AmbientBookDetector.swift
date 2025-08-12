@@ -61,8 +61,12 @@ class AmbientBookDetector: ObservableObject {
     // MARK: - Natural Language Processing
     
     func detectBookInText(_ text: String) {
-        guard isDetecting else { return }
+        guard isDetecting else { 
+            print("📚 Book detection not active")
+            return 
+        }
         
+        print("📚 Detecting book in text: \(text)")
         let lowercased = text.lowercased()
         
         // Check for trigger phrases
@@ -114,11 +118,13 @@ class AmbientBookDetector: ObservableObject {
     
     private func checkAgainstKnownBooks(_ text: String) {
         let lowercased = text.lowercased()
+        print("📚 Checking against \(libraryBooks.count) known books")
         
         for book in libraryBooks {
             // Check title match
             let titleLower = book.title.lowercased()
             if lowercased.contains(titleLower) {
+                print("📚 Found exact match: \(book.title)")
                 setDetectedBook(book, confidence: 0.9)
                 return
             }
