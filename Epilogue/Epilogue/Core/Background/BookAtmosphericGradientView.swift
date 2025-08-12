@@ -4,13 +4,15 @@ import SwiftUI
 struct BookAtmosphericGradientView: View {
     let colorPalette: ColorPalette
     let intensity: Double
+    let audioLevel: Float
     
     @State private var gradientOffset: CGFloat = 0
     @State private var displayedPalette: ColorPalette?
     
-    init(colorPalette: ColorPalette, intensity: Double = 1.0) {
+    init(colorPalette: ColorPalette, intensity: Double = 1.0, audioLevel: Float = 0) {
         self.colorPalette = colorPalette
         self.intensity = intensity
+        self.audioLevel = audioLevel
     }
     
     var body: some View {

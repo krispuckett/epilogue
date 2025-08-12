@@ -2674,7 +2674,7 @@ struct VoiceResponsiveBottomGradient: View {
             return [
                 Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
                 Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.4),
-                Color.warmAmber.opacity(0.2),
+                Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.2),
                 Color.clear
             ]
         }
@@ -2776,7 +2776,7 @@ struct AmbientChatGradientView: View {
                 stops: [
                     .init(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), location: 0.0),
                     .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.25), location: 0.15),
-                    .init(color: Color.warmAmber.opacity(0.15), location: 0.3),
+                    .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.15), location: 0.3),
                     .init(color: Color.clear, location: 0.5)
                 ],
                 startPoint: .top,
