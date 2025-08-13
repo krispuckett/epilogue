@@ -481,11 +481,9 @@ struct AmbientModeView: View {
                 }
                 
                 if !responseExists {
-                    // Format the response to include the question context
-                    let formattedResponse = "**Q: \(item.text)**\n\n\(item.response!)"
-                    
+                    // Just show the AI response, not the question
                     let aiMessage = UnifiedChatMessage(
-                        content: formattedResponse,
+                        content: item.response!,
                         isUser: false,
                         timestamp: Date(),
                         bookContext: currentBookContext,

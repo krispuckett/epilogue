@@ -763,6 +763,16 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback
     func processQuestionWithFeedback(_ question: String, confidence: Float) async {
+        // Check if we've already processed this question
+        let questionHash = question.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let processedKey = "question_\(questionHash)"
+        
+        if processedTextHashes.contains(processedKey) {
+            logger.warning("⚠️ Question already processed, skipping: \(question.prefix(30))...")
+            return
+        }
+        processedTextHashes.insert(processedKey)
+        
         // Default to true if not set (enable by default)
         let realTimeEnabled = UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true
         
@@ -822,15 +832,26 @@ extension TrueAmbientProcessor {
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             
-            // Update UI immediately
-            await MainActor.run {
-                self.detectedContent.append(content)
-                
-                // Post notification for UI update
-                NotificationCenter.default.post(
-                    name: .questionProcessed,
-                    object: content
-                )
+            // Check if this content already exists in detectedContent
+            let exists = await MainActor.run {
+                self.detectedContent.contains { existing in
+                    existing.type == .question && existing.text == question
+                }
+            }
+            
+            if !exists {
+                // Update UI immediately
+                await MainActor.run {
+                    self.detectedContent.append(content)
+                    
+                    // Post notification for UI update
+                    NotificationCenter.default.post(
+                        name: .questionProcessed,
+                        object: content
+                    )
+                }
+            } else {
+                logger.warning("⚠️ Question already in detectedContent, skipping UI update")
             }
             
             // Audio feedback if enabled
