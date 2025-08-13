@@ -78,41 +78,47 @@ struct AmbientModeView: View {
                 bottomInputArea
             }
         }
-        // Top navigation buttons
-        .overlay(alignment: .topLeading) {
-            ambientModeExitButton
-        }
-        .overlay(alignment: .topTrailing) {
-            VStack(spacing: 12) {
+        // Top navigation bar with aligned buttons
+        .overlay(alignment: .top) {
+            HStack {
+                // Close button (left side)
+                ambientModeExitButton
+                
+                Spacer()
+                
+                // Switch books button (right side)
                 if currentBookContext != nil {
                     switchBooksButton
                 }
-                
-                // Subtle save indicator
-                if showSaveAnimation {
-                    HStack(spacing: 6) {
-                        Image(systemName: detectionState.icon)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .symbolEffect(.pulse)
-                        
-                        Text("Saved")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .glassEffect()
-                    .glassEffectTransition(.materialize)
-                    .clipShape(Capsule())
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.8).combined(with: .opacity)
-                    ))
-                }
             }
-            .padding(.trailing, 20)
+            .padding(.horizontal, 20)
             .padding(.top, 20)
+        }
+        // Save indicator below the nav bar
+        .overlay(alignment: .topTrailing) {
+            if showSaveAnimation {
+                HStack(spacing: 6) {
+                    Image(systemName: detectionState.icon)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .symbolEffect(.pulse)
+                    
+                    Text("Saved")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .glassEffect()
+                .glassEffectTransition(.materialize)
+                .clipShape(Capsule())
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                ))
+                .padding(.trailing, 20)
+                .padding(.top, 70) // Below the nav bar
+            }
         }
         .statusBarHidden(true)
         .onAppear {
@@ -145,9 +151,7 @@ struct AmbientModeView: View {
         .onReceive(voiceManager.$currentAmplitude) { amplitude in
             audioLevel = amplitude
         }
-        .onReceive(NotificationCenter.default.publisher(for: .questionProcessed)) { notification in
-            handleAIResponse(notification)
-        }
+        // Removed duplicate question processing notification handler
         // Book strip overlay
         .overlay {
             if showingBookStrip {
@@ -390,8 +394,6 @@ struct AmbientModeView: View {
                 .glassEffectTransition(.materialize)
                 .clipShape(Circle())
         }
-        .padding(.leading, 20)
-        .padding(.top, 20) // Moved higher up
     }
     
     // MARK: - Switch Books Button
@@ -411,21 +413,26 @@ struct AmbientModeView: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10) // Match close button height
+            .frame(height: 40) // Same height as close button
             .glassEffect()
             .glassEffectTransition(.materialize)
             .clipShape(Capsule())
         }
-        .padding(.trailing, 20)
-        .padding(.top, 20)
     }
     
     // MARK: - CRITICAL DATA PERSISTENCE FIX
     
     private func processAndSaveDetectedContent(_ content: [AmbientProcessedContent]) {
         for item in content {
-            // Create hash for deduplication
-            let contentHash = "\(item.type)_\(item.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+            // Create hash for deduplication - include response for questions to prevent duplicate AI responses
+            let contentHash: String
+            if item.type == .question {
+                // For questions, include the response in the hash to ensure uniqueness
+                contentHash = "\(item.type)_\(item.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))_\(item.response ?? "")"
+            } else {
+                contentHash = "\(item.type)_\(item.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+            }
             
             // Skip if already processed (using hash to prevent duplicates)
             if processedContentHashes.contains(contentHash) {
@@ -475,21 +482,25 @@ struct AmbientModeView: View {
             // ONLY show AI responses for questions in ambient mode
             // Don't show the user's question as a bubble - just the AI response
             if item.type == .question && item.response != nil {
-                // Check if we already have this response to prevent duplicates
+                // More robust duplicate check - check both content and question context
                 let responseExists = messages.contains { msg in
-                    !msg.isUser && msg.content == item.response
+                    !msg.isUser && (msg.content == item.response || msg.content.contains(item.text))
                 }
                 
                 if !responseExists {
-                    // Just show the AI response, not the question
+                    // Format the response with the question for context
+                    let formattedResponse = "**\(item.text)**\n\n\(item.response!)"
                     let aiMessage = UnifiedChatMessage(
-                        content: item.response!,
+                        content: formattedResponse,
                         isUser: false,
                         timestamp: Date(),
                         bookContext: currentBookContext,
                         messageType: .text
                     )
                     messages.append(aiMessage)
+                    print("✅ Added AI response for question: \(item.text.prefix(30))...")
+                } else {
+                    print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
                 }
             }
             
@@ -836,23 +847,7 @@ struct AmbientModeView: View {
         }
     }
     
-    private func handleAIResponse(_ notification: Notification) {
-        guard let content = notification.object as? AmbientProcessedContent else { return }
-        
-        // Fade book cover when AI responds
-        withAnimation(.easeOut(duration: 0.3)) {
-            showBookCoverInChat = false
-        }
-        
-        // Restore after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            withAnimation(.easeIn(duration: 0.3)) {
-                showBookCoverInChat = true
-            }
-        }
-        
-        HapticManager.shared.lightTap()
-    }
+    // Removed duplicate handleAIResponse function - no longer needed
     
     private func exitInstantly() {
         // INSTANT UI updates

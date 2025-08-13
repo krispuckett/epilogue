@@ -148,7 +148,14 @@ public class TrueAmbientProcessor: ObservableObject {
         switch intent {
         case .question:
             logger.info("❓ Question detected: \(text)")
-            await processQuestionWithFeedback(text, confidence: confidence)
+            // Check if we've already processed this exact question recently
+            let questionKey = "recent_\(text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+            if !processedTextHashes.contains(questionKey) {
+                processedTextHashes.insert(questionKey)
+                await processQuestionWithFeedback(text, confidence: confidence)
+            } else {
+                logger.warning("⚠️ Question recently processed, skipping: \(text.prefix(30))...")
+            }
             
         case .quote:
             // Clean up quote text - extract the actual quote
@@ -835,7 +842,7 @@ extension TrueAmbientProcessor {
             // Check if this content already exists in detectedContent
             let exists = await MainActor.run {
                 self.detectedContent.contains { existing in
-                    existing.type == .question && existing.text == question
+                    existing.type == .question && existing.text == question && existing.response != nil
                 }
             }
             
@@ -843,15 +850,10 @@ extension TrueAmbientProcessor {
                 // Update UI immediately
                 await MainActor.run {
                     self.detectedContent.append(content)
-                    
-                    // Post notification for UI update
-                    NotificationCenter.default.post(
-                        name: .questionProcessed,
-                        object: content
-                    )
+                    logger.info("✅ Added question with response to detectedContent")
                 }
             } else {
-                logger.warning("⚠️ Question already in detectedContent, skipping UI update")
+                logger.warning("⚠️ Question with response already in detectedContent, skipping")
             }
             
             // Audio feedback if enabled
