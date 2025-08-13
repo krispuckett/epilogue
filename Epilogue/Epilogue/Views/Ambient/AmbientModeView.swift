@@ -94,9 +94,21 @@ struct AmbientModeView: View {
             handleBookDetection(book)
         }
         .onReceive(voiceManager.$transcribedText) { text in
-            liveTranscription = text
-            if !text.isEmpty {
-                bookDetector.detectBookInText(text)
+            // Only update if actually recording
+            guard isRecording else {
+                liveTranscription = ""
+                return
+            }
+            
+            // Clean transcription - only show new content
+            let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Update live transcription
+            liveTranscription = cleanedText
+            
+            // Detect book mentions if text is substantial
+            if cleanedText.count > 10 {
+                bookDetector.detectBookInText(cleanedText)
             }
         }
         .onReceive(voiceManager.$currentAmplitude) { amplitude in
@@ -557,11 +569,14 @@ struct AmbientModeView: View {
     // MARK: - Actions
     
     private func startAmbientExperience() {
+        // CRITICAL: Set the model context for the processor
         processor.setModelContext(modelContext)
         processor.startSession()
+        
+        // Update library for book detection
         bookDetector.updateLibrary(libraryViewModel.books)
         
-        // Auto-start recording
+        // Auto-start recording after short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             handleMicrophoneTap()
         }
@@ -585,8 +600,9 @@ struct AmbientModeView: View {
     
     private func stopRecording() {
         isRecording = false
+        liveTranscription = "" // Clear immediately
         voiceManager.stopListening()
-        liveTranscription = ""
+        voiceManager.transcribedText = "" // Force clear the source
         HapticManager.shared.lightTap()
     }
     
@@ -733,12 +749,17 @@ struct AmbientModeView: View {
     }
     
     private func exitInstantly() {
+        // INSTANT UI updates
         isRecording = false
+        liveTranscription = ""
         voiceManager.stopListening()
+        
+        // Dismiss IMMEDIATELY
         dismiss()
         
-        Task.detached {
-            await processor.endSession()
+        // Process cleanup in background (non-blocking)
+        Task.detached { [weak processor] in
+            await processor?.endSession()
             await AmbientLiveActivityManager.shared.endActivity()
         }
     }

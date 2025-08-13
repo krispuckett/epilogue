@@ -623,11 +623,11 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback
     func processQuestionWithFeedback(_ question: String, confidence: Float) async {
-        // Check if real-time is enabled (default to true if not set)
+        // Default to true if not set (enable by default)
         let realTimeEnabled = UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true
         
         guard realTimeEnabled else {
-            // Save for post-session batch processing
+            // Save for later if disabled
             let content = AmbientProcessedContent(
                 text: question,
                 type: .question,
@@ -635,59 +635,43 @@ extension TrueAmbientProcessor {
                 confidence: confidence
             )
             sessionContent.append(content)
-            logger.info("💾 Question saved for post-session: \(question.prefix(50))...")
             return
         }
         
-        // Visual feedback - immediate
-        await MainActor.run { [weak self] in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                // Update state for UI
-                self?.currentState = .processing(.question, question)
-                
-                // Post notification for UI updates
-                NotificationCenter.default.post(
-                    name: .questionProcessing,
-                    object: question
-                )
-            }
-        }
-        
-        // Get AI response - CRITICAL: Make sure AI service is configured
-        logger.info("🤖 Getting AI response for: \(question)")
-        
-        // Check if AI service is configured
+        // Check API configuration with debug info
         guard AICompanionService.shared.isConfigured() else {
-            logger.error("❌ AI service not configured - check API key")
+            logger.error("❌ AI service not configured")
             
-            // Still save the question without response
+            // Still create the question with error message
             let content = AmbientProcessedContent(
                 text: question,
                 type: .question,
                 timestamp: Date(),
                 confidence: confidence,
-                response: "AI service not configured. Please check your API key in settings.",
+                response: "Please configure your Perplexity API key in Settings",
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             
-            await saveQuestionWithResponse(content)
+            await MainActor.run {
+                self.detectedContent.append(content)
+            }
             return
         }
         
+        // Process with AI
         do {
+            logger.info("🤖 Requesting AI response for: \(question)")
+            
             let response = try await AICompanionService.shared.processMessage(
                 question,
                 bookContext: AmbientBookDetector.shared.detectedBook,
                 conversationHistory: []
             )
             
-            // Audio feedback if enabled
-            if QuestionSettings.audioFeedbackEnabled {
-                await speakResponse(response)
-            }
+            logger.info("✅ Got AI response: \(response.prefix(50))...")
             
-            // Save processed question with response
+            // Create content with response
             let content = AmbientProcessedContent(
                 text: question,
                 type: .question,
@@ -698,14 +682,25 @@ extension TrueAmbientProcessor {
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             
-            await saveQuestionWithResponse(content)
+            // Update UI immediately
+            await MainActor.run {
+                self.detectedContent.append(content)
+                
+                // Post notification for UI update
+                NotificationCenter.default.post(
+                    name: .questionProcessed,
+                    object: content
+                )
+            }
             
-            logger.info("✅ Question processed with response: \(response.prefix(50))...")
+            // Audio feedback if enabled
+            if QuestionSettings.audioFeedbackEnabled {
+                await speakResponse(response)
+            }
             
         } catch {
-            logger.error("❌ Failed to process question: \(error)")
+            logger.error("❌ AI processing failed: \(error)")
             
-            // Save question with error message
             let content = AmbientProcessedContent(
                 text: question,
                 type: .question,
@@ -716,7 +711,9 @@ extension TrueAmbientProcessor {
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             
-            await saveQuestionWithResponse(content)
+            await MainActor.run {
+                self.detectedContent.append(content)
+            }
         }
     }
     
