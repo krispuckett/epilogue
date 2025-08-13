@@ -804,16 +804,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             
             logger.info("🎯 SingleSourceProcessor: Processing '\(text.prefix(50))...' (final: \(result.isFinal))")
             
-            // Send transcriptions to TrueAmbientProcessor for processing
-            // Process quotes and notes even from partial transcriptions
-            let lowercased = text.lowercased()
-            let shouldProcess = result.isFinal || 
-                               lowercased.starts(with: "quote") ||
-                               lowercased.contains("all we have") ||
-                               lowercased.contains("i love") ||
-                               lowercased.contains("from the movie")
-            
-            if shouldProcess && !text.isEmpty {
+            // ONLY process FINAL transcriptions after user stops speaking
+            // This prevents duplicate/partial saves
+            if result.isFinal && !text.isEmpty {
                 Task {
                     await processor.processDetectedText(text, confidence: Float(self.confidenceScore))
                 }

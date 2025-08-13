@@ -22,6 +22,8 @@ struct AmbientModeView: View {
     @State private var lastDetectedBookId: UUID?
     @State private var showingBookStrip = false
     @State private var showBookCoverInChat = true
+    @State private var savedItemsCount = 0
+    @State private var showSaveAnimation = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -80,9 +82,36 @@ struct AmbientModeView: View {
             ambientModeExitButton
         }
         .overlay(alignment: .topTrailing) {
-            if currentBookContext != nil {
-                switchBooksButton
+            VStack(spacing: 12) {
+                if currentBookContext != nil {
+                    switchBooksButton
+                }
+                
+                // Subtle save indicator
+                if showSaveAnimation {
+                    HStack(spacing: 6) {
+                        Image(systemName: detectionState.icon)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .symbolEffect(.pulse)
+                        
+                        Text("Saved")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .glassEffect()
+                    .glassEffectTransition(.materialize)
+                    .clipShape(Capsule())
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                    ))
+                }
             }
+            .padding(.trailing, 20)
+            .padding(.top, 20)
         }
         .statusBarHidden(true)
         .onAppear {
@@ -157,8 +186,9 @@ struct AmbientModeView: View {
     @ViewBuilder
     private var voiceGradientOverlay: some View {
         VStack {
-            // Book cover positioned near top - fades when AI responds
-            if let book = currentBookContext, let coverURL = book.coverImageURL, showBookCoverInChat {
+            // Book cover - only show when no messages (questions) are visible
+            let hasQuestions = messages.contains { !$0.content.contains("[Transcribing]") }
+            if let book = currentBookContext, let coverURL = book.coverImageURL, !hasQuestions {
                 SharedBookCoverView(
                     coverURL: coverURL,
                     width: 140,
@@ -167,10 +197,9 @@ struct AmbientModeView: View {
                 .aspectRatio(2/3, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-                .scaleEffect(isRecording && showBookCoverInChat ? 1.0 : 0.9)
-                .opacity(isRecording && showBookCoverInChat ? 1.0 : 0.3)
+                .scaleEffect(isRecording ? 1.0 : 0.9)
+                .opacity(isRecording ? 1.0 : 0.3)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isRecording)
-                .animation(.easeOut(duration: 0.3), value: showBookCoverInChat)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.5).combined(with: .opacity),
                     removal: .scale(scale: 0.5).combined(with: .opacity)
@@ -417,32 +446,45 @@ struct AmbientModeView: View {
             switch item.type {
             case .quote:
                 saveQuoteToSwiftData(item)
+                savedItemsCount += 1
+                showSaveAnimation = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    showSaveAnimation = false
+                }
             case .note, .thought:
                 saveNoteToSwiftData(item)
+                savedItemsCount += 1
+                showSaveAnimation = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    showSaveAnimation = false
+                }
             case .question:
                 saveQuestionToSwiftData(item)
             default:
                 break
             }
             
-            // Add to messages
-            let message = UnifiedChatMessage(
-                content: item.text,
-                isUser: true,
-                timestamp: item.timestamp,
-                bookContext: currentBookContext
-            )
-            messages.append(message)
-            
-            // Add AI response if available
-            if let response = item.response {
-                let aiMessage = UnifiedChatMessage(
-                    content: response,
-                    isUser: false,
-                    timestamp: Date(),
+            // ONLY show questions in the chat during ambient mode
+            // Notes and quotes are saved silently in the background
+            if item.type == .question {
+                let message = UnifiedChatMessage(
+                    content: item.text,
+                    isUser: true,
+                    timestamp: item.timestamp,
                     bookContext: currentBookContext
                 )
-                messages.append(aiMessage)
+                messages.append(message)
+                
+                // Add AI response if available
+                if let response = item.response {
+                    let aiMessage = UnifiedChatMessage(
+                        content: response,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(aiMessage)
+                }
             }
             
             // Reset state
