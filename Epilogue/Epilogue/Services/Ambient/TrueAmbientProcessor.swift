@@ -56,6 +56,11 @@ public class TrueAmbientProcessor: ObservableObject {
     @Published public var detectedContent: [AmbientProcessedContent] = []
     @Published public var lastConfidence: Float = 0.0
     
+    // Enhanced intelligence systems
+    private let intentDetector = EnhancedIntentDetector()
+    private let conversationMemory = ConversationMemory()
+    private let foundationModels = FoundationModelsManager.shared
+    
     // Debug properties
     @Published public var currentState: ProcessorState = .listening
     @Published public var processingQueue: [QueueItem] = []
@@ -138,8 +143,22 @@ public class TrueAmbientProcessor: ObservableObject {
         // Use the same flow as Whisper transcription
         logger.info("🎯 Processing detected text: \(text)")
         
-        // Detect intent
-        let intent = detectIntentFallback(text)
+        // Use enhanced intent detection
+        let bookContext = AmbientBookDetector.shared.detectedBook
+        let enhancedIntent = intentDetector.detectIntent(
+            from: text,
+            bookTitle: bookContext?.title,
+            bookAuthor: bookContext?.author
+        )
+        let intent = mapEnhancedToLegacyIntent(enhancedIntent)
+        
+        // Add to conversation memory
+        let memory = conversationMemory.addMemory(
+            text: text,
+            intent: enhancedIntent,
+            bookTitle: bookContext?.title,
+            bookAuthor: bookContext?.author
+        )
         
         // Update state
         currentState = .processing(intent, text)
@@ -152,7 +171,7 @@ public class TrueAmbientProcessor: ObservableObject {
             let questionKey = "recent_\(text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
             if !processedTextHashes.contains(questionKey) {
                 processedTextHashes.insert(questionKey)
-                await processQuestionWithFeedback(text, confidence: confidence)
+                await processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
             } else {
                 logger.warning("⚠️ Question recently processed, skipping: \(text.prefix(30))...")
             }
@@ -160,6 +179,13 @@ public class TrueAmbientProcessor: ObservableObject {
         case .quote:
             // Clean up quote text - extract the actual quote
             var cleanedText = text
+            
+            // Use iOS 26 Writing Tools if available for better quote extraction
+            if foundationModels.isAvailable() {
+                Task {
+                    cleanedText = await foundationModels.enhanceText(cleanedText)
+                }
+            }
             
             // Remove common prefixes
             let prefixesToRemove = [
@@ -252,6 +278,9 @@ public class TrueAmbientProcessor: ObservableObject {
         sessionStartTime = Date()
         sessionActive = true
         
+        // Clear conversation memory for new session
+        conversationMemory.clearSession()
+        
         logger.info("🎯 TrueAmbientProcessor session started")
     }
     
@@ -280,12 +309,22 @@ public class TrueAmbientProcessor: ObservableObject {
             totalContent: detectedContent.count
         )
         
+        // Log enhanced session summary
+        var memorySummary = conversationMemory.generateSessionSummary()
+        
+        // Use iOS 26 to generate even better summary if available
+        if foundationModels.isAvailable() {
+            memorySummary = await foundationModels.summarize(memorySummary)
+        }
+        
         logger.info("🎯 Session ended - Duration: \(Int(duration))s, Content: \(self.detectedContent.count) items")
+        logger.info("\n\(memorySummary)")
         
         // Reset for next session
         sessionContent.removeAll()
         detectedContent.removeAll()
         currentTranscript = ""
+        conversationMemory.clearSession()
         
         return summary
     }
@@ -483,6 +522,29 @@ public class TrueAmbientProcessor: ObservableObject {
         }
     }
     
+    // Map enhanced intent to legacy ContentType for compatibility
+    private func mapEnhancedToLegacyIntent(_ enhanced: EnhancedIntent) -> AmbientProcessedContent.ContentType {
+        switch enhanced.primary {
+        case .question:
+            return .question
+        case .quote:
+            return .quote
+        case .note:
+            return .note
+        case .thought:
+            return .thought
+        case .reflection:
+            return .thought // Map reflection to thought for now
+        case .progress:
+            return .note // Map progress to note for now
+        case .ambient:
+            return .ambient
+        case .unknown:
+            return .unknown
+        }
+    }
+    
+    // Keep legacy fallback for backward compatibility
     private func detectIntentFallback(_ text: String) -> AmbientProcessedContent.ContentType {
         let lowercased = text.lowercased()
         
@@ -537,7 +599,14 @@ public class TrueAmbientProcessor: ObservableObject {
             return .thought
         }
         
-        return .ambient
+        // Now just calls enhanced detection and maps back
+        let bookContext = AmbientBookDetector.shared.detectedBook
+        let enhanced = intentDetector.detectIntent(
+            from: text,
+            bookTitle: bookContext?.title,
+            bookAuthor: bookContext?.author
+        )
+        return mapEnhancedToLegacyIntent(enhanced)
     }
     
     // MARK: - Real-time Question Processing
@@ -768,8 +837,45 @@ extension TrueAmbientProcessor {
         }
     }
     
+    // Process question with enhanced context
+    private func processQuestionWithEnhancedContext(_ question: String, confidence: Float, enhancedIntent: EnhancedIntent) async {
+        // Build context from conversation memory
+        let conversationContext = conversationMemory.buildContextForResponse(currentIntent: enhancedIntent)
+        
+        // Get book context
+        let bookContext = AmbientBookDetector.shared.detectedBook
+        let bookInfo = bookContext.map { "Currently reading: \($0.title) by \($0.author)" } ?? ""
+        
+        // Determine question type for better response
+        var questionContext = ""
+        if case .question(let subtype) = enhancedIntent.primary {
+            switch subtype {
+            case .analytical:
+                questionContext = "Provide a thoughtful analysis."
+            case .comparative:
+                questionContext = "Compare and contrast as requested."
+            case .speculative:
+                questionContext = "Explore the hypothetical scenario."
+            case .clarification:
+                questionContext = "Clarify the concept clearly."
+            case .opinion:
+                questionContext = "Share an informed perspective."
+            case .factual:
+                questionContext = "Provide accurate information."
+            }
+        }
+        
+        // Combine all context
+        let fullContext = [bookInfo, conversationContext, questionContext]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+        
+        // Now process with the original method but with enhanced context
+        await processQuestionWithFeedback(question, confidence: confidence, context: fullContext)
+    }
+    
     // Enhanced question processing with audio feedback
-    func processQuestionWithFeedback(_ question: String, confidence: Float) async {
+    func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
         // Check if we've already processed this question
         let questionHash = question.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let processedKey = "question_\(questionHash)"
@@ -820,8 +926,16 @@ extension TrueAmbientProcessor {
         do {
             logger.info("🤖 Requesting AI response for: \(question)")
             
+            // Include context in the question if available
+            var enhancedQuestion = context.isEmpty ? question : "\(context)\n\nUser question: \(question)"
+            
+            // Use iOS 26 models to enhance the question if available
+            if foundationModels.isAvailable() {
+                enhancedQuestion = await foundationModels.enhanceText(enhancedQuestion)
+            }
+            
             let response = try await AICompanionService.shared.processMessage(
-                question,
+                enhancedQuestion,
                 bookContext: AmbientBookDetector.shared.detectedBook,
                 conversationHistory: []
             )
@@ -837,6 +951,20 @@ extension TrueAmbientProcessor {
                 response: response,
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+            )
+            
+            // Update memory with response
+            let bookContext = AmbientBookDetector.shared.detectedBook
+            conversationMemory.addMemory(
+                text: question,
+                intent: intentDetector.detectIntent(
+                    from: question,
+                    bookTitle: bookContext?.title,
+                    bookAuthor: bookContext?.author
+                ),
+                response: response,
+                bookTitle: bookContext?.title,
+                bookAuthor: bookContext?.author
             )
             
             // Check if this content already exists in detectedContent
