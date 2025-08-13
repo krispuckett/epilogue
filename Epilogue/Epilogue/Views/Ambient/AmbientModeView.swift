@@ -472,24 +472,23 @@ struct AmbientModeView: View {
                 break
             }
             
-            // ONLY show questions in the chat during ambient mode
-            // Notes and quotes are saved silently in the background
-            if item.type == .question {
-                let message = UnifiedChatMessage(
-                    content: item.text,
-                    isUser: true,
-                    timestamp: item.timestamp,
-                    bookContext: currentBookContext
-                )
-                messages.append(message)
+            // ONLY show AI responses for questions in ambient mode
+            // Don't show the user's question as a bubble - just the AI response
+            if item.type == .question && item.response != nil {
+                // Check if we already have this response to prevent duplicates
+                let responseExists = messages.contains { msg in
+                    !msg.isUser && msg.content == item.response
+                }
                 
-                // Add AI response if available
-                if let response = item.response {
+                if !responseExists {
+                    // Create a special message that includes both Q&A
                     let aiMessage = UnifiedChatMessage(
-                        content: response,
+                        content: item.response!,
                         isUser: false,
                         timestamp: Date(),
-                        bookContext: currentBookContext
+                        bookContext: currentBookContext,
+                        messageType: .text,
+                        metadata: ["question": item.text] // Store question in metadata
                     )
                     messages.append(aiMessage)
                 }
@@ -535,13 +534,9 @@ struct AmbientModeView: View {
             }
         }
         
-        // Clean the quote text - remove "I love this quote" prefix if present
-        var quoteText = content.text
-        if quoteText.lowercased().starts(with: "i love this quote.") {
-            quoteText = String(quoteText.dropFirst(18)).trimmingCharacters(in: .whitespaces)
-        } else if quoteText.lowercased().starts(with: "i love this quote") {
-            quoteText = String(quoteText.dropFirst(17)).trimmingCharacters(in: .whitespaces)
-        }
+        // The text should already be cleaned by TrueAmbientProcessor
+        // Just use it as-is since the processor handles the cleanup
+        let quoteText = content.text
         
         let capturedQuote = CapturedQuote(
             text: quoteText,

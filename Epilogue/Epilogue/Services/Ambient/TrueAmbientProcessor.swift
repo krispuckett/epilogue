@@ -151,12 +151,32 @@ public class TrueAmbientProcessor: ObservableObject {
             await processQuestionWithFeedback(text, confidence: confidence)
             
         case .quote:
-            // Clean up quote text - remove "Quote" prefix if present
+            // Clean up quote text - extract the actual quote
             var cleanedText = text
-            if text.lowercased().starts(with: "quote ") {
-                cleanedText = String(text.dropFirst(6))
-            } else if text.lowercased().starts(with: "quote:") {
-                cleanedText = String(text.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            
+            // Remove common prefixes
+            let prefixesToRemove = [
+                "i love this quote.",
+                "i love this quote",
+                "quote:",
+                "quote ",
+                "here's a quote:",
+                "this quote:"
+            ]
+            
+            for prefix in prefixesToRemove {
+                if cleanedText.lowercased().starts(with: prefix) {
+                    cleanedText = String(cleanedText.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+                    break
+                }
+            }
+            
+            // Extract text between quotation marks if present
+            if let firstQuote = cleanedText.firstIndex(of: "\""),
+               let lastQuote = cleanedText.lastIndex(of: "\""),
+               firstQuote < lastQuote {
+                let startIndex = cleanedText.index(after: firstQuote)
+                cleanedText = String(cleanedText[startIndex..<lastQuote])
             }
             
             // Only process if we have meaningful content
@@ -459,9 +479,11 @@ public class TrueAmbientProcessor: ObservableObject {
     private func detectIntentFallback(_ text: String) -> AmbientProcessedContent.ContentType {
         let lowercased = text.lowercased()
         
-        // Quote detection - check for explicit "Quote" prefix FIRST
-        if lowercased.starts(with: "quote") ||
-           lowercased.starts(with: "all we have") || // Specific quote from logs
+        // Quote detection - check for quote indicators
+        if lowercased.starts(with: "i love this quote") ||
+           lowercased.starts(with: "quote") ||
+           lowercased.starts(with: "all we have") || // Specific LOTR quote
+           lowercased.contains("all we have to do is decide") || // Full LOTR quote
            text.contains("\"") || text.contains("\u{201C}") ||
            (lowercased.contains("said") && (text.contains("\"") || text.contains("\u{201C}"))) ||
            lowercased.contains("famous quote") ||
