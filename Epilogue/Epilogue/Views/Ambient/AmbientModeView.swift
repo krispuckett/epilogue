@@ -25,6 +25,8 @@ struct AmbientModeView: View {
     @State private var savedItemsCount = 0
     @State private var showSaveAnimation = false
     @State private var processedContentHashes = Set<String>() // Deduplication
+    @State private var transcriptionFadeTimer: Timer?
+    @State private var showLiveTranscription = true
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -134,6 +136,8 @@ struct AmbientModeView: View {
             // Only update if actually recording
             guard isRecording else {
                 liveTranscription = ""
+                showLiveTranscription = false
+                transcriptionFadeTimer?.invalidate()
                 return
             }
             
@@ -142,6 +146,23 @@ struct AmbientModeView: View {
             
             // Update live transcription
             liveTranscription = cleanedText
+            
+            // Show transcription immediately when new text arrives
+            if !cleanedText.isEmpty {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    showLiveTranscription = true
+                }
+                
+                // Cancel existing timer
+                transcriptionFadeTimer?.invalidate()
+                
+                // Start new 5-second timer for fade out
+                transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showLiveTranscription = false
+                    }
+                }
+            }
             
             // Detect book mentions if text is substantial
             if cleanedText.count > 10 {
@@ -234,7 +255,7 @@ struct AmbientModeView: View {
             Spacer()
             
             // Live transcription with animated glass container
-            if !liveTranscription.isEmpty {
+            if !liveTranscription.isEmpty && showLiveTranscription {
                 Text(liveTranscription)
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
@@ -254,6 +275,7 @@ struct AmbientModeView: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: liveTranscription.count)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
+                    .opacity(showLiveTranscription ? 1 : 0)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -705,6 +727,9 @@ struct AmbientModeView: View {
     private func stopRecording() {
         isRecording = false
         liveTranscription = "" // Clear immediately
+        showLiveTranscription = false
+        transcriptionFadeTimer?.invalidate()
+        transcriptionFadeTimer = nil
         voiceManager.stopListening()
         voiceManager.transcribedText = "" // Force clear the source
         HapticManager.shared.lightTap()
@@ -853,6 +878,9 @@ struct AmbientModeView: View {
         // INSTANT UI updates
         isRecording = false
         liveTranscription = ""
+        showLiveTranscription = false
+        transcriptionFadeTimer?.invalidate()
+        transcriptionFadeTimer = nil
         voiceManager.stopListening()
         
         // Dismiss IMMEDIATELY
