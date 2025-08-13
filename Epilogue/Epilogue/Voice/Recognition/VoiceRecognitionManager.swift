@@ -61,6 +61,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine = AVAudioEngine()
     private var inputNode: AVAudioInputNode?
+    
+    // Silence detection for complete thoughts
+    private var lastSpeechTime: Date = Date()
+    private var pendingTranscription: String = ""
+    private var thoughtTimer: Timer?
     private var audioSession: AVAudioSession?
     
     // Voice Activity Detection
@@ -357,6 +362,20 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     func stopListening() {
+        // Process any pending transcription before stopping
+        if !pendingTranscription.isEmpty {
+            let finalThought = pendingTranscription
+            pendingTranscription = ""
+            Task {
+                logger.info("🎯 Processing final thought before stop: \(finalThought)")
+                await TrueAmbientProcessor.shared.processDetectedText(finalThought, confidence: Float(self.confidenceScore))
+            }
+        }
+        
+        // Cancel thought timer
+        thoughtTimer?.invalidate()
+        thoughtTimer = nil
+        
         // Haptic feedback for voice recording stop
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         isListening = false
@@ -804,11 +823,24 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             
             logger.info("🎯 SingleSourceProcessor: Processing '\(text.prefix(50))...' (final: \(result.isFinal))")
             
-            // ONLY process FINAL transcriptions after user stops speaking
-            // This prevents duplicate/partial saves
-            if result.isFinal && !text.isEmpty {
-                Task {
-                    await processor.processDetectedText(text, confidence: Float(self.confidenceScore))
+            // Capture the most recent complete transcription
+            if !text.isEmpty {
+                pendingTranscription = text
+                lastSpeechTime = Date()
+                
+                // Start or restart thought timer (1.5 seconds of silence = complete thought)
+                thoughtTimer?.invalidate()
+                thoughtTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { _ in
+                    // User has been silent - process the complete thought
+                    if !self.pendingTranscription.isEmpty {
+                        let completeThought = self.pendingTranscription
+                        self.pendingTranscription = ""
+                        
+                        Task {
+                            logger.info("💭 Processing complete thought after silence: \(completeThought)")
+                            await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
+                        }
+                    }
                 }
             }
         }
