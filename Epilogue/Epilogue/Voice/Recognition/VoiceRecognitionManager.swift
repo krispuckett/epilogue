@@ -70,7 +70,6 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     
     // Voice Activity Detection
     private var silenceTimer: Timer?
-    private var lastSpeechTime: Date = Date()
     private let silenceThreshold: TimeInterval = 3.0
     private let voiceActivityThreshold: Float = 0.00005 // Even lower threshold for better sensitivity
     
