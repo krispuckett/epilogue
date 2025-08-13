@@ -24,6 +24,7 @@ struct AmbientModeView: View {
     @State private var showBookCoverInChat = true
     @State private var savedItemsCount = 0
     @State private var showSaveAnimation = false
+    @State private var processedContentHashes = Set<String>() // Deduplication
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -423,10 +424,17 @@ struct AmbientModeView: View {
     
     private func processAndSaveDetectedContent(_ content: [AmbientProcessedContent]) {
         for item in content {
-            // Skip if already processed
-            if messages.contains(where: { $0.content == item.text }) {
+            // Create hash for deduplication
+            let contentHash = "\(item.type)_\(item.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
+            
+            // Skip if already processed (using hash to prevent duplicates)
+            if processedContentHashes.contains(contentHash) {
+                print("⚠️ Skipping duplicate: \(item.text.prefix(30))...")
                 continue
             }
+            
+            // Mark as processed
+            processedContentHashes.insert(contentHash)
             
             // Update detection state
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -497,6 +505,19 @@ struct AmbientModeView: View {
     }
     
     private func saveQuoteToSwiftData(_ content: AmbientProcessedContent) {
+        // Check for existing duplicate before saving
+        let cleanText = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fetchRequest = FetchDescriptor<CapturedQuote>(
+            predicate: #Predicate { quote in
+                quote.text == cleanText
+            }
+        )
+        
+        if let existingQuotes = try? modelContext.fetch(fetchRequest), !existingQuotes.isEmpty {
+            print("⚠️ Quote already exists, skipping save: \(cleanText.prefix(30))...")
+            return
+        }
+        
         var bookModel: BookModel? = nil
         if let book = currentBookContext {
             // Check if BookModel already exists in context
@@ -514,8 +535,16 @@ struct AmbientModeView: View {
             }
         }
         
+        // Clean the quote text - remove "I love this quote" prefix if present
+        var quoteText = content.text
+        if quoteText.lowercased().starts(with: "i love this quote.") {
+            quoteText = String(quoteText.dropFirst(18)).trimmingCharacters(in: .whitespaces)
+        } else if quoteText.lowercased().starts(with: "i love this quote") {
+            quoteText = String(quoteText.dropFirst(17)).trimmingCharacters(in: .whitespaces)
+        }
+        
         let capturedQuote = CapturedQuote(
-            text: content.text,
+            text: quoteText,
             book: bookModel,
             author: currentBookContext?.author,
             pageNumber: nil,
@@ -535,6 +564,19 @@ struct AmbientModeView: View {
     }
     
     private func saveNoteToSwiftData(_ content: AmbientProcessedContent) {
+        // Check for existing duplicate before saving
+        let cleanText = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fetchRequest = FetchDescriptor<CapturedNote>(
+            predicate: #Predicate { note in
+                note.content == cleanText
+            }
+        )
+        
+        if let existingNotes = try? modelContext.fetch(fetchRequest), !existingNotes.isEmpty {
+            print("⚠️ Note already exists, skipping save: \(cleanText.prefix(30))...")
+            return
+        }
+        
         var bookModel: BookModel? = nil
         if let book = currentBookContext {
             let fetchRequest = FetchDescriptor<BookModel>(
@@ -571,6 +613,19 @@ struct AmbientModeView: View {
     }
     
     private func saveQuestionToSwiftData(_ content: AmbientProcessedContent) {
+        // Check for existing duplicate before saving
+        let cleanText = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fetchRequest = FetchDescriptor<CapturedQuestion>(
+            predicate: #Predicate { question in
+                question.content == cleanText
+            }
+        )
+        
+        if let existingQuestions = try? modelContext.fetch(fetchRequest), !existingQuestions.isEmpty {
+            print("⚠️ Question already exists, skipping save: \(cleanText.prefix(30))...")
+            return
+        }
+        
         var bookModel: BookModel? = nil
         if let book = currentBookContext {
             let fetchRequest = FetchDescriptor<BookModel>(

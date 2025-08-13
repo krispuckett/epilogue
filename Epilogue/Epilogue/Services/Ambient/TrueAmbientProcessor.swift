@@ -86,6 +86,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var sessionContent: [AmbientProcessedContent] = []
     private var sessionStartTime: Date?
     private var modelContext: ModelContext?
+    private var processedTextHashes = Set<String>() // Prevent duplicate processing
     
     // Processing state
     private var isInitialized = false
@@ -126,6 +127,14 @@ public class TrueAmbientProcessor: ObservableObject {
             startSession()
         }
         
+        // Deduplication check
+        let textHash = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if processedTextHashes.contains(textHash) {
+            logger.warning("⚠️ Already processed this text, skipping: \(text.prefix(30))...")
+            return
+        }
+        processedTextHashes.insert(textHash)
+        
         // Use the same flow as Whisper transcription
         logger.info("🎯 Processing detected text: \(text)")
         
@@ -142,8 +151,22 @@ public class TrueAmbientProcessor: ObservableObject {
             await processQuestionWithFeedback(text, confidence: confidence)
             
         case .quote:
+            // Clean up quote text - remove "Quote" prefix if present
+            var cleanedText = text
+            if text.lowercased().starts(with: "quote ") {
+                cleanedText = String(text.dropFirst(6))
+            } else if text.lowercased().starts(with: "quote:") {
+                cleanedText = String(text.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            }
+            
+            // Only process if we have meaningful content
+            guard !cleanedText.isEmpty && cleanedText.count > 10 else {
+                logger.warning("Quote too short or empty, skipping")
+                return
+            }
+            
             let content = AmbientProcessedContent(
-                text: text,
+                text: cleanedText,
                 type: .quote,
                 timestamp: Date(),
                 confidence: confidence,
@@ -151,7 +174,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             detectedContent.append(content)
-            logger.info("💭 Quote captured: \(text.prefix(50))...")
+            logger.info("💭 Quote captured: \(cleanedText.prefix(50))...")
             
         case .note, .thought:
             let content = AmbientProcessedContent(
@@ -197,6 +220,7 @@ public class TrueAmbientProcessor: ObservableObject {
         // Fresh session each time - no persistence
         sessionContent.removeAll()
         detectedContent.removeAll()
+        processedTextHashes.removeAll() // Clear deduplication set
         currentTranscript = ""
         sessionStartTime = Date()
         sessionActive = true
