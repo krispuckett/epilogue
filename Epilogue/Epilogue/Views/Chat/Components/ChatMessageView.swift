@@ -122,7 +122,7 @@ struct ChatMessageView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.8, alignment: .trailing)
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.7, alignment: .trailing)
             .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
             .glassEffect(in: .rect(cornerRadius: 18))
             .overlay(alignment: .topTrailing) {

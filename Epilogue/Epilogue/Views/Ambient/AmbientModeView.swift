@@ -21,6 +21,7 @@ struct AmbientModeView: View {
     @State private var detectionState: DetectionState = .idle
     @State private var lastDetectedBookId: UUID?
     @State private var showingBookStrip = false
+    @State private var showBookCoverInChat = true
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -156,8 +157,8 @@ struct AmbientModeView: View {
     @ViewBuilder
     private var voiceGradientOverlay: some View {
         VStack {
-            // Book cover positioned near top
-            if let book = currentBookContext, let coverURL = book.coverImageURL {
+            // Book cover positioned near top - fades when AI responds
+            if let book = currentBookContext, let coverURL = book.coverImageURL, showBookCoverInChat {
                 SharedBookCoverView(
                     coverURL: coverURL,
                     width: 140,
@@ -166,9 +167,10 @@ struct AmbientModeView: View {
                 .aspectRatio(2/3, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-                .scaleEffect(isRecording ? 1.0 : 0.9)
-                .opacity(isRecording ? 1.0 : 0.8)
+                .scaleEffect(isRecording && showBookCoverInChat ? 1.0 : 0.9)
+                .opacity(isRecording && showBookCoverInChat ? 1.0 : 0.3)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isRecording)
+                .animation(.easeOut(duration: 0.3), value: showBookCoverInChat)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.5).combined(with: .opacity),
                     removal: .scale(scale: 0.5).combined(with: .opacity)
@@ -745,6 +747,19 @@ struct AmbientModeView: View {
     
     private func handleAIResponse(_ notification: Notification) {
         guard let content = notification.object as? AmbientProcessedContent else { return }
+        
+        // Fade book cover when AI responds
+        withAnimation(.easeOut(duration: 0.3)) {
+            showBookCoverInChat = false
+        }
+        
+        // Restore after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            withAnimation(.easeIn(duration: 0.3)) {
+                showBookCoverInChat = true
+            }
+        }
+        
         HapticManager.shared.lightTap()
     }
     

@@ -801,10 +801,23 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             
             // Route to TrueAmbientProcessor - THE ONLY PROCESSOR
             let processor = TrueAmbientProcessor.shared
-            // TrueAmbientProcessor expects audio buffer, not text
-            // For now, skip processing here since it's handled via audio buffer
             
             logger.info("🎯 SingleSourceProcessor: Processing '\(text.prefix(50))...' (final: \(result.isFinal))")
+            
+            // Send transcriptions to TrueAmbientProcessor for processing
+            // Process quotes and notes even from partial transcriptions
+            let lowercased = text.lowercased()
+            let shouldProcess = result.isFinal || 
+                               lowercased.starts(with: "quote") ||
+                               lowercased.contains("all we have") ||
+                               lowercased.contains("i love") ||
+                               lowercased.contains("from the movie")
+            
+            if shouldProcess && !text.isEmpty {
+                Task {
+                    await processor.processDetectedText(text, confidence: Float(self.confidenceScore))
+                }
+            }
         }
         
         // Check for reaction phrases that might precede quotes

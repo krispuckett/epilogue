@@ -435,6 +435,17 @@ public class TrueAmbientProcessor: ObservableObject {
     private func detectIntentFallback(_ text: String) -> AmbientProcessedContent.ContentType {
         let lowercased = text.lowercased()
         
+        // Quote detection - check for explicit "Quote" prefix FIRST
+        if lowercased.starts(with: "quote") ||
+           lowercased.starts(with: "all we have") || // Specific quote from logs
+           text.contains("\"") || text.contains("\u{201C}") ||
+           (lowercased.contains("said") && (text.contains("\"") || text.contains("\u{201C}"))) ||
+           lowercased.contains("famous quote") ||
+           lowercased.contains("quote from") {
+            logger.info("💬 Quote detected via fallback: \(text.prefix(50))...")
+            return .quote
+        }
+        
         // Question detection
         if lowercased.contains("?") ||
            lowercased.starts(with: "what") ||
@@ -446,12 +457,6 @@ public class TrueAmbientProcessor: ObservableObject {
             return .question
         }
         
-        // Quote detection
-        if text.contains("\"") || text.contains("\u{201C}") ||
-           lowercased.contains("said") || lowercased.contains("wrote") {
-            return .quote
-        }
-        
         // Note detection - expanded to catch more personal reflections
         if lowercased.contains("remember") ||
            lowercased.contains("note to self") ||
@@ -459,9 +464,14 @@ public class TrueAmbientProcessor: ObservableObject {
            lowercased.contains("i love") ||
            lowercased.contains("i hate") ||
            lowercased.contains("i prefer") ||
+           lowercased.contains("from the movie") || // Movie comparisons
+           lowercased.contains("in the movie") ||
+           lowercased.contains("movie version") ||
+           lowercased.contains("film version") ||
            lowercased.contains("better than") ||
            lowercased.contains("worse than") ||
            lowercased.contains("more than") {
+            logger.info("📝 Note detected via fallback: \(text.prefix(50))...")
             return .note
         }
         
