@@ -92,9 +92,85 @@ public class TrueAmbientProcessor: ObservableObject {
     private let processingDispatchQueue = DispatchQueue(label: "com.epilogue.trueprocessor", qos: .userInitiated)
     
     private init() {
+        setupNotificationObservers()
         Task {
             await initializeWhisper()
         }
+    }
+    
+    private func setupNotificationObservers() {
+        // Listen for natural reactions from VoiceRecognitionManager
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleNaturalReaction),
+            name: Notification.Name("NaturalReactionDetected"),
+            object: nil
+        )
+    }
+    
+    @objc private func handleNaturalReaction(_ notification: Notification) {
+        guard let text = notification.object as? String else { return }
+        
+        logger.info("📝 Received natural reaction: \(text)")
+        
+        Task {
+            // Process using the main flow
+            await processDetectedText(text, confidence: 0.9)
+        }
+    }
+    
+    // Public method to process text from external sources
+    public func processDetectedText(_ text: String, confidence: Float) async {
+        if !sessionActive { 
+            logger.warning("Session not active, starting session")
+            startSession()
+        }
+        
+        // Use the same flow as Whisper transcription
+        logger.info("🎯 Processing detected text: \(text)")
+        
+        // Detect intent
+        let intent = detectIntentFallback(text)
+        
+        // Update state
+        currentState = .processing(intent, text)
+        
+        // Process based on intent
+        switch intent {
+        case .question:
+            logger.info("❓ Question detected: \(text)")
+            await processQuestionWithFeedback(text, confidence: confidence)
+            
+        case .quote:
+            let content = AmbientProcessedContent(
+                text: text,
+                type: .quote,
+                timestamp: Date(),
+                confidence: confidence,
+                bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+                bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+            )
+            detectedContent.append(content)
+            logger.info("💭 Quote captured: \(text.prefix(50))...")
+            
+        case .note, .thought:
+            let content = AmbientProcessedContent(
+                text: text,
+                type: intent,
+                timestamp: Date(),
+                confidence: confidence,
+                bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+                bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+            )
+            detectedContent.append(content)
+            logger.info("📝 \(String(describing: intent)) captured: \(text.prefix(50))...")
+            
+        default:
+            logger.info("🎤 Ambient content: \(text.prefix(50))...")
+        }
+        
+        // Reset state
+        currentState = .listening
     }
     
     // MARK: - WhisperKit Initialization
@@ -376,17 +452,25 @@ public class TrueAmbientProcessor: ObservableObject {
             return .quote
         }
         
-        // Note detection
+        // Note detection - expanded to catch more personal reflections
         if lowercased.contains("remember") ||
            lowercased.contains("note to self") ||
-           lowercased.contains("important") {
+           lowercased.contains("important") ||
+           lowercased.contains("i love") ||
+           lowercased.contains("i hate") ||
+           lowercased.contains("i prefer") ||
+           lowercased.contains("better than") ||
+           lowercased.contains("worse than") ||
+           lowercased.contains("more than") {
             return .note
         }
         
         // Thought detection
         if lowercased.contains("i think") ||
            lowercased.contains("i feel") ||
-           lowercased.contains("reminds me") {
+           lowercased.contains("i believe") ||
+           lowercased.contains("reminds me") ||
+           lowercased.contains("makes me") {
             return .thought
         }
         
