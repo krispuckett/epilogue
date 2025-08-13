@@ -71,6 +71,20 @@ struct SwiftDataNotesView: View {
         }
     }
     
+    // Delete question from SwiftData  
+    private func deleteQuestion(_ question: CapturedQuestion) {
+        modelContext.delete(question)
+        
+        // Save the context
+        do {
+            try modelContext.save()
+            SyncStatusManager.shared.incrementPendingChanges()
+            HapticManager.shared.lightTap()
+        } catch {
+            print("Error deleting question: \(error)")
+        }
+    }
+    
     // Restore deleted note
     private func restoreNote(_ noteId: UUID) {
         guard let (deletedItem, type) = deletedNotes[noteId] else { return }
@@ -202,6 +216,15 @@ struct SwiftDataNotesView: View {
                     ForEach(questions) { question in
                         CapturedQuestionCard(question: question)
                             .id(question.id)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    withAnimation(.smooth) {
+                                        deleteQuestion(question)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                             .transition(.asymmetric(
                                 insertion: .scale(scale: 0.95).combined(with: .opacity),
                                 removal: .scale(scale: 0.95).combined(with: .opacity)
@@ -692,6 +715,8 @@ private struct ShareableQuoteView: View {
 
 struct CapturedQuestionCard: View {
     let question: CapturedQuestion
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDeleteConfirmation = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -759,5 +784,49 @@ struct CapturedQuestionCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
         )
+        .contextMenu {
+            Button {
+                UIPasteboard.general.string = question.content
+                HapticManager.shared.lightTap()
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            
+            if let book = question.book {
+                Button {
+                    // Navigate to book
+                    NotificationCenter.default.post(
+                        name: Notification.Name("NavigateToBook"),
+                        object: book
+                    )
+                } label: {
+                    Label("View Book", systemImage: "book.closed")
+                }
+            }
+            
+            Divider()
+            
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .confirmationDialog(
+            "Delete Question",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                withAnimation(.smooth) {
+                    modelContext.delete(question)
+                    try? modelContext.save()
+                    HapticManager.shared.lightTap()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This question will be permanently deleted.")
+        }
     }
 }
