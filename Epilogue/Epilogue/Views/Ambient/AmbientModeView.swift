@@ -481,14 +481,15 @@ struct AmbientModeView: View {
                 }
                 
                 if !responseExists {
-                    // Create a special message that includes both Q&A
+                    // Format the response to include the question context
+                    let formattedResponse = "**Q: \(item.text)**\n\n\(item.response!)"
+                    
                     let aiMessage = UnifiedChatMessage(
-                        content: item.response!,
+                        content: formattedResponse,
                         isUser: false,
                         timestamp: Date(),
                         bookContext: currentBookContext,
-                        messageType: .text,
-                        metadata: ["question": item.text] // Store question in metadata
+                        messageType: .text
                     )
                     messages.append(aiMessage)
                 }
