@@ -900,10 +900,45 @@ extension TrueAmbientProcessor {
                 if !words.isEmpty && Float(commonWords.count) / Float(words.count) > 0.8 {
                     return true
                 }
+                
+                // Check for Levenshtein distance (for typos/mistranscriptions)
+                if levenshteinDistance(existingQuestion, normalizedQuestion) <= 3 {
+                    return true
+                }
             }
         }
         
         return false
+    }
+    
+    // Calculate Levenshtein distance between two strings
+    private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
+        let m = s1.count
+        let n = s2.count
+        
+        if m == 0 { return n }
+        if n == 0 { return m }
+        
+        var matrix = [[Int]](repeating: [Int](repeating: 0, count: n + 1), count: m + 1)
+        
+        for i in 0...m { matrix[i][0] = i }
+        for j in 0...n { matrix[0][j] = j }
+        
+        let s1Array = Array(s1)
+        let s2Array = Array(s2)
+        
+        for i in 1...m {
+            for j in 1...n {
+                let cost = s1Array[i-1] == s2Array[j-1] ? 0 : 1
+                matrix[i][j] = min(
+                    matrix[i-1][j] + 1,      // deletion
+                    matrix[i][j-1] + 1,      // insertion
+                    matrix[i-1][j-1] + cost  // substitution
+                )
+            }
+        }
+        
+        return matrix[m][n]
     }
     
     // Process question with enhanced context

@@ -178,9 +178,11 @@ public class EnhancedIntentDetector {
             detectedIntents.append((.question(subtype: questionType), calculateQuestionConfidence(text, questionType)))
         }
         
-        // Check for quote
-        if let quoteInfo = detectQuote(from: text, entities: entities) {
-            detectedIntents.append((.quote(speaker: quoteInfo.speaker), quoteInfo.confidence))
+        // Check for note (higher priority for personal reflections)
+        if let category = detectNoteCategory(from: text, entities: entities) {
+            // Personal notes get higher confidence
+            let confidence: Float = category == .personal ? 0.85 : 0.6
+            detectedIntents.append((.note(category: category), confidence))
         }
         
         // Check for reflection
@@ -189,14 +191,14 @@ public class EnhancedIntentDetector {
             detectedIntents.append((.reflection(emotion: emotion), 0.7))
         }
         
+        // Check for quote (after notes to avoid misclassification)
+        if let quoteInfo = detectQuote(from: text, entities: entities) {
+            detectedIntents.append((.quote(speaker: quoteInfo.speaker), quoteInfo.confidence))
+        }
+        
         // Check for progress update
         if let progress = detectProgress(from: lowercased) {
             detectedIntents.append((.progress(type: progress), 0.8))
-        }
-        
-        // Check for note
-        if let category = detectNoteCategory(from: text, entities: entities) {
-            detectedIntents.append((.note(category: category), 0.6))
         }
         
         // Check for thought
@@ -263,13 +265,56 @@ public class EnhancedIntentDetector {
     // MARK: - Quote Detection
     private func detectQuote(from text: String, entities: [EnhancedEntity]) -> (speaker: String?, confidence: Float)? {
         let hasQuotationMarks = text.contains("\"") || text.contains("\u{201C}") || text.contains("\u{201D}")
-        let hasQuoteKeyword = text.lowercased().contains("quote") || text.lowercased().contains("said")
+        let lowercased = text.lowercased()
         
-        if hasQuotationMarks || hasQuoteKeyword {
-            // Try to find speaker from entities
+        // Check if user is introducing a quote
+        let quoteIntroPatterns = [
+            "i love this quote",
+            "i like this quote",
+            "favorite quote",
+            "great quote",
+            "this quote",
+            "here's a quote",
+            "quote:",
+            "quote from"
+        ]
+        
+        let isIntroducingQuote = quoteIntroPatterns.contains { lowercased.contains($0) }
+        
+        // Check for personal reflection patterns that shouldn't be quotes
+        // BUT exclude them only if NOT introducing a quote
+        let personalPatterns = [
+            "there i said it", "i said it", // Strong personal indicators
+            "in my opinion", "personally", "to me", "for me"
+        ]
+        
+        // Special handling for "I love/hate/think" - only personal if NOT about a quote
+        let personalOnlyPatterns = [
+            "i love", "i hate", "i think", "i feel", "i believe", "i prefer", "i like"
+        ]
+        
+        let isDefinitelyPersonal = personalPatterns.contains { lowercased.contains($0) }
+        let mightBePersonal = personalOnlyPatterns.contains { lowercased.contains($0) } && 
+                              !lowercased.contains("quote") && 
+                              !lowercased.contains("passage") &&
+                              !lowercased.contains("line")
+        
+        let isPersonalReflection = isDefinitelyPersonal || mightBePersonal
+        
+        // Quote detection logic
+        let hasExplicitQuoteReference = lowercased.contains("book says") ||
+                                        lowercased.contains("author says") ||
+                                        lowercased.contains("character says") ||
+                                        isIntroducingQuote
+        
+        if (hasQuotationMarks || isIntroducingQuote) && !isDefinitelyPersonal {
+            // High confidence for actual quoted text or introduced quotes
             let speaker = entities.first(where: { $0.type == .character })?.text
-            let confidence: Float = hasQuotationMarks ? 0.9 : 0.7
-            return (speaker, confidence)
+            return (speaker, isIntroducingQuote ? 0.85 : 0.9)
+        } else if hasExplicitQuoteReference && !isPersonalReflection {
+            // Medium confidence for referenced quotes
+            let speaker = entities.first(where: { $0.type == .character })?.text
+            return (speaker, 0.7)
         }
         
         return nil
@@ -297,15 +342,49 @@ public class EnhancedIntentDetector {
     
     // MARK: - Note Category Detection
     private func detectNoteCategory(from text: String, entities: [EnhancedEntity]) -> EnhancedIntent.NoteCategory? {
-        // Check entities for clues
-        if entities.contains(where: { $0.type == .character }) { return .character }
-        
-        // Check keywords
         let lowercased = text.lowercased()
+        
+        // Skip note detection if this is clearly a quote introduction
+        if lowercased.contains("i love this quote") || 
+           lowercased.contains("i like this quote") ||
+           lowercased.contains("favorite quote") ||
+           lowercased.contains("here's a quote") {
+            return nil  // Let quote detection handle it
+        }
+        
+        // Personal reflection indicators (highest priority)
+        let personalIndicators = [
+            "i said it", "there i said it", // Definite personal
+            "unpopular opinion", "hot take", "confession", "i admit",
+            "in my opinion", "personally", "to me", "for me", "makes me", "reminds me"
+        ]
+        
+        // Conditional personal indicators (only personal if NOT about quotes/books)
+        let conditionalPersonalIndicators = [
+            "i love", "i hate", "i think", "i feel", "i believe", "i prefer", "i like"
+        ]
+        
+        let isDefinitelyPersonal = personalIndicators.contains(where: { lowercased.contains($0) })
+        let isConditionallyPersonal = conditionalPersonalIndicators.contains(where: { lowercased.contains($0) }) &&
+                                      !lowercased.contains("quote") &&
+                                      !lowercased.contains("passage") &&
+                                      !lowercased.contains("chapter") &&
+                                      !lowercased.contains("book")
+        
+        if isDefinitelyPersonal || isConditionallyPersonal {
+            return .personal
+        }
+        
+        // Check entities for character-related notes
+        if entities.contains(where: { $0.type == .character }) && 
+           !lowercased.contains("quote") { 
+            return .character 
+        }
+        
+        // Check other keywords
         if lowercased.contains("theme") || lowercased.contains("symbol") { return .theme }
         if lowercased.contains("plot") || lowercased.contains("story") { return .plot }
         if lowercased.contains("writing") || lowercased.contains("style") { return .writing }
-        if lowercased.contains("reminds me") || lowercased.contains("i feel") { return .personal }
         if lowercased.contains("similar to") || lowercased.contains("like in") { return .comparison }
         
         return nil

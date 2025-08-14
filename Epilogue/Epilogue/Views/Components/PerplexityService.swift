@@ -77,7 +77,7 @@ class PerplexityService: ObservableObject {
             ],
             "stream": true,  // Enable streaming
             "temperature": 0.7,
-            "max_tokens": selectedModel == "sonar-pro" ? 300 : 150
+            "max_tokens": selectedModel == "sonar-pro" ? 1000 : 500
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -145,7 +145,7 @@ class PerplexityService: ObservableObject {
                 ["role": "user", "content": message]
             ],
             "temperature": 0.7,
-            "max_tokens": selectedModel == "sonar-pro" ? 300 : 150  // More tokens for pro model
+            "max_tokens": selectedModel == "sonar-pro" ? 1000 : 500  // Increased for complete responses
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)

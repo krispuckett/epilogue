@@ -29,6 +29,9 @@ struct AmbientModeView: View {
     @State private var showLiveTranscription = true
     @State private var currentSession: AmbientSession?
     @State private var showingSessionSummary = false
+    @State private var isEditingTranscription = false
+    @State private var editableTranscription = ""
+    @FocusState private var isTranscriptionFocused: Bool
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -177,8 +180,28 @@ struct AmbientModeView: View {
                 // Cancel existing timer
                 transcriptionFadeTimer?.invalidate()
                 
-                // Start new 5-second timer for fade out
-                transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+                // Check if this is a book mention or progress update - fade faster
+                let lowercased = cleanedText.lowercased()
+                let isBookMention = lowercased.contains("i'm reading") ||
+                                   lowercased.contains("currently reading") ||
+                                   lowercased.contains("just started") ||
+                                   lowercased.contains("finished reading") ||
+                                   lowercased.contains("reading") && libraryViewModel.books.contains { book in
+                                       lowercased.contains(book.title.lowercased())
+                                   }
+                
+                // Also fade faster for progress updates
+                let isProgressUpdate = lowercased.contains("chapter") ||
+                                      lowercased.contains("page") ||
+                                      lowercased.contains("finished") ||
+                                      lowercased.contains("i'm on") ||
+                                      lowercased.contains("just got to")
+                
+                // Use shorter fade time for contextual mentions (1.5s) vs normal content (5s)
+                let fadeDelay = (isBookMention || isProgressUpdate) ? 1.5 : 5.0
+                
+                // Start timer for fade out
+                transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: fadeDelay, repeats: false) { _ in
                     withAnimation(.easeOut(duration: 0.5)) {
                         showLiveTranscription = false
                     }
@@ -275,28 +298,47 @@ struct AmbientModeView: View {
         VStack {
             Spacer()
             
-            // Live transcription with animated glass container
+            // Live transcription with animated glass container (editable)
             if isRecording && !liveTranscription.isEmpty {
-                Text(liveTranscription)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: UIScreen.main.bounds.width - 80)
-                    .glassEffect()
-                    .glassEffectTransition(.materialize)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: liveTranscription.count < 30 ? 24 :
-                                        liveTranscription.count < 60 ? 20 :
-                                        liveTranscription.count < 100 ? 18 : 16
-                        )
+                Group {
+                    if isEditingTranscription {
+                        TextField("Edit transcription...", text: $editableTranscription)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .focused($isTranscriptionFocused)
+                            .onSubmit {
+                                liveTranscription = editableTranscription
+                                isEditingTranscription = false
+                            }
+                    } else {
+                        Text(liveTranscription)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .onTapGesture {
+                                editableTranscription = liveTranscription
+                                isEditingTranscription = true
+                                isTranscriptionFocused = true
+                            }
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .frame(maxWidth: UIScreen.main.bounds.width - 80)
+                .glassEffect()
+                .glassEffectTransition(.materialize)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: liveTranscription.count < 30 ? 24 :
+                                    liveTranscription.count < 60 ? 20 :
+                                    liveTranscription.count < 100 ? 18 : 16
                     )
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: liveTranscription.count)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                    .opacity(showLiveTranscription ? 1 : 0)
+                )
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: liveTranscription.count)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+                .opacity(showLiveTranscription ? 1 : 0)
                     .animation(.easeInOut(duration: 0.3), value: showLiveTranscription)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),

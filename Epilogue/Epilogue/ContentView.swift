@@ -192,7 +192,7 @@ struct ContentView: View {
                 .tag(0)
                 
                 NavigationStack {
-                    SwiftDataNotesView()
+                    AwardWinningNotesView()
                 }
                 .tabItem {
                     Label {

@@ -68,7 +68,7 @@ final class AmbientSession {
     
     init(startTime: Date = Date(), bookModel: BookModel? = nil) {
         self.startTime = startTime
-        self.endTime = startTime
+        self.endTime = Date() // Set to current time, will be updated when session ends
         self.bookModel = bookModel
     }
     
