@@ -79,18 +79,27 @@ class NoteIntelligenceEngine: ObservableObject {
         // Generate embedding for query
         let queryEmbedding = await generateEmbedding(for: query)
         
-        // Calculate similarity scores
-        let scoredNotes = notes.compactMap { note -> (Note, Float)? in
-            guard let noteEmbedding = embeddings[note.id] else { return nil }
-            let similarity = cosineSimilarity(queryEmbedding, noteEmbedding)
-            return (note, similarity)
+        // Calculate similarity scores - break up for type checking
+        var scoredNotes: [(Note, Float)] = []
+        for note in notes {
+            if let noteEmbedding = embeddings[note.id] {
+                let similarity = cosineSimilarity(queryEmbedding, noteEmbedding)
+                scoredNotes.append((note, similarity))
+            }
         }
         
-        // Return sorted by relevance
-        return scoredNotes
-            .sorted { $0.1 > $1.1 }
-            .filter { $0.1 > 0.7 } // Relevance threshold
-            .map { $0.0 }
+        // Sort by relevance
+        scoredNotes.sort { $0.1 > $1.1 }
+        
+        // Filter and extract notes
+        var results: [Note] = []
+        for (note, score) in scoredNotes {
+            if score > 0.7 {
+                results.append(note)
+            }
+        }
+        
+        return results
     }
     
     /// Get AI suggestions for a specific note
@@ -261,7 +270,8 @@ class NoteIntelligenceEngine: ObservableObject {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
         
         // Today's Thoughts
-        let todaysNotes = (notes + quotes).filter { note in
+        var allNotes = notes + quotes
+        let todaysNotes = allNotes.filter { note in
             note.dateCreated >= today
         }
         if !todaysNotes.isEmpty {
@@ -300,10 +310,12 @@ class NoteIntelligenceEngine: ObservableObject {
         }
         
         // Golden Quotes (most engaged with)
-        let goldenQuotes = quotes.sorted { quote1, quote2 in
+        var sortedQuotes = quotes
+        sortedQuotes.sort { quote1, quote2 in
             // Sort by some engagement metric (for now, use length as proxy)
             quote1.content.count > quote2.content.count
-        }.prefix(5).map { $0 }
+        }
+        let goldenQuotes = Array(sortedQuotes.prefix(5))
         
         if !goldenQuotes.isEmpty {
             sections.append(SmartSection(
@@ -316,11 +328,11 @@ class NoteIntelligenceEngine: ObservableObject {
             ))
         }
         
-        // Recently Edited
-        let recentlyEdited = (notes + quotes)
-            .filter { $0.dateModified >= yesterday }
-            .sorted { $0.dateModified > $1.dateModified }
-            .prefix(10)
+        // Recently Edited (using dateCreated since dateModified doesn't exist)
+        var combinedNotes = notes + quotes
+        combinedNotes = combinedNotes.filter { $0.dateCreated >= yesterday }
+        combinedNotes.sort { $0.dateCreated > $1.dateCreated }
+        let recentlyEdited = Array(combinedNotes.prefix(10))
         
         if !recentlyEdited.isEmpty {
             sections.append(SmartSection(
@@ -357,9 +369,23 @@ class NoteIntelligenceEngine: ObservableObject {
     private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
         guard a.count == b.count else { return 0 }
         
-        let dotProduct = zip(a, b).map(*).reduce(0, +)
-        let magnitudeA = sqrt(a.map { $0 * $0 }.reduce(0, +))
-        let magnitudeB = sqrt(b.map { $0 * $0 }.reduce(0, +))
+        // Break up complex expressions for better type checking
+        var dotProduct: Float = 0
+        for i in 0..<a.count {
+            dotProduct += a[i] * b[i]
+        }
+        
+        var sumA: Float = 0
+        for value in a {
+            sumA += value * value
+        }
+        let magnitudeA = sqrt(sumA)
+        
+        var sumB: Float = 0
+        for value in b {
+            sumB += value * value
+        }
+        let magnitudeB = sqrt(sumB)
         
         guard magnitudeA > 0 && magnitudeB > 0 else { return 0 }
         return dotProduct / (magnitudeA * magnitudeB)
@@ -371,8 +397,19 @@ class NoteIntelligenceEngine: ObservableObject {
         let negativeWords = ["hate", "terrible", "awful", "disappointing", "bad"]
         
         let words = text.lowercased().components(separatedBy: .whitespacesAndNewlines)
-        let positiveCount = words.filter { positiveWords.contains($0) }.count
-        let negativeCount = words.filter { negativeWords.contains($0) }.count
+        
+        // Count positive and negative words more efficiently
+        var positiveCount = 0
+        var negativeCount = 0
+        
+        for word in words {
+            if positiveWords.contains(word) {
+                positiveCount += 1
+            }
+            if negativeWords.contains(word) {
+                negativeCount += 1
+            }
+        }
         
         if positiveCount > negativeCount {
             return ("positive", positiveCount > 2)
