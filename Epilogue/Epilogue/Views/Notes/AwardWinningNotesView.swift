@@ -369,7 +369,7 @@ struct AwardWinningNotesView: View {
     private func noteCard(note: Note, isHero: Bool = false) -> some View {
         Group {
             if note.type == .quote {
-                QuoteCard(note: note)
+                SimpleQuoteCard(note: note)
             } else {
                 SimpleNoteCard(note: note)
             }
