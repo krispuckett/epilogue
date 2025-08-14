@@ -251,7 +251,7 @@ struct AmbientModeView: View {
                     insertion: .scale(scale: 0.5).combined(with: .opacity),
                     removal: .scale(scale: 0.5).combined(with: .opacity)
                 ))
-                .padding(.top, 100) // Position below navigation buttons
+                .padding(.top, 140) // Position below navigation buttons with more space
             }
             
             Spacer()
@@ -337,7 +337,11 @@ struct AmbientModeView: View {
     private var mainScrollContent: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 16) {
+                VStack(spacing: 16) {
+                    // Top spacer for navigation area
+                    Color.clear
+                        .frame(height: 100)
+                    
                     let hasRealContent = messages.contains { msg in
                         !msg.content.contains("[Transcribing]")
                     }
@@ -346,7 +350,7 @@ struct AmbientModeView: View {
                         if currentBookContext == nil && !isRecording {
                             // Simplified welcome
                             minimalWelcomeView
-                                .padding(.top, 150)
+                                .padding(.top, 50)
                         }
                     }
                     
@@ -359,10 +363,13 @@ struct AmbientModeView: View {
                         )
                         .id(message.id)
                     }
+                    
+                    // Bottom spacer for input area
+                    Color.clear
+                        .frame(height: 80)
+                        .id("bottom")
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 100)
-                .padding(.bottom, 100)
             }
             .scrollBounceBehavior(.basedOnSize) // Prevent excessive bouncing
             .scrollDismissesKeyboard(.immediately)
@@ -370,9 +377,12 @@ struct AmbientModeView: View {
                 scrollProxy = proxy
             }
             .onChange(of: messages.count) { _, _ in
-                withAnimation {
-                    if let lastMessage = messages.last {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                // Scroll to new message with delay to ensure layout is complete
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        if let lastMessage = messages.last {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -749,9 +759,6 @@ struct AmbientModeView: View {
     }
     
     private func stopRecording() {
-        // Preserve scroll position before stopping
-        let currentScrollPosition = scrollProxy
-        
         isRecording = false
         liveTranscription = "" // Clear immediately
         showLiveTranscription = false
@@ -761,14 +768,8 @@ struct AmbientModeView: View {
         voiceManager.transcribedText = "" // Force clear the source
         HapticManager.shared.lightTap()
         
-        // Restore scroll position after a small delay
-        if let proxy = currentScrollPosition, let lastMessage = messages.last {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                }
-            }
-        }
+        // Don't force scroll - let the content stay where it is
+        // The onChange handler will scroll when new messages arrive
     }
     
     private func sendMessage() {

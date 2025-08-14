@@ -14,6 +14,8 @@ struct MarkdownText: View {
                 .foregroundStyle(isUserMessage ? .white : Color(red: 0.98, green: 0.97, blue: 0.96))
                 .lineSpacing(isUserMessage ? 2 : 4)
                 .tint(Color(red: 1.0, green: 0.55, blue: 0.26)) // Amber for links
+                .fixedSize(horizontal: false, vertical: true) // Ensure full text is displayed
+                .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             // Fallback for older iOS versions
             Text(text)
@@ -22,6 +24,8 @@ struct MarkdownText: View {
                       .custom("Georgia", size: 17))
                 .foregroundStyle(isUserMessage ? .white : Color(red: 0.98, green: 0.97, blue: 0.96))
                 .lineSpacing(isUserMessage ? 2 : 4)
+                .fixedSize(horizontal: false, vertical: true) // Ensure full text is displayed
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
     

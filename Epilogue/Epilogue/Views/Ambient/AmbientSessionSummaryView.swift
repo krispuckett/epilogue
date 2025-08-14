@@ -14,6 +14,8 @@ struct AmbientSessionSummaryView: View {
     @FocusState private var isInputFocused: Bool
     @State private var showShareSheet = false
     @State private var showExportOptions = false
+    @State private var showingCommandPalette = false
+    @State private var isRecording = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -22,88 +24,176 @@ struct AmbientSessionSummaryView: View {
     // Animation states
     @State private var cardsVisible = false
     @State private var headerScale = 0.95
+    @State private var contentOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
     
     var body: some View {
-        ZStack {
-            // Gradient background
-            backgroundGradient
-            
-            // Main content
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Session header
-                        sessionHeaderView
-                            .padding(.top, 100)
-                            .scaleEffect(headerScale)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                                    headerScale = 1.0
-                                }
-                            }
-                        
-                        // Quick actions
-                        quickActionsRow
-                            .opacity(cardsVisible ? 1 : 0)
-                            .animation(.easeOut(duration: 0.4).delay(0.1), value: cardsVisible)
-                        
-                        // Questions & Answers section
-                        if !session.capturedQuestions.isEmpty {
-                            questionsSection
-                                .opacity(cardsVisible ? 1 : 0)
-                                .animation(.easeOut(duration: 0.4).delay(0.2), value: cardsVisible)
-                        }
-                        
-                        // Captured content
-                        if !session.capturedQuotes.isEmpty || !session.capturedNotes.isEmpty {
-                            capturedContentSection
-                                .opacity(cardsVisible ? 1 : 0)
-                                .animation(.easeOut(duration: 0.4).delay(0.3), value: cardsVisible)
-                        }
-                        
-                        // Additional follow-up messages
-                        ForEach(additionalMessages) { message in
-                            ChatMessageView(
-                                message: message,
-                                currentBookContext: session.book,
-                                colorPalette: colorPalette ?? defaultColorPalette
+        NavigationView {
+            ZStack {
+                // Gradient background
+                backgroundGradient
+                
+                // Main content
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        GeometryReader { geo in
+                            Color.clear.preference(
+                                key: SessionScrollOffsetPreferenceKey.self,
+                                value: geo.frame(in: .named("scroll")).origin.y
                             )
-                            .id(message.id)
-                            .padding(.horizontal, 16)
+                        }
+                        .frame(height: 0)
+                        
+                        VStack(spacing: 24) {
+                            // Book info section (if available)
+                            if let book = session.book {
+                                bookInfoSection(book: book)
+                                    .padding(.top, 20)
+                                    .scaleEffect(headerScale)
+                                    .opacity(headerOpacity)
+                                    .onAppear {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                            headerScale = 1.0
+                                        }
+                                    }
+                            }
+                            
+                            // Session stats
+                            sessionStatsRow
+                                .opacity(cardsVisible ? 1 : 0)
+                                .animation(.easeOut(duration: 0.4).delay(0.05), value: cardsVisible)
+                            
+                            // Quick actions
+                            quickActionsRow
+                                .opacity(cardsVisible ? 1 : 0)
+                                .animation(.easeOut(duration: 0.4).delay(0.1), value: cardsVisible)
+                            
+                            // Questions & Answers section
+                            if !session.capturedQuestions.isEmpty {
+                                questionsSection
+                                    .opacity(cardsVisible ? 1 : 0)
+                                    .animation(.easeOut(duration: 0.4).delay(0.2), value: cardsVisible)
+                            }
+                            
+                            // Captured content
+                            if !session.capturedQuotes.isEmpty || !session.capturedNotes.isEmpty {
+                                capturedContentSection
+                                    .opacity(cardsVisible ? 1 : 0)
+                                    .animation(.easeOut(duration: 0.4).delay(0.3), value: cardsVisible)
+                            }
+                            
+                            // Additional follow-up messages
+                            ForEach(additionalMessages) { message in
+                                ChatMessageView(
+                                    message: message,
+                                    currentBookContext: session.book,
+                                    colorPalette: colorPalette ?? defaultColorPalette
+                                )
+                                .id(message.id)
+                                .padding(.horizontal, 16)
+                            }
+                            
+                            Spacer(minLength: 100)
+                        }
+                    }
+                    .coordinateSpace(name: "scroll")
+                    .scrollIndicators(.hidden)
+                    .scrollDismissesKeyboard(.immediately)
+                    .onPreferenceChange(SessionScrollOffsetPreferenceKey.self) { value in
+                        contentOffset = value
+                    }
+                    .onChange(of: additionalMessages.count) { _, _ in
+                        if let lastMessage = additionalMessages.last {
+                            withAnimation {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Reading Session")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            showFullTranscript = true
+                        } label: {
+                            Label("Show Transcript", systemImage: "doc.text")
                         }
                         
-                        Spacer(minLength: 100)
-                    }
-                }
-                .scrollIndicators(.hidden)
-                .scrollDismissesKeyboard(.immediately)
-                .onChange(of: additionalMessages.count) { _, _ in
-                    if let lastMessage = additionalMessages.last {
-                        withAnimation {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        Button {
+                            exportSession()
+                        } label: {
+                            Label("Export", systemImage: "square.and.arrow.up")
                         }
+                        
+                        Button {
+                            shareInsights()
+                        } label: {
+                            Label("Share Insights", systemImage: "sparkles")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
                     }
                 }
             }
-        }
-        // Navigation bar
-        .overlay(alignment: .top) {
-            navigationBar
-        }
-        // Continuation input
-        .safeAreaInset(edge: .bottom) {
-            continuationInputBar
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.3)) {
-                cardsVisible = true
+            .overlay(alignment: .bottomTrailing) {
+                if contentOffset < -100 {
+                    floatingActionButton
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                continuationInputBar
+            }
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    cardsVisible = true
+                }
+            }
+            .sheet(isPresented: $showFullTranscript) {
+                TranscriptView(session: session, colorPalette: colorPalette)
+            }
+            .sheet(isPresented: $showShareSheet) {
+                ShareSheet(session: session)
             }
         }
-        .sheet(isPresented: $showFullTranscript) {
-            TranscriptView(session: session, colorPalette: colorPalette)
-        }
-        .sheet(isPresented: $showShareSheet) {
-            ShareSheet(session: session)
+        .navigationViewStyle(StackNavigationViewStyle())
+        .overlay {
+            if showingCommandPalette {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingCommandPalette = false
+                    }
+                    .ignoresSafeArea()
+                
+                ChatCommandPalette(
+                    isPresented: $showingCommandPalette,
+                    selectedBook: .constant(session.book),
+                    commandText: $continuationText
+                )
+                .environmentObject(libraryViewModel)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 80)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9, anchor: .bottom).combined(with: .opacity),
+                    removal: .scale(scale: 0.9, anchor: .bottom).combined(with: .opacity)
+                ))
+            }
         }
     }
     
@@ -124,99 +214,80 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
-    // MARK: - Navigation Bar
-    private var navigationBar: some View {
-        HStack {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .glassEffect()
-                    .clipShape(Circle())
+    // MARK: - Book Info Section
+    @ViewBuilder
+    private func bookInfoSection(book: Book) -> some View {
+        HStack(spacing: 12) {
+            if let coverURL = book.coverImageURL {
+                SharedBookCoverView(
+                    coverURL: coverURL,
+                    width: 44,
+                    height: 66
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             
-            Spacer()
-            
-            Menu {
-                Button {
-                    showFullTranscript = true
-                } label: {
-                    Label("Show Transcript", systemImage: "doc.text")
-                }
-                
-                Button {
-                    exportSession()
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                
-                Button {
-                    shareInsights()
-                } label: {
-                    Label("Share Insights", systemImage: "sparkles")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 16))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(book.title)
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .glassEffect()
-                    .clipShape(Circle())
+                    .lineLimit(1)
+                
+                if !book.author.isEmpty {
+                    Text(book.author)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(14)
+        .glassEffect()
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 20)
-        .padding(.top, 60)
     }
     
-    // MARK: - Session Header
-    private var sessionHeaderView: some View {
-        VStack(spacing: 12) {
-            // Title
-            Text("Reading Session")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(.white)
-            
-            // Book info (if available)
-            if let book = session.book {
-                HStack(spacing: 10) {
-                    if let coverURL = book.coverImageURL {
-                        SharedBookCoverView(
-                            coverURL: coverURL,
-                            width: 36,
-                            height: 54
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(book.title)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.95))
-                        
-                        if !book.author.isEmpty {
-                            Text(book.author)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(12)
-                .glassEffect()
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+    private var headerOpacity: Double {
+        guard contentOffset < 0 else { return 1.0 }
+        let fadeStart: CGFloat = -50
+        let fadeEnd: CGFloat = -150
+        
+        if contentOffset > fadeStart {
+            return 1.0
+        } else if contentOffset < fadeEnd {
+            return 0.3
+        } else {
+            let progress = (contentOffset - fadeStart) / (fadeEnd - fadeStart)
+            return 1.0 - (progress * 0.7)
+        }
+    }
+    
+    // MARK: - Floating Action Button
+    private var floatingActionButton: some View {
+        Button {
+            withAnimation(.spring()) {
+                contentOffset = 0
             }
-            
-            // Stats row
-            HStack(spacing: 20) {
-                statItem(icon: "clock", value: formatDuration(session.duration))
-                statItem(icon: "questionmark.circle", value: "\(session.questions.count)")
-                statItem(icon: "quote.bubble", value: "\(session.quotes.count)")
-                if !session.notes.isEmpty {
-                    statItem(icon: "note.text", value: "\(session.notes.count)")
-                }
+        } label: {
+            Image(systemName: "arrow.up")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 50, height: 50)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .padding(.trailing, 20)
+        .padding(.bottom, 100)
+    }
+    
+    // MARK: - Session Stats Row
+    private var sessionStatsRow: some View {
+        HStack(spacing: 12) {
+            statItem(icon: "clock", value: formatDuration(session.duration), color: .blue)
+            statItem(icon: "questionmark.circle", value: "\(session.questions.count)", color: .purple)
+            statItem(icon: "quote.bubble", value: "\(session.quotes.count)", color: .green)
+            if !session.notes.isEmpty {
+                statItem(icon: "note.text", value: "\(session.notes.count)", color: .orange)
             }
         }
         .padding(.horizontal, 20)
@@ -304,10 +375,10 @@ struct AmbientSessionSummaryView: View {
     private var continuationInputBar: some View {
         VStack(spacing: 0) {
             // Suggested actions
-            if continuationText.isEmpty && !session.suggestedContinuations.isEmpty {
+            if continuationText.isEmpty && !isProcessingFollowUp {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(["Summarize this session", "Key takeaways"], id: \.self) { suggestion in
+                        ForEach(["Summarize this session", "Key takeaways", "What did I learn?"], id: \.self) { suggestion in
                             Button {
                                 continuationText = suggestion
                                 sendFollowUp()
@@ -327,59 +398,48 @@ struct AmbientSessionSummaryView: View {
                 }
             }
             
-            // Input field
-            HStack(spacing: 12) {
-                TextField("Continue the conversation...", text: $continuationText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white)
-                    .focused($isInputFocused)
-                    .submitLabel(.send)
-                    .onSubmit {
-                        sendFollowUp()
-                    }
-                
-                if isProcessingFollowUp {
+            // Processing indicator
+            if isProcessingFollowUp {
+                HStack(spacing: 8) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
-                } else {
-                    Button {
-                        sendFollowUp()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(continuationText.isEmpty ? .white.opacity(0.3) : .white)
-                    }
-                    .disabled(continuationText.isEmpty)
+                    Text("Thinking...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
+                .padding(.bottom, 12)
             }
-            .padding(14)
-            .glassEffect()
-            .clipShape(Capsule())
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-        }
-        .background(
-            LinearGradient(
-                colors: [.black.opacity(0), .black.opacity(0.3)],
-                startPoint: .top,
-                endPoint: .bottom
+            
+            // Universal Input Bar - matching UnifiedChatView
+            UniversalInputBar(
+                messageText: $continuationText,
+                showingCommandPalette: $showingCommandPalette,
+                isInputFocused: $isInputFocused,
+                context: .chat(book: session.book),
+                onSend: sendFollowUp,
+                onMicrophoneTap: handleMicrophoneTap,
+                isRecording: $isRecording,
+                colorPalette: colorPalette,
+                isAmbientMode: true // Match ambient mode styling
             )
-        )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+        }
     }
     
     // MARK: - Helper Functions
-    private func statItem(icon: String, value: String) -> some View {
-        HStack(spacing: 5) {
+    private func statItem(icon: String, value: String, color: Color) -> some View {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 13))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
         }
-        .foregroundStyle(.white.opacity(0.85))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .glassEffect()
         .clipShape(Capsule())
     }
@@ -439,6 +499,17 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
+    private func handleMicrophoneTap() {
+        // For now, just toggle recording state
+        // In future, this could integrate with voice input
+        isRecording.toggle()
+        if isRecording {
+            HapticManager.shared.mediumTap()
+        } else {
+            HapticManager.shared.lightTap()
+        }
+    }
+    
     private func summarizeSession() {
         continuationText = "Summarize this reading session"
         sendFollowUp()
@@ -471,6 +542,14 @@ struct AmbientSessionSummaryView: View {
     }
 }
 
+// MARK: - Preference Key for Scroll Offset
+struct SessionScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 // MARK: - Question Card (Properly Designed)
 struct SessionQuestionCard: View {
     let question: CapturedQuestion
@@ -478,39 +557,59 @@ struct SessionQuestionCard: View {
     let onToggle: () -> Void
     let onAskFollowUp: (String) -> Void
     
+    @State private var showContent = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Question header
-            Button(action: onToggle) {
+            // Question header with glass effect
+            Button(action: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    onToggle()
+                }
+            }) {
                 HStack(spacing: 12) {
-                    Image(systemName: "questionmark.circle")
-                        .font(.system(size: 18))
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(.blue)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 32, height: 32)
                     
                     Text(question.content)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(isExpanded ? nil : 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(16)
+                .glassEffect()
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
             
-            // Answer (expandable)
+            // Answer (expandable) - without glass effect for cleaner appearance
             if isExpanded, let answer = question.answer {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(answer)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .lineSpacing(4)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineSpacing(6)
+                        .multilineTextAlignment(.leading)
                         .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .opacity(showContent ? 1 : 0)
+                        .offset(y: showContent ? 0 : 10)
+                        .onAppear {
+                            withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                                showContent = true
+                            }
+                        }
+                        .onDisappear {
+                            showContent = false
+                        }
                     
                     // Follow-up actions
                     VStack(alignment: .leading, spacing: 8) {
@@ -539,13 +638,11 @@ struct SessionQuestionCard: View {
                     .padding(.bottom, 12)
                 }
                 .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .top)),
-                    removal: .opacity
+                    insertion: .push(from: .top).combined(with: .opacity),
+                    removal: .push(from: .bottom).combined(with: .opacity)
                 ))
             }
         }
-        .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
@@ -556,23 +653,25 @@ struct ContentCard: View {
     let author: String?
     let type: ContentType
     
+    @State private var isPressed = false
+    
     enum ContentType {
         case quote, note
     }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(type == .quote ? .green : .orange)
-                .frame(width: 20, height: 20, alignment: .center)
+                .frame(width: 28, height: 28)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(text)
-                    .font(.system(size: 14))
+                    .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.9))
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
                 if let author = author {
                     Text("— \(author)")
@@ -583,7 +682,7 @@ struct ContentCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
+        .padding(16)
         .glassEffect()
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
@@ -595,19 +694,32 @@ struct SessionActionButton: View {
     let icon: String
     let action: () -> Void
     
+    @State private var isPressed = false
+    
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isPressed = true
+            }
+            action()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isPressed = false
+                }
+            }
+        }) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
-                Text(title)
                     .font(.system(size: 14, weight: .medium))
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
             }
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(.white.opacity(0.95))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .glassEffect()
             .clipShape(RoundedRectangle(cornerRadius: 14))
+            .scaleEffect(isPressed ? 0.95 : 1.0)
         }
     }
 }

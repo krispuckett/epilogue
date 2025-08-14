@@ -7,9 +7,10 @@ import AVFAudio
 import OSLog
 import Combine
 import UniformTypeIdentifiers
-// iOS 26 imports - uncomment when available
-// import FoundationModels
-// import TextToSpeech
+// iOS 26 Foundation Models - Enable when SDK available
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 private let logger = Logger(subsystem: "com.epilogue", category: "TrueAmbientProcessor")
 
@@ -61,6 +62,12 @@ public class TrueAmbientProcessor: ObservableObject {
     private let conversationMemory = ConversationMemory()
     private let foundationModels = FoundationModelsManager.shared
     
+    // iOS 26 Foundation Models
+    #if canImport(FoundationModels)
+    private var languageModel: SystemLanguageModel?
+    private var modelSession: LanguageModelSession?
+    #endif
+    
     // Debug properties
     @Published public var currentState: ProcessorState = .listening
     @Published public var processingQueue: [QueueItem] = []
@@ -92,6 +99,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var sessionStartTime: Date?
     private var modelContext: ModelContext?
     private var processedTextHashes = Set<String>() // Prevent duplicate processing
+    private var currentBook: Book? // Current book context
     
     // Processing state
     private var isInitialized = false
@@ -101,7 +109,23 @@ public class TrueAmbientProcessor: ObservableObject {
         setupNotificationObservers()
         Task {
             await initializeWhisper()
+            await initializeFoundationModels()
         }
+    }
+    
+    private func initializeFoundationModels() async {
+        #if canImport(FoundationModels)
+        do {
+            // Initialize the system language model
+            languageModel = SystemLanguageModel.default
+            modelSession = LanguageModelSession()
+            logger.info("✅ Foundation Models initialized successfully")
+        } catch {
+            logger.error("❌ Failed to initialize Foundation Models: \(error)")
+        }
+        #else
+        logger.info("ℹ️ Foundation Models not available on this platform")
+        #endif
     }
     
     private func setupNotificationObservers() {
@@ -275,6 +299,7 @@ public class TrueAmbientProcessor: ObservableObject {
         detectedContent.removeAll()
         processedTextHashes.removeAll() // Clear deduplication set
         currentTranscript = ""
+        currentBook = AmbientBookDetector.shared.detectedBook
         sessionStartTime = Date()
         sessionActive = true
         
@@ -946,7 +971,48 @@ extension TrueAmbientProcessor {
             return
         }
         
-        // Check API configuration with debug info
+        // Try Foundation Models first (iOS 26)
+        #if canImport(FoundationModels)
+        if let modelSession = modelSession {
+            do {
+                logger.info("🧠 Using Foundation Models for question: \(question)")
+                let response = try await modelSession.respond(to: question)
+                
+                // Process successful response
+                var content = AmbientProcessedContent(
+                    text: question,
+                    type: .question,
+                    timestamp: Date(),
+                    confidence: confidence,
+                    response: response.content
+                )
+                
+                detectedContent.append(content)
+                sessionContent.append(content)
+                let bookContext = AmbientBookDetector.shared.detectedBook
+                _ = conversationMemory.addMemory(
+                    text: question,
+                    intent: EnhancedIntent(
+                        primary: .question(subtype: .factual),
+                        confidence: 0.9,
+                        entities: [],
+                        sentiment: .neutral,
+                        subIntents: []
+                    ),
+                    response: response.content,
+                    bookTitle: bookContext?.title,
+                    bookAuthor: bookContext?.author
+                )
+                
+                logger.info("✅ Foundation Models response received")
+                return
+            } catch {
+                logger.error("❌ Foundation Models failed, falling back to AI service: \(error)")
+            }
+        }
+        #endif
+        
+        // Fall back to existing AI service
         guard AICompanionService.shared.isConfigured() else {
             logger.error("❌ AI service not configured")
             

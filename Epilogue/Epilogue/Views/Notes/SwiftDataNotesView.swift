@@ -124,7 +124,7 @@ struct SwiftDataNotesView: View {
     }
     
     private var notesContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             
             if allNotes.isEmpty && questions.isEmpty {
                 if isInitialLoad {
@@ -155,8 +155,8 @@ struct SwiftDataNotesView: View {
                     }
                 }
             } else {
-                // Content is available, show the grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                // Content is available, show the list
+                LazyVStack(spacing: 16) {
                     ForEach(allNotes) { note in
                         SelectableNoteCard(
                             note: note,
@@ -166,47 +166,44 @@ struct SwiftDataNotesView: View {
                                 // Handle note tap
                             }
                         )
-                        .iOS26SwipeActions([
-                            SwipeAction(
-                                icon: "pencil",
-                                backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
-                                handler: {
-                                    // Edit note
-                                    editingNote = note
-                                    HapticManager.shared.lightTap()
-                                }
-                            ),
-                            SwipeAction(
-                                icon: "square.and.arrow.up",
-                                backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
-                                handler: {
-                                    // Share note
-                                    if note.type == .quote {
-                                        ShareQuoteService.shareQuote(note)
-                                    } else {
-                                        // Share as text for regular notes
-                                        let activityController = UIActivityViewController(
-                                            activityItems: [note.content],
-                                            applicationActivities: nil
-                                        )
-                                        
-                                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                           let rootViewController = windowScene.windows.first?.rootViewController {
-                                            rootViewController.present(activityController, animated: true)
-                                        }
-                                    }
-                                    HapticManager.shared.success()
-                                }
-                            ),
-                            SwipeAction(
-                                icon: "trash.fill",
-                                backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                                isDestructive: true,
-                                handler: {
+                        .id(note.id)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                withAnimation(.smooth) {
                                     deleteNote(note)
                                 }
-                            )
-                        ])
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            
+                            Button {
+                                if note.type == .quote {
+                                    ShareQuoteService.shareQuote(note)
+                                } else {
+                                    let activityController = UIActivityViewController(
+                                        activityItems: [note.content],
+                                        applicationActivities: nil
+                                    )
+                                    
+                                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                       let rootViewController = windowScene.windows.first?.rootViewController {
+                                        rootViewController.present(activityController, animated: true)
+                                    }
+                                }
+                                HapticManager.shared.success()
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .tint(Color(red: 0.2, green: 0.6, blue: 1.0))
+                            
+                            Button {
+                                editingNote = note
+                                HapticManager.shared.lightTap()
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        }
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.95).combined(with: .opacity),
                             removal: .scale(scale: 0.95).combined(with: .opacity)
@@ -243,7 +240,7 @@ struct SwiftDataNotesView: View {
             }
         }
         .padding(.top, 8)
-        .padding(.bottom, 80)
+        .padding(.bottom, 120) // Increased to account for tab bar + quick actions
     }
     
     @ViewBuilder
@@ -319,6 +316,9 @@ struct SwiftDataNotesView: View {
                         ScrollView {
                             notesContent
                         }
+                        .scrollDismissesKeyboard(.interactively)
+                        .scrollIndicators(.visible)
+                        .scrollContentBackground(.hidden)
                         .onChange(of: navigationCoordinator.highlightedNoteID) { _, noteID in
                             if let noteID = noteID {
                                 withAnimation {

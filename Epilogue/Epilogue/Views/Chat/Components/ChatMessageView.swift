@@ -156,9 +156,12 @@ struct ChatMessageView: View {
             MarkdownText(text: message.content, isUserMessage: false)
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.9))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .leading)
-        .padding(.horizontal, 8) // Increased padding for better readability
+        .padding(.horizontal, 12) // Increased padding for better readability
+        .padding(.vertical, 4) // Add vertical padding for better spacing
     }
     
     // MARK: - Whisper Transcription View
