@@ -27,6 +27,8 @@ struct AmbientModeView: View {
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
     @State private var showLiveTranscription = true
+    @State private var currentSession: AmbientSession?
+    @State private var showingSessionSummary = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -94,7 +96,7 @@ struct AmbientModeView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.top, 60) // Increased to account for safe area
         }
         // Save indicator below the nav bar
         .overlay(alignment: .topTrailing) {
@@ -123,6 +125,20 @@ struct AmbientModeView: View {
             }
         }
         .statusBarHidden(true)
+        .fullScreenCover(isPresented: $showingSessionSummary, onDismiss: {
+            // After summary is dismissed, close ambient mode
+            dismiss()
+        }) {
+            if let session = currentSession {
+                AmbientSessionSummaryView(
+                    session: session,
+                    colorPalette: colorPalette
+                )
+                .environment(\.modelContext, modelContext)
+                .environmentObject(libraryViewModel)
+                .environmentObject(notesViewModel)
+            }
+        }
         .onAppear {
             startAmbientExperience()
         }
@@ -342,6 +358,8 @@ struct AmbientModeView: View {
                 .padding(.top, 100)
                 .padding(.bottom, 100)
             }
+            .scrollBounceBehavior(.basedOnSize) // Prevent excessive bouncing
+            .scrollDismissesKeyboard(.immediately)
             .onAppear {
                 scrollProxy = proxy
             }
@@ -406,7 +424,7 @@ struct AmbientModeView: View {
     // MARK: - Clean Exit Button
     private var ambientModeExitButton: some View {
         Button {
-            exitInstantly()
+            stopAndSaveSession() // Changed to save session if there's content
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: 20, weight: .regular))
@@ -725,6 +743,9 @@ struct AmbientModeView: View {
     }
     
     private func stopRecording() {
+        // Preserve scroll position before stopping
+        let currentScrollPosition = scrollProxy
+        
         isRecording = false
         liveTranscription = "" // Clear immediately
         showLiveTranscription = false
@@ -733,6 +754,15 @@ struct AmbientModeView: View {
         voiceManager.stopListening()
         voiceManager.transcribedText = "" // Force clear the source
         HapticManager.shared.lightTap()
+        
+        // Restore scroll position after a small delay
+        if let proxy = currentScrollPosition, let lastMessage = messages.last {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            }
+        }
     }
     
     private func sendMessage() {
@@ -883,14 +913,136 @@ struct AmbientModeView: View {
         transcriptionFadeTimer = nil
         voiceManager.stopListening()
         
-        // Dismiss IMMEDIATELY
-        dismiss()
+        // End processor session
+        Task {
+            await processor.endSession()
+        }
         
-        // Process cleanup in background (non-blocking)
+        // Dismiss the view immediately
+        dismiss()
+    }
+    
+    private func stopAndSaveSession() {
+        // Stop recording
+        isRecording = false
+        liveTranscription = ""
+        showLiveTranscription = false
+        transcriptionFadeTimer?.invalidate()
+        transcriptionFadeTimer = nil
+        voiceManager.stopListening()
+        
+        // Create and save session if we have content
+        if !processor.detectedContent.isEmpty {
+            // Create the session first
+            let session = createSession()
+            
+            // Set it as current for the sheet
+            currentSession = session
+            
+            // Show the summary with a small delay to ensure UI is ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                print("🎬 Presenting session summary...")
+                showingSessionSummary = true
+            }
+            
+            // DON'T dismiss yet - let the summary view handle that
+        } else {
+            // No content to save, just dismiss
+            Task {
+                await processor.endSession()
+            }
+            dismiss()
+        }
+    }
+    
+    private func createSession() -> AmbientSession {
+        // Create session with all captured content
+        let session = AmbientSession(book: currentBookContext)
+        session.endTime = Date()
+        
+        print("📊 Creating session with \(processor.detectedContent.count) items")
+        
+        // Add captured content to session
+        for item in processor.detectedContent {
+            switch item.type {
+            case .quote:
+                if let quote = findQuote(matching: item.text) {
+                    session.capturedQuotes.append(quote)
+                    print("✅ Added quote to session")
+                }
+            case .note, .thought:
+                if let note = findNote(matching: item.text) {
+                    session.capturedNotes.append(note)
+                    print("✅ Added note to session")
+                }
+            case .question:
+                // For questions, also check if it's saved with answer property
+                if let question = findQuestion(matching: item.text) {
+                    session.capturedQuestions.append(question)
+                    print("✅ Added question to session: \(item.text)")
+                } else {
+                    // Create a new question if not found
+                    let bookModel: BookModel? = nil // We'd need to convert Book to BookModel
+                    let newQuestion = CapturedQuestion(
+                        content: item.text,
+                        book: bookModel,
+                        timestamp: item.timestamp,
+                        source: .ambient
+                    )
+                    newQuestion.answer = item.response
+                    newQuestion.isAnswered = item.response != nil
+                    modelContext.insert(newQuestion)
+                    session.capturedQuestions.append(newQuestion)
+                    print("✅ Created and added new question to session")
+                }
+            default:
+                break
+            }
+        }
+        
+        // Save session to SwiftData
+        modelContext.insert(session)
+        do {
+            try modelContext.save()
+            print("✅ Session saved to SwiftData")
+        } catch {
+            print("❌ Failed to save session: \(error)")
+        }
+        
+        // End processor session in background
         Task.detached { [weak processor] in
             await processor?.endSession()
             await AmbientLiveActivityManager.shared.endActivity()
         }
+        
+        return session
+    }
+    
+    private func findQuote(matching text: String) -> CapturedQuote? {
+        let fetchRequest = FetchDescriptor<CapturedQuote>(
+            predicate: #Predicate { quote in
+                quote.text == text
+            }
+        )
+        return try? modelContext.fetch(fetchRequest).first
+    }
+    
+    private func findNote(matching text: String) -> CapturedNote? {
+        let fetchRequest = FetchDescriptor<CapturedNote>(
+            predicate: #Predicate { note in
+                note.content == text
+            }
+        )
+        return try? modelContext.fetch(fetchRequest).first
+    }
+    
+    private func findQuestion(matching text: String) -> CapturedQuestion? {
+        let fetchRequest = FetchDescriptor<CapturedQuestion>(
+            predicate: #Predicate { question in
+                question.content == text
+            }
+        )
+        return try? modelContext.fetch(fetchRequest).first
     }
     
     private func generatePlaceholderPalette(for book: Book) -> ColorPalette {

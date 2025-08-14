@@ -837,6 +837,50 @@ extension TrueAmbientProcessor {
         }
     }
     
+    // Helper function to normalize questions for deduplication
+    private func normalizeQuestion(_ question: String) -> String {
+        var normalized = question.lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "?", with: "")
+            .replacingOccurrences(of: "!", with: "")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: ",", with: "")
+        
+        // Handle common variations (e.g., "Gand" vs "Gandalf")
+        if normalized.contains("gand") && !normalized.contains("gandalf") {
+            // Likely a truncated/misheard "Gandalf"
+            normalized = normalized.replacingOccurrences(of: "gand", with: "gandalf")
+        }
+        
+        return normalized
+    }
+    
+    // Check if we have a similar question already processed
+    private func hasSimilarProcessedQuestion(_ normalizedQuestion: String) -> Bool {
+        let words = normalizedQuestion.split(separator: " ")
+        
+        // Check for questions that are substrings or superstrings
+        for hash in processedTextHashes {
+            if hash.hasPrefix("question_") {
+                let existingQuestion = String(hash.dropFirst(9)) // Remove "question_" prefix
+                
+                // Check if one is a substring of the other
+                if existingQuestion.contains(normalizedQuestion) || normalizedQuestion.contains(existingQuestion) {
+                    return true
+                }
+                
+                // Check for high word overlap (80% similarity)
+                let existingWords = existingQuestion.split(separator: " ")
+                let commonWords = words.filter { existingWords.contains($0) }
+                if !words.isEmpty && Float(commonWords.count) / Float(words.count) > 0.8 {
+                    return true
+                }
+            }
+        }
+        
+        return false
+    }
+    
     // Process question with enhanced context
     private func processQuestionWithEnhancedContext(_ question: String, confidence: Float, enhancedIntent: EnhancedIntent) async {
         // Build context from conversation memory
@@ -876,12 +920,13 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback
     func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
-        // Check if we've already processed this question
-        let questionHash = question.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let processedKey = "question_\(questionHash)"
+        // Normalize question for better deduplication
+        let normalizedQuestion = normalizeQuestion(question)
+        let processedKey = "question_\(normalizedQuestion)"
         
-        if processedTextHashes.contains(processedKey) {
-            logger.warning("⚠️ Question already processed, skipping: \(question.prefix(30))...")
+        // Check if we've already processed this or a very similar question
+        if processedTextHashes.contains(processedKey) || hasSimilarProcessedQuestion(normalizedQuestion) {
+            logger.warning("⚠️ Question already processed or similar exists, skipping: \(question.prefix(30))...")
             return
         }
         processedTextHashes.insert(processedKey)

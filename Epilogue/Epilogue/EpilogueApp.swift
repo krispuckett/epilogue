@@ -46,7 +46,8 @@ struct EpilogueApp: App {
             BookModel.self,
             CapturedNote.self,
             CapturedQuote.self,
-            CapturedQuestion.self
+            CapturedQuestion.self,
+            AmbientSession.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         

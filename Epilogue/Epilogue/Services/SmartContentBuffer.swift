@@ -53,7 +53,7 @@ class SmartContentBuffer: ObservableObject {
         }
     }
     
-    struct ProcessedContent {
+    struct BufferedProcessedContent {
         let text: String
         let type: ContentType
         let confidence: Float
@@ -120,7 +120,7 @@ class SmartContentBuffer: ObservableObject {
     }
     
     /// Force process current buffer
-    func forceProcess() async -> ProcessedContent? {
+    func forceProcess() async -> BufferedProcessedContent? {
         pauseTimer?.invalidate()
         bufferTimer?.invalidate()
         
@@ -230,7 +230,7 @@ class SmartContentBuffer: ObservableObject {
     
     // MARK: - Buffer Processing
     
-    private func processBuffer() async -> ProcessedContent? {
+    private func processBuffer() async -> BufferedProcessedContent? {
         let bufferContent = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Clear state
@@ -271,7 +271,7 @@ class SmartContentBuffer: ObservableObject {
             recentSentences.removeFirst()
         }
         
-        let result = ProcessedContent(
+        let result = BufferedProcessedContent(
             text: cleanedContent,
             type: contentType,
             confidence: avgConfidence,
@@ -322,7 +322,7 @@ class SmartContentBuffer: ObservableObject {
     
     // MARK: - Content Type Detection
     
-    private func detectContentType(_ text: String) async -> ProcessedContent.ContentType {
+    private func detectContentType(_ text: String) async -> BufferedProcessedContent.ContentType {
         let lowercased = text.lowercased()
         
         // Question detection
@@ -478,7 +478,7 @@ class SmartContentBuffer: ObservableObject {
         return false
     }
     
-    private func mapToProcessedType(_ contextType: ContentContext.ContentType) -> ProcessedContent.ContentType {
+    private func mapToProcessedType(_ contextType: ContentContext.ContentType) -> BufferedProcessedContent.ContentType {
         switch contextType {
         case .quote: return .quote
         case .reflection: return .note
@@ -546,7 +546,7 @@ class SmartContentBuffer: ObservableObject {
     
     // MARK: - Content Saving
     
-    private func saveProcessedContent(_ content: ProcessedContent) async {
+    private func saveProcessedContent(_ content: BufferedProcessedContent) async {
         // Send to TrueAmbientProcessor for saving
         let processor = TrueAmbientProcessor.shared
         
@@ -575,7 +575,7 @@ class SmartContentBuffer: ObservableObject {
         }
     }
     
-    private func mapToAmbientType(_ type: ProcessedContent.ContentType) -> AmbientProcessedContent.ContentType {
+    private func mapToAmbientType(_ type: BufferedProcessedContent.ContentType) -> AmbientProcessedContent.ContentType {
         switch type {
         case .quote: return .quote
         case .note: return .note
@@ -593,7 +593,7 @@ class SmartContentBuffer: ObservableObject {
         // If book changed, create a note about the switch
         if let newBook = book, let oldBook = previousBook, newBook.id != oldBook.id {
             // Create contextual book switching note
-            let switchNote = ProcessedContent(
+            let switchNote = BufferedProcessedContent(
                 text: "Now reading \(newBook.title)", // More natural than "Started reading"
                 type: .note,
                 confidence: 0.9,
@@ -610,7 +610,7 @@ class SmartContentBuffer: ObservableObject {
         } else if let newBook = book, previousBook == nil {
             // First book detection - only if we have meaningful context
             if !textBuffer.isEmpty && textBuffer.lowercased().contains("reading") {
-                let switchNote = ProcessedContent(
+                let switchNote = BufferedProcessedContent(
                     text: "Now reading \(newBook.title)",
                     type: .note,
                     confidence: 0.9,

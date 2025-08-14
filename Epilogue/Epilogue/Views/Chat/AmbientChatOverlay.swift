@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 import UIImageColors
 
-// MARK: - Ambient Session Model
-struct AmbientSession: Identifiable {
+// MARK: - Legacy Ambient Session Model (replaced by SwiftData AmbientSession)
+struct LegacyAmbientSession: Identifiable {
     let id = UUID()
     let startTime: Date
     var endTime: Date?
@@ -507,7 +507,7 @@ struct MinimalBookSelection: View {
 struct AmbientChatOverlay: View {
     @Binding var isActive: Bool
     @Binding var selectedBook: Book?
-    @Binding var session: AmbientSession?
+    @Binding var session: LegacyAmbientSession?
     
     @State private var pulseAnimation = false
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
@@ -828,7 +828,7 @@ struct AmbientChatOverlay: View {
     
     private func startListening() {
         // Create new session
-        var newSession = AmbientSession(startTime: Date())
+        var newSession = LegacyAmbientSession(startTime: Date())
         newSession.book = selectedBook
         session = newSession
         
@@ -1023,7 +1023,7 @@ struct AmbientChatOverlay: View {
         }
     }
     
-    private func processAmbientSession(_ session: AmbientSession) async -> ProcessedAmbientSession {
+    private func processAmbientSession(_ session: LegacyAmbientSession) async -> ProcessedAmbientSession {
         print("[AmbientChat] Processing session with \(session.rawTranscriptions.count) transcriptions")
         
         // Combine all transcriptions into a single text for better context
@@ -1219,7 +1219,7 @@ struct AmbientChatOverlay: View {
         )
     }
     
-    private func generateSessionSummary(session: AmbientSession, quotes: [ExtractedQuote], notes: [ExtractedNote], questions: [ExtractedQuestion], cognitiveAnalysis: SessionCognitiveAnalysis) -> String {
+    private func generateSessionSummary(session: LegacyAmbientSession, quotes: [ExtractedQuote], notes: [ExtractedNote], questions: [ExtractedQuestion], cognitiveAnalysis: SessionCognitiveAnalysis) -> String {
         var summary = "Reading session"
         
         if let book = session.book {
@@ -1424,7 +1424,7 @@ struct AmbientChatOverlay: View {
 
 // MARK: - Minimal Processing Overlay
 struct ProcessingOverlay: View {
-    let session: AmbientSession?
+    let session: LegacyAmbientSession?
     
     var body: some View {
         ZStack {

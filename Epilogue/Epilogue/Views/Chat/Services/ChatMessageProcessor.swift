@@ -9,7 +9,7 @@ enum ProcessedContentType {
     case regular
 }
 
-struct ProcessedContent {
+struct ChatProcessedContent {
     let type: ProcessedContentType
     let content: String
     let saved: Bool
@@ -19,12 +19,12 @@ struct ProcessedContent {
 // MARK: - Chat Message Processor
 class ChatMessageProcessor {
     
-    static func processMessage(_ message: String, book: Book?) -> ProcessedContent {
+    static func processMessage(_ message: String, book: Book?) -> ChatProcessedContent {
         let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Check for quote patterns
         if let quoteContent = detectQuote(in: trimmedMessage) {
-            return ProcessedContent(
+            return ChatProcessedContent(
                 type: .quote,
                 content: quoteContent,
                 saved: true,
@@ -34,7 +34,7 @@ class ChatMessageProcessor {
         
         // Check for note patterns
         if let noteContent = detectNote(in: trimmedMessage) {
-            return ProcessedContent(
+            return ChatProcessedContent(
                 type: .note,
                 content: noteContent,
                 saved: true,
@@ -44,7 +44,7 @@ class ChatMessageProcessor {
         
         // Check for questions
         if isQuestion(trimmedMessage) {
-            return ProcessedContent(
+            return ChatProcessedContent(
                 type: .question,
                 content: trimmedMessage,
                 saved: false,
@@ -53,7 +53,7 @@ class ChatMessageProcessor {
         }
         
         // Regular message
-        return ProcessedContent(
+        return ChatProcessedContent(
             type: .regular,
             content: message,
             saved: false,

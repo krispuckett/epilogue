@@ -363,10 +363,10 @@ struct IntelligentSuggestionsSection: View {
                 removal: .scale(scale: 0.95).combined(with: .opacity)
             ))
             .onAppear {
-                // Create a temporary AmbientSession for processor
-                var ambientSession = AmbientSession(startTime: Date().addingTimeInterval(-session.duration))
+                // Create a temporary AmbientSession for processor  
+                let ambientSession = AmbientSession(startTime: Date().addingTimeInterval(-session.duration))
                 ambientSession.endTime = Date()
-                ambientSession.processedData = session
+                // processedData no longer needed - using SwiftData model
                 
                 // Suggestions temporarily disabled
                 suggestions = []

@@ -207,11 +207,16 @@ struct UnifiedChatView: View {
     private var viewWithSheet: some View {
         viewWithNavigation
             .sheet(isPresented: $showingSessionSummary) {
-                if let session = ambientSession {
-                    AmbientSessionSummaryView(session: session)
-                        .onDisappear {
-                            handleSessionSummaryDismiss()
-                        }
+                if let optimizedSession = ambientSession {
+                    // Convert OptimizedAmbientSession to AmbientSession
+                    let session = AmbientSession(book: optimizedSession.bookContext)
+                    AmbientSessionSummaryView(
+                        session: session,
+                        colorPalette: colorPalette
+                    )
+                    .onDisappear {
+                        handleSessionSummaryDismiss()
+                    }
                 }
             }
     }
@@ -1192,9 +1197,8 @@ struct UnifiedChatView: View {
             metadata: SessionMetadata()
         )
         
-        // Create old session for compatibility
-        var newSession = AmbientSession(startTime: Date())
-        newSession.book = currentBookContext
+        // Create SwiftData session for compatibility
+        let newSession = AmbientSession(book: currentBookContext)
         currentSession = newSession
         
         // Start listening in ambient mode (with book detection)
