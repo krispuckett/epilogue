@@ -7,70 +7,78 @@ struct SimpleNoteCard: View {
     @State private var isPressed = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with metadata
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
             HStack {
-                if let bookTitle = note.bookTitle {
-                    Label(bookTitle, systemImage: "book.closed.fill")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
-                        .lineLimit(1)
-                }
+                // Date
+                Text(note.formattedDate)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
                 
                 Spacer()
                 
-                Text(note.dateCreated, style: .relative)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.gray)
+                // Note indicator
+                Image(systemName: "note.text")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.white.opacity(0.2))
             }
             
-            // Main content
+            // Content
             Text(note.content)
-                .font(.system(size: sizeCategory.isAccessibilitySize ? 18 : 15, weight: .medium, design: .serif))
+                .font(.custom("SF Pro Display", size: 16))
                 .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                .lineSpacing(sizeCategory.isAccessibilitySize ? 8 : 6)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: false)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(4)
             
-            // Footer with tags or actions
-            if let pageNumber = note.pageNumber {
-                HStack {
-                    Image(systemName: "bookmark")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.gray)
+            // Book info (if available)
+            if note.bookTitle != nil || note.author != nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider()
+                        .background(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.1))
+                        .padding(.vertical, 4)
                     
-                    Text("Page \(pageNumber)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.gray)
-                    
-                    Spacer()
-                    
-                    // Note type indicator
-                    noteTypeIndicator
+                    HStack(spacing: 8) {
+                        Text("re:")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.4))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let bookTitle = note.bookTitle {
+                                Text(bookTitle)
+                                    .font(.system(size: 14, weight: .semibold, design: .serif))
+                                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.9))
+                            }
+                            
+                            HStack(spacing: 8) {
+                                if let author = note.author {
+                                    Text(author)
+                                        .font(.system(size: 12, design: .default))
+                                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                                }
+                                
+                                if let pageNumber = note.pageNumber {
+                                    Text("• p. \(pageNumber)")
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                    }
                 }
+                .padding(.top, 4)
             }
         }
         .padding(20)
-        .background(
+        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(isPressed ? 0.2 : 0.1),
-                                    Color.white.opacity(0.05)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-        )
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .onTapGesture {
             // Handle tap
         }
@@ -85,25 +93,6 @@ struct SimpleNoteCard: View {
         })
     }
     
-    @ViewBuilder
-    private var noteTypeIndicator: some View {
-        switch note.type {
-        case .note:
-            HStack(spacing: 4) {
-                Image(systemName: "note.text")
-                Text("Note")
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.blue.opacity(0.8))
-        case .quote:
-            HStack(spacing: 4) {
-                Image(systemName: "quote.bubble")
-                Text("Quote")
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.yellow.opacity(0.8))
-        }
-    }
 }
 
 // Press events already defined in HeroTransitionView
