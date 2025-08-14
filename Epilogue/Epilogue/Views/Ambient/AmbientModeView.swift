@@ -160,6 +160,11 @@ struct AmbientModeView: View {
             // Clean transcription - only show new content
             let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             
+            // Debug log
+            if !cleanedText.isEmpty {
+                print("📝 Live transcription received: \(cleanedText)")
+            }
+            
             // Update live transcription
             liveTranscription = cleanedText
             
@@ -271,7 +276,7 @@ struct AmbientModeView: View {
             Spacer()
             
             // Live transcription with animated glass container
-            if !liveTranscription.isEmpty && showLiveTranscription {
+            if isRecording && !liveTranscription.isEmpty {
                 Text(liveTranscription)
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
@@ -292,6 +297,7 @@ struct AmbientModeView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
                     .opacity(showLiveTranscription ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.3), value: showLiveTranscription)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 0.8).combined(with: .opacity)

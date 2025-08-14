@@ -1,15 +1,19 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Ambient Session Summary View
+// MARK: - Award-Winning Session Summary View
 struct AmbientSessionSummaryView: View {
     let session: AmbientSession
     let colorPalette: ColorPalette?
-    @State private var expandedCards = Set<String>()
+    
+    @State private var expandedQuestions = Set<String>()
     @State private var showFullTranscript = false
     @State private var continuationText = ""
-    @State private var selectedThread: ConversationThread?
+    @State private var isProcessingFollowUp = false
+    @State private var additionalMessages: [UnifiedChatMessage] = []
     @FocusState private var isInputFocused: Bool
+    @State private var showShareSheet = false
+    @State private var showExportOptions = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -17,279 +21,367 @@ struct AmbientSessionSummaryView: View {
     
     // Animation states
     @State private var cardsVisible = false
-    @State private var headerExpanded = false
+    @State private var headerScale = 0.95
     
     var body: some View {
         ZStack {
-            // Gradient background - using existing system
-            if let palette = colorPalette {
-                BookAtmosphericGradientView(
-                    colorPalette: palette,
-                    intensity: 0.7,
-                    audioLevel: 0
-                )
-                .ignoresSafeArea()
-            } else {
-                AmbientChatGradientView()
-                    .ignoresSafeArea()
-            }
+            // Gradient background
+            backgroundGradient
             
             // Main content
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 16) {
-                        // Session header card
-                        SessionHeaderCard(
-                            session: session,
-                            isExpanded: $headerExpanded,
-                            colorPalette: colorPalette
-                        )
-                        .padding(.top, 60)
-                        
-                        // Grouped conversation threads
-                        ForEach(session.groupedThreads) { thread in
-                            ConversationThreadCard(
-                                thread: thread,
-                                isExpanded: expandedCards.contains(thread.id),
-                                colorPalette: colorPalette,
-                                onToggle: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        if expandedCards.contains(thread.id) {
-                                            expandedCards.remove(thread.id)
-                                        } else {
-                                            expandedCards.insert(thread.id)
-                                        }
-                                    }
-                                },
-                                onSelectFollowUp: { question in
-                                    continuationText = question
-                                    isInputFocused = true
+                    VStack(spacing: 24) {
+                        // Session header
+                        sessionHeaderView
+                            .padding(.top, 100)
+                            .scaleEffect(headerScale)
+                            .onAppear {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    headerScale = 1.0
                                 }
-                            )
+                            }
+                        
+                        // Quick actions
+                        quickActionsRow
                             .opacity(cardsVisible ? 1 : 0)
-                            .scaleEffect(cardsVisible ? 1 : 0.9)
-                            .animation(
-                                .spring(response: 0.4, dampingFraction: 0.8)
-                                .delay(Double(thread.index) * 0.05),
-                                value: cardsVisible
-                            )
+                            .animation(.easeOut(duration: 0.4).delay(0.1), value: cardsVisible)
+                        
+                        // Questions & Answers section
+                        if !session.capturedQuestions.isEmpty {
+                            questionsSection
+                                .opacity(cardsVisible ? 1 : 0)
+                                .animation(.easeOut(duration: 0.4).delay(0.2), value: cardsVisible)
                         }
                         
-                        // Captured content section
-                        if !session.capturedContent.isEmpty {
-                            CapturedContentSection(
-                                quotes: session.quotes,
-                                notes: session.notes,
-                                colorPalette: colorPalette
+                        // Captured content
+                        if !session.capturedQuotes.isEmpty || !session.capturedNotes.isEmpty {
+                            capturedContentSection
+                                .opacity(cardsVisible ? 1 : 0)
+                                .animation(.easeOut(duration: 0.4).delay(0.3), value: cardsVisible)
+                        }
+                        
+                        // Additional follow-up messages
+                        ForEach(additionalMessages) { message in
+                            ChatMessageView(
+                                message: message,
+                                currentBookContext: session.book,
+                                colorPalette: colorPalette ?? defaultColorPalette
                             )
-                            .opacity(cardsVisible ? 1 : 0)
-                            .animation(
-                                .spring(response: 0.4, dampingFraction: 0.8)
-                                .delay(0.3),
-                                value: cardsVisible
-                            )
+                            .id(message.id)
+                            .padding(.horizontal, 16)
                         }
                         
                         Spacer(minLength: 100)
                     }
-                    .padding(.horizontal, 16)
                 }
                 .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.immediately)
+                .onChange(of: additionalMessages.count) { _, _ in
+                    if let lastMessage = additionalMessages.last {
+                        withAnimation {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
             }
         }
         // Navigation bar
         .overlay(alignment: .top) {
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .frame(width: 40, height: 40)
-                        .glassEffect()
-                        .clipShape(Circle())
-                }
-                
-                Spacer()
-                
-                SessionActionsMenu(session: session)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
+            navigationBar
         }
-        // Continuation input bar
+        // Continuation input
         .safeAreaInset(edge: .bottom) {
-            ContinuationInputBar(
-                text: $continuationText,
-                isInputFocused: _isInputFocused,
-                session: session,
-                colorPalette: colorPalette,
-                onSend: {
-                    sendContinuation()
-                }
-            )
+            continuationInputBar
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 0.6)) {
+            withAnimation(.easeOut(duration: 0.3)) {
                 cardsVisible = true
             }
         }
-    }
-    
-    private func sendContinuation() {
-        // Handle continuation message
-        guard !continuationText.isEmpty else { return }
-        
-        // Process as follow-up question
-        Task {
-            // Implementation for processing follow-up
+        .sheet(isPresented: $showFullTranscript) {
+            TranscriptView(session: session, colorPalette: colorPalette)
         }
-        
-        continuationText = ""
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(session: session)
+        }
     }
-}
-
-// MARK: - Session Header Card
-struct SessionHeaderCard: View {
-    let session: AmbientSession
-    @Binding var isExpanded: Bool
-    let colorPalette: ColorPalette?
     
-    @State private var statsAnimated = false
+    // MARK: - Background Gradient
+    @ViewBuilder
+    private var backgroundGradient: some View {
+        if let palette = colorPalette {
+            BookAtmosphericGradientView(
+                colorPalette: palette,
+                intensity: 0.7,
+                audioLevel: 0
+            )
+            .ignoresSafeArea()
+        } else {
+            AmbientChatGradientView()
+                .opacity(0.95)
+                .ignoresSafeArea()
+        }
+    }
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header row
-            HStack {
-                // Book icon and title
-                HStack(spacing: 12) {
-                    if let book = session.book {
-                        if let coverURL = book.coverImageURL {
-                            SharedBookCoverView(
-                                coverURL: coverURL,
-                                width: 40,
-                                height: 60
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(book.title)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                            
-                            if let chapter = session.currentChapter {
-                                Text("Chapter \(chapter)")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                        }
-                    } else {
-                        Image(systemName: "book.closed")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white.opacity(0.8))
-                        
-                        Text("Reading Session")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                
-                Spacer()
-                
-                // Expand button
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        isExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                }
+    // MARK: - Navigation Bar
+    private var navigationBar: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .glassEffect()
+                    .clipShape(Circle())
             }
             
-            // Quick stats row (always visible)
-            HStack(spacing: 16) {
-                StatPill(
-                    icon: "clock",
-                    value: formatDuration(session.duration),
-                    animated: statsAnimated
-                )
+            Spacer()
+            
+            Menu {
+                Button {
+                    showFullTranscript = true
+                } label: {
+                    Label("Show Transcript", systemImage: "doc.text")
+                }
                 
-                StatPill(
-                    icon: "questionmark.circle",
-                    value: "\(session.questions.count)",
-                    animated: statsAnimated
-                )
+                Button {
+                    exportSession()
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
                 
-                StatPill(
-                    icon: "quote.bubble",
-                    value: "\(session.quotes.count)",
-                    animated: statsAnimated
-                )
-                
+                Button {
+                    shareInsights()
+                } label: {
+                    Label("Share Insights", systemImage: "sparkles")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .glassEffect()
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 60)
+    }
+    
+    // MARK: - Session Header
+    private var sessionHeaderView: some View {
+        VStack(spacing: 12) {
+            // Title
+            Text("Reading Session")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(.white)
+            
+            // Book info (if available)
+            if let book = session.book {
+                HStack(spacing: 10) {
+                    if let coverURL = book.coverImageURL {
+                        SharedBookCoverView(
+                            coverURL: coverURL,
+                            width: 36,
+                            height: 54
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(book.title)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.95))
+                        
+                        if !book.author.isEmpty {
+                            Text(book.author)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(12)
+                .glassEffect()
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            
+            // Stats row
+            HStack(spacing: 20) {
+                statItem(icon: "clock", value: formatDuration(session.duration))
+                statItem(icon: "questionmark.circle", value: "\(session.questions.count)")
+                statItem(icon: "quote.bubble", value: "\(session.quotes.count)")
                 if !session.notes.isEmpty {
-                    StatPill(
-                        icon: "note.text",
-                        value: "\(session.notes.count)",
-                        animated: statsAnimated
+                    statItem(icon: "note.text", value: "\(session.notes.count)")
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Quick Actions Row
+    private var quickActionsRow: some View {
+        HStack(spacing: 12) {
+            SessionActionButton(title: "Summarize", icon: "text.badge.checkmark") {
+                summarizeSession()
+            }
+            
+            SessionActionButton(title: "Key takeaways", icon: "lightbulb") {
+                extractKeyTakeaways()
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Questions Section
+    private var questionsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Questions & Answers")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.horizontal, 20)
+            
+            VStack(spacing: 12) {
+                ForEach(session.capturedQuestions) { question in
+                    SessionQuestionCard(
+                        question: question,
+                        isExpanded: expandedQuestions.contains(question.id.uuidString),
+                        onToggle: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                if expandedQuestions.contains(question.id.uuidString) {
+                                    expandedQuestions.remove(question.id.uuidString)
+                                } else {
+                                    expandedQuestions.insert(question.id.uuidString)
+                                }
+                            }
+                        },
+                        onAskFollowUp: { followUp in
+                            continuationText = followUp
+                            sendFollowUp()
+                        }
                     )
                 }
             }
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    // MARK: - Captured Content Section
+    private var capturedContentSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Captured Content")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.horizontal, 20)
             
-            // Expanded content
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Key topics
-                    if !session.keyTopics.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Key Topics")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                            
-                            FlowLayout(spacing: 8) {
-                                ForEach(session.keyTopics, id: \.self) { topic in
-                                    TopicPill(topic: topic)
-                                }
+            VStack(spacing: 10) {
+                ForEach(session.capturedQuotes) { quote in
+                    ContentCard(
+                        icon: "quote.bubble",
+                        text: quote.text,
+                        author: quote.author,
+                        type: .quote
+                    )
+                }
+                
+                ForEach(session.capturedNotes) { note in
+                    ContentCard(
+                        icon: "note.text",
+                        text: note.content,
+                        author: nil,
+                        type: .note
+                    )
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    // MARK: - Continuation Input Bar
+    private var continuationInputBar: some View {
+        VStack(spacing: 0) {
+            // Suggested actions
+            if continuationText.isEmpty && !session.suggestedContinuations.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(["Summarize this session", "Key takeaways"], id: \.self) { suggestion in
+                            Button {
+                                continuationText = suggestion
+                                sendFollowUp()
+                            } label: {
+                                Text(suggestion)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.85))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .glassEffect()
+                                    .clipShape(Capsule())
                             }
                         }
                     }
-                    
-                    // Show full transcript button
-                    Button {
-                        // Show full transcript
-                    } label: {
-                        HStack {
-                            Text("Show Full Transcript")
-                                .font(.system(size: 14, weight: .medium))
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundStyle(.white.opacity(0.8))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .glassEffect()
-                        .clipShape(Capsule())
-                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
                 }
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .top)),
-                    removal: .opacity.combined(with: .move(edge: .top))
-                ))
             }
+            
+            // Input field
+            HStack(spacing: 12) {
+                TextField("Continue the conversation...", text: $continuationText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white)
+                    .focused($isInputFocused)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        sendFollowUp()
+                    }
+                
+                if isProcessingFollowUp {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                } else {
+                    Button {
+                        sendFollowUp()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(continuationText.isEmpty ? .white.opacity(0.3) : .white)
+                    }
+                    .disabled(continuationText.isEmpty)
+                }
+            }
+            .padding(14)
+            .glassEffect()
+            .clipShape(Capsule())
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
         }
-        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [.black.opacity(0), .black.opacity(0.3)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+    
+    // MARK: - Helper Functions
+    private func statItem(icon: String, value: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+            Text(value)
+                .font(.system(size: 14, weight: .medium))
+        }
+        .foregroundStyle(.white.opacity(0.85))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
         .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6).delay(0.2)) {
-                statsAnimated = true
-            }
-        }
+        .clipShape(Capsule())
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -297,385 +389,329 @@ struct SessionHeaderCard: View {
         let seconds = Int(duration) % 60
         return String(format: "%dm %02ds", minutes, seconds)
     }
-}
-
-// MARK: - Conversation Thread Card
-struct ConversationThreadCard: View {
-    let thread: ConversationThread
-    let isExpanded: Bool
-    let colorPalette: ColorPalette?
-    let onToggle: () -> Void
-    let onSelectFollowUp: (String) -> Void
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Thread header
-            Button(action: onToggle) {
-                HStack {
-                    // Thread type icon
-                    Image(systemName: thread.icon)
-                        .font(.system(size: 16))
-                        .foregroundStyle(thread.iconColor)
-                        .frame(width: 28, height: 28)
-                        .glassEffect()
-                        .clipShape(Circle())
-                    
-                    // Thread title (first question or topic)
-                    Text(thread.title)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(isExpanded ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    
-                    Spacer()
-                    
-                    // Message count
-                    if thread.messages.count > 1 {
-                        Text("\(thread.messages.count)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .glassEffect()
-                            .clipShape(Capsule())
-                    }
+    private func sendFollowUp() {
+        guard !continuationText.isEmpty else { return }
+        
+        let userMessage = UnifiedChatMessage(
+            content: continuationText,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: session.book
+        )
+        additionalMessages.append(userMessage)
+        
+        let questionText = continuationText
+        continuationText = ""
+        isProcessingFollowUp = true
+        
+        Task {
+            let aiService = AICompanionService.shared
+            do {
+                let response = try await aiService.processMessage(
+                    questionText,
+                    bookContext: session.book,
+                    conversationHistory: additionalMessages
+                )
+                
+                await MainActor.run {
+                    let aiMessage = UnifiedChatMessage(
+                        content: response,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: session.book
+                    )
+                    additionalMessages.append(aiMessage)
+                    isProcessingFollowUp = false
+                }
+            } catch {
+                await MainActor.run {
+                    let errorMessage = UnifiedChatMessage(
+                        content: "I couldn't process your question. Please try again.",
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: session.book
+                    )
+                    additionalMessages.append(errorMessage)
+                    isProcessingFollowUp = false
                 }
             }
-            
-            // Expanded content
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 12) {
-                    // AI Response
-                    if let response = thread.aiResponse {
-                        Text(response)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        }
+    }
+    
+    private func summarizeSession() {
+        continuationText = "Summarize this reading session"
+        sendFollowUp()
+    }
+    
+    private func extractKeyTakeaways() {
+        continuationText = "What are the key takeaways from this session?"
+        sendFollowUp()
+    }
+    
+    private func exportSession() {
+        showExportOptions = true
+    }
+    
+    private func shareInsights() {
+        showShareSheet = true
+    }
+    
+    private var defaultColorPalette: ColorPalette {
+        ColorPalette(
+            primary: Color(red: 1.0, green: 0.55, blue: 0.26),
+            secondary: Color(red: 0.8, green: 0.3, blue: 0.4),
+            accent: Color(red: 0.6, green: 0.2, blue: 0.5),
+            background: Color.black,
+            textColor: Color.white,
+            luminance: 0.5,
+            isMonochromatic: false,
+            extractionQuality: 1.0
+        )
+    }
+}
+
+// MARK: - Question Card (Properly Designed)
+struct SessionQuestionCard: View {
+    let question: CapturedQuestion
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    let onAskFollowUp: (String) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Question header
+            Button(action: onToggle) {
+                HStack(spacing: 12) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.blue)
+                        .frame(width: 24, height: 24)
                     
-                    // Follow-up suggestions
-                    if !thread.suggestedFollowUps.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Follow-up questions")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.5))
-                            
-                            ForEach(thread.suggestedFollowUps, id: \.self) { followUp in
-                                Button {
-                                    onSelectFollowUp(followUp)
-                                } label: {
-                                    HStack {
-                                        Text(followUp)
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(.white.opacity(0.8))
-                                            .multilineTextAlignment(.leading)
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: "arrow.right.circle")
-                                            .font(.system(size: 14))
-                                            .foregroundStyle(.white.opacity(0.5))
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .glassEffect()
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Text(question.content)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .padding(16)
+            }
+            
+            // Answer (expandable)
+            if isExpanded, let answer = question.answer {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(answer)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 16)
+                    
+                    // Follow-up actions
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ask a follow-up")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.horizontal, 16)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                FollowUpChip(text: "Tell me more") {
+                                    onAskFollowUp("Tell me more about this")
+                                }
+                                
+                                FollowUpChip(text: "Why is this important?") {
+                                    onAskFollowUp("Why is this important?")
+                                }
+                                
+                                FollowUpChip(text: "Examples?") {
+                                    onAskFollowUp("Can you give me examples?")
                                 }
                             }
+                            .padding(.horizontal, 16)
                         }
                     }
+                    .padding(.bottom, 12)
                 }
                 .transition(.asymmetric(
                     insertion: .opacity.combined(with: .move(edge: .top)),
-                    removal: .opacity.combined(with: .move(edge: .top))
+                    removal: .opacity
                 ))
             }
         }
-        .padding(16)
         .glassEffect()
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
-// MARK: - Captured Content Section
-struct CapturedContentSection: View {
-    let quotes: [CapturedQuote]
-    let notes: [CapturedNote]
-    let colorPalette: ColorPalette?
+// MARK: - Content Card
+struct ContentCard: View {
+    let icon: String
+    let text: String
+    let author: String?
+    let type: ContentType
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Captured Content")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
-                .padding(.horizontal, 4)
-            
-            // Quotes
-            ForEach(quotes) { quote in
-                QuoteSummaryCard(quote: quote, colorPalette: colorPalette)
-            }
-            
-            // Notes
-            ForEach(notes) { note in
-                NoteSummaryCard(note: note, colorPalette: colorPalette)
-            }
-        }
+    enum ContentType {
+        case quote, note
     }
-}
-
-// MARK: - Quote Summary Card
-struct QuoteSummaryCard: View {
-    let quote: CapturedQuote
-    let colorPalette: ColorPalette?
-    @State private var isEditing = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "quote.bubble.fill")
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(type == .quote ? .green : .orange)
+                .frame(width: 20, height: 20, alignment: .center)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 
-                Spacer()
-                
-                Menu {
-                    Button {
-                        // Share quote
-                    } label: {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
-                    
-                    Button {
-                        isEditing = true
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .frame(width: 24, height: 24)
+                if let author = author {
+                    Text("— \(author)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .padding(.top, 2)
                 }
             }
-            
-            Text(quote.text)
-                .font(.system(size: 15, weight: .regular, design: .serif))
-                .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            if let author = quote.author {
-                Text("— \(author)")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
+        .padding(14)
         .glassEffect()
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 
-// MARK: - Note Summary Card
-struct NoteSummaryCard: View {
-    let note: CapturedNote
-    let colorPalette: ColorPalette?
+// MARK: - Action Button
+struct SessionActionButton: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
     
     var body: some View {
-        HStack {
-            Image(systemName: "note.text")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.6))
-            
-            Text(note.content)
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(2)
-            
-            Spacer()
-        }
-        .padding(12)
-        .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-// MARK: - Continuation Input Bar
-struct ContinuationInputBar: View {
-    @Binding var text: String
-    @FocusState var isInputFocused: Bool
-    let session: AmbientSession
-    let colorPalette: ColorPalette?
-    let onSend: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            // Suggested questions
-            if !session.suggestedContinuations.isEmpty && text.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(session.suggestedContinuations, id: \.self) { suggestion in
-                            Button {
-                                text = suggestion
-                            } label: {
-                                Text(suggestion)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.white.opacity(0.8))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .glassEffect()
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
             }
-            
-            // Input field
-            HStack(spacing: 12) {
-                TextField("Continue the conversation...", text: $text)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white)
-                    .focused($isInputFocused)
-                    .submitLabel(.send)
-                    .onSubmit(onSend)
-                
-                Button(action: onSend) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.white)
-                        .opacity(text.isEmpty ? 0.3 : 1.0)
-                }
-                .disabled(text.isEmpty)
-            }
-            .padding(.horizontal, 16)
+            .foregroundStyle(.white.opacity(0.9))
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .glassEffect()
-            .clipShape(Capsule())
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
     }
 }
 
-// MARK: - Session Actions Menu
-struct SessionActionsMenu: View {
-    let session: AmbientSession
+// MARK: - Follow-up Chip
+struct FollowUpChip: View {
+    let text: String
+    let action: () -> Void
     
     var body: some View {
-        Menu {
-            Button {
-                // Export session
-            } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
-            }
-            
-            Button {
-                // Share insights
-            } label: {
-                Label("Share Insights", systemImage: "sparkles")
-            }
-            
-            Button {
-                // Add to collection
-            } label: {
-                Label("Add to Collection", systemImage: "folder.badge.plus")
-            }
-            
-            Button {
-                // Pin session
-            } label: {
-                Label("Pin Session", systemImage: "pin")
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: 20))
-                .foregroundStyle(.white.opacity(0.8))
-                .frame(width: 40, height: 40)
-                .glassEffect()
-                .clipShape(Circle())
-        }
-    }
-}
-
-// MARK: - Helper Views
-struct StatPill: View {
-    let icon: String
-    let value: String
-    let animated: Bool
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 11))
-            Text(value)
+        Button(action: action) {
+            Text(text)
                 .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .glassEffect()
+                .clipShape(Capsule())
         }
-        .foregroundStyle(.white.opacity(0.8))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .glassEffect()
-        .clipShape(Capsule())
-        .scaleEffect(animated ? 1 : 0)
-        .opacity(animated ? 1 : 0)
     }
 }
 
-struct TopicPill: View {
-    let topic: String
+// MARK: - Transcript View
+struct TranscriptView: View {
+    let session: AmbientSession
+    let colorPalette: ColorPalette?
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        Text(topic)
-            .font(.system(size: 12))
-            .foregroundStyle(.white.opacity(0.7))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .glassEffect()
-            .clipShape(Capsule())
-    }
-}
-
-// Flow layout for topics
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(in: proposal.replacingUnspecifiedDimensions().width, subviews: subviews, spacing: spacing)
-        return result.size
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
-        for (index, frame) in result.frames.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
-        }
-    }
-    
-    struct FlowResult {
-        var size: CGSize = .zero
-        var frames: [CGRect] = []
-        
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-            
-            for subview in subviews {
-                let viewSize = subview.sizeThatFits(.unspecified)
-                
-                if currentX + viewSize.width > maxWidth, currentX > 0 {
-                    currentY += lineHeight + spacing
-                    currentX = 0
-                    lineHeight = 0
+        NavigationView {
+            ZStack {
+                if let palette = colorPalette {
+                    BookAtmosphericGradientView(
+                        colorPalette: palette,
+                        intensity: 0.5,
+                        audioLevel: 0
+                    )
+                    .ignoresSafeArea()
+                } else {
+                    Color.black.ignoresSafeArea()
                 }
                 
-                frames.append(CGRect(origin: CGPoint(x: currentX, y: currentY), size: viewSize))
-                currentX += viewSize.width + spacing
-                lineHeight = max(lineHeight, viewSize.height)
-                size.width = max(size.width, currentX - spacing)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(Array(session.transcriptSegments.enumerated()), id: \.element.id) { _, segment in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: segment.speaker == .user ? "person.circle" : "sparkles")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(segment.speaker == .user ? "You" : "AI")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.5))
+                                    
+                                    Text(segment.text)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(12)
+                            .glassEffect()
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    .padding()
+                }
             }
-            size.height = currentY + lineHeight
+            .navigationTitle("Transcript")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Share Sheet
+struct ShareSheet: View {
+    let session: AmbientSession
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("Share options coming soon")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
+            }
+            .navigationTitle("Share Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
