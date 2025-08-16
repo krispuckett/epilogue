@@ -64,7 +64,9 @@ class SmartEpilogueAI: ObservableObject {
             - Author: \(book.author)
             """
             
-            // Add book-specific knowledge for popular books
+            // Add book-specific knowledge for popular books  
+            print("📚 Setting up AI context for book: \(book.title) by \(book.author)")
+            
             if book.title.lowercased().contains("project hail mary") {
                 bookInfo += """
                 
@@ -75,13 +77,19 @@ class SmartEpilogueAI: ObservableObject {
                 - The threat is the Astrophage, organisms eating the sun's energy
                 - Themes: Science, friendship across species, sacrifice, problem-solving
                 """
-            } else if book.title.lowercased().contains("lord of the rings") {
+            } else if book.title.lowercased().contains("lord of the rings") || book.title.lowercased().contains("fellowship") || book.title.lowercased().contains("two towers") || book.title.lowercased().contains("return of the king") {
                 bookInfo += """
                 
                 Key Information about Lord of the Rings:
-                - Main characters: Frodo Baggins, Sam, Aragorn, Gandalf, and the Fellowship
-                - Plot: Frodo must destroy the One Ring in Mount Doom to save Middle-earth
-                - Themes: Good vs evil, friendship, sacrifice, corruption of power
+                - Main characters: Frodo Baggins (hobbit, ring-bearer), Sam Gamgee (Frodo's loyal companion), Aragorn/Strider (ranger, true king), Gandalf (wizard), Legolas (elf), Gimli (dwarf), Boromir, Merry, Pippin
+                - Plot: Frodo must destroy the One Ring in Mount Doom to save Middle-earth from Sauron
+                - Important Swords:
+                  * Sting: Frodo's sword (given by Bilbo, glows blue when orcs are near)
+                  * Glamdring: Gandalf's sword (also called Foe-hammer)
+                  * Andúril: Aragorn's sword (reforged from Narsil, the sword that cut the Ring from Sauron)
+                  * NOT Frodo's sword - Frodo has Sting, not Andúril!
+                - The One Ring: Forged by Sauron, corrupts the bearer, must be destroyed
+                - Themes: Good vs evil, friendship, sacrifice, corruption of power, hope against despair
                 """
             } else if book.title.lowercased().contains("the silmarillion") {
                 bookInfo += """
@@ -97,9 +105,11 @@ class SmartEpilogueAI: ObservableObject {
             
             When answering questions:
             1. ALWAYS assume questions are about \(book.title) unless explicitly stated otherwise
-            2. Provide specific, accurate information about THIS book
-            3. If you don't know specific details about \(book.title), say so clearly
-            4. Be concise but informative
+            2. ALWAYS answer factually - do NOT refuse to answer about book content
+            3. This is NOT about avoiding spoilers - the user is reading this book!
+            4. Provide specific, accurate information about THIS book
+            5. Be direct and helpful - answer what was asked
+            6. If you don't know specific details about \(book.title), say so clearly
             """
         }
         
@@ -117,76 +127,88 @@ class SmartEpilogueAI: ObservableObject {
         setupSession() // Recreate session with new context
     }
     
-    // MARK: - Smart Query Routing
+    // MARK: - Smart Query Routing (OPTIMIZED FOR SPEED)
     func smartQuery(_ question: String) async -> String {
         isProcessing = true
         defer { isProcessing = false }
         
-        // Determine if question needs external knowledge
-        let needsExternal = await shouldUseExternal(question)
-        
-        if needsExternal || currentMode == .externalOnly {
+        // Force mode overrides
+        if currentMode == .externalOnly {
             return await queryWithPerplexity(question)
         } else if currentMode == .localOnly {
             return await queryLocal(question)
+        }
+        
+        // AUTOMATIC MODE - Intelligent routing
+        let needsExternal = await shouldUseExternal(question)
+        
+        if needsExternal {
+            // External knowledge needed - go straight to Perplexity
+            return await queryWithPerplexity(question)
         } else {
-            // Automatic mode - try local first, use tool if needed
-            return await queryWithSmartRouting(question)
+            // Book-specific question - try local first (FAST!)
+            // If Foundation Models available, it's faster than network
+            #if canImport(FoundationModels)
+            if #available(iOS 26.0, *), session != nil {
+                // Local is available and FAST - use it!
+                return await queryLocal(question)
+            }
+            #endif
+            
+            // Fallback to Perplexity if local not available
+            return await queryWithPerplexity(question)
         }
     }
     
-    // MARK: - Determine Query Type
+    // MARK: - Determine Query Type (OPTIMIZED)
     private func shouldUseExternal(_ question: String) async -> Bool {
         let questionLower = question.lowercased()
         
-        // Keywords that suggest external knowledge needed
-        let externalKeywords = [
-            "latest", "current", "recent", "news", "update",
-            "real world", "actually", "factual", "true story",
-            "author's life", "biography", "historical context",
-            "other books", "similar to", "compare with",
-            "movie adaptation", "film version", "tv series",
-            "when was it published", "sales", "awards", "reviews"
-        ]
-        
-        // Keywords that strongly suggest book-specific knowledge
-        let bookKeywords = [
-            "who is", "who are", "who's",  // Who is the main character?
-            "main character", "protagonist", "antagonist", "villain",
-            "plot", "story", "happen", "happens",
-            "theme", "meaning", "symbolism",
-            "chapter", "ending", "beginning", "scene", "part",
-            "quote", "said", "says", "tell", "tells",
-            "relationship", "conflict", "dies", "death",
-            "character", "rocky", "grace", "frodo", "gandalf"  // Common character names
-        ]
-        
-        // Check for external indicators
-        let needsExternal = externalKeywords.contains { questionLower.contains($0) }
-        
-        // Check for book-specific indicators - be more aggressive about detecting these
-        let isBookSpecific = bookKeywords.contains { keyword in 
-            questionLower.contains(keyword)
-        } || questionLower.starts(with: "who") || questionLower.starts(with: "what happens") || questionLower.starts(with: "how does")
-        
-        // If we have an active book and the question seems book-specific, ALWAYS use local
-        if activeBook != nil && isBookSpecific {
-            print("📚 Question '\(question)' detected as book-specific for '\(activeBook?.title ?? "unknown")'")
-            return false  // Use local Foundation Models
-        }
-        
-        // If explicitly asking for external info, use external
-        if needsExternal {
-            print("🌐 Question '\(question)' requires external knowledge")
+        // Fast path: If no book context, use Perplexity for general questions
+        guard activeBook != nil else {
+            print("🌐 No book context - using Perplexity for speed")
             return true
         }
         
-        // Default to local if we have a book context
-        if activeBook != nil {
+        // ULTRA-FAST book-specific detection - check these FIRST
+        // Questions about plot, characters, or story elements should ALWAYS use local
+        if questionLower.contains("sword") || 
+           questionLower.contains("character") ||
+           questionLower.contains("happen") ||
+           questionLower.contains("plot") ||
+           questionLower.contains("die") ||
+           questionLower.contains("end") ||
+           questionLower.starts(with: "who") ||
+           questionLower.starts(with: "what") ||
+           questionLower.starts(with: "when does") ||
+           questionLower.starts(with: "where") ||
+           questionLower.starts(with: "why") ||
+           questionLower.starts(with: "how") {
+            print("⚡ FAST: Book-specific question detected - using local Foundation Models")
             return false
         }
         
-        return needsExternal
+        // Keywords that DEFINITELY need external knowledge
+        let externalKeywords = [
+            "latest", "current", "recent", "news", "2024", "2025",
+            "real world", "actually happened", "true story",
+            "author died", "author born", "author's life",
+            "movie", "film", "tv show", "adaptation",
+            "published", "sales", "awards", "reviews",
+            "other books", "similar books", "compare"
+        ]
+        
+        // Fast check for external needs
+        for keyword in externalKeywords {
+            if questionLower.contains(keyword) {
+                print("🌐 External knowledge required for: \(keyword)")
+                return true
+            }
+        }
+        
+        // Default: Use local for book context questions
+        print("📚 Using local Foundation Models for book context")
+        return false
     }
     
     // MARK: - Query with Smart Routing

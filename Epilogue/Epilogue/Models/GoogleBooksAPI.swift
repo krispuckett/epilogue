@@ -279,6 +279,12 @@ class GoogleBooksService: ObservableObject {
             throw APIError.invalidQuery
         }
         
+        // Check if this is an ISBN search
+        if cleanQuery.lowercased().hasPrefix("isbn:") {
+            // Direct ISBN search - use as-is
+            return try await performDirectSearch(query: cleanQuery)
+        }
+        
         // Enhanced search query building with smart interpretation
         var searchQuery = cleanQuery
         
@@ -296,12 +302,20 @@ class GoogleBooksService: ObservableObject {
                 // Use intitle and inauthor for precise results
                 searchQuery = "intitle:\"\(title)\" inauthor:\"\(expandedAuthor)\""
             }
+        } else if cleanQuery.lowercased().contains(" and ") {
+            // Handle queries with "and" - might be multiple authors or title with "and"
+            // Keep as-is for broader search
+            searchQuery = cleanQuery
         } else if cleanQuery.split(separator: " ").count == 1 && cleanQuery.count < 20 {
             // Single word - likely a famous book title
             searchQuery = "intitle:\(cleanQuery)"
         } else if detectsSeriesNumber(in: cleanQuery) {
             // Handle series books (e.g., "Harry Potter 2", "Hunger Games book 1")
             searchQuery = formatSeriesQuery(cleanQuery)
+        } else if cleanQuery.count > 100 {
+            // Very long query - probably extracted text with noise
+            // Try to extract the most important parts
+            searchQuery = extractKeyTerms(from: cleanQuery)
         } else {
             // General book title - use quotes for exact matching if short
             if cleanQuery.split(separator: " ").count <= 5 {
@@ -394,58 +408,118 @@ class GoogleBooksService: ObservableObject {
         var score = 0
         let titleLower = book.title.lowercased()
         let authorLower = book.author.lowercased()
+        let queryLower = query.lowercased()
+        
+        // Remove common noise words from comparison
+        let cleanTitle = titleLower
+            .replacingOccurrences(of: ": a novel", with: "")
+            .replacingOccurrences(of: " (", with: " ")
+            .replacingOccurrences(of: ")", with: "")
         
         // Exact title match gets highest score
-        if titleLower == query {
+        if cleanTitle == queryLower || titleLower == queryLower {
             score += 1000
         }
         
-        // Title starts with query
-        if titleLower.hasPrefix(query) {
-            score += 500
+        // Title starts with query (very strong signal)
+        if titleLower.hasPrefix(queryLower) {
+            score += 800
         }
         
         // Title contains exact query
-        if titleLower.contains(query) {
-            score += 300
+        if titleLower.contains(queryLower) {
+            score += 500
+        }
+        
+        // Check for ISBN in query
+        if queryLower.hasPrefix("isbn:") {
+            // For ISBN searches, exact match is critical
+            let isbn = queryLower.replacingOccurrences(of: "isbn:", with: "")
+            if let bookISBN = book.isbn, bookISBN == isbn {
+                score += 2000 // Highest priority for exact ISBN match
+            }
         }
         
         // All query words in title (in order)
         var lastIndex = titleLower.startIndex
         var allWordsInOrder = true
+        var wordMatchCount = 0
         for word in queryWords {
             if let range = titleLower.range(of: word, range: lastIndex..<titleLower.endIndex) {
                 lastIndex = range.upperBound
                 score += 50
+                wordMatchCount += 1
+            } else if titleLower.contains(word) {
+                // Word exists but not in order
+                score += 25
+                wordMatchCount += 1
+                allWordsInOrder = false
             } else {
                 allWordsInOrder = false
             }
         }
-        if allWordsInOrder {
+        
+        // Bonus for having all words
+        if wordMatchCount == queryWords.count {
             score += 200
         }
         
+        if allWordsInOrder && wordMatchCount == queryWords.count {
+            score += 300
+        }
+        
         // Author match for "by" queries
-        if query.contains(" by ") {
-            let parts = query.split(separator: " by ", maxSplits: 1).map(String.init)
+        if queryLower.contains(" by ") {
+            let parts = queryLower.split(separator: " by ", maxSplits: 1).map(String.init)
             if parts.count == 2 {
                 let authorQuery = parts[1]
                 if authorLower.contains(authorQuery) {
-                    score += 300
+                    score += 400
                 }
-                if authorLower.hasPrefix(authorQuery) {
-                    score += 100
+                if authorLower == authorQuery {
+                    score += 200
+                }
+                
+                // Check title match when author is specified
+                let titleQuery = parts[0]
+                if titleLower.contains(titleQuery) {
+                    score += 300
                 }
             }
         }
         
+        // Penalize titles with unwanted keywords
+        let unwantedKeywords = ["study guide", "cliff notes", "sparknotes", "summary", "analysis", 
+                              "teacher", "student", "workbook", "companion", "movie", "film"]
+        for keyword in unwantedKeywords {
+            if titleLower.contains(keyword) {
+                score -= 200
+            }
+        }
+        
         // Penalize overly long titles (often compilations or special editions)
-        if book.title.count > 50 {
+        if book.title.count > 80 {
+            score -= 100
+        } else if book.title.count > 60 {
             score -= 50
         }
         
+        // Boost books with cover images
+        if book.coverImageURL != nil {
+            score += 30
+        }
+        
         // Boost popular/classic books (those with more pages tend to be full novels)
-        if let pageCount = book.pageCount, pageCount > 200 {
+        if let pageCount = book.pageCount {
+            if pageCount > 200 && pageCount < 1000 {
+                score += 50
+            } else if pageCount >= 100 && pageCount <= 200 {
+                score += 25
+            }
+        }
+        
+        // Boost books with descriptions (usually means it's a real book)
+        if book.description != nil && !book.description!.isEmpty {
             score += 20
         }
         
@@ -541,6 +615,72 @@ class GoogleBooksService: ObservableObject {
         }
         
         return "intitle:\(query)"
+    }
+    
+    // New helper function for direct search
+    private func performDirectSearch(query: String) async throws -> [Book] {
+        guard var components = URLComponents(string: baseURL) else {
+            throw URLError(.badURL)
+        }
+        
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "maxResults", value: "40"),
+            URLQueryItem(name: "orderBy", value: "relevance"),
+            URLQueryItem(name: "printType", value: "books")
+        ]
+        
+        guard let url = components.url else {
+            throw APIError.invalidURL
+        }
+        
+        print("GoogleBooksAPI: Direct search URL: \(url)")
+        
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        
+        let decoder = JSONDecoder()
+        let googleResponse = try decoder.decode(GoogleBooksResponse.self, from: data)
+        
+        let books = googleResponse.items?.compactMap { $0.book } ?? []
+        return Array(books.prefix(20))
+    }
+    
+    // Extract key terms from long/noisy text
+    private func extractKeyTerms(from text: String) -> String {
+        // Common words to ignore
+        let stopWords = Set(["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", 
+                           "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
+                           "have", "has", "had", "do", "does", "did", "will", "would", "could",
+                           "should", "may", "might", "must", "can", "introduction", "new", "edition"])
+        
+        // Split into words and filter
+        let words = text.lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { word in
+                !word.isEmpty && 
+                !stopWords.contains(word) &&
+                word.count > 2 &&
+                !word.contains(where: { $0.isNumber })
+            }
+        
+        // Take the first few significant words
+        let keyWords = Array(words.prefix(5))
+        
+        // If we have an author name pattern (capitalized words), prioritize it
+        let capitalizedWords = text.components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.first?.isUppercase == true && $0.count > 2 }
+            .prefix(3)
+        
+        if !capitalizedWords.isEmpty {
+            return capitalizedWords.joined(separator: " ")
+        }
+        
+        return keyWords.joined(separator: " ")
     }
 }
 

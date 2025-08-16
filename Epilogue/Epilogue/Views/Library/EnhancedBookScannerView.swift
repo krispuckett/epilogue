@@ -568,40 +568,26 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         // Stop camera for processing
         captureSession?.stopRunning()
         
-        // Search for book by ISBN using Google Books API
+        // Always show search sheet for ISBN to let user choose cover
         Task {
-            print("📚 Searching for ISBN: \(stringValue)")
+            print("📚 ISBN \(stringValue) detected - showing search sheet")
             await MainActor.run { [weak self] in
-                self?.detectionStatus?.wrappedValue = "Searching for ISBN \(stringValue)..."
-            }
-            
-            let googleBooks = GoogleBooksService()
-            if let book = await googleBooks.searchBookByISBN(stringValue) {
-                print("✅ Found book: \(book.title)")
-                // Found book - call the callback directly
-                await MainActor.run { [weak self] in
-                    self?.onBookFound?(book)
-                    self?.processingISBN = false
-                }
-            } else {
-                print("❌ ISBN not found, showing search sheet")
-                // Show search sheet with ISBN query
-                await MainActor.run { [weak self] in
-                    // Post notification to show search sheet
-                    NotificationCenter.default.post(
-                        name: Notification.Name("ShowBookSearchFromScanner"),
-                        object: "isbn:\(stringValue)"
-                    )
-                    
-                    // Reset state
-                    self?.processingISBN = false
-                    self?.isProcessing?.wrappedValue = false
-                    
-                    // Start camera on background thread
-                    if let session = self?.captureSession {
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            session.startRunning()
-                        }
+                self?.detectionStatus?.wrappedValue = "Found ISBN - showing results..."
+                
+                // Always show search sheet with ISBN query
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowBookSearchFromScanner"),
+                    object: "isbn:\(stringValue)"
+                )
+                
+                // Reset state
+                self?.processingISBN = false
+                self?.isProcessing?.wrappedValue = false
+                
+                // Start camera on background thread
+                if let session = self?.captureSession {
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        session.startRunning()
                     }
                 }
             }

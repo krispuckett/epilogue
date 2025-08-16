@@ -119,13 +119,55 @@ public class TrueAmbientProcessor: ObservableObject {
         do {
             // Initialize the system language model
             languageModel = SystemLanguageModel.default
-            modelSession = LanguageModelSession()
+            
+            // Get book context if available
+            var instructions = "You are a helpful AI reading companion. Always answer questions factually and helpfully."
+            if let book = AmbientBookDetector.shared.detectedBook {
+                instructions = """
+                You are a helpful AI assistant discussing the book '\(book.title)' by \(book.author).
+                ALWAYS answer questions about this book factually and helpfully.
+                Do NOT refuse to answer questions about the book's content.
+                The user is reading this book and wants to discuss it - this is NOT about avoiding spoilers.
+                Be direct, factual, and helpful with all answers.
+                """
+            }
+            
+            modelSession = LanguageModelSession(instructions: instructions)
             logger.info("✅ Foundation Models initialized successfully")
         } catch {
             logger.error("❌ Failed to initialize Foundation Models: \(error)")
         }
         #else
         logger.info("ℹ️ Foundation Models not available on this platform")
+        #endif
+    }
+    
+    // Add method to update session when book changes
+    func updateBookContext(_ book: Book?) {
+        #if canImport(FoundationModels)
+        Task {
+            do {
+                var instructions = "You are Epilogue's AI reading companion."
+                if let book = book {
+                    instructions = """
+                    You are a helpful AI assistant discussing the book '\(book.title)' by \(book.author).
+                    ALWAYS answer questions about this book factually and helpfully.
+                    Do NOT refuse to answer questions about the book's content.
+                    This is NOT about spoilers - the user is already reading this book and wants to discuss it.
+                    
+                    Important facts to remember:
+                    - In Lord of the Rings: Sting is Frodo's sword (given by Bilbo), Glamdring is Gandalf's sword, Andúril is Aragorn's sword
+                    - Answer all questions about characters, plot, items, and story elements directly
+                    - Be concise and helpful
+                    """
+                }
+                
+                modelSession = LanguageModelSession(instructions: instructions)
+                logger.info("📚 Updated Foundation Models session with book: \(book?.title ?? "none")")
+            } catch {
+                logger.error("❌ Failed to update Foundation Models session: \(error)")
+            }
+        }
         #endif
     }
     
@@ -988,8 +1030,21 @@ extension TrueAmbientProcessor {
         await processQuestionWithFeedback(question, confidence: confidence, context: fullContext)
     }
     
-    // Enhanced question processing with audio feedback
+    // Enhanced question processing with audio feedback (OPTIMIZED FOR SPEED)
     func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
+        // SPEED: Immediately notify UI we're processing (shows thinking indicator)
+        await MainActor.run {
+            let pendingContent = AmbientProcessedContent(
+                text: question,
+                type: .question,
+                timestamp: Date(),
+                confidence: confidence,
+                response: nil // No response yet - triggers thinking indicator
+            )
+            self.detectedContent.append(pendingContent)
+            print("💭 FAST: Thinking indicator shown for: \(question.prefix(30))...")
+        }
+        
         // Normalize question for better deduplication
         let normalizedQuestion = normalizeQuestion(question)
         let processedKey = "question_\(normalizedQuestion)"
@@ -1020,8 +1075,18 @@ extension TrueAmbientProcessor {
         #if canImport(FoundationModels)
         if let modelSession = modelSession {
             do {
-                logger.info("🧠 Using Foundation Models for question: \(question)")
-                let response = try await modelSession.respond(to: question)
+                // Add book context to the question if available
+                let bookContext = AmbientBookDetector.shared.detectedBook
+                let contextualQuestion: String
+                if let book = bookContext {
+                    contextualQuestion = "Regarding the book '\(book.title)' by \(book.author): \(question)"
+                    logger.info("🧠 Using Foundation Models with book context for: \(question)")
+                } else {
+                    contextualQuestion = question
+                    logger.info("🧠 Using Foundation Models without book context for: \(question)")
+                }
+                
+                let response = try await modelSession.respond(to: contextualQuestion)
                 
                 // Process successful response
                 var content = AmbientProcessedContent(
@@ -1032,9 +1097,21 @@ extension TrueAmbientProcessor {
                     response: response.content
                 )
                 
-                detectedContent.append(content)
+                // Update existing pending question instead of adding a new one
+                if let existingIndex = detectedContent.firstIndex(where: { 
+                    $0.type == .question && 
+                    $0.text == question && 
+                    $0.response == nil 
+                }) {
+                    // Update the existing item with the response
+                    detectedContent[existingIndex].response = response.content
+                    logger.info("✅ Updated existing question with Foundation Models response")
+                } else {
+                    // Add as new if not found (shouldn't happen normally)
+                    detectedContent.append(content)
+                }
                 sessionContent.append(content)
-                let bookContext = AmbientBookDetector.shared.detectedBook
+                // bookContext already declared above
                 _ = conversationMemory.addMemory(
                     text: question,
                     intent: EnhancedIntent(

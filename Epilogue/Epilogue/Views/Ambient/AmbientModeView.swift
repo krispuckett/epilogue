@@ -32,6 +32,8 @@ struct AmbientModeView: View {
     @State private var isEditingTranscription = false
     @State private var editableTranscription = ""
     @FocusState private var isTranscriptionFocused: Bool
+    @State private var isWaitingForAIResponse = false
+    @State private var pendingQuestion: String?
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -412,6 +414,19 @@ struct AmbientModeView: View {
                         .id(message.id)
                     }
                     
+                    // Show thinking indicator when waiting for AI response
+                    if isWaitingForAIResponse {
+                        ThinkingMessageView(
+                            bookContext: currentBookContext,
+                            colorPalette: colorPalette ?? defaultColorPalette
+                        )
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .id("thinking-indicator")
+                    }
+                    
                     // Bottom spacer for input area
                     Color.clear
                         .frame(height: 80)
@@ -581,26 +596,36 @@ struct AmbientModeView: View {
             
             // ONLY show AI responses for questions in ambient mode
             // Don't show the user's question as a bubble - just the AI response
-            if item.type == .question && item.response != nil {
-                // More robust duplicate check - check both content and question context
-                let responseExists = messages.contains { msg in
-                    !msg.isUser && (msg.content == item.response || msg.content.contains(item.text))
-                }
-                
-                if !responseExists {
-                    // Format the response with the question for context
-                    let formattedResponse = "**\(item.text)**\n\n\(item.response!)"
-                    let aiMessage = UnifiedChatMessage(
-                        content: formattedResponse,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext,
-                        messageType: .text
-                    )
-                    messages.append(aiMessage)
-                    print("✅ Added AI response for question: \(item.text.prefix(30))...")
+            if item.type == .question {
+                if item.response != nil {
+                    // More robust duplicate check - check both content and question context
+                    let responseExists = messages.contains { msg in
+                        !msg.isUser && (msg.content == item.response || msg.content.contains(item.text))
+                    }
+                    
+                    if !responseExists {
+                        // Hide thinking indicator when we have a response
+                        isWaitingForAIResponse = false
+                        
+                        // Format the response with the question for context
+                        let formattedResponse = "**\(item.text)**\n\n\(item.response!)"
+                        let aiMessage = UnifiedChatMessage(
+                            content: formattedResponse,
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: currentBookContext,
+                            messageType: .text
+                        )
+                        messages.append(aiMessage)
+                        print("✅ Added AI response for question: \(item.text.prefix(30))...")
+                    } else {
+                        print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
+                    }
                 } else {
-                    print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
+                    // Question detected but no response yet - show thinking indicator
+                    pendingQuestion = item.text
+                    isWaitingForAIResponse = true
+                    print("💭 Showing thinking indicator for question: \(item.text.prefix(30))...")
                 }
             }
             
@@ -907,6 +932,9 @@ struct AmbientModeView: View {
         withAnimation(.easeInOut(duration: 0.5)) {
             currentBookContext = book
         }
+        
+        // Update the TrueAmbientProcessor with the new book context
+        TrueAmbientProcessor.shared.updateBookContext(book)
         
         Task {
             await extractColorsForBook(book)
