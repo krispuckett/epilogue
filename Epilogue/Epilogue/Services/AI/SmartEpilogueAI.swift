@@ -37,17 +37,58 @@ class SmartEpilogueAI: ObservableObject {
         var instructions = "You are Epilogue's AI reading companion."
         
         if let book = activeBook {
-            instructions = """
+            // Build rich context for the book
+            var bookInfo = """
             You are Epilogue's AI reading companion currently discussing '\(book.title)' by \(book.author).
             
-            When asked about characters, plot, themes, or specific questions about this book:
-            - Provide specific answers about '\(book.title)'
-            - Reference actual characters, events, and themes from this book
-            - Be concise and accurate
+            IMPORTANT: You are discussing THIS SPECIFIC BOOK. When asked any question about:
+            - "the main character" or "protagonist" - answer about \(book.title)'s main character
+            - "the plot" or "story" - answer about \(book.title)'s plot
+            - "the ending" - answer about \(book.title)'s ending
+            - "the theme" - answer about \(book.title)'s themes
+            - Any character names - assume they're from \(book.title)
             
-            Current book context:
+            Book Details:
             - Title: \(book.title)
             - Author: \(book.author)
+            """
+            
+            // Add book-specific knowledge for popular books
+            if book.title.lowercased().contains("project hail mary") {
+                bookInfo += """
+                
+                Key Information about Project Hail Mary:
+                - Main characters: Ryland Grace (human protagonist) and Rocky (alien friend)
+                - Plot: Ryland Grace wakes up alone on a spaceship with amnesia, tasked with saving Earth from extinction
+                - Rocky is an Eridian, a spider-like alien who becomes Grace's friend and collaborator
+                - The threat is the Astrophage, organisms eating the sun's energy
+                - Themes: Science, friendship across species, sacrifice, problem-solving
+                """
+            } else if book.title.lowercased().contains("lord of the rings") {
+                bookInfo += """
+                
+                Key Information about Lord of the Rings:
+                - Main characters: Frodo Baggins, Sam, Aragorn, Gandalf, and the Fellowship
+                - Plot: Frodo must destroy the One Ring in Mount Doom to save Middle-earth
+                - Themes: Good vs evil, friendship, sacrifice, corruption of power
+                """
+            } else if book.title.lowercased().contains("the silmarillion") {
+                bookInfo += """
+                
+                Key Information about The Silmarillion:
+                - Main themes: Creation myth of Middle-earth, the Silmarils, wars of the First Age
+                - Key figures: Eru Ilúvatar, Melkor/Morgoth, Fëanor, Beren and Lúthien
+                - Structure: Mythological history from creation through the First Age
+                """
+            }
+            
+            instructions = bookInfo + """
+            
+            When answering questions:
+            1. ALWAYS assume questions are about \(book.title) unless explicitly stated otherwise
+            2. Provide specific, accurate information about THIS book
+            3. If you don't know specific details about \(book.title), say so clearly
+            4. Be concise but informative
             """
         }
         
@@ -90,24 +131,44 @@ class SmartEpilogueAI: ObservableObject {
             "real world", "actually", "factual", "true story",
             "author's life", "biography", "historical context",
             "other books", "similar to", "compare with",
-            "movie adaptation", "film version", "tv series"
+            "movie adaptation", "film version", "tv series",
+            "when was it published", "sales", "awards", "reviews"
         ]
         
-        // Keywords that suggest book-specific knowledge
+        // Keywords that strongly suggest book-specific knowledge
         let bookKeywords = [
-            "main character", "protagonist", "plot", "theme",
-            "chapter", "ending", "beginning", "scene",
-            "quote", "said", "relationship", "conflict"
+            "who is", "who are", "who's",  // Who is the main character?
+            "main character", "protagonist", "antagonist", "villain",
+            "plot", "story", "happen", "happens",
+            "theme", "meaning", "symbolism",
+            "chapter", "ending", "beginning", "scene", "part",
+            "quote", "said", "says", "tell", "tells",
+            "relationship", "conflict", "dies", "death",
+            "character", "rocky", "grace", "frodo", "gandalf"  // Common character names
         ]
         
         // Check for external indicators
         let needsExternal = externalKeywords.contains { questionLower.contains($0) }
         
-        // Check for book-specific indicators
-        let isBookSpecific = bookKeywords.contains { questionLower.contains($0) }
+        // Check for book-specific indicators - be more aggressive about detecting these
+        let isBookSpecific = bookKeywords.contains { keyword in 
+            questionLower.contains(keyword)
+        } || questionLower.starts(with: "who") || questionLower.starts(with: "what happens") || questionLower.starts(with: "how does")
         
-        // If book-specific and we have active book, use local
-        if isBookSpecific && activeBook != nil {
+        // If we have an active book and the question seems book-specific, ALWAYS use local
+        if activeBook != nil && isBookSpecific {
+            print("📚 Question '\(question)' detected as book-specific for '\(activeBook?.title ?? "unknown")'")
+            return false  // Use local Foundation Models
+        }
+        
+        // If explicitly asking for external info, use external
+        if needsExternal {
+            print("🌐 Question '\(question)' requires external knowledge")
+            return true
+        }
+        
+        // Default to local if we have a book context
+        if activeBook != nil {
             return false
         }
         
@@ -171,17 +232,35 @@ class SmartEpilogueAI: ObservableObject {
             return question
         }
         
-        // For questions about "the main character" or similar, add book context
+        // For ANY question when we have a book context, make it explicit
         let questionLower = question.lowercased()
         
-        if questionLower.contains("main character") ||
-           questionLower.contains("protagonist") ||
-           questionLower.contains("plot") ||
-           questionLower.contains("ending") ||
-           questionLower.contains("theme") {
-            return "In the book '\(book.title)' by \(book.author): \(question)"
+        // Questions that definitely need book context
+        let needsContext = questionLower.starts(with: "who") ||
+                          questionLower.starts(with: "what") ||
+                          questionLower.starts(with: "when") ||
+                          questionLower.starts(with: "where") ||
+                          questionLower.starts(with: "why") ||
+                          questionLower.starts(with: "how") ||
+                          questionLower.contains("character") ||
+                          questionLower.contains("plot") ||
+                          questionLower.contains("theme") ||
+                          questionLower.contains("ending") ||
+                          questionLower.contains("chapter") ||
+                          questionLower.contains("happen")
+        
+        if needsContext {
+            // Make it VERY explicit what book we're discussing
+            if questionLower == "who is the main character" || questionLower == "who is the main character?" {
+                return "Who is the main character in the book '\(book.title)' by \(book.author)?"
+            } else if questionLower.starts(with: "who is") || questionLower.starts(with: "who are") {
+                return "In the book '\(book.title)' by \(book.author): \(question)"
+            } else {
+                return "Regarding the book '\(book.title)' by \(book.author): \(question)"
+            }
         }
         
+        // For other questions, still add context but more subtly
         return question
     }
     
