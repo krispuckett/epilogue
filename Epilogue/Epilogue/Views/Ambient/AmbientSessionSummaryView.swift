@@ -176,9 +176,14 @@ struct AmbientSessionSummaryView: View {
     private var metricsSection: some View {
         HStack(spacing: 32) {
             metricItem(value: formatDuration(session.duration), label: "DURATION")
-            metricItem(value: "\(session.questions.count)", label: "QUESTIONS")
+            if session.questions.count > 0 {
+                metricItem(value: "\(session.questions.count)", label: "QUESTIONS")
+            }
             if session.quotes.count > 0 {
                 metricItem(value: "\(session.quotes.count)", label: "QUOTES")
+            }
+            if session.notes.count > 0 {
+                metricItem(value: "\(session.notes.count)", label: "NOTES")
             }
         }
         .padding(.horizontal, 20)
@@ -478,7 +483,7 @@ struct MinimalThreadedCard: View {
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
                 .tracking(1.2)
-                .frame(width: 50, alignment: .leading)
+                .frame(width: 60, alignment: .leading)
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(content)

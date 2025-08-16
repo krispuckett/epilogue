@@ -1022,11 +1022,13 @@ struct AmbientModeView: View {
             switch item.type {
             case .quote:
                 if let quote = findQuote(matching: item.text) {
+                    quote.ambientSession = session
                     session.capturedQuotes.append(quote)
                     print("✅ Added quote to session")
                 }
             case .note, .thought:
                 if let note = findNote(matching: item.text) {
+                    note.ambientSession = session
                     session.capturedNotes.append(note)
                     print("✅ Added note to session")
                 }
@@ -1055,11 +1057,13 @@ struct AmbientModeView: View {
             }
         }
         
-        // Save session to SwiftData
-        modelContext.insert(session)
+        // Save session to SwiftData (only insert if not already inserted)
+        if currentSession == nil {
+            modelContext.insert(session)
+        }
         do {
             try modelContext.save()
-            print("✅ Session saved to SwiftData")
+            print("✅ Session saved to SwiftData with all relationships")
         } catch {
             print("❌ Failed to save session: \(error)")
         }
