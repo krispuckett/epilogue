@@ -168,6 +168,12 @@ struct EnhancedBookScannerView: View {
         .onAppear {
             checkCameraPermission()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearchFromScanner"))) { notification in
+            if let query = notification.object as? String {
+                searchQuery = query
+                showBookSearch = true
+            }
+        }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
                 searchQuery: searchQuery,
@@ -464,13 +470,12 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
                 // Show the search results sheet
                 await MainActor.run { [weak self] in
                     // The BookScannerService will set showSearchResults to true
-                    // which triggers the sheet in ContentView
+                    // which triggers the sheet in this view
                     self?.isProcessing?.wrappedValue = false
+                    self?.captureSession?.startRunning()
+                    self?.consecutiveDetections = 0
                     
-                    // Dismiss the scanner to show the search sheet
-                    if let parent = self?.parent as? UIViewController {
-                        parent.dismiss(animated: true)
-                    }
+                    // Don't dismiss - the sheet will show over the scanner
                 }
             } else {
                 await MainActor.run { [weak self] in
@@ -507,8 +512,8 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
             return
         }
         
-        // Check time since last scan
-        guard Date().timeIntervalSince(lastProcessedTime) > 2 else {
+        // Check time since last scan - reduce to 0.5 seconds
+        guard Date().timeIntervalSince(lastProcessedTime) > 0.5 else {
             // Silent skip - too soon after last scan
             return
         }
@@ -569,22 +574,21 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 
                 await MainActor.run { [weak self] in
-                    // Post notification to show book search with ISBN
-                    NotificationCenter.default.post(
-                        name: Notification.Name("ShowBookSearch"),
-                        object: "isbn:\(stringValue)"
-                    )
-                    self?.processingISBN = false
+                    // Show search directly in this view
+                    self?.detectionStatus?.wrappedValue = "Showing search for ISBN \(stringValue)..."
                     
-                    // Find the parent SwiftUI view and dismiss
-                    var responder: UIResponder? = self
-                    while let next = responder?.next {
-                        if let viewController = next as? UIHostingController<EnhancedBookScannerView> {
-                            viewController.dismiss(animated: true)
-                            break
-                        }
-                        responder = next
+                    // Trigger the search sheet with ISBN prepopulated
+                    // Use the view's own sheet, not notification
+                    if let parent = self?.parent as? CameraScannerView {
+                        // Access the parent EnhancedBookScannerView through the representable
+                        NotificationCenter.default.post(
+                            name: Notification.Name("ShowBookSearchFromScanner"),
+                            object: "isbn:\(stringValue)"
+                        )
                     }
+                    
+                    self?.processingISBN = false
+                    self?.captureSession?.startRunning()
                 }
             }
         }

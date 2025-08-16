@@ -2,16 +2,26 @@ import SwiftUI
 import Foundation
 import Combine
 import SwiftData
+#if canImport(FoundationModels)
 import FoundationModels
+#endif
 
 // MARK: - Smart Context-Aware AI Service
 @MainActor
 class SmartEpilogueAI: ObservableObject {
     static let shared = SmartEpilogueAI()
     
-    // Foundation Models
-    private let model = SystemLanguageModel.default
+    // Foundation Models (only available on iOS 26+)
+    #if canImport(FoundationModels)
+    @available(iOS 26.0, *)
+    private var model: SystemLanguageModel? {
+        return SystemLanguageModel.default
+    }
+    @available(iOS 26.0, *)
     private var session: LanguageModelSession?
+    #else
+    private var session: Any?
+    #endif
     
     // Perplexity Service for external queries
     private let perplexityService = PerplexityService()
@@ -34,6 +44,12 @@ class SmartEpilogueAI: ObservableObject {
     
     // MARK: - Session Setup with Book Context
     private func setupSession() {
+        #if canImport(FoundationModels)
+        guard #available(iOS 26.0, *) else {
+            print("⚠️ Foundation Models requires iOS 26.0 or later")
+            return
+        }
+        
         var instructions = "You are Epilogue's AI reading companion."
         
         if let book = activeBook {
@@ -95,6 +111,9 @@ class SmartEpilogueAI: ObservableObject {
         // Create session with instructions
         // TODO: Add tool support when Foundation Models API supports it
         session = LanguageModelSession(instructions: instructions)
+        #else
+        print("⚠️ Foundation Models not available on this iOS version")
+        #endif
     }
     
     // MARK: - Update Active Book Context
@@ -177,37 +196,58 @@ class SmartEpilogueAI: ObservableObject {
     
     // MARK: - Query with Smart Routing
     private func queryWithSmartRouting(_ question: String) async -> String {
-        guard let session = session else {
-            return "AI session not available"
-        }
-        
-        do {
-            // The session will automatically use tools when needed
-            let response = try await session.respond(to: formatQuestionWithContext(question))
-            lastResponse = response.content
-            return response.content
-        } catch {
-            print("Smart routing failed: \(error)")
-            // Fallback to Perplexity
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            guard let session = session else {
+                print("⚠️ No Foundation Models session available, falling back to Perplexity")
+                return await queryWithPerplexity(question)
+            }
+            
+            do {
+                // The session will automatically use tools when needed
+                let response = try await session.respond(to: formatQuestionWithContext(question))
+                lastResponse = response.content
+                return response.content
+            } catch {
+                print("Smart routing failed: \(error)")
+                // Fallback to Perplexity
+                return await queryWithPerplexity(question)
+            }
+        } else {
+            // iOS version too old, use Perplexity
             return await queryWithPerplexity(question)
         }
+        #else
+        // Foundation Models not available, use Perplexity
+        return await queryWithPerplexity(question)
+        #endif
     }
     
     // MARK: - Local Query (Foundation Models)
     private func queryLocal(_ question: String) async -> String {
-        guard let session = session else {
-            return "Local AI not available"
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            guard let session = session else {
+                print("⚠️ No Foundation Models session - iOS 26 required")
+                return "Local AI requires iOS 26 or later. Please use Perplexity mode instead."
+            }
+            
+            do {
+                let formattedQuestion = formatQuestionWithContext(question)
+                let response = try await session.respond(to: formattedQuestion)
+                lastResponse = response.content
+                return response.content
+            } catch {
+                print("❌ Foundation Models error: \(error)")
+                lastResponse = "Unable to process question locally: \(error.localizedDescription)"
+                return lastResponse
+            }
+        } else {
+            return "Local AI requires iOS 26 or later. Please use Perplexity mode instead."
         }
-        
-        do {
-            let formattedQuestion = formatQuestionWithContext(question)
-            let response = try await session.respond(to: formattedQuestion)
-            lastResponse = response.content
-            return response.content
-        } catch {
-            lastResponse = "Unable to process question locally"
-            return lastResponse
-        }
+        #else
+        return "Foundation Models not available on this device. Please use Perplexity mode."
+        #endif
     }
     
     // MARK: - External Query (Perplexity)

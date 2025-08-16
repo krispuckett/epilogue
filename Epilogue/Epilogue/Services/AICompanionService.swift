@@ -33,11 +33,15 @@ class AICompanionService: ObservableObject {
                 return true // Available if API key is configured
             case .appleIntelligence:
                 // Check if Foundation Models is available
-                if #available(iOS 18.2, *) {
-                    return true // Foundation Models available
+                #if canImport(FoundationModels)
+                if #available(iOS 26.0, *) {
+                    return true // Foundation Models available on iOS 26+
                 } else {
                     return false
                 }
+                #else
+                return false
+                #endif
             }
         }
         
