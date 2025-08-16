@@ -472,17 +472,29 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
                     // The BookScannerService will set showSearchResults to true
                     // which triggers the sheet in this view
                     self?.isProcessing?.wrappedValue = false
-                    self?.captureSession?.startRunning()
                     self?.consecutiveDetections = 0
+                    
+                    // Start camera on background thread
+                    if let session = self?.captureSession {
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            session.startRunning()
+                        }
+                    }
                     
                     // Don't dismiss - the sheet will show over the scanner
                 }
             } else {
                 await MainActor.run { [weak self] in
                     self?.isProcessing?.wrappedValue = false
-                    self?.captureSession?.startRunning()
                     self?.detectionStatus?.wrappedValue = "Could not read book cover. Try ISBN."
                     self?.consecutiveDetections = 0
+                    
+                    // Start camera on background thread
+                    if let session = self?.captureSession {
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            session.startRunning()
+                        }
+                    }
                 }
             }
         }
@@ -584,7 +596,13 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
                     // Reset state
                     self?.processingISBN = false
                     self?.isProcessing?.wrappedValue = false
-                    self?.captureSession?.startRunning()
+                    
+                    // Start camera on background thread
+                    if let session = self?.captureSession {
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            session.startRunning()
+                        }
+                    }
                 }
             }
         }

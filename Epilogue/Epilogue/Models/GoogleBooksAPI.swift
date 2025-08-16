@@ -204,13 +204,39 @@ class GoogleBooksService: ObservableObject {
     func searchBookByISBN(_ isbn: String) async -> Book? {
         print("GoogleBooksAPI: Searching for ISBN: \(isbn)")
         
+        // For ISBN search, we need to use the direct ISBN query without intitle
+        // Build URL directly for ISBN search
+        guard var components = URLComponents(string: baseURL) else { return nil }
+        components.queryItems = [
+            URLQueryItem(name: "q", value: "isbn:\(isbn)"),
+            URLQueryItem(name: "maxResults", value: "1")
+        ]
+        
+        guard let url = components.url else { return nil }
+        print("GoogleBooksAPI: ISBN search URL: \(url)")
+        
         do {
-            let books = try await performSearch(query: "isbn:\(isbn)")
-            return books.first
+            let (data, response) = try await session.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                print("GoogleBooksAPI: ISBN search failed with status")
+                return nil
+            }
+            
+            let decoder = JSONDecoder()
+            let googleResponse = try decoder.decode(GoogleBooksResponse.self, from: data)
+            
+            if let item = googleResponse.items?.first {
+                let book = item.book
+                print("GoogleBooksAPI: Found book via ISBN: \(book.title)")
+                return book
+            }
         } catch {
-            print("GoogleBooksAPI: ISBN search failed: \(error)")
-            return nil
+            print("GoogleBooksAPI: ISBN search error: \(error)")
         }
+        
+        return nil
     }
     
     func searchBooks(query: String) async {
