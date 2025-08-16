@@ -13,11 +13,6 @@ class SmartEpilogueAI: ObservableObject {
     
     // Foundation Models (only available on iOS 26+)
     #if canImport(FoundationModels)
-    @available(iOS 26.0, *)
-    private var model: SystemLanguageModel? {
-        return SystemLanguageModel.default
-    }
-    @available(iOS 26.0, *)
     private var session: LanguageModelSession?
     #else
     private var session: Any?

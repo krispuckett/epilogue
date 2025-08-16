@@ -65,8 +65,20 @@ class PerplexityService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
-        // Optimized for streaming
-        let systemPrompt = "Literary assistant. Brief, insightful responses."
+        // Create detailed system prompt with book context for streaming
+        let systemPrompt: String
+        if let book = bookContext {
+            systemPrompt = """
+            You are discussing the specific book '\(book.title)' by \(book.author).
+            IMPORTANT: When the user asks ANY question about characters, plot, themes, or story elements, assume they are asking about THIS SPECIFIC BOOK.
+            - If asked "Who is [character name]?" - answer about that character IN \(book.title)
+            - If asked about "the main character" - answer about \(book.title)'s main character
+            - If asked about plot, ending, themes - answer about \(book.title) specifically
+            Brief, insightful responses.
+            """
+        } else {
+            systemPrompt = "Literary assistant. Brief, insightful responses."
+        }
         let selectedModel = model ?? UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
         print("🤖 Using Perplexity model: \(selectedModel)")
         let requestBody: [String: Any] = [
@@ -130,10 +142,20 @@ class PerplexityService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
-        // Create concise system prompt for faster responses
-        let systemPrompt = bookContext != nil ? 
-            "Literary companion discussing '\(bookContext!.title)'. Be concise and insightful. Use *italics* for book titles and **bold** for key concepts." :
-            "Literary companion. Be concise and insightful about books. Use *italics* for book titles and **bold** for key concepts."
+        // Create detailed system prompt with book context
+        let systemPrompt: String
+        if let book = bookContext {
+            systemPrompt = """
+            You are discussing the specific book '\(book.title)' by \(book.author).
+            IMPORTANT: When the user asks ANY question about characters, plot, themes, or story elements, assume they are asking about THIS SPECIFIC BOOK.
+            - If asked "Who is [character name]?" - answer about that character IN \(book.title)
+            - If asked about "the main character" - answer about \(book.title)'s main character
+            - If asked about plot, ending, themes - answer about \(book.title) specifically
+            Be concise and insightful. Use *italics* for book titles and **bold** for key concepts.
+            """
+        } else {
+            systemPrompt = "Literary companion. Be concise and insightful about books. Use *italics* for book titles and **bold** for key concepts."
+        }
         
         // Build request body with selected model
         let selectedModel = model ?? UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"

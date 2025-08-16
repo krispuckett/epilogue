@@ -251,10 +251,10 @@ class CameraScannerViewController: UIViewController {
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var photoOutput: AVCapturePhotoOutput?
-    private var lastProcessedTime = Date()
     private var processingISBN = false
     private var rectangleDetectionTimer: Timer?
     private var consecutiveDetections = 0
+    private var lastRectangleCheck = Date()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -370,7 +370,7 @@ class CameraScannerViewController: UIViewController {
 extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         // Throttle detection to avoid excessive processing
-        guard Date().timeIntervalSince(lastProcessedTime) > 0.5,
+        guard Date().timeIntervalSince(lastRectangleCheck) > 0.5,
               !processingISBN,
               isProcessing?.wrappedValue == false else { return }
         
@@ -405,7 +405,7 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
         
-        lastProcessedTime = Date()
+        lastRectangleCheck = Date()
     }
     
     private func captureBookPhoto() {
@@ -504,17 +504,11 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     }
     
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        print("📊 Metadata delegate called with \(metadataObjects.count) objects")
+        // Remove excessive logging - only log when we have objects
+        guard !metadataObjects.isEmpty else { return }
         
         // Don't process if already processing
         guard !processingISBN else {
-            print("⏭️ Already processing ISBN, skipping")
-            return
-        }
-        
-        // Check time since last scan - reduce to 0.5 seconds
-        guard Date().timeIntervalSince(lastProcessedTime) > 0.5 else {
-            // Silent skip - too soon after last scan
             return
         }
         
@@ -523,71 +517,73 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
             return
         }
         
-        print("📦 Metadata type: \(metadataObject.type.rawValue)")
+        // Log the type to see what we're detecting
+        let typeString = metadataObject.type.rawValue
         
         // Cast to readable code
         guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else {
-            print("❌ Could not cast to AVMetadataMachineReadableCodeObject")
+            print("❌ Could not cast \(typeString) to readable code")
             return
         }
         
         // Get string value
         guard let stringValue = readableObject.stringValue, !stringValue.isEmpty else {
-            print("❌ No string value in barcode")
+            print("❌ No string value in \(typeString)")
             return
         }
         
-        print("📖 Detected barcode: \(stringValue)")
+        // Check if this is actually an ISBN (13 or 10 digits)
+        let digitsOnly = stringValue.replacingOccurrences(of: "-", with: "").replacingOccurrences(of: " ", with: "")
+        guard digitsOnly.count == 13 || digitsOnly.count == 10 else {
+            print("⚠️ Barcode '\(stringValue)' is not an ISBN (wrong length: \(digitsOnly.count))")
+            return
+        }
+        
+        print("📖 ISBN DETECTED: \(stringValue)")
         
         // Update status
         DispatchQueue.main.async { [weak self] in
             self?.detectionStatus?.wrappedValue = "ISBN detected: \(stringValue)"
         }
         
-        // Found ISBN barcode
+        // Prevent duplicate processing
         processingISBN = true
-        lastProcessedTime = Date()
         isProcessing?.wrappedValue = true
+        
+        // Haptic feedback
+        HapticManager.shared.mediumTap()
+        
+        // Stop camera for processing
         captureSession?.stopRunning()
         
         // Search for book by ISBN using Google Books API
         Task {
             print("📚 Searching for ISBN: \(stringValue)")
-            self.detectionStatus?.wrappedValue = "Searching for ISBN \(stringValue)..."
+            await MainActor.run { [weak self] in
+                self?.detectionStatus?.wrappedValue = "Searching for ISBN \(stringValue)..."
+            }
             
             let googleBooks = GoogleBooksService()
             if let book = await googleBooks.searchBookByISBN(stringValue) {
                 print("✅ Found book: \(book.title)")
-                // Found book - call the callback
+                // Found book - call the callback directly
                 await MainActor.run { [weak self] in
                     self?.onBookFound?(book)
                     self?.processingISBN = false
                 }
             } else {
-                print("❌ ISBN not found in Google Books")
-                // ISBN not found, show search sheet with ISBN prepopulated
+                print("❌ ISBN not found, showing search sheet")
+                // Show search sheet with ISBN query
                 await MainActor.run { [weak self] in
-                    self?.detectionStatus?.wrappedValue = "ISBN not found. Showing search..."
-                }
-                
-                // Small delay for user to see the message
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                
-                await MainActor.run { [weak self] in
-                    // Show search directly in this view
-                    self?.detectionStatus?.wrappedValue = "Showing search for ISBN \(stringValue)..."
+                    // Post notification to show search sheet
+                    NotificationCenter.default.post(
+                        name: Notification.Name("ShowBookSearchFromScanner"),
+                        object: "isbn:\(stringValue)"
+                    )
                     
-                    // Trigger the search sheet with ISBN prepopulated
-                    // Use the view's own sheet, not notification
-                    if let parent = self?.parent as? CameraScannerView {
-                        // Access the parent EnhancedBookScannerView through the representable
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ShowBookSearchFromScanner"),
-                            object: "isbn:\(stringValue)"
-                        )
-                    }
-                    
+                    // Reset state
                     self?.processingISBN = false
+                    self?.isProcessing?.wrappedValue = false
                     self?.captureSession?.startRunning()
                 }
             }
