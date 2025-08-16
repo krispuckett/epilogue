@@ -32,37 +32,16 @@ struct LibraryCommandPalette: View {
         Command(
             icon: "camera.viewfinder",
             title: "Scan Book",
-            description: "Use camera to add book to library",
+            description: "Visual Intelligence or ISBN barcode",
             action: .scanBook,
             isFeatured: true
         ),
         Command(
-            icon: "plus.circle",
-            title: "Add Book",
-            description: "Search and add a book manually",
+            icon: "magnifyingglass",
+            title: "Search Books",
+            description: "Find and add books to library",
             action: .addBook,
-            isFeatured: false
-        ),
-        Command(
-            icon: "note.text",
-            title: "Create Note",
-            description: "Capture a thought or idea",
-            action: .createNote,
-            isFeatured: false
-        ),
-        Command(
-            icon: "quote.opening",
-            title: "Save Quote",
-            description: "Remember a meaningful passage",
-            action: .createQuote,
-            isFeatured: false
-        ),
-        Command(
-            icon: "doc.text.magnifyingglass",
-            title: "Search Notes",
-            description: "Find your notes and quotes",
-            action: .searchNotes,
-            isFeatured: false
+            isFeatured: true
         )
     ]
     
@@ -86,18 +65,23 @@ struct LibraryCommandPalette: View {
                 .padding(.bottom, 16)
             
             // Results (no search bar - simpler for quick actions)
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(filteredCommands.enumerated()), id: \.offset) { index, command in
-                        commandRow(command: command)
-                            .onTapGesture {
-                                handleCommandSelection(command)
-                            }
+            VStack(spacing: 0) {
+                ForEach(Array(filteredCommands.enumerated()), id: \.offset) { index, command in
+                    commandRow(command: command)
+                        .onTapGesture {
+                            handleCommandSelection(command)
+                        }
+                    
+                    // Add divider between items
+                    if index < filteredCommands.count - 1 {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(height: 0.5)
+                            .padding(.horizontal, 16)
                     }
                 }
-                .padding(.vertical, 8)
             }
-            .frame(maxHeight: 300)
+            .padding(.vertical, 8)
         }
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .overlay {
@@ -169,28 +153,17 @@ struct LibraryCommandPalette: View {
         
         switch command.action {
         case .scanBook:
-            // Post notification to trigger book scanner
-            NotificationCenter.default.post(name: Notification.Name("ShowBookScanner"), object: nil)
+            // Post notification to trigger enhanced book scanner with Visual Intelligence & ISBN
+            NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
             dismiss()
             
         case .addBook:
-            commandText = "add book "
-            NotificationCenter.default.post(name: Notification.Name("ShowLiquidCommandPalette"), object: nil)
+            // Immediately show Google Books search
+            NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
             dismiss()
             
-        case .createNote:
-            commandText = "note: "
-            NotificationCenter.default.post(name: Notification.Name("ShowLiquidCommandPalette"), object: nil)
-            dismiss()
-            
-        case .createQuote:
-            commandText = "\""
-            NotificationCenter.default.post(name: Notification.Name("ShowLiquidCommandPalette"), object: nil)
-            dismiss()
-            
-        case .searchNotes:
-            // Navigate to notes tab
-            NotificationCenter.default.post(name: Notification.Name("NavigateToTab"), object: 1)
+        case .createNote, .createQuote, .searchNotes:
+            // These are now handled through intelligent input parsing
             dismiss()
         }
     }
