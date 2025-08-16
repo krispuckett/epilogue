@@ -98,6 +98,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var sessionContent: [AmbientProcessedContent] = []
     private var sessionStartTime: Date?
     private var modelContext: ModelContext?
+    private weak var currentAmbientSession: AmbientSession?
     private var processedTextHashes = Set<String>() // Prevent duplicate processing
     private var currentBook: Book? // Current book context
     
@@ -522,6 +523,7 @@ public class TrueAmbientProcessor: ObservableObject {
                     timestamp: content.timestamp,
                     source: .ambient
                 )
+                quote.ambientSession = currentAmbientSession
                 modelContext.insert(quote)
                 
             case .note, .thought:
@@ -531,6 +533,7 @@ public class TrueAmbientProcessor: ObservableObject {
                     timestamp: content.timestamp,
                     source: .ambient
                 )
+                note.ambientSession = currentAmbientSession
                 modelContext.insert(note)
                 
             default:
@@ -672,6 +675,7 @@ public class TrueAmbientProcessor: ObservableObject {
             timestamp: content.timestamp,
             source: .ambient
         )
+        quote.ambientSession = currentAmbientSession
         
         modelContext.insert(quote)
         try? modelContext.save()
@@ -700,6 +704,7 @@ public class TrueAmbientProcessor: ObservableObject {
             timestamp: content.timestamp,
             source: .ambient
         )
+        note.ambientSession = currentAmbientSession
         
         modelContext.insert(note)
         try? modelContext.save()
@@ -746,6 +751,10 @@ public class TrueAmbientProcessor: ObservableObject {
     
     public func setModelContext(_ context: ModelContext) {
         self.modelContext = context
+    }
+    
+    public func setCurrentSession(_ session: AmbientSession) {
+        self.currentAmbientSession = session
     }
     
     public func setConfidenceThreshold(_ threshold: Float) {

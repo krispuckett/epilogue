@@ -13,9 +13,12 @@ final class CapturedNote {
     var source: CaptureSource
     var tags: [String]
     
-    // Relationship
+    // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
+    
+    @Relationship(inverse: \AmbientSession.capturedNotes)
+    var ambientSession: AmbientSession?
     
     init(
         content: String,
@@ -49,9 +52,12 @@ final class CapturedQuote {
     var source: CaptureSource
     var notes: String? // User's notes about the quote
     
-    // Relationship
+    // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
+    
+    @Relationship(inverse: \AmbientSession.capturedQuotes)
+    var ambientSession: AmbientSession?
     
     init(
         text: String,
@@ -87,9 +93,12 @@ final class CapturedQuestion {
     var isAnswered: Bool
     var answer: String?
     
-    // Relationship
+    // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
+    
+    @Relationship(inverse: \AmbientSession.capturedQuestions)
+    var ambientSession: AmbientSession?
     
     init(
         content: String,

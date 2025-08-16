@@ -771,8 +771,14 @@ struct AmbientModeView: View {
     // MARK: - Actions
     
     private func startAmbientExperience() {
-        // CRITICAL: Set the model context for the processor
+        // Create the session at the START
+        let session = AmbientSession(book: currentBookContext)
+        currentSession = session
+        modelContext.insert(session)
+        
+        // CRITICAL: Set the model context and session for the processor
         processor.setModelContext(modelContext)
+        processor.setCurrentSession(session)
         processor.startSession()
         
         // Update library for book detection
@@ -1005,8 +1011,8 @@ struct AmbientModeView: View {
     }
     
     private func createSession() -> AmbientSession {
-        // Create session with all captured content
-        let session = AmbientSession(book: currentBookContext)
+        // Use existing session or create new one if somehow missing
+        let session = currentSession ?? AmbientSession(book: currentBookContext)
         session.endTime = Date()
         
         print("📊 Creating session with \(processor.detectedContent.count) items")

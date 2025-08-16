@@ -2,6 +2,9 @@ import Foundation
 import NaturalLanguage
 import CoreML
 import OSLog
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 #if canImport(WritingTools)
 import WritingTools
 #endif

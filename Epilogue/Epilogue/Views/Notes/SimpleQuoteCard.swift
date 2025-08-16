@@ -7,7 +7,7 @@ struct SimpleQuoteCard: View {
     @State private var isPressed = false
     
     var firstLetter: String {
-        String(note.content.prefix(1))
+        String(note.content.prefix(1)).uppercased()
     }
     
     var restOfContent: String {
@@ -85,10 +85,13 @@ struct SimpleQuoteCard: View {
         }
         .padding(32) // Generous padding
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.11, green: 0.105, blue: 0.102)) // Dark charcoal matching LibraryView
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
         )
-        .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .onTapGesture {

@@ -23,6 +23,7 @@ struct CleanNotesView: View {
     @State private var showingSessionSummary = false
     @State private var selectedSessionNote: CapturedNote?
     @State private var selectedSessionQuote: CapturedQuote?
+    @State private var collapsedSections: Set<String> = []
     @Namespace private var animation
     
     enum FilterType: String, CaseIterable {
@@ -67,7 +68,7 @@ struct CleanNotesView: View {
             items = items.filter { $0.note != nil }
         case .quotes:
             items = items.filter { $0.quote != nil }
-        case .all, .none:
+        case .all, .byBook, .none:
             break
         }
         
@@ -296,6 +297,16 @@ struct CleanNotesView: View {
             let itemType = (itemToDelete as? CapturedNote) != nil ? "note" : "quote"
             Text("Are you sure you want to delete this \(itemType)? This action cannot be undone.")
         }
+        .sheet(isPresented: $showingSessionSummary) {
+            NavigationView {
+                if selectedSessionNote != nil || selectedSessionQuote != nil {
+                    SessionSummaryPlaceholderView(
+                        note: selectedSessionNote,
+                        quote: selectedSessionQuote
+                    )
+                }
+            }
+        }
     }
     
     // Removed headerView - now using navigation title
@@ -348,36 +359,60 @@ struct CleanNotesView: View {
                 let section = groupedItems[index].0
                 let items = groupedItems[index].1
                 VStack(alignment: .leading, spacing: 20) {
-                    // Section Header
-                    HStack(alignment: .lastTextBaseline, spacing: 8) {
-                        Text(section)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white)
-                        
-                        Text("(\(items.count))")
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.4))
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    // Items in section with staggered animation
-                    VStack(spacing: 16) {
-                        ForEach(items.indices, id: \.self) { itemIndex in
-                            let item = items[itemIndex]
-                            Group {
-                                if let note = item.note {
-                                    noteCard(note: note)
-                                } else if let quote = item.quote {
-                                    quoteCard(quote: quote)
+                    // Section Header (collapsible for By Book filter)
+                    Button {
+                        if selectedFilter == .byBook {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                if collapsedSections.contains(section) {
+                                    collapsedSections.remove(section)
+                                } else {
+                                    collapsedSections.insert(section)
                                 }
                             }
-                            .padding(.horizontal, 20)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.95).combined(with: .opacity),
-                                removal: .scale(scale: 0.95).combined(with: .opacity)
-                            ))
+                            HapticManager.shared.lightTap()
+                        }
+                    } label: {
+                        HStack(alignment: .center, spacing: 8) {
+                            if selectedFilter == .byBook {
+                                Image(systemName: collapsedSections.contains(section) ? "chevron.right" : "chevron.down")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .frame(width: 20)
+                            }
+                            
+                            Text(section)
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundStyle(.white)
+                            
+                            Text("(\(items.count))")
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.4))
+                            
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(selectedFilter != .byBook)
+                    .padding(.horizontal, 20)
+                    
+                    // Items in section with staggered animation (collapsible)
+                    if !collapsedSections.contains(section) {
+                        VStack(spacing: 16) {
+                            ForEach(items.indices, id: \.self) { itemIndex in
+                                let item = items[itemIndex]
+                                Group {
+                                    if let note = item.note {
+                                        noteCard(note: note)
+                                    } else if let quote = item.quote {
+                                        quoteCard(quote: quote)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                    removal: .scale(scale: 0.95).combined(with: .opacity)
+                                ))
+                            }
                         }
                     }
                 }
@@ -416,6 +451,15 @@ struct CleanNotesView: View {
                 
                 Button {
                     if let captured = capturedNote {
+                        shareNote(note)
+                    }
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .tint(Color.blue)
+                
+                Button {
+                    if let captured = capturedNote {
                         startEdit(note: captured)
                     }
                 } label: {
@@ -427,42 +471,52 @@ struct CleanNotesView: View {
     
     private func noteCardContent(note: Note) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Timestamp
+            // Timestamp header
             Text(formatDate(note.dateCreated))
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(.white.opacity(0.5))
             
             // Content
             Text(note.content)
-                .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(4)
             
             // Book context if available
             if let bookTitle = note.bookTitle {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text("re:")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.5))
                     
                     Text(bookTitle)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
                     
                     if let author = note.author {
-                        Text("by \(author)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.5))
+                        Text("•")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.white.opacity(0.3))
+                        
+                        Text(author)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.6))
                     }
                 }
+                .padding(.top, 4)
             }
         }
-        .padding(16)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(
-            .regular.tint(Color.white.opacity(0.02)),
-            in: RoundedRectangle(cornerRadius: 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
     
@@ -495,6 +549,13 @@ struct CleanNotesView: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
+                
+                Button {
+                    shareQuote(quote)
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .tint(Color.blue)
                 
                 Button {
                     startEdit(quote: quote)
@@ -642,6 +703,59 @@ struct CleanNotesView: View {
         try? modelContext.save()
         HapticManager.shared.success()
     }
+    
+    // MARK: - Share Actions
+    
+    private func shareNote(_ note: Note) {
+        let text = note.content
+        var shareText = text
+        
+        if let bookTitle = note.bookTitle {
+            shareText += "\n\n— From '\(bookTitle)'"
+            if let author = note.author {
+                shareText += " by \(author)"
+            }
+        }
+        
+        let activityController = UIActivityViewController(
+            activityItems: [shareText],
+            applicationActivities: nil
+        )
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+            rootViewController.present(activityController, animated: true)
+        }
+        
+        HapticManager.shared.lightTap()
+    }
+    
+    private func shareQuote(_ quote: CapturedQuote) {
+        var shareText = "\"\(quote.text)\""
+        
+        if let author = quote.author {
+            shareText += "\n\n— \(author)"
+        }
+        
+        if let book = quote.book {
+            shareText += ", \(book.title)"
+        }
+        
+        let activityController = UIActivityViewController(
+            activityItems: [shareText],
+            applicationActivities: nil
+        )
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+            rootViewController.present(activityController, animated: true)
+        }
+        
+        HapticManager.shared.lightTap()
+    }
 }
 
 // Extension removed - already exists in SwiftDataNotesBridge.swift
+// EditContentSheet already exists in UnifiedChatView.swift
