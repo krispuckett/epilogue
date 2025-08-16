@@ -47,7 +47,9 @@ struct CleanNotesView: View {
         var items: [(date: Date, note: Note?, quote: CapturedQuote?)] = []
         
         // Add notes
-        items += capturedNotes.map { (date: $0.timestamp, note: $0.toNote(), quote: nil) }
+        items += capturedNotes.map { capturedNote in
+            (date: capturedNote.timestamp, note: capturedNote.toNote(), quote: nil)
+        }
         
         // Add quotes
         items += capturedQuotes.map { (date: $0.timestamp, note: nil, quote: $0) }

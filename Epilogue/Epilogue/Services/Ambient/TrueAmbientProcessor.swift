@@ -753,7 +753,7 @@ public class TrueAmbientProcessor: ObservableObject {
         self.modelContext = context
     }
     
-    public func setCurrentSession(_ session: AmbientSession) {
+    func setCurrentSession(_ session: AmbientSession) {
         self.currentAmbientSession = session
     }
     
