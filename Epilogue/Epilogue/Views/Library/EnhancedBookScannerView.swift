@@ -113,17 +113,37 @@ struct EnhancedBookScannerView: View {
                     
                     Spacer()
                     
-                    // Cancel button at bottom
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Cancel")
+                    // Action buttons at bottom
+                    HStack(spacing: 12) {
+                        // Cancel button
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Cancel")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .glassEffect()
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        
+                        // Manual search button
+                        Button {
+                            // Show search sheet directly
+                            showBookSearch = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                Text("Search")
+                            }
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .glassEffect()
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 30)
@@ -244,11 +264,8 @@ class CameraScannerViewController: UIViewController {
     private func setupCamera() {
         print("📸 Setting up camera")
         
-        // Check camera permission first
-        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
-            print("❌ Camera not authorized")
-            return
-        }
+        // Don't check permission here - just set up
+        // Permission will be checked in the SwiftUI view
         
         captureSession = AVCaptureSession()
         
@@ -278,12 +295,36 @@ class CameraScannerViewController: UIViewController {
         if captureSession.canAddOutput(metadataOutput) {
             captureSession.addOutput(metadataOutput)
             
+            // IMPORTANT: Set delegate AFTER adding output to session
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
             
-            // For ISBN barcode scanning
+            // For ISBN barcode scanning - also add more barcode types
+            // IMPORTANT: Set metadata types AFTER adding output
+            var barcodeTypes: [AVMetadataObject.ObjectType] = []
             if metadataOutput.availableMetadataObjectTypes.contains(.ean13) {
-                metadataOutput.metadataObjectTypes = [.ean13, .ean8]
+                barcodeTypes.append(.ean13)
             }
+            if metadataOutput.availableMetadataObjectTypes.contains(.ean8) {
+                barcodeTypes.append(.ean8)
+            }
+            if metadataOutput.availableMetadataObjectTypes.contains(.code128) {
+                barcodeTypes.append(.code128)
+            }
+            if metadataOutput.availableMetadataObjectTypes.contains(.code39) {
+                barcodeTypes.append(.code39)
+            }
+            if metadataOutput.availableMetadataObjectTypes.contains(.qr) {
+                barcodeTypes.append(.qr)
+            }
+            
+            if !barcodeTypes.isEmpty {
+                metadataOutput.metadataObjectTypes = barcodeTypes
+                print("✅ Set barcode types: \(barcodeTypes)")
+            } else {
+                print("❌ No barcode types available")
+            }
+        } else {
+            print("❌ Could not add metadata output")
         }
         
         // Add photo output for visual book scanning
@@ -297,6 +338,9 @@ class CameraScannerViewController: UIViewController {
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
         if captureSession.canAddOutput(videoOutput) {
             captureSession.addOutput(videoOutput)
+            print("✅ Added video output for rectangle detection")
+        } else {
+            print("❌ Could not add video output")
         }
         
         previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
@@ -455,12 +499,21 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     }
     
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        print("📊 Metadata delegate called with \(metadataObjects.count) objects")
+        
         // Don't process if already processing or too soon after last scan
         guard !processingISBN,
               Date().timeIntervalSince(lastProcessedTime) > 2,
               let metadataObject = metadataObjects.first,
               let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-              let stringValue = readableObject.stringValue else { return }
+              let stringValue = readableObject.stringValue else { 
+            if metadataObjects.count > 0 {
+                print("⚠️ Metadata object not readable or processing skipped")
+            }
+            return 
+        }
+        
+        print("📖 Detected barcode: \(stringValue)")
         
         // Update status
         DispatchQueue.main.async { [weak self] in

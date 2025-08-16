@@ -232,7 +232,7 @@ struct LibraryView: View {
             )
         }
         .sheet(isPresented: $showingEnhancedScanner) {
-            SimplifiedBookScanner { book in
+            EnhancedBookScannerView { book in
                 viewModel.addBook(book)
                 showingEnhancedScanner = false
                 
