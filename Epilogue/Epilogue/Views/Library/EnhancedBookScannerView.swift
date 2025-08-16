@@ -501,16 +501,35 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         print("📊 Metadata delegate called with \(metadataObjects.count) objects")
         
-        // Don't process if already processing or too soon after last scan
-        guard !processingISBN,
-              Date().timeIntervalSince(lastProcessedTime) > 2,
-              let metadataObject = metadataObjects.first,
-              let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-              let stringValue = readableObject.stringValue else { 
-            if metadataObjects.count > 0 {
-                print("⚠️ Metadata object not readable or processing skipped")
-            }
-            return 
+        // Don't process if already processing
+        guard !processingISBN else {
+            print("⏭️ Already processing ISBN, skipping")
+            return
+        }
+        
+        // Check time since last scan
+        guard Date().timeIntervalSince(lastProcessedTime) > 2 else {
+            // Silent skip - too soon after last scan
+            return
+        }
+        
+        // Get first metadata object
+        guard let metadataObject = metadataObjects.first else {
+            return
+        }
+        
+        print("📦 Metadata type: \(metadataObject.type.rawValue)")
+        
+        // Cast to readable code
+        guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else {
+            print("❌ Could not cast to AVMetadataMachineReadableCodeObject")
+            return
+        }
+        
+        // Get string value
+        guard let stringValue = readableObject.stringValue, !stringValue.isEmpty else {
+            print("❌ No string value in barcode")
+            return
         }
         
         print("📖 Detected barcode: \(stringValue)")
