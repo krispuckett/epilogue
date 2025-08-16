@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftData
 
 // MARK: - AI Service Protocol
 protocol AIServiceProtocol {
@@ -12,23 +13,28 @@ class AICompanionService: ObservableObject {
     static let shared = AICompanionService()
     
     // Published properties for UI binding
-    @Published var currentProvider: AIProvider = .perplexity
+    @Published var currentProvider: AIProvider = .smart
     @Published var isProcessing = false
+    
+    // Smart AI instance for intelligent routing (lazy to avoid initialization issues)
+    private lazy var smartAI = SmartEpilogueAI.shared
     
     // Available AI providers
     enum AIProvider: String, CaseIterable {
-        case perplexity = "Perplexity"
-        case appleIntelligence = "Apple Intelligence"
+        case smart = "Smart (Auto-routing)"
+        case perplexity = "Perplexity Only"
+        case appleIntelligence = "Apple Intelligence Only"
         
         var isAvailable: Bool {
             switch self {
+            case .smart:
+                return true // Always available - routes intelligently
             case .perplexity:
-                return true // Always available if API key is configured
+                return true // Available if API key is configured
             case .appleIntelligence:
-                // Check if Apple Intelligence is available on this device
-                if #available(iOS 18.0, *) {
-                    // Future: Check for actual Apple Intelligence availability
-                    return false // Not yet implemented
+                // Check if Foundation Models is available
+                if #available(iOS 18.2, *) {
+                    return true // Foundation Models available
                 } else {
                     return false
                 }
@@ -37,8 +43,8 @@ class AICompanionService: ObservableObject {
         
         var requiresAPIKey: Bool {
             switch self {
-            case .perplexity:
-                return true
+            case .smart, .perplexity:
+                return true // Perplexity needs API key
             case .appleIntelligence:
                 return false
             }
@@ -79,6 +85,13 @@ class AICompanionService: ObservableObject {
             }
         }
         
+        // Set active book context for smart AI
+        if let book = bookContext {
+            await MainActor.run {
+                smartAI.setActiveBook(book.toBookModel())
+            }
+        }
+        
         // Build context from conversation history
         let contextualMessage = buildContextualMessage(
             message: message,
@@ -87,14 +100,23 @@ class AICompanionService: ObservableObject {
         )
         
         switch currentProvider {
+        case .smart:
+            // Use SmartEpilogueAI for intelligent routing
+            return await smartAI.smartQuery(contextualMessage)
+            
         case .perplexity:
-            let service = PerplexityService()
-            let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
-            return try await service.chat(with: contextualMessage, bookContext: bookContext, model: model)
+            // Force Perplexity only
+            await MainActor.run {
+                smartAI.currentMode = .externalOnly
+            }
+            return await smartAI.smartQuery(contextualMessage)
             
         case .appleIntelligence:
-            // Future implementation
-            throw AIServiceError.providerNotImplemented
+            // Force local Foundation Models only
+            await MainActor.run {
+                smartAI.currentMode = .localOnly
+            }
+            return await smartAI.smartQuery(contextualMessage)
         }
     }
     
@@ -106,21 +128,24 @@ class AICompanionService: ObservableObject {
             }
         }
         
+        // Set active book context for smart AI
+        if let book = bookContext {
+            await MainActor.run {
+                smartAI.setActiveBook(book.toBookModel())
+            }
+        }
+        
         let contextualMessage = buildContextualMessage(
             message: message,
             bookContext: bookContext,
             history: conversationHistory
         )
         
-        switch currentProvider {
-        case .perplexity:
-            let service = PerplexityService()
-            let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
-            return try await service.streamChat(message: contextualMessage, bookContext: bookContext, model: model)
-            
-        case .appleIntelligence:
-            throw AIServiceError.providerNotImplemented
-        }
+        // For streaming, we'll use Perplexity directly for now
+        // TODO: Implement streaming for SmartEpilogueAI
+        let service = PerplexityService()
+        let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
+        return try await service.streamChat(message: contextualMessage, bookContext: bookContext, model: model)
     }
     
     // MARK: - Configuration
@@ -133,7 +158,7 @@ class AICompanionService: ObservableObject {
     
     func isConfigured() -> Bool {
         switch currentProvider {
-        case .perplexity:
+        case .smart, .perplexity:
             // Check if API key is configured - try KeychainManager first, then Info.plist
             let apiKey = KeychainManager.shared.getPerplexityAPIKey() ?? 
                          Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
@@ -148,7 +173,7 @@ class AICompanionService: ObservableObject {
             return configured
             
         case .appleIntelligence:
-            return false // Not yet implemented
+            return true // Foundation Models doesn't need API key
         }
     }
     
@@ -357,6 +382,16 @@ class AICompanionService: ObservableObject {
         
         do {
             switch currentProvider {
+            case .smart:
+                print("🧠 Testing Smart AI with automatic routing...")
+                if isConfigured() {
+                    print("Smart AI is configured (Perplexity API key found)")
+                    let response = try await processMessage(message, bookContext: bookContext)
+                    print("📤 Response received [\(response.count) characters]")
+                } else {
+                    print("Smart AI requires Perplexity API key for external queries")
+                }
+                
             case .perplexity:
                 print("🌐 Testing Perplexity service...")
                 if isConfigured() {
@@ -373,7 +408,9 @@ class AICompanionService: ObservableObject {
                 }
                 
             case .appleIntelligence:
-                print("🍎 Apple Intelligence not yet implemented")
+                print("🍎 Testing Apple Intelligence (Foundation Models)...")
+                let response = try await processMessage(message, bookContext: bookContext)
+                print("📤 Response received [\(response.count) characters]")
             }
             
         } catch {

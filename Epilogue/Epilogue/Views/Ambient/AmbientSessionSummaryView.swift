@@ -14,6 +14,7 @@ struct AmbientSessionSummaryView: View {
     @State private var showingCommandPalette = false
     @State private var isRecording = false
     @State private var contentOffset: CGFloat = 0
+    @State private var isKeyInsightExpanded = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -204,18 +205,38 @@ struct AmbientSessionSummaryView: View {
     
     // MARK: - Primary Insight Card
     private func primaryInsightCard(question: CapturedQuestion) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("KEY INSIGHT")
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
-                .tracking(1.2)
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isKeyInsightExpanded.toggle()
+                }
+                HapticManager.shared.lightTap()
+            }) {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack {
+                        Text("KEY INSIGHT")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .tracking(1.2)
+                        
+                        Spacer()
+                        
+                        Image(systemName: isKeyInsightExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                    
+                    Text(question.content)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.leading)
+                }
+                .padding(24)
+            }
+            .buttonStyle(PlainButtonStyle())
             
-            VStack(alignment: .leading, spacing: 16) {
-                Text(question.content)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
-                
-                if let answer = question.answer {
+            if isKeyInsightExpanded, let answer = question.answer {
+                VStack(alignment: .leading, spacing: 16) {
                     Rectangle()
                         .fill(Color.white.opacity(0.1))
                         .frame(height: 0.5)
@@ -225,12 +246,21 @@ struct AmbientSessionSummaryView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .lineSpacing(6)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
                 }
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .top)),
+                    removal: .opacity
+                ))
             }
         }
-        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.02))
+        )
         .overlay(
-            Rectangle()
+            RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
         )
     }
@@ -478,7 +508,7 @@ struct MinimalThreadedCard: View {
     let author: String?
     
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(type)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))

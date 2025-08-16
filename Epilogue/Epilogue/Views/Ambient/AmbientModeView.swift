@@ -776,6 +776,14 @@ struct AmbientModeView: View {
         currentSession = session
         modelContext.insert(session)
         
+        // Save the session immediately so relationships can be established
+        do {
+            try modelContext.save()
+            print("✅ Initial session created and saved")
+        } catch {
+            print("❌ Failed to save initial session: \(error)")
+        }
+        
         // CRITICAL: Set the model context and session for the processor
         processor.setModelContext(modelContext)
         processor.setCurrentSession(session)
