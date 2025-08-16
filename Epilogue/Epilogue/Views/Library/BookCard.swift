@@ -18,11 +18,13 @@ struct BookCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Book cover - using thumbnail for grid view
-            BookCoverThumbnailView(
+            // Book cover - using thumbnail for grid view with library flag
+            SharedBookCoverView(
                 coverURL: book.coverImageURL,
                 width: 170,
-                height: 255
+                height: 255,
+                loadFullImage: false,
+                isLibraryView: true
             )
             .accessibilityHidden(true) // Hide decorative image from VoiceOver
             

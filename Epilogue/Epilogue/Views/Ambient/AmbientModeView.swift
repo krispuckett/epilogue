@@ -414,18 +414,7 @@ struct AmbientModeView: View {
                         .id(message.id)
                     }
                     
-                    // Show thinking indicator when waiting for AI response
-                    if isWaitingForAIResponse {
-                        ThinkingMessageView(
-                            bookContext: currentBookContext,
-                            colorPalette: colorPalette ?? defaultColorPalette
-                        )
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                        .id("thinking-indicator")
-                    }
+                    // Removed thinking indicator - was causing problems
                     
                     // Bottom spacer for input area
                     Color.clear

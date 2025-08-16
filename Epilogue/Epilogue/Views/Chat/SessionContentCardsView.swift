@@ -172,7 +172,7 @@ struct SessionContentCardsView: View {
             if let question = item.content as? ExtractedQuestion {
                 ChatQuestionCard(
                     question: question.text,
-                    response: question.context ?? "Thinking about this...",
+                    response: question.response ?? "Thinking about this...",
                     bookTitle: bookTitle,
                     timestamp: question.timestamp
                 )

@@ -285,6 +285,7 @@ struct ExtractedQuestion {
     let text: String
     let context: String?
     let timestamp: Date
+    let response: String?  // AI response to the question
     
     func toSessionContent(with aiResponse: AISessionResponse? = nil) -> SessionContent {
         SessionContent(

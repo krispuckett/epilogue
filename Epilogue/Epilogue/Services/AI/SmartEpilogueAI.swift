@@ -109,7 +109,11 @@ class SmartEpilogueAI: ObservableObject {
             3. This is NOT about avoiding spoilers - the user is reading this book!
             4. Provide specific, accurate information about THIS book
             5. Be direct and helpful - answer what was asked
-            6. If you don't know specific details about \(book.title), say so clearly
+            6. Give DETAILED, COMPREHENSIVE answers with context and examples
+            7. Include relevant quotes, character motivations, and themes when applicable
+            8. Connect the answer to broader themes in the book
+            9. If you don't know specific details about \(book.title), say so clearly
+            10. Aim for responses that are at least 2-3 paragraphs when answering substantial questions
             """
         }
         

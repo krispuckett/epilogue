@@ -74,10 +74,20 @@ class PerplexityService: ObservableObject {
             - If asked "Who is [character name]?" - answer about that character IN \(book.title)
             - If asked about "the main character" - answer about \(book.title)'s main character
             - If asked about plot, ending, themes - answer about \(book.title) specifically
-            Brief, insightful responses.
+            
+            PROVIDE DETAILED, COMPREHENSIVE ANSWERS:
+            - Include context and examples from the book
+            - Reference specific scenes or chapters when relevant
+            - Connect answers to broader themes
+            - Aim for responses that are at least 2-3 paragraphs for substantial questions
+            - Be thorough but engaging - help the reader understand deeply
             """
         } else {
-            systemPrompt = "Literary assistant. Brief, insightful responses."
+            systemPrompt = """
+            Literary assistant providing detailed, comprehensive responses.
+            Give thorough answers with context and examples.
+            Aim for responses that are at least 2-3 paragraphs for substantial questions.
+            """
         }
         let selectedModel = model ?? UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
         print("🤖 Using Perplexity model: \(selectedModel)")
@@ -89,7 +99,7 @@ class PerplexityService: ObservableObject {
             ],
             "stream": true,  // Enable streaming
             "temperature": 0.7,
-            "max_tokens": selectedModel == "sonar-pro" ? 1000 : 500
+            "max_tokens": selectedModel == "sonar-pro" ? 2000 : 1000  // Increased for detailed responses
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -151,10 +161,22 @@ class PerplexityService: ObservableObject {
             - If asked "Who is [character name]?" - answer about that character IN \(book.title)
             - If asked about "the main character" - answer about \(book.title)'s main character
             - If asked about plot, ending, themes - answer about \(book.title) specifically
-            Be concise and insightful. Use *italics* for book titles and **bold** for key concepts.
+            
+            PROVIDE DETAILED, COMPREHENSIVE ANSWERS:
+            - Include context and examples from the book
+            - Reference specific scenes or chapters when relevant
+            - Connect answers to broader themes
+            - Aim for responses that are at least 2-3 paragraphs for substantial questions
+            - Be thorough but engaging - help the reader understand deeply
+            - Use *italics* for book titles and **bold** for key concepts.
             """
         } else {
-            systemPrompt = "Literary companion. Be concise and insightful about books. Use *italics* for book titles and **bold** for key concepts."
+            systemPrompt = """
+            Literary companion providing detailed, comprehensive responses.
+            Give thorough answers with context and examples.
+            Aim for responses that are at least 2-3 paragraphs for substantial questions.
+            Use *italics* for book titles and **bold** for key concepts.
+            """
         }
         
         // Build request body with selected model
@@ -167,7 +189,7 @@ class PerplexityService: ObservableObject {
                 ["role": "user", "content": message]
             ],
             "temperature": 0.7,
-            "max_tokens": selectedModel == "sonar-pro" ? 1000 : 500  // Increased for complete responses
+            "max_tokens": selectedModel == "sonar-pro" ? 2000 : 1000  // Increased for detailed responses
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)

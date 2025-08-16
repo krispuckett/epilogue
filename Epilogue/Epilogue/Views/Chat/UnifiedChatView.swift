@@ -300,6 +300,32 @@ struct UnifiedChatView: View {
             .onReceive(voiceManager.$transcribedText, perform: handleTranscribedText)
             // Processing handled via detectedContent observable
             .onReceive(processor.$detectedContent) { content in
+                // Check for questions with new responses
+                for item in content {
+                    if item.type == .question, let response = item.response {
+                        // Check if we already have this response displayed
+                        let questionExists = messages.contains { msg in
+                            msg.content == item.text && msg.isUser
+                        }
+                        let responseExists = messages.contains { msg in
+                            msg.content == response && !msg.isUser
+                        }
+                        
+                        // If we have the question but not the response, add the response
+                        if questionExists && !responseExists {
+                            messages.append(UnifiedChatMessage(
+                                content: response,
+                                isUser: false,
+                                timestamp: Date(),
+                                bookContext: currentBookContext
+                            ))
+                            // Scroll will happen automatically
+                            logger.info("✅ AI response displayed: \(response.prefix(50))...")
+                        }
+                    }
+                }
+                
+                // Also handle new items
                 if let lastItem = content.last {
                     handleProcessorResult(lastItem)
                 }
@@ -1963,7 +1989,8 @@ struct UnifiedChatView: View {
                 questions.append(ExtractedQuestion(
                     text: trimmed,
                     context: nil,
-                    timestamp: Date()
+                    timestamp: Date(),
+                    response: nil  // Will be filled in later if AI responds
                 ))
                 // Track for session summary
                 if isAmbientMode {

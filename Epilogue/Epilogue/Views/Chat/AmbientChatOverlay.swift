@@ -1139,7 +1139,8 @@ struct AmbientChatOverlay: View {
                 questions.append(ExtractedQuestion(
                     text: trimmed,
                     context: session.book?.title,
-                    timestamp: Date()
+                    timestamp: Date(),
+                    response: nil  // Will be filled in later if AI responds
                 ))
             }
             

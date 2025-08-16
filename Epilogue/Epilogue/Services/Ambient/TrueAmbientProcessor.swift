@@ -15,7 +15,7 @@ import FoundationModels
 private let logger = Logger(subsystem: "com.epilogue", category: "TrueAmbientProcessor")
 
 // MARK: - Ambient Processed Content
-public struct AmbientProcessedContent: Identifiable {
+public struct AmbientProcessedContent: Identifiable, Hashable {
     public let id = UUID()
     public let text: String
     public let type: ContentType
@@ -295,6 +295,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             detectedContent.append(content)
+            sessionContent.append(content)  // Add to sessionContent for batch processing
             logger.info("💭 Quote captured: \(cleanedText.prefix(50))...")
             
         case .note, .thought:
@@ -307,6 +308,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
             detectedContent.append(content)
+            sessionContent.append(content)  // Add to sessionContent for batch processing
             logger.info("📝 \(String(describing: intent)) captured: \(text.prefix(50))...")
             
         default:
@@ -690,7 +692,11 @@ public class TrueAmbientProcessor: ObservableObject {
     // MARK: - Batch Processing (Post-Session)
     
     private func processSessionContent() async {
-        for content in sessionContent {
+        // Process both sessionContent and detectedContent to ensure nothing is missed
+        let allContent = sessionContent + detectedContent
+        let uniqueContent = Array(Set(allContent))  // Remove duplicates
+        
+        for content in uniqueContent {
             switch content.type {
             case .quote:
                 await saveQuote(content)
@@ -720,6 +726,11 @@ public class TrueAmbientProcessor: ObservableObject {
         )
         quote.ambientSession = currentAmbientSession
         
+        // Add to the session's capturedQuotes array
+        if let session = currentAmbientSession {
+            session.capturedQuotes.append(quote)
+        }
+        
         modelContext.insert(quote)
         try? modelContext.save()
         
@@ -748,6 +759,11 @@ public class TrueAmbientProcessor: ObservableObject {
             source: .ambient
         )
         note.ambientSession = currentAmbientSession
+        
+        // Add to the session's capturedNotes array
+        if let session = currentAmbientSession {
+            session.capturedNotes.append(note)
+        }
         
         modelContext.insert(note)
         try? modelContext.save()
@@ -934,32 +950,7 @@ extension TrueAmbientProcessor {
     
     // Check if we have a similar question already processed
     private func hasSimilarProcessedQuestion(_ normalizedQuestion: String) -> Bool {
-        let words = normalizedQuestion.split(separator: " ")
-        
-        // Check for questions that are substrings or superstrings
-        for hash in processedTextHashes {
-            if hash.hasPrefix("question_") {
-                let existingQuestion = String(hash.dropFirst(9)) // Remove "question_" prefix
-                
-                // Check if one is a substring of the other
-                if existingQuestion.contains(normalizedQuestion) || normalizedQuestion.contains(existingQuestion) {
-                    return true
-                }
-                
-                // Check for high word overlap (80% similarity)
-                let existingWords = existingQuestion.split(separator: " ")
-                let commonWords = words.filter { existingWords.contains($0) }
-                if !words.isEmpty && Float(commonWords.count) / Float(words.count) > 0.8 {
-                    return true
-                }
-                
-                // Check for Levenshtein distance (for typos/mistranscriptions)
-                if levenshteinDistance(existingQuestion, normalizedQuestion) <= 3 {
-                    return true
-                }
-            }
-        }
-        
+        // Disabled - too aggressive, causing duplicates
         return false
     }
     
@@ -1049,9 +1040,9 @@ extension TrueAmbientProcessor {
         let normalizedQuestion = normalizeQuestion(question)
         let processedKey = "question_\(normalizedQuestion)"
         
-        // Check if we've already processed this or a very similar question
-        if processedTextHashes.contains(processedKey) || hasSimilarProcessedQuestion(normalizedQuestion) {
-            logger.warning("⚠️ Question already processed or similar exists, skipping: \(question.prefix(30))...")
+        // Check if we've already processed this exact question
+        if processedTextHashes.contains(processedKey) {
+            logger.info("⚠️ Skipping duplicate: \(question.prefix(30))...")
             return
         }
         processedTextHashes.insert(processedKey)
@@ -1200,21 +1191,18 @@ extension TrueAmbientProcessor {
                 bookAuthor: bookContext?.author
             )
             
-            // Check if this content already exists in detectedContent
-            let exists = await MainActor.run {
-                self.detectedContent.contains { existing in
-                    existing.type == .question && existing.text == question && existing.response != nil
+            // Always update or add the question with response
+            await MainActor.run {
+                // Remove any existing question without response
+                self.detectedContent.removeAll { 
+                    $0.type == .question && 
+                    $0.text == question && 
+                    $0.response == nil 
                 }
-            }
-            
-            if !exists {
-                // Update UI immediately
-                await MainActor.run {
-                    self.detectedContent.append(content)
-                    logger.info("✅ Added question with response to detectedContent")
-                }
-            } else {
-                logger.warning("⚠️ Question with response already in detectedContent, skipping")
+                
+                // Add the question with response
+                self.detectedContent.append(content)
+                logger.info("✅ Added question with AI response to detectedContent")
             }
             
             // Audio feedback if enabled
@@ -1246,8 +1234,8 @@ extension TrueAmbientProcessor {
         await MainActor.run { [weak self] in
             guard let self = self else { return }
             
-            // Add to detected content
-            self.detectedContent.append(content)
+            // Don't add duplicate - this is already added in processQuestion
+            // self.detectedContent.append(content)
             
             // Save to SwiftData if context available
             if let modelContext = self.modelContext {
@@ -1263,6 +1251,12 @@ extension TrueAmbientProcessor {
                 // Set answer separately
                 question.answer = content.response
                 question.isAnswered = content.response != nil
+                question.ambientSession = self.currentAmbientSession
+                
+                // Add to the session's capturedQuestions array
+                if let session = self.currentAmbientSession {
+                    session.capturedQuestions.append(question)
+                }
                 
                 modelContext.insert(question)
                 
