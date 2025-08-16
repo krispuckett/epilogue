@@ -73,6 +73,25 @@ struct AmbientModeView: View {
             // Main scroll content
             mainScrollContent
         }
+        // Top gradient overlay for fake blur effect (like BookView)
+        .overlay(alignment: .top) {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.black.opacity(0.7),  // Much darker at the top
+                    Color.black.opacity(0.6),
+                    Color.black.opacity(0.4),
+                    Color.black.opacity(0.2),
+                    Color.black.opacity(0.05),
+                    Color.clear
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 180)  // Slightly taller for smoother gradient
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .blur(radius: 0.5)  // Subtle blur to soften the gradient edge
+        }
         // Voice gradient overlay - appears on top when recording
         .overlay(alignment: .bottom) {
             if isRecording {
@@ -85,21 +104,11 @@ struct AmbientModeView: View {
                 bottomInputArea
             }
         }
-        // Top navigation bar with aligned buttons
-        .overlay(alignment: .top) {
-            HStack {
-                // Close button (left side)
-                ambientModeExitButton
-                
-                Spacer()
-                
-                // Switch books button (right side)
-                if currentBookContext != nil {
-                    switchBooksButton
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 60) // Increased to account for safe area
+        // Top navigation bar with BookView-style header
+        .safeAreaInset(edge: .top) {
+            bookStyleHeader
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
         }
         // Removed - moved above transcription bar
         .statusBarHidden(true)
@@ -377,9 +386,9 @@ struct AmbientModeView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // Top spacer for navigation area
+                    // Small top spacer since header uses safeAreaInset
                     Color.clear
-                        .frame(height: 100)
+                        .frame(height: 20)
                     
                     let hasRealContent = messages.contains { msg in
                         !msg.content.contains("[Transcribing]")
@@ -476,43 +485,39 @@ struct AmbientModeView: View {
         }
     }
     
-    // MARK: - Clean Exit Button
-    private var ambientModeExitButton: some View {
-        Button {
-            stopAndSaveSession() // Changed to save session if there's content
-        } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(.white.opacity(0.6))
-                .frame(width: 40, height: 40)
-                .glassEffect()
-                .glassEffectTransition(.materialize)
-                .clipShape(Circle())
-        }
-    }
-    
-    // MARK: - Switch Books Button
-    private var switchBooksButton: some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                showingBookStrip.toggle()
+    // MARK: - BookView-Style Header
+    private var bookStyleHeader: some View {
+        HStack(spacing: 0) {
+            // Left side - Exit button (X in circle with liquid glass)
+            Button {
+                stopAndSaveSession()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(width: 44, height: 44)
+                    .glassEffect()
+                    .clipShape(Circle())
             }
-        } label: {
-            HStack(spacing: 6) {
-                Text("Switch books")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.8))
-                
-                Image(systemName: showingBookStrip ? "xmark.circle.fill" : "book.closed.circle")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.8))
+            
+            Spacer()
+            
+            // Right side - Switch books pill with liquid glass
+            if currentBookContext != nil {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingBookStrip.toggle()
+                    }
+                } label: {
+                    Text("Switch Book")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .glassEffect()
+                        .clipShape(Capsule())
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10) // Match close button height
-            .frame(height: 40) // Same height as close button
-            .glassEffect()
-            .glassEffectTransition(.materialize)
-            .clipShape(Capsule())
         }
     }
     
