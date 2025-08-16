@@ -3,6 +3,7 @@ import SwiftUI
 struct NotesView: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
     
     @State private var selectedFilter: NoteType? = nil
     @State private var showingAddNote = false
@@ -13,6 +14,9 @@ struct NotesView: View {
     @State private var scrollToNoteId: UUID? = nil
     @State private var contextMenuNote: Note? = nil
     @State private var contextMenuSourceRect: CGRect = .zero
+    
+    // View style toggle
+    @AppStorage("notesViewStyle") private var viewStyle: NotesViewStyle = .grid
     
     // Search states
     @State private var searchText = ""
@@ -195,6 +199,13 @@ struct NotesView: View {
     }
     
     var body: some View {
+        // Use the clean notes view for now
+        CleanNotesView()
+            .environmentObject(notesViewModel)
+            .environmentObject(libraryViewModel)
+    }
+    
+    var mainGridView: some View {
         ZStack {
             // Match the app's dark background
             Color.black
@@ -203,8 +214,9 @@ struct NotesView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 16) {
-                    // Filter pills at the top of content
+                    // Filter pills and view toggle at the top
                     HStack(spacing: 8) {
+                        // Filter pills
                         FilterPill(
                             title: "All",
                             count: notesViewModel.notes.count,
@@ -229,6 +241,27 @@ struct NotesView: View {
                         )
                         
                         Spacer()
+                        
+                        // View style toggle
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                viewStyle = viewStyle == .grid ? .stack : .grid
+                                HapticManager.shared.lightTap()
+                            }
+                        }) {
+                            Image(systemName: viewStyle.icon)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .frame(width: 36, height: 36)
+                                .glassEffect(
+                                    .regular.tint(Color.white.opacity(0.05)),
+                                    in: RoundedRectangle(cornerRadius: 12)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                                }
+                        }
                     }
                     .padding(.horizontal)
                     
@@ -241,7 +274,7 @@ struct NotesView: View {
                         )
                         .frame(minHeight: 400)
                         .padding(.top, 60)
-                    } else {
+                    } else if viewStyle == .grid {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
                             ForEach(filteredNotes) { note in
                                 noteCardView(for: note)
@@ -393,6 +426,16 @@ struct NotesView: View {
                 }
             }
             return formatted
+        }
+    }
+}
+
+// MARK: - Note Type to Filter Type Extension
+extension NoteType {
+    func toFilterType() -> FilterType {
+        switch self {
+        case .quote: return .quotes
+        case .note: return .notes
         }
     }
 }

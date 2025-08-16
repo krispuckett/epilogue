@@ -700,10 +700,13 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             // Smooth frequency
             self.voiceFrequency = self.voiceFrequency * 0.9 + normalizedFreq * 0.1
             
-            // Debug logging for voice pattern changes
+            // Debug logging for voice pattern changes (commented out to reduce noise)
+            // Uncomment for debugging voice patterns
+            /*
             if abs(self.voiceIntensity - previousIntensity) > 0.05 || abs(self.voiceFrequency - previousFrequency) > 0.05 {
-                logger.info("🎵 Voice Patterns - Intensity: \(String(format: "%.2f", self.voiceIntensity)), Frequency: \(String(format: "%.2f", self.voiceFrequency)), Rhythm: \(String(format: "%.2f", self.voiceRhythm))")
+                print("🎵 Voice Patterns - Intensity: \(String(format: "%.2f", self.voiceIntensity)), Frequency: \(String(format: "%.2f", self.voiceFrequency)), Rhythm: \(String(format: "%.2f", self.voiceRhythm))")
             }
+            */
         }
     }
     

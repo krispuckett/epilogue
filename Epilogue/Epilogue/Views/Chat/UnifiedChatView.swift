@@ -2604,59 +2604,152 @@ struct EditContentSheet: View {
     let onSave: () -> Void
     let onCancel: () -> Void
     @FocusState private var isFocused: Bool
+    @State private var characterCount: Int = 0
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Text("Edit Content")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
+            ZStack {
+                // Ultra dark background
+                Color(red: 0.08, green: 0.075, blue: 0.072)
+                    .ignoresSafeArea()
                 
-                // Text editor
-                TextEditor(text: $editedText)
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
-                    .scrollContentBackground(.hidden)
-                    .padding(12)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-                    }
-                    .focused($isFocused)
-                    .frame(minHeight: 150)
-                
-                // Action buttons
-                HStack(spacing: 16) {
-                    Button("Cancel") {
-                        onCancel()
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Capsule())
+                VStack(spacing: 0) {
+                    // Drag indicator
+                    Capsule()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 36, height: 5)
+                        .padding(.top, 8)
+                        .padding(.bottom, 20)
                     
-                    Button("Save") {
-                        onSave()
+                    // Title with character count
+                    HStack {
+                        Text("Edit Content")
+                            .font(.system(size: 22, weight: .bold, design: .default))
+                            .foregroundStyle(.white)
+                        
+                        Spacer()
+                        
+                        Text("\(characterCount) characters")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.4))
                     }
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.black)
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Color.white)
-                    .clipShape(Capsule())
+                    .padding(.bottom, 20)
+                    
+                    // Glass effect text editor
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $editedText)
+                            .font(.system(size: 16, weight: .regular, design: .default))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .scrollContentBackground(.hidden)
+                            .padding(20)
+                            .focused($isFocused)
+                            .onChange(of: editedText) { _, newValue in
+                                characterCount = newValue.count
+                            }
+                        
+                        // Placeholder
+                        if editedText.isEmpty {
+                            Text("Enter your thoughts...")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white.opacity(0.3))
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 24)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .frame(minHeight: 200, maxHeight: 300)
+                    .glassEffect(
+                        .regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.8)),
+                        in: RoundedRectangle(cornerRadius: 20)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.2),
+                                        Color.white.opacity(0.05)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.5
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
+                    
+                    // Smart save indicator
+                    HStack {
+                        if editedText != originalText {
+                            Text("Unsaved changes")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.8))
+                        } else {
+                            Text("No changes")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.3))
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+                    
+                    Spacer(minLength: 0)
                 }
-                
-                Spacer()
             }
-            .padding(24)
-            .background(Color.black)
+            .navigationBarHidden(true)
             .onAppear {
                 isFocused = true
+                characterCount = editedText.count
             }
+            .overlay(alignment: .bottom) {
+                // Toolbar with cancel and save
+                HStack(spacing: 0) {
+                    Button {
+                        HapticManager.shared.lightTap()
+                        onCancel()
+                    } label: {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                    }
+                    
+                    Divider()
+                        .frame(width: 0.5, height: 20)
+                        .background(Color.white.opacity(0.2))
+                    
+                    Button {
+                        if editedText != originalText {
+                            HapticManager.shared.success()
+                            onSave()
+                        }
+                    } label: {
+                        Text("Done")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(editedText != originalText ? Color(red: 1.0, green: 0.549, blue: 0.259) : .white.opacity(0.3))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                    }
+                    .disabled(editedText == originalText)
+                }
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .frame(height: 0.5)
+                        .foregroundStyle(Color.white.opacity(0.1))
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(32)
+        .presentationBackground {
+            Color.clear
         }
     }
 }

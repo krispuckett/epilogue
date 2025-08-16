@@ -433,7 +433,7 @@ class NoteIntelligenceEngine: ObservableObject {
 }
 
 // MARK: - Smart Section Model
-struct SmartSection: Identifiable {
+struct SmartSection: Identifiable, Equatable {
     let id: UUID
     let type: NoteIntelligenceEngine.SectionType
     let title: String
@@ -447,6 +447,10 @@ struct SmartSection: Identifiable {
         case compact
         case comfortable
         case spacious
+    }
+    
+    static func == (lhs: SmartSection, rhs: SmartSection) -> Bool {
+        lhs.id == rhs.id
     }
 }
 

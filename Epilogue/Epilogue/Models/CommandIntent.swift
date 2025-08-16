@@ -173,34 +173,26 @@ struct CommandParser {
             return .addBook(query: query)
         }
         
-        // Phase 6: General Book Title Detection
-        if isLikelyBookTitle(input: trimmed) && !isLikelyNote(input: trimmed) {
+        // Phase 6: Advanced Book Title Detection with ML-like scoring
+        let bookScore = calculateBookTitleScore(input: trimmed)
+        let noteScore = calculateNoteScore(input: trimmed)
+        
+        print("CommandParser: Scores - Book: \(bookScore), Note: \(noteScore)")
+        
+        // If book score is significantly higher than note score, it's likely a book
+        if bookScore > noteScore && bookScore > 0.4 {
             let query = cleanBookQuery(from: input)
-            print("CommandParser: Detected book title pattern, query: '\(query)'")
+            print("CommandParser: Detected book title (score: \(bookScore)), query: '\(query)'")
             return .addBook(query: query)
         }
         
-        // Phase 6.5: Check if lowercase version might be a book title
-        // This handles cases where user types book title in lowercase
-        if trimmed.split(separator: " ").count >= 2 && trimmed.split(separator: " ").count <= 5 {
-            // Try title-casing the input
-            let titleCased = trimmed.split(separator: " ")
-                .map { word in
-                    let str = String(word)
-                    // Don't capitalize articles/prepositions unless they're first
-                    if ["a", "an", "the", "and", "or", "of", "in", "on", "at", "to", "for", "with", "by"].contains(str.lowercased()) {
-                        return str.lowercased()
-                    }
-                    return str.prefix(1).uppercased() + str.dropFirst().lowercased()
-                }
-                .joined(separator: " ")
-            
-            // Capitalize first word regardless
-            let finalTitleCased = titleCased.prefix(1).uppercased() + titleCased.dropFirst()
-            
-            if isLikelyBookTitle(input: finalTitleCased) && !isLikelyNote(input: trimmed) {
+        // Phase 6.5: Smart lowercase book title detection
+        // Many users type book titles in lowercase - be smart about it
+        if trimmed.count >= 3 && trimmed.count <= 100 && !trimmed.contains("?") {
+            // Check if it matches common book title patterns
+            if matchesBookTitlePattern(input: trimmed) {
                 let query = cleanBookQuery(from: input)
-                print("CommandParser: Detected book title pattern (after title-casing), query: '\(query)'")
+                print("CommandParser: Detected book title via pattern matching, query: '\(query)'")
                 return .addBook(query: query)
             }
         }
@@ -588,10 +580,8 @@ struct CommandParser {
         ]
         
         // Check if it starts with a reaction phrase
-        var detectedReaction: String? = nil
         for phrase in reactionPhrases {
             if lowercased.starts(with: phrase) && workingText.count > phrase.count + 10 {
-                detectedReaction = phrase
                 // Extract everything after the reaction
                 if let phraseRange = workingText.lowercased().range(of: phrase) {
                     workingText = String(workingText[phraseRange.upperBound...]).trimmingCharacters(in: .whitespaces)
@@ -907,5 +897,198 @@ struct CommandSuggestion: Identifiable {
         ))
         
         return suggestions
+    }
+}
+
+// MARK: - Extension with NLP Scoring Functions
+extension CommandParser {
+    
+    static func calculateBookTitleScore(input: String) -> Double {
+        var score = 0.0
+        let words = input.split(separator: " ")
+        let wordCount = words.count
+        
+        // Title length scoring (books typically have 1-8 words)
+        if wordCount >= 1 && wordCount <= 3 {
+            score += 0.3
+        } else if wordCount <= 8 {
+            score += 0.2
+        } else if wordCount > 15 {
+            score -= 0.2
+        }
+        
+        // Check for capitalization (even if not perfect)
+        let capitalizedWords = words.filter { $0.first?.isUppercase == true }.count
+        if capitalizedWords > 0 {
+            score += Double(capitalizedWords) / Double(wordCount) * 0.3
+        }
+        
+        // Common book title words
+        let bookTitleIndicators = [
+            "the", "of", "and", "a", "an", "in", "on", "at", "to", "for",
+            "book", "novel", "story", "tale", "chronicles", "adventures",
+            "memoir", "biography", "history", "guide", "handbook"
+        ]
+        
+        for word in words {
+            if bookTitleIndicators.contains(String(word).lowercased()) {
+                score += 0.05
+            }
+        }
+        
+        // Classic book title patterns
+        let patterns = [
+            "the .* of .*",  // "The Lord of the Rings"
+            "a .* of .*",    // "A Tale of Two Cities"
+            ".* and .*",     // "Pride and Prejudice"
+            "the .*'s .*",   // "The Hitchhiker's Guide"
+            ".* war$",       // "World War Z", "Cold War"
+            ".* part .*",    // "Part One", "Part Two"
+        ]
+        
+        for pattern in patterns {
+            if input.lowercased().range(of: pattern, options: .regularExpression) != nil {
+                score += 0.2
+                break
+            }
+        }
+        
+        // Popular book words
+        let popularBookWords = ["harry", "potter", "lord", "rings", "game", "thrones", 
+                               "hunger", "games", "twilight", "hobbit", "narnia", 
+                               "pride", "prejudice", "gatsby", "mockingbird",
+                               "1984", "fahrenheit", "brave", "world", "odyssey",
+                               "iliad", "quixote", "moby", "dick", "war", "peace"]
+        
+        for word in words {
+            if popularBookWords.contains(String(word).lowercased()) {
+                score += 0.15
+            }
+        }
+        
+        // Numbers often appear in book titles
+        if words.contains(where: { $0.rangeOfCharacter(from: .decimalDigits) != nil }) {
+            score += 0.1
+        }
+        
+        // Ends with a number (common for series)
+        if let lastWord = words.last, Int(lastWord) != nil {
+            score += 0.1
+        }
+        
+        return min(score, 1.0)
+    }
+    
+    static func calculateNoteScore(input: String) -> Double {
+        var score = 0.0
+        let lowercased = input.lowercased()
+        
+        // Note indicators
+        if lowercased.starts(with: "remember") || lowercased.starts(with: "don't forget") ||
+           lowercased.starts(with: "todo") || lowercased.starts(with: "reminder") ||
+           lowercased.starts(with: "note to self") || lowercased.starts(with: "important") {
+            score += 0.5
+        }
+        
+        // Questions are often notes
+        if input.contains("?") {
+            score += 0.3
+        }
+        
+        // Personal pronouns suggest notes
+        let personalPronouns = ["i ", "me ", "my ", "we ", "our ", "i'm ", "i've ", "i'll "]
+        for pronoun in personalPronouns {
+            if lowercased.contains(pronoun) {
+                score += 0.1
+                break
+            }
+        }
+        
+        // Action verbs suggest notes
+        let actionVerbs = ["need to", "should", "must", "have to", "want to", "going to"]
+        for verb in actionVerbs {
+            if lowercased.contains(verb) {
+                score += 0.2
+                break
+            }
+        }
+        
+        // URLs or email patterns suggest notes
+        if input.contains("http://") || input.contains("https://") || 
+           input.contains("www.") || input.contains("@") || input.contains(".com") {
+            score += 0.4
+        }
+        
+        // Very long text is likely a note
+        if input.count > 100 {
+            score += 0.3
+        }
+        
+        return min(score, 1.0)
+    }
+    
+    static func matchesBookTitlePattern(input: String) -> Bool {
+        let lowercased = input.lowercased()
+        let words = lowercased.split(separator: " ")
+        
+        // Single word that could be a book title
+        if words.count == 1 && input.count >= 3 {
+            // Famous single-word books
+            let singleWordBooks = ["dune", "emma", "dracula", "frankenstein", "hamlet", 
+                                  "macbeth", "othello", "beloved", "atonement", "middlesex",
+                                  "americanah", "pachinko", "circe", "hamnet", "klara"]
+            if singleWordBooks.contains(lowercased) {
+                return true
+            }
+        }
+        
+        // Common book title structures (even in lowercase)
+        let bookPatterns = [
+            // Series patterns
+            "^.+ book (one|two|three|four|five|\\d+)$",
+            "^.+ volume (i|ii|iii|iv|v|\\d+)$",
+            "^.+ part (one|two|three|\\d+)$",
+            
+            // Common title patterns
+            "^the .+$",                    // "the hobbit"
+            "^a .+ (of|in|at|on) .+$",    // "a game of thrones"
+            "^.+'s .+$",                   // "harry's adventure"
+            "^.+ and the .+$",             // "harry and the stone"
+            
+            // Genre patterns
+            "^.+ (chronicles|adventures|tales|story|stories)$",
+            "^(autobiography|biography|memoir|diary) of .+$",
+            "^.+ (handbook|guide|manual)$",
+            
+            // Classic structures
+            "^(life|death|birth|rise|fall|return) of .+$",
+            "^.+ (rising|falling|returns|begins|ends)$"
+        ]
+        
+        for pattern in bookPatterns {
+            if lowercased.range(of: pattern, options: .regularExpression) != nil {
+                return true
+            }
+        }
+        
+        // Check if it's likely a book series mention
+        if lowercased.contains("series") || lowercased.contains("trilogy") || 
+           lowercased.contains("book") || lowercased.contains("novel") {
+            return true
+        }
+        
+        // If 2-5 words and doesn't look like a sentence, probably a title
+        if words.count >= 2 && words.count <= 5 {
+            // Check if it lacks typical sentence structure
+            let sentenceIndicators = ["is", "are", "was", "were", "can", "will", "would", 
+                                     "should", "could", "have", "has", "had", "do", "does", "did"]
+            let hasSentenceStructure = words.contains { sentenceIndicators.contains(String($0)) }
+            
+            if !hasSentenceStructure && !input.contains("?") && !input.contains("!") {
+                return true
+            }
+        }
+        
+        return false
     }
 }

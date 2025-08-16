@@ -22,6 +22,8 @@ struct ContentView: View {
     @State private var showingLibraryCommandPalette = false
     @State private var showGlassToast = false
     @State private var toastMessage = ""
+    @State private var showBookSearch = false
+    @State private var bookSearchQuery = ""
     
     // Command processing
     @Environment(\.modelContext) private var modelContext
@@ -84,6 +86,22 @@ struct ContentView: View {
                     }
                 )
             }
+            .sheet(isPresented: $showBookSearch) {
+                BookSearchSheet(
+                    searchQuery: bookSearchQuery,
+                    onBookSelected: { book in
+                        libraryViewModel.addBook(book)
+                        HapticManager.shared.bookOpen()
+                        
+                        // Show success toast
+                        toastMessage = "Added \"\(book.title)\" to library"
+                        showGlassToast = true
+                        
+                        showBookSearch = false
+                        bookSearchQuery = ""
+                    }
+                )
+            }
             .overlay {
                 BookScannerLoadingOverlay()
             }
@@ -140,6 +158,15 @@ struct ContentView: View {
                 showCommandInput = false
                 showingLibraryCommandPalette = false
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
+                if let query = notification.object as? String {
+                    bookSearchQuery = query
+                    showBookSearch = true
+                    // Dismiss command input if it's open
+                    showCommandInput = false
+                    commandText = ""
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowCommandInput"))) { _ in
                 showCommandInput = true
                 HapticManager.shared.commandPaletteOpen()
@@ -192,7 +219,7 @@ struct ContentView: View {
                 .tag(0)
                 
                 NavigationStack {
-                    AwardWinningNotesView()
+                    CleanNotesView()
                 }
                 .tabItem {
                     Label {

@@ -9,6 +9,11 @@ struct SessionContentCardsView: View {
     @StateObject private var processor = TrueAmbientProcessor.shared
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     
+    @State private var editingQuote: ExtractedQuote?
+    @State private var editingNote: ExtractedNote?
+    @State private var showEditSheet = false
+    @State private var editContent = ""
+    
     private enum ContentType {
         case quote
         case note
@@ -95,6 +100,30 @@ struct SessionContentCardsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
+        .sheet(isPresented: $showEditSheet) {
+            EditContentSheet(
+                originalText: editingQuote?.text ?? editingNote?.text ?? "",
+                editedText: $editContent,
+                onSave: {
+                    // Save edited content
+                    if editingQuote != nil {
+                        // Update quote
+                        HapticManager.shared.success()
+                    } else if editingNote != nil {
+                        // Update note
+                        HapticManager.shared.success()
+                    }
+                    editingQuote = nil
+                    editingNote = nil
+                    showEditSheet = false
+                },
+                onCancel: {
+                    editingQuote = nil
+                    editingNote = nil
+                    showEditSheet = false
+                }
+            )
+        }
     }
     
     @ViewBuilder
@@ -108,6 +137,18 @@ struct SessionContentCardsView: View {
                     bookAuthor: bookAuthor,
                     timestamp: quote.timestamp
                 )
+                .onTapGesture {
+                    editContent = quote.text
+                    editingQuote = quote
+                    showEditSheet = true
+                    HapticManager.shared.lightTap()
+                }
+                .onLongPressGesture {
+                    editContent = quote.text
+                    editingQuote = quote
+                    showEditSheet = true
+                    HapticManager.shared.mediumTap()
+                }
             }
         case .note:
             if let note = item.content as? ExtractedNote {
@@ -117,6 +158,18 @@ struct SessionContentCardsView: View {
                     bookAuthor: bookAuthor,
                     timestamp: note.timestamp
                 )
+                .onTapGesture {
+                    editContent = note.text
+                    editingNote = note
+                    showEditSheet = true
+                    HapticManager.shared.lightTap()
+                }
+                .onLongPressGesture {
+                    editContent = note.text
+                    editingNote = note
+                    showEditSheet = true
+                    HapticManager.shared.mediumTap()
+                }
             }
         case .question:
             if let question = item.content as? ExtractedQuestion {

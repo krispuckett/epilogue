@@ -208,20 +208,30 @@ class GoogleBooksService: ObservableObject {
         }
         
         print("GoogleBooksAPI: Starting search for: '\(query)'")
-        isLoading = true
-        errorMessage = nil
+        
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+            searchResults = []
+        }
         
         do {
             let books = try await performSearch(query: query)
             print("GoogleBooksAPI: Found \(books.count) books")
-            searchResults = books
+            
+            await MainActor.run {
+                searchResults = books
+                isLoading = false
+            }
         } catch {
-            print("GoogleBooksAPI: Error - \(error.localizedDescription)")
-            errorMessage = error.localizedDescription
-            searchResults = []
+            print("GoogleBooksAPI: Search failed with error: \(error)")
+            
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                searchResults = []
+                isLoading = false
+            }
         }
-        
-        isLoading = false
     }
     
     private func performSearch(query: String) async throws -> [Book] {
@@ -231,19 +241,36 @@ class GoogleBooksService: ObservableObject {
             throw APIError.invalidQuery
         }
         
-        // Enhanced search query building
+        // Enhanced search query building with smart interpretation
         var searchQuery = cleanQuery
         
-        // If query contains "by", format it properly for Google Books
+        // Smart query enhancement based on input
         if cleanQuery.lowercased().contains(" by ") {
+            // Handle "Title by Author" format
             let parts = cleanQuery.split(separator: " by ", maxSplits: 1, omittingEmptySubsequences: true).map(String.init)
             if parts.count == 2 {
-                // Use intitle and inauthor for more precise results
-                searchQuery = "intitle:\(parts[0]) inauthor:\(parts[1])"
+                let title = parts[0].trimmingCharacters(in: .whitespaces)
+                let author = parts[1].trimmingCharacters(in: .whitespaces)
+                
+                // Handle common author abbreviations
+                let expandedAuthor = expandAuthorName(author)
+                
+                // Use intitle and inauthor for precise results
+                searchQuery = "intitle:\"\(title)\" inauthor:\"\(expandedAuthor)\""
             }
-        } else {
-            // For single terms or titles without author, use intitle for better results
+        } else if cleanQuery.split(separator: " ").count == 1 && cleanQuery.count < 20 {
+            // Single word - likely a famous book title
             searchQuery = "intitle:\(cleanQuery)"
+        } else if detectsSeriesNumber(in: cleanQuery) {
+            // Handle series books (e.g., "Harry Potter 2", "Hunger Games book 1")
+            searchQuery = formatSeriesQuery(cleanQuery)
+        } else {
+            // General book title - use quotes for exact matching if short
+            if cleanQuery.split(separator: " ").count <= 5 {
+                searchQuery = "intitle:\"\(cleanQuery)\""
+            } else {
+                searchQuery = cleanQuery
+            }
         }
         
         // Build URL with parameters
@@ -269,10 +296,16 @@ class GoogleBooksService: ObservableObject {
             throw APIError.invalidURL
         }
         
-        print("GoogleBooksAPI: Making search request")
+        print("GoogleBooksAPI: Making search request to URL: \(url)")
         
-        // Perform the request
-        let (data, response) = try await session.data(from: url)
+        // Perform the request with error handling
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(from: url)
+        } catch {
+            print("GoogleBooksAPI: Network request failed: \(error)")
+            throw APIError.invalidResponse
+        }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
@@ -379,6 +412,97 @@ class GoogleBooksService: ObservableObject {
         }
         
         return score
+    }
+    
+    // MARK: - Smart Query Helpers
+    
+    private func expandAuthorName(_ author: String) -> String {
+        // Expand common author abbreviations
+        var expanded = author
+        
+        // Handle J.R.R. Tolkien, J.K. Rowling, etc.
+        let abbreviations = [
+            "jrr": "j.r.r.",
+            "jk": "j.k.",
+            "cs": "c.s.",
+            "hg": "h.g.",
+            "pg": "p.g.",
+            "rr": "r.r.",
+            "grrm": "george r.r. martin",
+            "jd": "j.d.",
+            "hp": "h.p.",
+            "ts": "t.s.",
+            "ee": "e.e."
+        ]
+        
+        let lowerAuthor = author.lowercased()
+        for (abbr, full) in abbreviations {
+            if lowerAuthor == abbr || lowerAuthor.starts(with: abbr + " ") {
+                expanded = expanded.replacingOccurrences(of: abbr, with: full, options: .caseInsensitive)
+            }
+        }
+        
+        // Handle common name patterns
+        if lowerAuthor == "tolkien" {
+            return "j.r.r. tolkien"
+        } else if lowerAuthor == "rowling" {
+            return "j.k. rowling"
+        } else if lowerAuthor == "martin" && !lowerAuthor.contains("george") {
+            return "george r.r. martin"
+        } else if lowerAuthor == "lewis" && !lowerAuthor.contains("c.s.") {
+            return "c.s. lewis"
+        }
+        
+        return expanded
+    }
+    
+    private func detectsSeriesNumber(in query: String) -> Bool {
+        let patterns = [
+            "\\d+$",                    // Ends with number
+            "book \\d+",                // "book 1", "book 2"
+            "volume \\d+",              // "volume 1"
+            "part \\d+",                // "part 1"
+            "#\\d+",                    // "#1", "#2"
+            "(one|two|three|four|five|six|seven|eight|nine|ten)$"  // Written numbers
+        ]
+        
+        let lower = query.lowercased()
+        for pattern in patterns {
+            if lower.range(of: pattern, options: .regularExpression) != nil {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    private func formatSeriesQuery(_ query: String) -> String {
+        // Handle series queries intelligently
+        let lower = query.lowercased()
+        
+        // Extract series name and number
+        if let match = lower.range(of: "\\s+(\\d+|book \\d+|#\\d+|part \\d+|volume \\d+)$", options: .regularExpression) {
+            let seriesName = String(query[..<match.lowerBound])
+            let seriesNumber = String(query[match.lowerBound...]).trimmingCharacters(in: .whitespaces)
+            
+            // Format for better Google Books results
+            return "intitle:\"\(seriesName)\" \(seriesNumber)"
+        }
+        
+        // Handle written numbers
+        let numberMap = [
+            "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+            "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"
+        ]
+        
+        for (written, digit) in numberMap {
+            if lower.hasSuffix(" \(written)") {
+                let seriesName = String(query.dropLast(written.count + 1))
+                return "intitle:\"\(seriesName)\" \(digit)"
+            }
+        }
+        
+        return "intitle:\(query)"
     }
 }
 

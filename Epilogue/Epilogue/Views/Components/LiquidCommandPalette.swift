@@ -354,7 +354,10 @@ struct LiquidCommandPalette: View {
             // Open BookSearchSheet with the query (the smart way!)
             bookSearchQuery = query
             showBookSearch = true
-            dismissPalette()
+            // Small delay before dismissing to ensure sheet binding is set
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                dismissPalette()
+            }
         case .searchLibrary(let query), .searchNotes(let query), .searchAll(let query):
             // Navigate to search with query
             performSearch(query: query, intent: intent)
@@ -381,12 +384,16 @@ struct LiquidCommandPalette: View {
                 // Short single word might be a book title - open search sheet
                 bookSearchQuery = trimmed
                 showBookSearch = true
-                dismissPalette()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    dismissPalette()
+                }
             } else if trimmed.count < 100 {
                 // Medium length text could be book search - open search sheet
                 bookSearchQuery = trimmed
                 showBookSearch = true
-                dismissPalette()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    dismissPalette()
+                }
             } else {
                 // Long text defaults to note
                 createNote(from: trimmed)

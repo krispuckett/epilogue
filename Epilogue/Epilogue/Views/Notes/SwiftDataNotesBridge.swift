@@ -32,3 +32,18 @@ extension CapturedQuote {
         )
     }
 }
+
+extension CapturedQuestion {
+    func toNote() -> Note {
+        Note(
+            type: .note,  // Questions are stored as notes
+            content: self.content,
+            bookId: self.book?.localId != nil ? UUID(uuidString: self.book!.localId) : nil,
+            bookTitle: self.book?.title,
+            author: self.book?.author,
+            pageNumber: self.pageNumber,
+            dateCreated: self.timestamp,
+            id: self.id
+        )
+    }
+}
