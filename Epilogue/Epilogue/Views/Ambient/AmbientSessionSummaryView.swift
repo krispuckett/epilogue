@@ -30,8 +30,8 @@ struct AmbientSessionSummaryView: View {
                     VStack(spacing: 0) {
                         // Clean header section
                         headerSection
-                            .padding(.top, 20)
-                            .padding(.bottom, 32)
+                            .padding(.top, 0)  // Remove top padding - navigation handles it
+                            .padding(.bottom, 24)
                         
                         // Session metrics in monospace
                         metricsSection
@@ -68,9 +68,14 @@ struct AmbientSessionSummaryView: View {
                 }
                 .scrollIndicators(.hidden)
             }
-            .navigationBarHidden(true)
-            .safeAreaInset(edge: .top) {
-                customNavigationBar
+            .navigationTitle("Reading Session")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 minimalInputBar
@@ -109,39 +114,55 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
-    // MARK: - Custom Navigation Bar
+    // MARK: - Custom Navigation Bar (Removed - using native toolbar)
+    // Keeping for reference if needed later
+    /*
     private var customNavigationBar: some View {
-        HStack(spacing: 20) {
+        HStack {
+            // Left - Back button
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "arrow.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
             }
             
             Spacer()
             
+            // Center - Title
             Text("Reading Session")
                 .font(.system(size: 17, weight: .semibold, design: .default))
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(.white)
             
             Spacer()
             
+            // Right - Menu button
             Menu {
-                Button("Export Session") { exportSession() }
-                Button("Share Insights") { shareInsights() }
+                Button {
+                    exportSession()
+                } label: {
+                    Label("Export Session", systemImage: "square.and.arrow.up")
+                }
+                
+                Button {
+                    shareInsights()
+                } label: {
+                    Label("Share Insights", systemImage: "message")
+                }
             } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
             }
         }
-        .padding(.horizontal, 4)
-        .frame(height: 52)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(height: 56)
     }
+    */
     
     // MARK: - Header Section with Book Cover
     private var headerSection: some View {
@@ -509,12 +530,13 @@ struct MinimalThreadedCard: View {
     let author: String?
     
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
+        HStack(alignment: .top, spacing: 16) {
             Text(type)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
                 .tracking(1.2)
                 .frame(width: 60, alignment: .leading)
+                .padding(.top, 2)  // Small adjustment to align with text cap height
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(content)
