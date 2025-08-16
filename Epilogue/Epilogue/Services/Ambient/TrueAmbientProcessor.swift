@@ -16,7 +16,7 @@ private let logger = Logger(subsystem: "com.epilogue", category: "TrueAmbientPro
 
 // MARK: - Ambient Processed Content
 public struct AmbientProcessedContent: Identifiable, Hashable {
-    public let id = UUID()
+    public let id: UUID
     public let text: String
     public let type: ContentType
     public let timestamp: Date
@@ -24,6 +24,30 @@ public struct AmbientProcessedContent: Identifiable, Hashable {
     public var response: String?
     public var bookTitle: String?
     public var bookAuthor: String?
+    
+    // Content-based hashing for proper deduplication
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(text)
+        hasher.combine(type)
+        // Don't include response in hash - we want to find items regardless of response state
+    }
+    
+    public static func == (lhs: AmbientProcessedContent, rhs: AmbientProcessedContent) -> Bool {
+        // Two items are equal if they have the same text and type
+        // This prevents duplicates while allowing response updates
+        return lhs.text == rhs.text && lhs.type == rhs.type
+    }
+    
+    init(text: String, type: ContentType, timestamp: Date = Date(), confidence: Float = 1.0, response: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
+        self.id = UUID()
+        self.text = text
+        self.type = type
+        self.timestamp = timestamp
+        self.confidence = confidence
+        self.response = response
+        self.bookTitle = bookTitle
+        self.bookAuthor = bookAuthor
+    }
     
     public enum ContentType {
         case question
@@ -294,8 +318,10 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
-            detectedContent.append(content)
-            sessionContent.append(content)  // Add to sessionContent for batch processing
+            // Only add to detectedContent (single source of truth)
+            if !detectedContent.contains(where: { $0.text == content.text && $0.type == content.type }) {
+                detectedContent.append(content)
+            }
             logger.info("💭 Quote captured: \(cleanedText.prefix(50))...")
             
         case .note, .thought:
@@ -307,8 +333,10 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
-            detectedContent.append(content)
-            sessionContent.append(content)  // Add to sessionContent for batch processing
+            // Only add to detectedContent (single source of truth)
+            if !detectedContent.contains(where: { $0.text == content.text && $0.type == content.type }) {
+                detectedContent.append(content)
+            }
             logger.info("📝 \(String(describing: intent)) captured: \(text.prefix(50))...")
             
         default:
@@ -392,8 +420,7 @@ public class TrueAmbientProcessor: ObservableObject {
         logger.info("\n\(memorySummary)")
         
         // Reset for next session
-        sessionContent.removeAll()
-        detectedContent.removeAll()
+        detectedContent.removeAll()  // Single source of truth
         currentTranscript = ""
         conversationMemory.clearSession()
         
@@ -535,7 +562,7 @@ public class TrueAmbientProcessor: ObservableObject {
             await saveContentImmediately(content)
             
             // Also add to session for batch processing
-            sessionContent.append(content)
+            // Removed - using detectedContent as single source
             
         case .ambient, .unknown:
             // Less important content - batch process later
@@ -545,7 +572,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 timestamp: Date(),
                 confidence: confidence
             )
-            sessionContent.append(content)
+            // Removed - using detectedContent as single source
         }
         
         // Reset to listening state
@@ -860,33 +887,49 @@ public class TrueAmbientProcessor: ObservableObject {
         case .question:
             await processQuestion(text, confidence: confidence)
         case .quote:
-            sessionContent.append(AmbientProcessedContent(
+            // Add to detectedContent as single source of truth
+            let content = AmbientProcessedContent(
                 text: text,
                 type: .quote,
                 timestamp: Date(),
                 confidence: confidence
-            ))
+            )
+            if !detectedContent.contains(where: { $0.text == text && $0.type == .quote }) {
+                detectedContent.append(content)
+            }
         case .note:
-            sessionContent.append(AmbientProcessedContent(
+            // Add to detectedContent as single source of truth
+            let content = AmbientProcessedContent(
                 text: text,
                 type: .note,
                 timestamp: Date(),
                 confidence: confidence
-            ))
+            )
+            if !detectedContent.contains(where: { $0.text == text && $0.type == .note }) {
+                detectedContent.append(content)
+            }
         case .thought:
-            sessionContent.append(AmbientProcessedContent(
+            // Add to detectedContent as single source of truth
+            let content = AmbientProcessedContent(
                 text: text,
                 type: .thought,
                 timestamp: Date(),
                 confidence: confidence
-            ))
+            )
+            if !detectedContent.contains(where: { $0.text == text && $0.type == .thought }) {
+                detectedContent.append(content)
+            }
         default:
-            sessionContent.append(AmbientProcessedContent(
+            // Add to detectedContent as single source of truth
+            let content = AmbientProcessedContent(
                 text: text,
                 type: .ambient,
                 timestamp: Date(),
                 confidence: confidence
-            ))
+            )
+            if !detectedContent.contains(where: { $0.text == text && $0.type == .ambient }) {
+                detectedContent.append(content)
+            }
         }
     }
     #endif
@@ -1058,7 +1101,7 @@ extension TrueAmbientProcessor {
                 timestamp: Date(),
                 confidence: confidence
             )
-            sessionContent.append(content)
+            // Removed - using detectedContent as single source
             return
         }
         
@@ -1101,7 +1144,7 @@ extension TrueAmbientProcessor {
                     // Add as new if not found (shouldn't happen normally)
                     detectedContent.append(content)
                 }
-                sessionContent.append(content)
+                // Removed - using detectedContent as single source
                 // bookContext already declared above
                 _ = conversationMemory.addMemory(
                     text: question,
@@ -1191,18 +1234,31 @@ extension TrueAmbientProcessor {
                 bookAuthor: bookContext?.author
             )
             
-            // Always update or add the question with response
+            // Update existing question with response
             await MainActor.run {
-                // Remove any existing question without response
-                self.detectedContent.removeAll { 
+                // Find and update the existing question
+                if let index = self.detectedContent.firstIndex(where: { 
                     $0.type == .question && 
                     $0.text == question && 
                     $0.response == nil 
+                }) {
+                    // Create a new instance with the response (structs are immutable)
+                    let updatedContent = AmbientProcessedContent(
+                        text: question,
+                        type: .question,
+                        timestamp: self.detectedContent[index].timestamp,
+                        confidence: confidence,
+                        response: response,
+                        bookTitle: content.bookTitle,
+                        bookAuthor: content.bookAuthor
+                    )
+                    self.detectedContent[index] = updatedContent
+                    logger.info("✅ Updated question with AI response")
+                } else {
+                    // Add as new if not found
+                    self.detectedContent.append(content)
+                    logger.info("✅ Added question with AI response to detectedContent")
                 }
-                
-                // Add the question with response
-                self.detectedContent.append(content)
-                logger.info("✅ Added question with AI response to detectedContent")
             }
             
             // Audio feedback if enabled

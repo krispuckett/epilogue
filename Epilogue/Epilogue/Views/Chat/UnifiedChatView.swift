@@ -300,32 +300,31 @@ struct UnifiedChatView: View {
             .onReceive(voiceManager.$transcribedText, perform: handleTranscribedText)
             // Processing handled via detectedContent observable
             .onReceive(processor.$detectedContent) { content in
-                // Check for questions with new responses
-                for item in content {
+                // Optimized: Only process the last few items instead of entire history
+                let recentItems = content.suffix(5)  // Only check recent items
+                
+                for item in recentItems {
                     if item.type == .question, let response = item.response {
-                        // Check if we already have this response displayed
-                        let questionExists = messages.contains { msg in
+                        // Use a more efficient check
+                        let needsResponse = messages.contains { msg in
                             msg.content == item.text && msg.isUser
-                        }
-                        let responseExists = messages.contains { msg in
+                        } && !messages.contains { msg in
                             msg.content == response && !msg.isUser
                         }
                         
-                        // If we have the question but not the response, add the response
-                        if questionExists && !responseExists {
+                        if needsResponse {
                             messages.append(UnifiedChatMessage(
                                 content: response,
                                 isUser: false,
                                 timestamp: Date(),
                                 bookContext: currentBookContext
                             ))
-                            // Scroll will happen automatically
                             logger.info("✅ AI response displayed: \(response.prefix(50))...")
                         }
                     }
                 }
                 
-                // Also handle new items
+                // Handle new items
                 if let lastItem = content.last {
                     handleProcessorResult(lastItem)
                 }

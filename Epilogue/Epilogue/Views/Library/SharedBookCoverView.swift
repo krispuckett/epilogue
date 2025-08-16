@@ -83,6 +83,7 @@ struct SharedBookCoverView: View {
         // Check quick cache first for immediate display
         let cacheKey = "\(urlString)_\(loadFullImage ? "full" : "thumb")" as NSString
         if let cachedImage = Self.quickImageCache.object(forKey: cacheKey) {
+            print("📚 Using quick cached image for: \(urlString.suffix(50))")
             if loadFullImage {
                 self.fullImage = cachedImage
             } else {

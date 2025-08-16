@@ -324,50 +324,15 @@ struct BookSearchResultRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Book cover - match library list size
-            Group {
-                if let coverURL = book.coverImageURL,
-                   let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.gray.opacity(0.2))
-                                .overlay {
-                                    ProgressView()
-                                        .tint(.white.opacity(0.5))
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 60, height: 90)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        case .failure(_):
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                                .overlay {
-                                    Image(systemName: "book.closed.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundStyle(.white.opacity(0.3))
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                        .overlay {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.3))
-                        }
-                }
-            }
-            .frame(width: 60, height: 90)
-            .clipped()
+            // Book cover - use SharedBookCoverView for consistency
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 60,
+                height: 90,
+                loadFullImage: false,
+                isLibraryView: false
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             
             // Book details

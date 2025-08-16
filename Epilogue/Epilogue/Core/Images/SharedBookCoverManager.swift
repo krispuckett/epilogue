@@ -179,10 +179,24 @@ public class SharedBookCoverManager: ObservableObject {
             }
             
             do {
-                print("📥 Loading book cover image")
-                let (data, _) = try await URLSession.shared.data(from: url)
+                print("📥 Loading book cover from: \(url.absoluteString.suffix(100))")
+                let (data, response) = try await URLSession.shared.data(from: url)
                 
-                guard let originalImage = UIImage(data: data) else { return nil }
+                // Check HTTP status
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("📊 HTTP Status: \(httpResponse.statusCode)")
+                    if httpResponse.statusCode == 404 {
+                        print("⚠️ Cover image not found (404), will need fallback")
+                        return nil
+                    }
+                }
+                
+                guard let originalImage = UIImage(data: data) else { 
+                    print("❌ Failed to decode image data")
+                    return nil 
+                }
+                
+                print("✅ Successfully decoded image: \(originalImage.size)")
                 
                 // Resize if needed
                 let processedImage: UIImage
@@ -207,7 +221,7 @@ public class SharedBookCoverManager: ObservableObject {
                 return processedImage
                 
             } catch {
-                print("❌ Failed to load image: \(error)")
+                print("❌ Failed to load image from \(url.absoluteString.suffix(100)): \(error.localizedDescription)")
             }
             
             return nil
@@ -399,6 +413,32 @@ public class SharedBookCoverManager: ObservableObject {
         }
         
         print("✅ Cleared all caches")
+    }
+    
+    /// Force refresh a cover image (useful for broken URLs)
+    public func refreshCover(for urlString: String) async -> UIImage? {
+        let cleanedURL = cleanURL(urlString)
+        
+        // Clear from all caches
+        let thumbKey = "\(cleanedURL)_thumb" as NSString
+        let fullKey = "\(cleanedURL)_full" as NSString
+        
+        Self.thumbnailCache.removeObject(forKey: thumbKey)
+        Self.imageCache.removeObject(forKey: fullKey)
+        // Note: quickImageCache is in SharedBookCoverView, not here
+        
+        // Remove from disk
+        if let diskCacheURL = diskCacheURL {
+            let thumbPath = diskCacheURL.appendingPathComponent(thumbKey as String)
+            let fullPath = diskCacheURL.appendingPathComponent(fullKey as String)
+            try? FileManager.default.removeItem(at: thumbPath)
+            try? FileManager.default.removeItem(at: fullPath)
+        }
+        
+        print("🔄 Refreshing cover: \(urlString.suffix(50))")
+        
+        // Re-download
+        return await loadFullImage(from: urlString)
     }
     
     /// Get cache statistics

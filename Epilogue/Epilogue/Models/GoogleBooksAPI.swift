@@ -488,12 +488,25 @@ class GoogleBooksService: ObservableObject {
             }
         }
         
-        // Penalize titles with unwanted keywords
+        // Penalize titles with unwanted keywords (expanded list)
         let unwantedKeywords = ["study guide", "cliff notes", "sparknotes", "summary", "analysis", 
-                              "teacher", "student", "workbook", "companion", "movie", "film"]
+                              "teacher", "student", "workbook", "companion", "movie", "film",
+                              "abridged", "shortened", "condensed", "simplified", "quiz",
+                              "test prep", "exam", "for dummies", "idiot's guide", "course notes"]
         for keyword in unwantedKeywords {
             if titleLower.contains(keyword) {
-                score -= 200
+                score -= 300  // Increased penalty
+                print("📉 Penalizing '\(book.title)' for containing '\(keyword)' (-300)")
+            }
+        }
+        
+        // Heavily penalize known summary publishers
+        let summaryPublishers = ["everest media", "quick read", "book summary", "minute read", 
+                                "bookrags", "shmoop", "gradesaver", "instaread"]
+        for publisher in summaryPublishers {
+            if authorLower.contains(publisher) {
+                score -= 500
+                print("📉 Heavily penalizing '\(book.title)' - summary publisher '\(publisher)' (-500)")
             }
         }
         
@@ -507,6 +520,25 @@ class GoogleBooksService: ObservableObject {
         // Boost books with cover images
         if book.coverImageURL != nil {
             score += 30
+            
+            // Extra boost for high-quality covers (extraLarge or large in URL)
+            if let url = book.coverImageURL,
+               (url.contains("zoom=5") || url.contains("zoom=4") || 
+                url.contains("extraLarge") || url.contains("large")) {
+                score += 20
+                print("📈 Boosting '\(book.title)' for high-quality cover (+20)")
+            }
+        }
+        
+        // Boost original editions and penalize special editions
+        if titleLower.contains("anniversary edition") || 
+           titleLower.contains("special edition") ||
+           titleLower.contains("collector's edition") {
+            score -= 50  // Slight penalty for special editions (often different covers)
+        } else if titleLower.contains("first edition") || 
+                  titleLower.contains("original") {
+            score += 50  // Boost original editions
+            print("📈 Boosting '\(book.title)' as original edition (+50)")
         }
         
         // Boost popular/classic books (those with more pages tend to be full novels)
