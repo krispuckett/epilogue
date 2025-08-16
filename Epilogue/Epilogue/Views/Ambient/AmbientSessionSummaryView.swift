@@ -250,7 +250,7 @@ struct AmbientSessionSummaryView: View {
                         .padding(.bottom, 24)
                 }
                 .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .top)),
+                    insertion: .opacity,
                     removal: .opacity
                 ))
             }
@@ -263,6 +263,7 @@ struct AmbientSessionSummaryView: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
         )
+        .clipped()
     }
     
     // MARK: - Conversation Section

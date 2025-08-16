@@ -216,6 +216,7 @@ public class TrueAmbientProcessor: ObservableObject {
             let prefixesToRemove = [
                 "i love this quote.",
                 "i love this quote",
+                "quote...",
                 "quote:",
                 "quote ",
                 "here's a quote:",

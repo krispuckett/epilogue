@@ -8,24 +8,45 @@ struct SessionSummaryPlaceholderView: View {
     @Query private var sessions: [AmbientSession]
     
     private var matchingSession: AmbientSession? {
+        // Debug logging
+        print("🔍 Looking for session:")
+        print("  - Note: \(note?.content.prefix(30) ?? "nil")")
+        print("  - Quote: \(quote?.text.prefix(30) ?? "nil")")
+        print("  - Note session: \(note?.ambientSession?.id ?? UUID())")
+        print("  - Quote session: \(quote?.ambientSession?.id ?? UUID())")
+        print("  - Available sessions: \(sessions.count)")
+        
         // Use direct relationship if available
         if let noteSession = note?.ambientSession {
+            print("✅ Found session via note relationship")
             return noteSession
         }
         if let quoteSession = quote?.ambientSession {
+            print("✅ Found session via quote relationship")
             return quoteSession
         }
         
         // Fallback to timestamp matching for older data
         let targetDate = note?.timestamp ?? quote?.timestamp ?? Date()
+        print("🕓 Looking for session by timestamp: \(targetDate)")
         
-        return sessions.first { session in
+        let found = sessions.first { session in
             let sessionStart = session.startTime
             let sessionEnd = session.endTime
             
             // Check if the note/quote was created during this session
-            return targetDate >= sessionStart && targetDate <= sessionEnd.addingTimeInterval(300) // 5 minute buffer
+            let matches = targetDate >= sessionStart && targetDate <= sessionEnd.addingTimeInterval(300) // 5 minute buffer
+            if matches {
+                print("✅ Found session by timestamp match")
+            }
+            return matches
         }
+        
+        if found == nil {
+            print("❌ No matching session found")
+        }
+        
+        return found
     }
     
     var body: some View {

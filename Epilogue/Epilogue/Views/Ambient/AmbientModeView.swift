@@ -101,32 +101,7 @@ struct AmbientModeView: View {
             .padding(.horizontal, 20)
             .padding(.top, 60) // Increased to account for safe area
         }
-        // Save indicator below the nav bar
-        .overlay(alignment: .topTrailing) {
-            if showSaveAnimation {
-                HStack(spacing: 6) {
-                    Image(systemName: detectionState.icon)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .symbolEffect(.pulse)
-                    
-                    Text("Saved")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .glassEffect()
-                .glassEffectTransition(.materialize)
-                .clipShape(Capsule())
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 0.8).combined(with: .opacity)
-                ))
-                .padding(.trailing, 20)
-                .padding(.top, 70) // Below the nav bar
-            }
-        }
+        // Removed - moved above transcription bar
         .statusBarHidden(true)
         .fullScreenCover(isPresented: $showingSessionSummary, onDismiss: {
             // After summary is dismissed, close ambient mode
@@ -298,6 +273,30 @@ struct AmbientModeView: View {
         VStack {
             Spacer()
             
+            // Save indicator above transcription
+            if showSaveAnimation {
+                HStack(spacing: 6) {
+                    Image(systemName: detectionState.icon)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .symbolEffect(.pulse)
+                    
+                    Text("Saved")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .glassEffect()
+                .glassEffectTransition(.materialize)
+                .clipShape(Capsule())
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                ))
+                .padding(.bottom, 10)
+            }
+            
             // Live transcription with animated glass container (editable)
             if isRecording && !liveTranscription.isEmpty {
                 Group {
@@ -330,9 +329,7 @@ struct AmbientModeView: View {
                 .glassEffectTransition(.materialize)
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: liveTranscription.count < 30 ? 24 :
-                                    liveTranscription.count < 60 ? 20 :
-                                    liveTranscription.count < 100 ? 18 : 16
+                        cornerRadius: 12  // Fixed corner radius for polished look
                     )
                 )
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: liveTranscription.count)
