@@ -201,6 +201,18 @@ class GoogleBooksService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    func searchBookByISBN(_ isbn: String) async -> Book? {
+        print("GoogleBooksAPI: Searching for ISBN: \(isbn)")
+        
+        do {
+            let books = try await performSearch(query: "isbn:\(isbn)")
+            return books.first
+        } catch {
+            print("GoogleBooksAPI: ISBN search failed: \(error)")
+            return nil
+        }
+    }
+    
     func searchBooks(query: String) async {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { 
             print("GoogleBooksAPI: Empty query")

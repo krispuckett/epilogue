@@ -100,29 +100,26 @@ struct SessionContentCardsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(
-                originalText: editingQuote?.text ?? editingNote?.text ?? "",
-                editedText: $editContent,
-                onSave: {
-                    // Save edited content
-                    if editingQuote != nil {
-                        // Update quote
-                        HapticManager.shared.success()
-                    } else if editingNote != nil {
-                        // Update note
-                        HapticManager.shared.success()
+        .overlay {
+            if showEditSheet {
+                EditContentOverlay(
+                    originalText: editingQuote?.text ?? editingNote?.text ?? "",
+                    editedText: $editContent,
+                    isPresented: $showEditSheet,
+                    onSave: {
+                        // Save edited content
+                        if editingQuote != nil {
+                            // Update quote
+                            HapticManager.shared.success()
+                        } else if editingNote != nil {
+                            // Update note
+                            HapticManager.shared.success()
+                        }
+                        editingQuote = nil
+                        editingNote = nil
                     }
-                    editingQuote = nil
-                    editingNote = nil
-                    showEditSheet = false
-                },
-                onCancel: {
-                    editingQuote = nil
-                    editingNote = nil
-                    showEditSheet = false
-                }
-            )
+                )
+            }
         }
     }
     

@@ -1,5 +1,5 @@
 import SwiftUI
-import AVKit
+import AVFoundation
 import Vision
 
 struct EnhancedBookScannerView: View {
@@ -11,6 +11,7 @@ struct EnhancedBookScannerView: View {
     @State private var lastScannedISBN: String?
     @State private var showBookSearch = false
     @State private var searchQuery = ""
+    @State private var hasRequestedPermission = false
     
     var body: some View {
         NavigationView {
@@ -144,6 +145,9 @@ struct EnhancedBookScannerView: View {
             }
             .navigationBarHidden(true)
         }
+        .onAppear {
+            checkCameraPermission()
+        }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
                 searchQuery: searchQuery,
@@ -163,6 +167,32 @@ struct EnhancedBookScannerView: View {
                     dismiss()
                 }
             )
+        }
+    }
+    
+    private func checkCameraPermission() {
+        guard !hasRequestedPermission else { return }
+        hasRequestedPermission = true
+        
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            print("📸 Camera already authorized")
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        print("📸 Camera permission granted")
+                    } else {
+                        print("❌ Camera permission denied")
+                        detectionStatus = "Camera access required"
+                    }
+                }
+            }
+        case .denied, .restricted:
+            print("❌ Camera access denied or restricted")
+            detectionStatus = "Camera access required. Enable in Settings."
+        @unknown default:
+            break
         }
     }
 }
@@ -202,14 +232,31 @@ class CameraScannerViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        print("📸 CameraScannerViewController viewDidLoad")
         setupCamera()
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.layer.bounds
+    }
+    
     private func setupCamera() {
+        print("📸 Setting up camera")
+        
+        // Check camera permission first
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+            print("❌ Camera not authorized")
+            return
+        }
+        
         captureSession = AVCaptureSession()
         
         guard let captureSession = captureSession,
-              let videoCaptureDevice = AVCaptureDevice.default(for: .video) else { return }
+              let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+            print("❌ Failed to get video device")
+            return
+        }
         
         let videoInput: AVCaptureDeviceInput
         
@@ -262,6 +309,9 @@ class CameraScannerViewController: UIViewController {
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession?.startRunning()
+            DispatchQueue.main.async {
+                print("✅ Camera session started")
+            }
         }
     }
 }
@@ -310,13 +360,18 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
     
     private func captureBookPhoto() {
         guard let photoOutput = photoOutput,
-              isProcessing?.wrappedValue == false else { return }
+              isProcessing?.wrappedValue == false else { 
+            print("⚠️ Already processing or no photo output")
+            return 
+        }
         
+        print("📸 Capturing book photo...")
         isProcessing?.wrappedValue = true
-        captureSession?.stopRunning()
-        detectionStatus?.wrappedValue = "Processing book cover..."
+        detectionStatus?.wrappedValue = "Capturing book cover..."
         
+        // Don't stop the session until after capture
         let settings = AVCapturePhotoSettings()
+        settings.flashMode = .off
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
 }
@@ -324,10 +379,8 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
 // MARK: - Photo Capture Delegate
 extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard error == nil,
-              let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            // Photo capture failed
+        if let error = error {
+            print("❌ Photo capture error: \(error)")
             DispatchQueue.main.async { [weak self] in
                 self?.isProcessing?.wrappedValue = false
                 self?.captureSession?.startRunning()
@@ -335,6 +388,22 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
             }
             return
         }
+        
+        guard let data = photo.fileDataRepresentation(),
+              let image = UIImage(data: data) else {
+            print("❌ Failed to get image data")
+            DispatchQueue.main.async { [weak self] in
+                self?.isProcessing?.wrappedValue = false
+                self?.captureSession?.startRunning()
+                self?.detectionStatus?.wrappedValue = "Capture failed. Try again."
+            }
+            return
+        }
+        
+        print("✅ Photo captured successfully")
+        
+        // Stop the session after successful capture
+        captureSession?.stopRunning()
         
         // Process the captured image with BookScannerService
         Task {
@@ -406,15 +475,27 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         
         // Search for book by ISBN using Google Books API
         Task {
+            print("📚 Searching for ISBN: \(stringValue)")
+            self.detectionStatus?.wrappedValue = "Searching for ISBN \(stringValue)..."
+            
             let googleBooks = GoogleBooksService()
             if let book = await googleBooks.searchBookByISBN(stringValue) {
+                print("✅ Found book: \(book.title)")
                 // Found book - call the callback
                 await MainActor.run { [weak self] in
                     self?.onBookFound?(book)
                     self?.processingISBN = false
                 }
             } else {
+                print("❌ ISBN not found in Google Books")
                 // ISBN not found, show search sheet with ISBN prepopulated
+                await MainActor.run { [weak self] in
+                    self?.detectionStatus?.wrappedValue = "ISBN not found. Showing search..."
+                }
+                
+                // Small delay for user to see the message
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                
                 await MainActor.run { [weak self] in
                     // Post notification to show book search with ISBN
                     NotificationCenter.default.post(
@@ -423,9 +504,14 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
                     )
                     self?.processingISBN = false
                     
-                    // Dismiss the scanner since we're showing search
-                    if let parent = self?.parent as? UIViewController {
-                        parent.dismiss(animated: true)
+                    // Find the parent SwiftUI view and dismiss
+                    var responder: UIResponder? = self
+                    while let next = responder?.next {
+                        if let viewController = next as? UIHostingController<EnhancedBookScannerView> {
+                            viewController.dismiss(animated: true)
+                            break
+                        }
+                        responder = next
                     }
                 }
             }

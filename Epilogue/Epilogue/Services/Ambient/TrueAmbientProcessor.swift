@@ -98,7 +98,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var sessionContent: [AmbientProcessedContent] = []
     private var sessionStartTime: Date?
     private var modelContext: ModelContext?
-    private weak var currentAmbientSession: AmbientSession?
+    private var currentAmbientSession: AmbientSession?  // Not weak - we need to maintain the reference
     private var processedTextHashes = Set<String>() // Prevent duplicate processing
     private var currentBook: Book? // Current book context
     

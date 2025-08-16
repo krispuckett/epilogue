@@ -12,9 +12,20 @@ struct SessionSummaryPlaceholderView: View {
         print("🔍 Looking for session:")
         print("  - Note: \(note?.content.prefix(30) ?? "nil")")
         print("  - Quote: \(quote?.text.prefix(30) ?? "nil")")
-        print("  - Note session: \(note?.ambientSession?.id ?? UUID())")
-        print("  - Quote session: \(quote?.ambientSession?.id ?? UUID())")
+        print("  - Note has session: \(note?.ambientSession != nil)")
+        print("  - Quote has session: \(quote?.ambientSession != nil)")
+        if let noteSession = note?.ambientSession {
+            print("  - Note session ID: \(noteSession.id)")
+            print("  - Note session book: \(noteSession.book?.title ?? "nil")")
+        }
+        if let quoteSession = quote?.ambientSession {
+            print("  - Quote session ID: \(quoteSession.id)")
+            print("  - Quote session book: \(quoteSession.book?.title ?? "nil")")
+        }
         print("  - Available sessions: \(sessions.count)")
+        for (index, session) in sessions.enumerated() {
+            print("    Session \(index): \(session.id) - \(session.book?.title ?? "no book")")
+        }
         
         // Use direct relationship if available
         if let noteSession = note?.ambientSession {

@@ -2603,80 +2603,107 @@ struct EditContentOverlay: View {
     @Binding var isPresented: Bool
     let onSave: () -> Void
     @FocusState private var isFocused: Bool
+    @State private var keyboardHeight: CGFloat = 0
     
     var body: some View {
-        ZStack {
-            // Dark backdrop - visible like LiquidCommandPalette
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    isPresented = false
-                    HapticManager.shared.lightTap()
-                }
-            
-            VStack {
-                Spacer()
-                
-                // Clean input bar - just text field and arrow button
-                HStack(alignment: .bottom, spacing: 12) {
-                    // Text input field with the content already loaded
-                    TextField("", text: $editedText, axis: .vertical)
-                        .font(.system(size: 17, weight: .regular))
-                        .foregroundStyle(.white)
-                        .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
-                        .focused($isFocused)
-                        .lineLimit(1...8) // Allow vertical expansion
-                        .textFieldStyle(.plain)
-                        .padding(.vertical, 12)
-                        .padding(.leading, 16)
-                    
-                    // Single arrow button for save/submit
-                    Button {
-                        if editedText != originalText && !editedText.isEmpty {
-                            HapticManager.shared.success()
-                            onSave()
-                            isPresented = false
-                        } else if editedText.isEmpty {
-                            // If empty, just close
-                            HapticManager.shared.lightTap()
-                            isPresented = false
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(
-                                editedText != originalText && !editedText.isEmpty
-                                    ? Color(red: 1.0, green: 0.55, blue: 0.26)
-                                    : .white.opacity(0.3)
-                            )
-                            .padding(.trailing, 16)
-                            .padding(.vertical, 12)
+        GeometryReader { geometry in
+            ZStack {
+                // Dark backdrop - visible like LiquidCommandPalette
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        isPresented = false
+                        HapticManager.shared.lightTap()
                     }
-                    .disabled(editedText == originalText || editedText.isEmpty)
+                
+                VStack {
+                    Spacer()
+                    
+                    // Clean input bar - just text field and arrow button
+                    HStack(alignment: .bottom, spacing: 12) {
+                        // Text input field with the content already loaded
+                        TextField("", text: $editedText, axis: .vertical)
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundStyle(.white)
+                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .focused($isFocused)
+                            .lineLimit(1...8) // Allow vertical expansion
+                            .textFieldStyle(.plain)
+                            .padding(.vertical, 12)
+                            .padding(.leading, 16)
+                        
+                        // Single arrow button for save/submit
+                        Button {
+                            if editedText != originalText && !editedText.isEmpty {
+                                HapticManager.shared.success()
+                                onSave()
+                                isPresented = false
+                            } else if editedText.isEmpty {
+                                // If empty, just close
+                                HapticManager.shared.lightTap()
+                                isPresented = false
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundStyle(
+                                    editedText != originalText && !editedText.isEmpty
+                                        ? Color(red: 1.0, green: 0.55, blue: 0.26)
+                                        : .white.opacity(0.3)
+                                )
+                                .padding(.trailing, 16)
+                                .padding(.vertical, 12)
+                        }
+                        .disabled(editedText == originalText || editedText.isEmpty)
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: 28)
+                            .fill(Color(red: 0.12, green: 0.11, blue: 0.105))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 28)
+                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                            )
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, keyboardHeight > 0 ? 20 : 30) // Adjust padding when keyboard shown
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(Color(red: 0.12, green: 0.11, blue: 0.105))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28)
-                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                        )
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 30)
-                .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
-                ))
+                .animation(.easeOut(duration: 0.25), value: keyboardHeight)
             }
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .ignoresSafeArea(.container, edges: .top) // Only ignore top safe area
         .onAppear {
             // Text is already populated with originalText via binding
             withAnimation(.easeOut(duration: 0.2)) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isFocused = true
+                }
+            }
+            
+            // Subscribe to keyboard notifications
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillShowNotification,
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        keyboardHeight = keyboardFrame.height
+                    }
+                }
+            }
+            
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillHideNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                withAnimation(.easeOut(duration: 0.25)) {
+                    keyboardHeight = 0
                 }
             }
         }

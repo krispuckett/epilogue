@@ -9,7 +9,7 @@ struct CleanNotesView: View {
     @Query(sort: \CapturedNote.timestamp, order: .reverse) private var capturedNotes: [CapturedNote]
     @Query(sort: \CapturedQuote.timestamp, order: .reverse) private var capturedQuotes: [CapturedQuote]
     
-    @State private var selectedFilter: FilterType? = nil
+    @State private var selectedFilter: FilterType = .all
     @State private var searchText = ""
     @State private var showEditSheet = false
     @State private var editingNote: CapturedNote?
@@ -38,6 +38,15 @@ struct CleanNotesView: View {
             case .notes: return "note.text"
             case .quotes: return "quote.opening"
             case .byBook: return "books.vertical"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .all: return "All Items"
+            case .notes: return "Notes Only"
+            case .quotes: return "Quotes Only"
+            case .byBook: return "Group by Book"
             }
         }
     }
@@ -70,7 +79,7 @@ struct CleanNotesView: View {
             items = items.filter { $0.note != nil }
         case .quotes:
             items = items.filter { $0.quote != nil }
-        case .all, .byBook, .none:
+        case .all, .byBook:
             break
         }
         
@@ -214,8 +223,8 @@ struct CleanNotesView: View {
                             ))
                         }
                         
-                        // Filter Pills under navigation
-                        filterPills
+                        // Filter Popover Button
+                        filterPopoverButton
                             .padding(.horizontal, 20)
                             .padding(.top, showSearchBar ? 8 : 16)
                             .padding(.bottom, 20)
@@ -320,54 +329,78 @@ struct CleanNotesView: View {
     
     // Removed headerView - now using navigation title
     
-    private var filterPills: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+    private var filterPopoverButton: some View {
+        HStack {
+            Menu {
                 ForEach(FilterType.allCases, id: \.self) { filter in
-                    filterPill(for: filter)
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedFilter = filter
+                        }
+                        HapticManager.shared.lightTap()
+                    } label: {
+                        Label {
+                            HStack {
+                                Text(filter.description)
+                                Spacer()
+                                if selectedFilter == filter {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                            }
+                        } icon: {
+                            Image(systemName: filter.icon)
+                        }
+                    }
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: selectedFilter.icon)
+                        .font(.system(size: 14, weight: .medium))
+                    
+                    Text(selectedFilter.description)
+                        .font(.system(size: 15, weight: .medium))
+                    
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background {
+                    // Clean glass effect with subtle tint
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.08))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.15),
+                                            Color.white.opacity(0.08)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        }
+                }
+                .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
             }
-            .padding(.horizontal, 1) // Small padding to prevent clipping
+            .menuStyle(.automatic)
+            .menuIndicator(.hidden)
+            
+            Spacer()
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedFilter)
-    }
-    
-    private func filterPill(for filter: FilterType) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                selectedFilter = selectedFilter == filter ? nil : filter
-            }
-            HapticManager.shared.lightTap()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: filter.icon)
-                    .font(.system(size: 12, weight: .medium))
-                
-                Text(filter.rawValue)
-                    .font(.system(size: 14, weight: .medium))
-            }
-            .foregroundStyle(
-                selectedFilter == filter || (selectedFilter == nil && filter == .all) 
-                    ? .black 
-                    : .white.opacity(0.7)
-            )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                selectedFilter == filter || (selectedFilter == nil && filter == .all)
-                    ? Color.white
-                    : Color.white.opacity(0.1),
-                in: Capsule()
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
     }
     
     private var contentSections: some View {
         VStack(spacing: 24) {
-            ForEach(groupedItems.indices, id: \.self) { index in
-                let section = groupedItems[index].0
-                let items = groupedItems[index].1
+            ForEach(Array(groupedItems.enumerated()), id: \.0) { index, group in
+                let section = group.0
+                let items = group.1
                 VStack(alignment: .leading, spacing: 16) {
                     // Section Header (collapsible for By Book filter)
                     Button {
@@ -423,13 +456,14 @@ struct CleanNotesView: View {
                     // Items in section with staggered animation (collapsible)
                     if !collapsedSections.contains(section) {
                         VStack(spacing: 16) {
-                            ForEach(items.indices, id: \.self) { itemIndex in
-                                let item = items[itemIndex]
+                            ForEach(items, id: \.date) { item in
                                 Group {
                                     if let note = item.note {
                                         noteCard(note: note)
+                                            .id(note.id)
                                     } else if let quote = item.quote {
                                         quoteCard(quote: quote)
+                                            .id(quote.id)
                                     }
                                 }
                                 .padding(.horizontal, 20)

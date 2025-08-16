@@ -21,6 +21,8 @@ struct LibraryView: View {
     @State private var settingsButtonPressed = false
     @State private var visibleBookIDs: Set<UUID> = []
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
+    @State private var showingBookSearch = false
+    @State private var showingEnhancedScanner = false
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -220,12 +222,39 @@ struct LibraryView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }
+        .sheet(isPresented: $showingBookSearch) {
+            BookSearchSheet(
+                searchQuery: "",
+                onBookSelected: { book in
+                    viewModel.addBook(book)
+                    showingBookSearch = false
+                }
+            )
+        }
+        .sheet(isPresented: $showingEnhancedScanner) {
+            SimplifiedBookScanner { book in
+                viewModel.addBook(book)
+                showingEnhancedScanner = false
+                
+                // Show success toast
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowGlassToast"),
+                    object: ["message": "Added \"\(book.title)\" to library"]
+                )
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {
                 // Navigate directly to book detail
                 selectedBookForNavigation = book
                 navigateToBookDetail = true
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { _ in
+            showingBookSearch = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowEnhancedBookScanner"))) { _ in
+            showingEnhancedScanner = true
         }
         #if DEBUG
         .onAppear {
