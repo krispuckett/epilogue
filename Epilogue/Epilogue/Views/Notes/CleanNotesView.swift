@@ -279,13 +279,20 @@ struct CleanNotesView: View {
                 }
             }
         }
-        .sheet(isPresented: $showEditSheet) {
-            EditContentSheet(
-                originalText: editingNote?.content ?? editingQuote?.text ?? "",
-                editedText: $editedText,
-                onSave: saveEdit,
-                onCancel: cancelEdit
-            )
+        .overlay {
+            if showEditSheet {
+                EditContentOverlay(
+                    originalText: editingNote?.content ?? editingQuote?.text ?? "",
+                    editedText: $editedText,
+                    isPresented: $showEditSheet,
+                    onSave: saveEdit
+                )
+            }
+        }
+        .onChange(of: showEditSheet) { _, newValue in
+            if !newValue {
+                notesViewModel.isEditingNote = false
+            }
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
@@ -320,6 +327,7 @@ struct CleanNotesView: View {
                     filterPill(for: filter)
                 }
             }
+            .padding(.horizontal, 1) // Small padding to prevent clipping
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedFilter)
     }
@@ -356,11 +364,11 @@ struct CleanNotesView: View {
     }
     
     private var contentSections: some View {
-        VStack(spacing: 36) {
+        VStack(spacing: 24) {
             ForEach(groupedItems.indices, id: \.self) { index in
                 let section = groupedItems[index].0
                 let items = groupedItems[index].1
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
                     // Section Header (collapsible for By Book filter)
                     Button {
                         if selectedFilter == .byBook {
@@ -374,7 +382,7 @@ struct CleanNotesView: View {
                             HapticManager.shared.lightTap()
                         }
                     } label: {
-                        HStack(alignment: .center, spacing: 8) {
+                        HStack(alignment: .center, spacing: 12) {
                             if selectedFilter == .byBook {
                                 Image(systemName: collapsedSections.contains(section) ? "chevron.right" : "chevron.down")
                                     .font(.system(size: 14, weight: .medium))
@@ -382,13 +390,28 @@ struct CleanNotesView: View {
                                     .frame(width: 20)
                             }
                             
-                            Text(section)
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundStyle(.white)
+                            // Book title with refined typography
+                            Text(section.uppercased())
+                                .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                                .kerning(0.6)
+                                .foregroundStyle(.white.opacity(0.9))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             
-                            Text("(\(items.count))")
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.4))
+                            // Count badge with monospaced font
+                            Text("\(items.count)")
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Circle()
+                                        .fill(Color.white.opacity(0.12))
+                                )
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                                )
                             
                             Spacer()
                         }
@@ -432,34 +455,9 @@ struct CleanNotesView: View {
     
     private func noteCard(note: Note) -> some View {
         let capturedNote = capturedNotes.first { $0.id == note.id }
-        return noteCardContent(note: note)
+        return noteCardContent(note: note, capturedNote: capturedNote)
             .contentShape(Rectangle())
-            .onLongPressGesture {
-                // Navigate to session summary if from ambient session
-                if let captured = capturedNote, captured.source == .ambient {
-                    selectedSessionNote = captured
-                    showingSessionSummary = true
-                    HapticManager.shared.mediumTap()
-                }
-            }
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button(role: .destructive) {
-                    if let captured = capturedNote {
-                        deleteNote(captured)
-                    }
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-                
-                Button {
-                    if let captured = capturedNote {
-                        shareNote(note)
-                    }
-                } label: {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-                .tint(Color.blue)
-                
+            .contextMenu {
                 Button {
                     if let captured = capturedNote {
                         startEdit(note: captured)
@@ -467,59 +465,110 @@ struct CleanNotesView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                .tint(Color.orange)
+                
+                Button {
+                    shareNote(note)
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                
+                Divider()
+                
+                Button(role: .destructive) {
+                    if let captured = capturedNote {
+                        deleteNote(captured)
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
             }
     }
     
-    private func noteCardContent(note: Note) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Timestamp header
-            Text(formatDate(note.dateCreated))
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(.white.opacity(0.5))
+    private func noteCardContent(note: Note, capturedNote: CapturedNote? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Timestamp header - more refined typography
+            Text(formatDate(note.dateCreated).uppercased())
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .kerning(1.2)
+                .foregroundStyle(
+                    capturedNote?.source == .ambient 
+                        ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
+                        : .white.opacity(0.4)
+                )
             
-            // Content
+            // Content with better typography
             Text(note.content)
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(.white)
+                .font(.system(size: 16, weight: .regular, design: .default))
+                .foregroundStyle(.white.opacity(0.95))
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(4)
+                .lineSpacing(6)
             
-            // Book context if available
+            // Book context with refined styling
             if let bookTitle = note.bookTitle {
-                HStack(spacing: 4) {
-                    Text("re:")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.5))
+                VStack(alignment: .leading, spacing: 4) {
+                    // Subtle divider
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0),
+                                    Color.white.opacity(0.1),
+                                    Color.white.opacity(0)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(height: 0.5)
+                        .padding(.vertical, 8)
                     
-                    Text(bookTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.7))
-                    
-                    if let author = note.author {
-                        Text("•")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.white.opacity(0.3))
+                    // Attribution stack
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(bookTitle.uppercased())
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .kerning(0.8)
+                            .foregroundStyle(.white.opacity(0.7))
                         
-                        Text(author)
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.6))
+                        if let author = note.author {
+                            Text(author.uppercased())
+                                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                .kerning(0.6)
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
                     }
                 }
                 .padding(.top, 4)
             }
         }
-        .padding(20)
+        .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.04))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
         )
+        .onTapGesture(count: 2) {
+            // Double tap to show session summary for ambient notes
+            if let captured = capturedNote, captured.source == .ambient {
+                selectedSessionNote = captured
+                showingSessionSummary = true
+                HapticManager.shared.mediumTap()
+            }
+        }
     }
     
     private func quoteCard(quote: CapturedQuote) -> some View {
@@ -537,19 +586,19 @@ struct CleanNotesView: View {
         
         return SimpleQuoteCard(note: note)
             .contentShape(Rectangle())
-            .onLongPressGesture {
-                // Navigate to session summary if from ambient session
+            .onTapGesture(count: 2) {
+                // Double tap to show session summary for ambient quotes
                 if quote.source == .ambient {
                     selectedSessionQuote = quote
                     showingSessionSummary = true
                     HapticManager.shared.mediumTap()
                 }
             }
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button(role: .destructive) {
-                    deleteQuote(quote)
+        .contextMenu {
+                Button {
+                    startEdit(quote: quote)
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label("Edit", systemImage: "pencil")
                 }
                 
                 Button {
@@ -557,14 +606,14 @@ struct CleanNotesView: View {
                 } label: {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
-                .tint(Color.blue)
                 
-                Button {
-                    startEdit(quote: quote)
+                Divider()
+                
+                Button(role: .destructive) {
+                    deleteQuote(quote)
                 } label: {
-                    Label("Edit", systemImage: "pencil")
+                    Label("Delete", systemImage: "trash")
                 }
-                .tint(Color.orange)
             }
     }
     
@@ -651,6 +700,7 @@ struct CleanNotesView: View {
         editingNote = note
         editingQuote = nil
         editedText = note.content
+        notesViewModel.isEditingNote = true
         showEditSheet = true
         HapticManager.shared.lightTap()
     }
@@ -659,6 +709,7 @@ struct CleanNotesView: View {
         editingQuote = quote
         editingNote = nil
         editedText = quote.text
+        notesViewModel.isEditingNote = true
         showEditSheet = true
         HapticManager.shared.lightTap()
     }
@@ -680,6 +731,7 @@ struct CleanNotesView: View {
         editingNote = nil
         editingQuote = nil
         editedText = ""
+        notesViewModel.isEditingNote = false
         showEditSheet = false
     }
     
