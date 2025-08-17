@@ -30,6 +30,7 @@ struct AmbientModeView: View {
     @State private var showLiveTranscription = true
     @State private var currentSession: AmbientSession?
     @State private var showingSessionSummary = false
+    @State private var sessionStartTime: Date?
     @State private var isEditingTranscription = false
     @State private var editableTranscription = ""
     @FocusState private var isTranscriptionFocused: Bool
@@ -853,8 +854,12 @@ struct AmbientModeView: View {
     // MARK: - Actions
     
     private func startAmbientExperience() {
+        // Record when the session actually starts
+        sessionStartTime = Date()
+        
         // Create the session at the START
         let session = AmbientSession(book: currentBookContext)
+        session.startTime = sessionStartTime! // Use the actual start time
         currentSession = session
         modelContext.insert(session)
         
@@ -1106,6 +1111,11 @@ struct AmbientModeView: View {
     private func createSession() -> AmbientSession {
         // Use existing session or create new one if somehow missing
         let session = currentSession ?? AmbientSession(book: currentBookContext)
+        
+        // Ensure the correct start and end times
+        if let startTime = sessionStartTime {
+            session.startTime = startTime
+        }
         session.endTime = Date()
         
         print("📊 Creating session with \(processor.detectedContent.count) items")

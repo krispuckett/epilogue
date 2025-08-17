@@ -89,8 +89,6 @@ public class TrueAmbientProcessor: ObservableObject {
     // NEW: Optimized components for App Store quality
     private let deduplicator = ContentDeduplicator()
     private let persistenceLayer = AmbientPersistenceLayer()
-    private let responseCache = AmbientResponseCache.shared
-    private let aiOrchestrator = AmbientAIOrchestrator()
     
     // iOS 26 Foundation Models
     #if canImport(FoundationModels)
@@ -1197,21 +1195,37 @@ extension TrueAmbientProcessor {
             return
         }
         
-        // Use optimized AI orchestrator for instant + enhanced responses
+        // Use AICompanionService directly for reliable responses
         let bookContext = AmbientBookDetector.shared.detectedBook
         
-        logger.info("🤖 Calling AI orchestrator for: \(question.prefix(50))...")
+        logger.info("🤖 Calling AICompanionService for: \(question.prefix(50))...")
         
-        // Get AI response with instant local + enhanced cloud strategy
-        let (instantResponse, enhancedResponse) = await aiOrchestrator.getResponse(
-            for: question,
-            bookContext: bookContext
-        )
+        guard AICompanionService.shared.isConfigured() else {
+            logger.error("❌ AI service not configured")
+            
+            await MainActor.run {
+                if let existingIndex = self.detectedContent.firstIndex(where: { 
+                    $0.type == .question && 
+                    $0.text == question && 
+                    $0.response == nil 
+                }) {
+                    self.detectedContent[existingIndex].response = "Please configure your Perplexity API key in Settings"
+                    logger.info("⚡ Updated question #\(existingIndex) with config error")
+                }
+            }
+            return
+        }
         
-        logger.info("🤖 AI orchestrator returned - Instant: \(instantResponse != nil), Enhanced: \(enhancedResponse != nil)")
-        
-        // Update UI with instant response (if available)
-        if let instant = instantResponse {
+        do {
+            let response = try await AICompanionService.shared.processMessage(
+                question,
+                bookContext: bookContext,
+                conversationHistory: []
+            )
+            
+            logger.info("✅ Got AI response: \(response.prefix(50))...")
+            
+            // Update UI with response
             await MainActor.run {
                 // Update ALL matching questions (handles partial questions)
                 for index in self.detectedContent.indices {
@@ -1220,54 +1234,16 @@ extension TrueAmbientProcessor {
                         self.detectedContent[index].text.contains(question) ||
                         question.contains(self.detectedContent[index].text)) &&
                        self.detectedContent[index].response == nil {
-                        self.detectedContent[index].response = instant
+                        self.detectedContent[index].response = response
                         logger.info("⚡ Updated question #\(index) with response")
                     }
                 }
             }
             
             // Update in persistence layer
-            await persistenceLayer.updateQuestionAnswer(questionText: question, answer: instant)
-        }
-        
-        // Update with enhanced response when available
-        if let enhanced = enhancedResponse {
-            await MainActor.run {
-                // Update ALL matching questions
-                for index in self.detectedContent.indices {
-                    if self.detectedContent[index].type == .question &&
-                       (self.detectedContent[index].text == question ||
-                        self.detectedContent[index].text.contains(question) ||
-                        question.contains(self.detectedContent[index].text)) {
-                        self.detectedContent[index].response = enhanced
-                        logger.info("✨ Updated question #\(index) with enhanced response")
-                    }
-                }
-                
-                // Cache for future instant access
-                self.responseCache.cacheResponse(enhanced, for: question, bookContext: bookContext?.title, source: .cloud)
-            }
+            await persistenceLayer.updateQuestionAnswer(questionText: question, answer: response)
             
-            // Update in persistence layer with enhanced response
-            await persistenceLayer.updateQuestionAnswer(questionText: question, answer: enhanced)
-        }
-        
-        // Fallback if no response available
-        if instantResponse == nil && enhancedResponse == nil {
-            await MainActor.run {
-                if let existingIndex = self.detectedContent.firstIndex(where: { 
-                    $0.type == .question && 
-                    $0.text == question && 
-                    $0.response == nil 
-                }) {
-                    self.detectedContent[existingIndex].response = "I'm thinking about your question. Let me process that..."
-                    logger.warning("No AI response available for: \(question)")
-                }
-            }
-        }
-        
-        // Add to conversation memory for context
-        if let finalResponse = enhancedResponse ?? instantResponse {
+            // Add to conversation memory for context
             _ = conversationMemory.addMemory(
                 text: question,
                 intent: EnhancedIntent(
@@ -1277,15 +1253,29 @@ extension TrueAmbientProcessor {
                     sentiment: .neutral,
                     subIntents: []
                 ),
-                response: finalResponse,
+                response: response,
                 bookTitle: bookContext?.title,
                 bookAuthor: bookContext?.author
             )
-        }
-        
-        // Audio feedback if enabled  
-        if QuestionSettings.audioFeedbackEnabled, let response = enhancedResponse ?? instantResponse {
-            await speakResponse(response)
+            
+            // Audio feedback if enabled  
+            if QuestionSettings.audioFeedbackEnabled {
+                await speakResponse(response)
+            }
+            
+        } catch {
+            logger.error("❌ AI processing failed: \(error)")
+            
+            await MainActor.run {
+                if let existingIndex = self.detectedContent.firstIndex(where: { 
+                    $0.type == .question && 
+                    $0.text == question && 
+                    $0.response == nil 
+                }) {
+                    self.detectedContent[existingIndex].response = "Error: \(error.localizedDescription)"
+                    logger.info("⚡ Updated question #\(existingIndex) with error")
+                }
+            }
         }
     }
     
