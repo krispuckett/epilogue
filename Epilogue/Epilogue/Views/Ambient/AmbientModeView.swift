@@ -793,8 +793,21 @@ struct AmbientModeView: View {
             }
         )
         
-        if let existingQuestions = try? modelContext.fetch(fetchRequest), !existingQuestions.isEmpty {
-            print("⚠️ Question already exists, skipping save: \(cleanText.prefix(30))...")
+        if let existingQuestions = try? modelContext.fetch(fetchRequest), 
+           let existingQuestion = existingQuestions.first {
+            // Update answer if we have a response
+            if let response = content.response, existingQuestion.answer == nil {
+                existingQuestion.answer = response
+                existingQuestion.isAnswered = true
+                do {
+                    try modelContext.save()
+                    print("✅ Updated question with answer: \(cleanText.prefix(30))...")
+                } catch {
+                    print("❌ Failed to update question: \(error)")
+                }
+            } else {
+                print("⚠️ Question already exists with answer: \(cleanText.prefix(30))...")
+            }
             return
         }
         
@@ -1115,8 +1128,14 @@ struct AmbientModeView: View {
             case .question:
                 // For questions, also check if it's saved with answer property
                 if let question = findQuestion(matching: item.text) {
+                    // Make sure the question has the latest answer
+                    if let response = item.response, question.answer == nil {
+                        question.answer = response
+                        question.isAnswered = true
+                    }
+                    question.ambientSession = session
                     session.capturedQuestions.append(question)
-                    print("✅ Added question to session: \(item.text)")
+                    print("✅ Added question to session: \(item.text) with answer: \(question.answer != nil)")
                 } else {
                     // Create a new question if not found
                     let bookModel: BookModel? = nil // We'd need to convert Book to BookModel

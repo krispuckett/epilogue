@@ -198,14 +198,14 @@ struct AmbientSessionSummaryView: View {
     private var metricsSection: some View {
         HStack(spacing: 32) {
             metricItem(value: formatDuration(session.duration), label: "DURATION")
-            if session.questions.count > 0 {
-                metricItem(value: "\(session.questions.count)", label: "QUESTIONS")
+            if session.capturedQuestions.count > 0 {
+                metricItem(value: "\(session.capturedQuestions.count)", label: "QUESTIONS")
             }
-            if session.quotes.count > 0 {
-                metricItem(value: "\(session.quotes.count)", label: "QUOTES")
+            if session.capturedQuotes.count > 0 {
+                metricItem(value: "\(session.capturedQuotes.count)", label: "QUOTES")
             }
-            if session.notes.count > 0 {
-                metricItem(value: "\(session.notes.count)", label: "NOTES")
+            if session.capturedNotes.count > 0 {
+                metricItem(value: "\(session.capturedNotes.count)", label: "NOTES")
             }
         }
         .padding(.horizontal, 20)
