@@ -134,7 +134,7 @@ class ResponseSynthesizer: ObservableObject {
         } else {
             // Fallback to Smart AI for quick response
             if let book = bookContext {
-                SmartEpilogueAI.shared.setActiveBook(book.toBookModel())
+                SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
             }
             
             let localResponse = await SmartEpilogueAI.shared.smartQuery(query)

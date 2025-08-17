@@ -7,10 +7,18 @@ class IntelligentQueryRouter {
     static let shared = IntelligentQueryRouter()
     private let logger = Logger(subsystem: "com.epilogue", category: "QueryRouter")
     
-    enum QueryType {
+    enum QueryType: CustomStringConvertible {
         case bookContent      // 0.6ms local
         case currentEvents    // Needs Perplexity
         case hybrid          // Both needed
+        
+        var description: String {
+            switch self {
+            case .bookContent: return "bookContent"
+            case .currentEvents: return "currentEvents" 
+            case .hybrid: return "hybrid"
+            }
+        }
     }
     
     private init() {}
@@ -80,7 +88,7 @@ class IntelligentQueryRouter {
             
             // Set book context for SmartEpilogueAI
             if let book = bookContext {
-                SmartEpilogueAI.shared.setActiveBook(book.toBookModel())
+                SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
             }
             
             let response = await SmartEpilogueAI.shared.smartQuery(query)
@@ -94,7 +102,7 @@ class IntelligentQueryRouter {
             
             do {
                 let service = PerplexityService()
-                let response = try await service.chat(message: query, bookContext: bookContext)
+                let response = try await service.chat(with: query, bookContext: bookContext)
                 return response
             } catch {
                 logger.error("❌ Perplexity failed: \(error)")
@@ -108,7 +116,7 @@ class IntelligentQueryRouter {
             
             // Set book context
             if let book = bookContext {
-                SmartEpilogueAI.shared.setActiveBook(book.toBookModel())
+                SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
             }
             
             // Execute in parallel
@@ -128,7 +136,7 @@ class IntelligentQueryRouter {
     private func fetchWebResult(_ query: String, bookContext: Book?) async -> String? {
         do {
             let service = PerplexityService()
-            return try await service.chat(message: query, bookContext: bookContext)
+            return try await service.chat(with: query, bookContext: bookContext)
         } catch {
             logger.error("❌ Web fetch failed: \(error)")
             return nil
@@ -171,7 +179,7 @@ class IntelligentQueryRouter {
         ]
         
         // Preload local AI with book context
-        SmartEpilogueAI.shared.setActiveBook(book.toBookModel())
+        SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
         
         for question in commonQuestions {
             _ = await SmartEpilogueAI.shared.smartQuery(question)
@@ -182,7 +190,7 @@ class IntelligentQueryRouter {
 
 // Extension to convert Book to BookModel if needed
 extension Book {
-    func toBookModel() -> BookModel {
+    func toIntelligentBookModel() -> BookModel {
         return BookModel(from: self)
     }
 }

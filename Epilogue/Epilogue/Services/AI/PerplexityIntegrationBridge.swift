@@ -16,7 +16,7 @@ extension IntelligentQueryRouter {
             logger.info("📚 Using local AI for book content")
             
             if let book = bookContext {
-                SmartEpilogueAI.shared.setActiveBook(book.toBookModel())
+                SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
             }
             
             // Check if Foundation Models are available for enhanced local processing
