@@ -165,12 +165,13 @@ final class LocalAIService {
             // Initialize iOS 26 Foundation Models
             self.languageModel = SystemLanguageModel.default
             self.modelSession = LanguageModelSession(
-                instructions: """You are a helpful AI assistant discussing literature and books.
+                instructions: """
+                You are a helpful AI assistant discussing literature and books.
                 ALWAYS answer questions about books factually and helpfully.
                 Do NOT refuse to answer questions about book content.
                 The user is reading these books and wants to discuss them.
                 Be direct, factual, and helpful with all answers.
-                For Lord of the Rings questions, provide accurate lore and character information."""
+                """
             )
             logger.info("✅ iOS 26 Foundation Models initialized")
         }

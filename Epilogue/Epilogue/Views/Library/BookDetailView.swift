@@ -113,19 +113,9 @@ struct BookDetailView: View {
     }
     
     private var accentColor: Color {
-        // Use the book's accent color but ensure it's bright enough
-        if let accent = colorPalette?.accent {
-            let uiColor = UIColor(accent)
-            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
-            
-            // Ensure accent is bright enough to stand out on dark background
-            if b < 0.7 {
-                return Color(hue: h, saturation: s, brightness: 0.8, opacity: a)
-            }
-            return accent
-        }
-        return .orange
+        // ALWAYS use our warm orange for UI elements
+        // Never use book colors - they often clash horribly
+        return Color(red: 1.0, green: 0.55, blue: 0.26)
     }
     
     private var shadowColor: Color {
@@ -195,7 +185,7 @@ struct BookDetailView: View {
             
             // Content - always visible but colors update
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollView(.vertical) {
                     VStack(spacing: 0) {
                         // Scroll detector with FIXED calculation
                         GeometryReader { geo in
