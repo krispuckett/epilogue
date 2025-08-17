@@ -567,7 +567,7 @@ struct FollowUpQuestionsSection: View {
         } label: {
             HStack {
                 Image(systemName: "questionmark.circle")
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 
                 Text(question)
                     .font(.subheadline)
