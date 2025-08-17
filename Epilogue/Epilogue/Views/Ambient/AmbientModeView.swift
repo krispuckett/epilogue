@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import Combine
+import OSLog
+
+private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
 // MARK: - Fixed Ambient Mode View (Keeping Original Gradients!)
 struct AmbientModeView: View {
@@ -1080,14 +1083,16 @@ struct AmbientModeView: View {
         dismiss()
         
         // Process session end in background AFTER dismissal
-        Task.detached { [weak self] in
-            guard let self = self else { return }
+        Task.detached {
+            // Capture values we need before dismissal
+            let processor = self.processor
+            let voiceManager = self.voiceManager
             
             // Stop voice first (non-blocking)
-            await self.voiceManager.stopListening()
+            await voiceManager.stopListening()
             
             // Stop recording immediately
-            await MainActor.run {
+            await MainActor.run { [self] in
                 self.isRecording = false
                 self.liveTranscription = ""
                 self.showLiveTranscription = false
@@ -1096,23 +1101,21 @@ struct AmbientModeView: View {
             }
             
             // Get summary data before ending session
-            if !self.processor.detectedContent.isEmpty {
+            let detectedContent = await MainActor.run { processor.detectedContent }
+            if !detectedContent.isEmpty {
                 // Create the session in background
-                let session = await MainActor.run { self.createSession() }
+                let session = await MainActor.run { [self] in self.createSession() }
                 
                 // Only show summary if there's meaningful content
                 if session.capturedQuestions.count > 0 || session.capturedQuotes.count > 0 || session.capturedNotes.count > 0 {
-                    await MainActor.run {
-                        self.currentSession = session
-                        // Navigate to summary view or show sheet
-                        // This happens AFTER the view is already dismissed
-                        self.showingSessionSummary = true
-                    }
+                    // Note: Cannot update view state after dismissal in a detached task
+                    // The summary should be handled before dismissal
+                    logger.info("Session has meaningful content but view is dismissed")
                 }
             }
             
             // End session
-            await self.processor.endSession()
+            await processor.endSession()
         }
     }
     
