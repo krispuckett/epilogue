@@ -1064,21 +1064,30 @@ extension TrueAmbientProcessor {
     
     // Process question with enhanced context
     private func processQuestionWithEnhancedContext(_ question: String, confidence: Float, enhancedIntent: EnhancedIntent) async {
-        // Debounce - wait a bit to see if more text is coming
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        // Wait for question to complete (voice recognition sends many partials)
+        try? await Task.sleep(nanoseconds: 800_000_000) // 0.8 seconds
         
-        // Check if this question has been superseded by a longer version
-        let currentQuestion = await MainActor.run {
-            self.detectedContent.first { content in
+        // Find the most complete version of this question
+        let mostCompleteQuestion = await MainActor.run { () -> String? in
+            // Find all related questions (partial or complete)
+            let relatedQuestions = self.detectedContent.filter { content in
                 content.type == .question &&
                 content.response == nil &&
-                (content.text == question || content.text.contains(question) || question.contains(content.text))
-            }?.text
+                (content.text.contains(question) || question.contains(content.text) ||
+                 content.text.lowercased().contains("elf") && question.lowercased().contains("elf"))
+            }
+            
+            // Return the longest one
+            return relatedQuestions.max(by: { $0.text.count < $1.text.count })?.text
         }
         
-        // If there's a longer version, skip this one
-        if let currentQuestion = currentQuestion, currentQuestion.count > question.count {
-            logger.info("🆙 Skipping partial question, longer version exists: \(currentQuestion.prefix(30))")
+        // If we found a more complete version, skip this partial
+        if let complete = mostCompleteQuestion, complete != question {
+            logger.info("🆙 Skipping partial, using complete: \(complete.prefix(50))")
+            // Remove this partial from detectedContent
+            await MainActor.run {
+                self.detectedContent.removeAll { $0.type == .question && $0.text == question }
+            }
             return
         }
         

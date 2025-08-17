@@ -1710,7 +1710,10 @@ struct StatusPill: View {
         .foregroundColor(.white)  // Always white text
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .glassEffect(in: Capsule(), tint: color.opacity(0.3))  // iOS 26 glass with tint
+        .glassEffect(
+            .regular.tint(color.opacity(0.3)),
+            in: Capsule()
+        )
     }
 }
 
