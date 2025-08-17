@@ -17,14 +17,14 @@ extension IntelligentQueryRouter {
             extensionLogger.info("📚 Using local AI for book content")
             
             if let book = bookContext {
-                Epilogue.SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
+                SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
             }
             
             // Check if Foundation Models are available for enhanced local processing
-            if Epilogue.FoundationModelsManager.shared.isAvailable() {
-                return await Epilogue.FoundationModelsManager.shared.processQuery(query, bookContext: bookContext)
+            if FoundationModelsManager.shared.isAvailable() {
+                return await FoundationModelsManager.shared.processQuery(query, bookContext: bookContext)
             } else {
-                return await Epilogue.SmartEpilogueAI.shared.smartQuery(query)
+                return await SmartEpilogueAI.shared.smartQuery(query)
             }
             
         case .currentEvents, .hybrid:
@@ -35,7 +35,7 @@ extension IntelligentQueryRouter {
             var citations: [Citation] = []
             
             do {
-                for try await response in Epilogue.OptimizedPerplexityService.shared.streamSonarResponse(query, bookContext: bookContext) {
+                for try await response in OptimizedPerplexityService.shared.streamSonarResponse(query, bookContext: bookContext) {
                     fullResponse = response.text
                     citations = response.citations
                     
@@ -101,14 +101,14 @@ extension TrueAmbientProcessor {
         let extensionLogger = Logger(subsystem: "com.epilogue", category: "AmbientStreaming")
         
         // Check if we need web access
-        if Epilogue.IntelligentQueryRouter.shared.needsWebAccess(question) {
+        if IntelligentQueryRouter.shared.needsWebAccess(question) {
             extensionLogger.info("🌐 Question needs web access, using Optimized Perplexity")
             
             var fullResponse = ""
             var streamStarted = false
             
             do {
-                for try await response in Epilogue.OptimizedPerplexityService.shared.streamSonarResponse(question, bookContext: bookContext) {
+                for try await response in OptimizedPerplexityService.shared.streamSonarResponse(question, bookContext: bookContext) {
                     if !streamStarted {
                         extensionLogger.info("🚀 Stream started, model: \(response.model)")
                         streamStarted = true
@@ -134,7 +134,7 @@ extension TrueAmbientProcessor {
         } else {
             // Use local processing for speed
             extensionLogger.info("📚 Using local processing for instant response")
-            return await Epilogue.IntelligentQueryRouter.shared.processWithParallelism(question, bookContext: bookContext)
+            return await IntelligentQueryRouter.shared.processWithParallelism(question, bookContext: bookContext)
         }
     }
     
@@ -168,20 +168,20 @@ extension AICompanionService {
         let extensionLogger = Logger(subsystem: "com.epilogue", category: "AICompanionOptimized")
         
         // Try Foundation Models first for local processing
-        if Epilogue.FoundationModelsManager.shared.isAvailable() {
+        if FoundationModelsManager.shared.isAvailable() {
             extensionLogger.info("🤖 Using Foundation Models for local processing")
             
             // Stream with Foundation Models
             var fullResponse = ""
-            for try await chunk in Epilogue.FoundationModelsManager.shared.streamResponse(message, bookContext: bookContext) {
+            for try await chunk in FoundationModelsManager.shared.streamResponse(message, bookContext: bookContext) {
                 fullResponse += chunk
             }
             
             // Check if we need to enhance with web data
-            if Epilogue.IntelligentQueryRouter.shared.needsWebAccess(message) {
+            if IntelligentQueryRouter.shared.needsWebAccess(message) {
                 extensionLogger.info("🔄 Enhancing with web data")
                 
-                let webResponse = try await Epilogue.OptimizedPerplexityService.shared.chat(
+                let webResponse = try await OptimizedPerplexityService.shared.chat(
                     message: message,
                     bookContext: bookContext
                 )
@@ -200,7 +200,7 @@ extension AICompanionService {
             // Use Optimized Perplexity as primary
             extensionLogger.info("🌐 Using Optimized Perplexity as primary service")
             
-            return try await Epilogue.OptimizedPerplexityService.shared.chat(
+            return try await OptimizedPerplexityService.shared.chat(
                 message: message,
                 bookContext: bookContext
             )
@@ -262,7 +262,7 @@ class PerplexityPerformanceMonitor {
         
         // Log cache stats
         Task {
-            let stats = await Epilogue.OptimizedPerplexityService.shared.getCacheStats()
+            let stats = await OptimizedPerplexityService.shared.getCacheStats()
             let hitRate = Double(stats.hits) / Double(stats.hits + stats.misses) * 100
             monitorLogger.info("  Cache: \(stats.hits) hits, \(stats.misses) misses (\(String(format: "%.1f", hitRate))% hit rate)")
         }
