@@ -8,12 +8,13 @@ extension IntelligentQueryRouter {
     
     // Enhanced processing with optimized Perplexity streaming
     func processWithOptimizedStreaming(_ query: String, bookContext: Book?) async -> String {
+        let extensionLogger = Logger(subsystem: "com.epilogue", category: "QueryRouter")
         let queryType = analyzeQuery(query, bookContext: bookContext)
         
         switch queryType {
         case .bookContent:
             // Use local AI for book-specific content
-            logger.info("📚 Using local AI for book content")
+            extensionLogger.info("📚 Using local AI for book content")
             
             if let book = bookContext {
                 SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
@@ -28,7 +29,7 @@ extension IntelligentQueryRouter {
             
         case .currentEvents, .hybrid:
             // Use optimized Perplexity with streaming and citations
-            logger.info("🌐 Using Optimized Perplexity with citations")
+            extensionLogger.info("🌐 Using Optimized Perplexity with citations")
             
             var fullResponse = ""
             var citations: [Citation] = []
@@ -40,9 +41,9 @@ extension IntelligentQueryRouter {
                     
                     // Log performance metrics
                     if response.cached {
-                        logger.info("💨 Served from cache with \(citations.count) citations")
+                        extensionLogger.info("💨 Served from cache with \(citations.count) citations")
                     } else {
-                        logger.info("📊 Confidence: \(String(format: "%.2f", response.confidence)), Citations: \(citations.count)")
+                        extensionLogger.info("📊 Confidence: \(String(format: "%.2f", response.confidence)), Citations: \(citations.count)")
                     }
                 }
                 
@@ -54,7 +55,7 @@ extension IntelligentQueryRouter {
                 return fullResponse
                 
             } catch {
-                logger.error("❌ Optimized streaming failed: \(error)")
+                extensionLogger.error("❌ Optimized streaming failed: \(error)")
                 // Fallback to standard processing
                 return await processWithParallelism(query, bookContext: bookContext)
             }
@@ -97,11 +98,11 @@ extension TrueAmbientProcessor {
     
     // Enhanced processing with streaming and citations
     func processQuestionWithStreaming(_ question: String, bookContext: Book?) async -> String {
-        let logger = Logger(subsystem: "com.epilogue", category: "AmbientStreaming")
+        let extensionLogger = Logger(subsystem: "com.epilogue", category: "AmbientStreaming")
         
         // Check if we need web access
         if IntelligentQueryRouter.shared.needsWebAccess(question) {
-            logger.info("🌐 Question needs web access, using Optimized Perplexity")
+            extensionLogger.info("🌐 Question needs web access, using Optimized Perplexity")
             
             var fullResponse = ""
             var streamStarted = false
@@ -109,7 +110,7 @@ extension TrueAmbientProcessor {
             do {
                 for try await response in OptimizedPerplexityService.shared.streamSonarResponse(question, bookContext: bookContext) {
                     if !streamStarted {
-                        logger.info("🚀 Stream started, model: \(response.model)")
+                        extensionLogger.info("🚀 Stream started, model: \(response.model)")
                         streamStarted = true
                     }
                     
@@ -126,13 +127,13 @@ extension TrueAmbientProcessor {
                 return fullResponse
                 
             } catch {
-                logger.error("❌ Streaming failed: \(error)")
+                extensionLogger.error("❌ Streaming failed: \(error)")
                 return "I'm having trouble processing your question. Please try again."
             }
             
         } else {
             // Use local processing for speed
-            logger.info("📚 Using local processing for instant response")
+            extensionLogger.info("📚 Using local processing for instant response")
             return await IntelligentQueryRouter.shared.processWithParallelism(question, bookContext: bookContext)
         }
     }
@@ -142,12 +143,16 @@ extension TrueAmbientProcessor {
             if let index = detectedContent.firstIndex(where: { $0.text == question && $0.type == .question }) {
                 detectedContent[index].response = partialResponse
                 
-                // Add citation indicators if available
+                // Add citation count to response text if available
                 if !citations.isEmpty {
-                    detectedContent[index].metadata = [
-                        "citations": citations.count,
-                        "topCredibility": citations.map { $0.credibilityScore }.max() ?? 0.0
-                    ]
+                    let citationCount = citations.count
+                    let topCredibility = citations.map { $0.credibilityScore }.max() ?? 0.0
+                    let citationInfo = " [\(citationCount) sources, \(String(format: "%.0f", topCredibility * 100))% credibility]"
+                    
+                    // Only add citation info if not already present
+                    if !partialResponse.contains("[") {
+                        detectedContent[index].response = partialResponse + citationInfo
+                    }
                 }
             }
         }
@@ -160,11 +165,11 @@ extension AICompanionService {
     
     // Enhanced chat with streaming and citations
     func chatWithOptimizedStreaming(message: String, bookContext: Book?) async throws -> String {
-        let logger = Logger(subsystem: "com.epilogue", category: "AICompanionOptimized")
+        let extensionLogger = Logger(subsystem: "com.epilogue", category: "AICompanionOptimized")
         
         // Try Foundation Models first for local processing
         if FoundationModelsManager.shared.isAvailable() {
-            logger.info("🤖 Using Foundation Models for local processing")
+            extensionLogger.info("🤖 Using Foundation Models for local processing")
             
             // Stream with Foundation Models
             var fullResponse = ""
@@ -174,7 +179,7 @@ extension AICompanionService {
             
             // Check if we need to enhance with web data
             if IntelligentQueryRouter.shared.needsWebAccess(message) {
-                logger.info("🔄 Enhancing with web data")
+                extensionLogger.info("🔄 Enhancing with web data")
                 
                 let webResponse = try await OptimizedPerplexityService.shared.chat(
                     message: message,
@@ -193,7 +198,7 @@ extension AICompanionService {
             
         } else {
             // Use Optimized Perplexity as primary
-            logger.info("🌐 Using Optimized Perplexity as primary service")
+            extensionLogger.info("🌐 Using Optimized Perplexity as primary service")
             
             return try await OptimizedPerplexityService.shared.chat(
                 message: message,
@@ -205,9 +210,10 @@ extension AICompanionService {
 
 // MARK: - Performance Monitoring
 
+@MainActor
 class PerplexityPerformanceMonitor {
     static let shared = PerplexityPerformanceMonitor()
-    private let logger = Logger(subsystem: "com.epilogue", category: "PerformanceMetrics")
+    private let monitorLogger = Logger(subsystem: "com.epilogue", category: "PerformanceMetrics")
     
     private var metrics: [String: [TimeInterval]] = [:]
     
@@ -224,7 +230,7 @@ class PerplexityPerformanceMonitor {
         
         // Log if latency exceeds threshold
         if latency > 1.0 {
-            logger.warning("⚠️ High latency for \(operation): \(String(format: "%.2f", latency))s")
+            monitorLogger.warning("⚠️ High latency for \(operation): \(String(format: "%.2f", latency))s")
         }
     }
     
@@ -245,12 +251,12 @@ class PerplexityPerformanceMonitor {
     }
     
     func logPerformanceSummary() {
-        logger.info("📊 Performance Summary:")
+        monitorLogger.info("📊 Performance Summary:")
         
         for (operation, measurements) in metrics {
             if let avg = getAverageLatency(for: operation),
                let p95 = getP95Latency(for: operation) {
-                logger.info("  \(operation): avg=\(String(format: "%.2f", avg))s, p95=\(String(format: "%.2f", p95))s")
+                monitorLogger.info("  \(operation): avg=\(String(format: "%.2f", avg))s, p95=\(String(format: "%.2f", p95))s")
             }
         }
         
@@ -258,7 +264,7 @@ class PerplexityPerformanceMonitor {
         Task {
             let stats = await OptimizedPerplexityService.shared.getCacheStats()
             let hitRate = Double(stats.hits) / Double(stats.hits + stats.misses) * 100
-            logger.info("  Cache: \(stats.hits) hits, \(stats.misses) misses (\(String(format: "%.1f", hitRate))% hit rate)")
+            monitorLogger.info("  Cache: \(stats.hits) hits, \(stats.misses) misses (\(String(format: "%.1f", hitRate))% hit rate)")
         }
     }
 }
