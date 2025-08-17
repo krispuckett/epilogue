@@ -402,15 +402,15 @@ struct BookDetailView: View {
                         .tint(accentColor)
                     }
                 } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8)
+                    StatusPill(text: book.readingStatus.rawValue, color: Color(red: 1.0, green: 0.55, blue: 0.26), interactive: true)
+                        .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 8)
                 }
                 .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 // Page count and percentage removed per user request
                 
                 if let rating = book.userRating {
-                    StatusPill(text: "★ \(rating)", color: accentColor.opacity(0.8))
+                    StatusPill(text: "★ \(rating)", color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
                         .accessibilityLabel("Rating: \(rating) stars")
                 }
             }
@@ -1696,11 +1696,10 @@ struct StatusPill: View {
         .foregroundColor(.white)  // Always white text
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(color.opacity(0.3))  // Use color as background
-        .clipShape(Capsule())
+        .glassEffect(in: Capsule())  // Use glass effect instead of color background
         .overlay {
             Capsule()
-                .strokeBorder(color.opacity(0.5), lineWidth: 0.5)
+                .strokeBorder(color.opacity(0.3), lineWidth: 0.5)
         }
     }
 }

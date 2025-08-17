@@ -1013,6 +1013,25 @@ extension TrueAmbientProcessor {
         return false
     }
     
+    // Check if two questions are essentially the same (for UI deduplication)
+    private func isSimilarQuestion(_ q1: String, to q2: String) -> Bool {
+        let normalized1 = q1.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized2 = q2.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Exact match
+        if normalized1 == normalized2 { return true }
+        
+        // One is a prefix of the other (evolving question)
+        if normalized1.hasPrefix(normalized2) || normalized2.hasPrefix(normalized1) {
+            // But only if they're similar in length (within 10 chars)
+            if abs(normalized1.count - normalized2.count) < 10 {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
     // Calculate Levenshtein distance between two strings
     private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
         let m = s1.count
@@ -1097,8 +1116,19 @@ extension TrueAmbientProcessor {
         )
         
         await MainActor.run {
-            self.detectedContent.append(pendingContent)
-            logger.info("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
+            // Check if we already have a similar question being processed
+            let hasExisting = self.detectedContent.contains { content in
+                content.type == .question &&
+                content.response == nil &&  // Still processing
+                self.isSimilarQuestion(content.text, to: question)
+            }
+            
+            if !hasExisting {
+                self.detectedContent.append(pendingContent)
+                logger.info("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
+            } else {
+                logger.info("✅ Similar question already processing: \(question.prefix(30))...")
+            }
         }
         
         // Save question immediately (will be updated with response later)

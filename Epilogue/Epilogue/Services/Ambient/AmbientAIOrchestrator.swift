@@ -226,8 +226,21 @@ final class PerplexitySonarService {
     
     init() {
         // Load API key from Keychain or Info.plist
-        self.apiKey = KeychainManager.shared.getPerplexityAPIKey() ??
-                      Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
+        let key = KeychainManager.shared.getPerplexityAPIKey() ??
+                  Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
+        
+        // Validate the key isn't a placeholder
+        if let key = key,
+           !key.isEmpty,
+           key != "your_actual_api_key_here",
+           !key.contains("$("),
+           key != "PLACEHOLDER_API_KEY" {
+            self.apiKey = key
+            logger.info("🔑 Perplexity API key loaded successfully")
+        } else {
+            self.apiKey = nil
+            logger.warning("⚠️ No valid Perplexity API key found")
+        }
     }
     
     func generateEnhancedResponse(for question: String, bookContext: Book?, timeout: TimeInterval) async throws -> String? {
