@@ -157,8 +157,11 @@ public class AmbientPersistenceLayer {
     
     private func saveQuote(_ content: AmbientProcessedContent, to session: AmbientSession, using context: ModelContext) async throws {
         // Check for existing quote
+        let quoteText = content.text
         let descriptor = FetchDescriptor<CapturedQuote>(
-            predicate: #Predicate { $0.text == content.text }
+            predicate: #Predicate { quote in
+                quote.text == quoteText
+            }
         )
         
         if let existing = try? context.fetch(descriptor).first {
@@ -189,8 +192,11 @@ public class AmbientPersistenceLayer {
     
     private func saveNote(_ content: AmbientProcessedContent, to session: AmbientSession, using context: ModelContext) async throws {
         // Check for existing note
+        let noteText = content.text
         let descriptor = FetchDescriptor<CapturedNote>(
-            predicate: #Predicate { $0.content == content.text }
+            predicate: #Predicate { note in
+                note.content == noteText
+            }
         )
         
         if let existing = try? context.fetch(descriptor).first {
@@ -219,8 +225,11 @@ public class AmbientPersistenceLayer {
     
     private func saveQuestion(_ content: AmbientProcessedContent, to session: AmbientSession, using context: ModelContext) async throws {
         // Check for existing question
+        let questionText = content.text
         let descriptor = FetchDescriptor<CapturedQuestion>(
-            predicate: #Predicate { $0.content == content.text }
+            predicate: #Predicate { question in
+                question.content == questionText
+            }
         )
         
         if let existing = try? context.fetch(descriptor).first {
@@ -261,7 +270,9 @@ public class AmbientPersistenceLayer {
         guard let bookTitle = content.bookTitle else { return nil }
         
         let descriptor = FetchDescriptor<BookModel>(
-            predicate: #Predicate { $0.title == bookTitle }
+            predicate: #Predicate { book in
+                book.title == bookTitle
+            }
         )
         
         if let existing = try? context.fetch(descriptor).first {
@@ -270,7 +281,7 @@ public class AmbientPersistenceLayer {
         
         // Create minimal book model
         let bookModel = BookModel(
-            id: UUID(),
+            id: UUID().uuidString,  // Use UUID string as fallback Google Books ID
             title: bookTitle,
             author: content.bookAuthor ?? "Unknown",
             publishedYear: nil,

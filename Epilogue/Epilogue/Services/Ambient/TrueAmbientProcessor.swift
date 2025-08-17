@@ -229,13 +229,11 @@ public class TrueAmbientProcessor: ObservableObject {
             startSession()
         }
         
-        // Deduplication check
-        let textHash = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        if processedTextHashes.contains(textHash) {
+        // Deduplication check using new deduplicator
+        if deduplicator.isDuplicate(text) {
             logger.warning("⚠️ Already processed this text, skipping: \(text.prefix(30))...")
             return
         }
-        processedTextHashes.insert(textHash)
         
         // Use the same flow as Whisper transcription
         logger.info("🎯 Processing detected text: \(text)")
@@ -265,9 +263,7 @@ public class TrueAmbientProcessor: ObservableObject {
         case .question:
             logger.info("❓ Question detected: \(text)")
             // Check if we've already processed this exact question recently
-            let questionKey = "recent_\(text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
-            if !processedTextHashes.contains(questionKey) {
-                processedTextHashes.insert(questionKey)
+            if !deduplicator.isQuestionDuplicate(text, within: 5.0) {
                 await processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
             } else {
                 logger.warning("⚠️ Question recently processed, skipping: \(text.prefix(30))...")
@@ -381,7 +377,7 @@ public class TrueAmbientProcessor: ObservableObject {
         // Fresh session each time - no persistence
         sessionContent.removeAll()
         detectedContent.removeAll()
-        processedTextHashes.removeAll() // Clear deduplication set
+        deduplicator.clearHistory() // Clear deduplication history
         currentTranscript = ""
         currentBook = AmbientBookDetector.shared.detectedBook
         sessionStartTime = Date()
@@ -1194,8 +1190,13 @@ extension TrueAmbientProcessor {
     }
     
     // Old fallback code removed - using orchestrator now
-    private func oldFallbackCode() {
+    private func oldFallbackCode() async {
         // This is never called - kept for reference only
+        // All parameters would need to be passed in if this were active
+        let question = ""  // Would be passed in
+        let confidence: Float = 1.0  // Would be passed in
+        let context = ""  // Would be passed in
+        
         guard AICompanionService.shared.isConfigured() else {
             logger.error("❌ AI service not configured")
             
