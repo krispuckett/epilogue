@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 // MARK: - Fixed Ambient Mode View (Keeping Original Gradients!)
 struct AmbientModeView: View {
@@ -34,6 +35,8 @@ struct AmbientModeView: View {
     @FocusState private var isTranscriptionFocused: Bool
     @State private var isWaitingForAIResponse = false
     @State private var pendingQuestion: String?
+    @State private var lastProcessedCount = 0
+    @State private var debounceTimer: Timer?
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -131,8 +134,16 @@ struct AmbientModeView: View {
         .onAppear {
             startAmbientExperience()
         }
-        .onChange(of: processor.detectedContent.count) { _, _ in
-            processAndSaveDetectedContent(processor.detectedContent)
+        .onReceive(processor.$detectedContent.debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)) { newContent in
+            // Only process if there are actual new items
+            if newContent.count > lastProcessedCount {
+                let newItems = Array(newContent.suffix(newContent.count - lastProcessedCount))
+                processAndSaveDetectedContent(newItems)
+                lastProcessedCount = newContent.count
+            } else if newContent.count == lastProcessedCount && newContent.count > 0 {
+                // Check for response updates on existing items
+                checkForResponseUpdates(in: newContent)
+            }
         }
         .onReceive(bookDetector.$detectedBook) { book in
             handleBookDetection(book)
@@ -414,7 +425,18 @@ struct AmbientModeView: View {
                         .id(message.id)
                     }
                     
-                    // Removed thinking indicator - was causing problems
+                    // Subtle thinking indicator for pending questions
+                    if isWaitingForAIResponse, let question = pendingQuestion {
+                        HStack {
+                            SubtleLiquidThinking(bookColor: adaptiveUIColor)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 1.1).combined(with: .opacity)
+                        ))
+                    }
                     
                     // Bottom spacer for input area
                     Color.clear
@@ -526,6 +548,37 @@ struct AmbientModeView: View {
     }
     
     // MARK: - CRITICAL DATA PERSISTENCE FIX
+    
+    private func checkForResponseUpdates(in content: [AmbientProcessedContent]) {
+        // Only check recent items for response updates to avoid excessive processing
+        let recentItems = content.suffix(10)
+        
+        for item in recentItems {
+            if item.type == .question, let response = item.response {
+                // Check if we already have this response displayed
+                let responseKey = "\(item.text)_response"
+                if !processedContentHashes.contains(responseKey) {
+                    processedContentHashes.insert(responseKey)
+                    
+                    // Hide thinking indicator and show response
+                    isWaitingForAIResponse = false
+                    pendingQuestion = nil
+                    
+                    // Format and display the response
+                    let formattedResponse = "**\(item.text)**\n\n\(response)"
+                    let aiMessage = UnifiedChatMessage(
+                        content: formattedResponse,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .text
+                    )
+                    messages.append(aiMessage)
+                    print("✅ Added AI response via update check: \(item.text.prefix(30))...")
+                }
+            }
+        }
+    }
     
     private func processAndSaveDetectedContent(_ content: [AmbientProcessedContent]) {
         for item in content {
