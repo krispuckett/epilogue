@@ -395,7 +395,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             let finalThought = pendingTranscription
             pendingTranscription = ""
             Task.detached {
-                self.logger.info("🎯 Processing final thought in background: \(finalThought)")
+                logger.info("🎯 Processing final thought in background: \(finalThought)")
                 await TrueAmbientProcessor.shared.processDetectedText(finalThought, confidence: Float(self.confidenceScore))
             }
         }
