@@ -262,12 +262,8 @@ public class TrueAmbientProcessor: ObservableObject {
         switch intent {
         case .question:
             logger.info("❓ Question detected: \(text)")
-            // Check if we've already processed this exact question recently
-            if !deduplicator.isQuestionDuplicate(text, within: 5.0) {
-                await processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
-            } else {
-                logger.warning("⚠️ Question recently processed, skipping: \(text.prefix(30))...")
-            }
+            // Process the question - deduplication happens inside processQuestionWithFeedback
+            await processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
             
         case .quote:
             // Clean up quote text - extract the actual quote
@@ -1078,24 +1074,31 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback (OPTIMIZED FOR SPEED)
     func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
-        // Check for duplicate questions within 5 second window
-        if deduplicator.isQuestionDuplicate(question, within: 5.0) {
+        // Check for duplicate questions within 2 second window (reduced from 5)
+        // This prevents double-processing but allows intentional re-asking
+        if deduplicator.isQuestionDuplicate(question, within: 2.0) {
             logger.info("⚠️ Duplicate question detected: \(question.prefix(30))...")
             return
         }
         
         // SPEED: Immediately notify UI we're processing (shows thinking indicator)
+        let pendingContent = AmbientProcessedContent(
+            text: question,
+            type: .question,
+            timestamp: Date(),
+            confidence: confidence,
+            response: nil, // No response yet - triggers thinking indicator
+            bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+            bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+        )
+        
         await MainActor.run {
-            let pendingContent = AmbientProcessedContent(
-                text: question,
-                type: .question,
-                timestamp: Date(),
-                confidence: confidence,
-                response: nil // No response yet - triggers thinking indicator
-            )
             self.detectedContent.append(pendingContent)
             print("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
         }
+        
+        // Save question immediately (will be updated with response later)
+        persistenceLayer.save(pendingContent)
         
         // Default to true if not set (enable by default)
         let realTimeEnabled = UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true
@@ -1115,11 +1118,15 @@ extension TrueAmbientProcessor {
         // Use optimized AI orchestrator for instant + enhanced responses
         let bookContext = AmbientBookDetector.shared.detectedBook
         
+        logger.info("🤖 Calling AI orchestrator for: \(question.prefix(50))...")
+        
         // Get AI response with instant local + enhanced cloud strategy
         let (instantResponse, enhancedResponse) = await aiOrchestrator.getResponse(
             for: question,
             bookContext: bookContext
         )
+        
+        logger.info("🤖 AI orchestrator returned - Instant: \(instantResponse != nil), Enhanced: \(enhancedResponse != nil)")
         
         // Update UI with instant response (if available)
         if let instant = instantResponse {
@@ -1134,6 +1141,9 @@ extension TrueAmbientProcessor {
                     logger.info("⚡ INSTANT response delivered: \(instant.prefix(50))...")
                 }
             }
+            
+            // Update in persistence layer
+            await persistenceLayer.updateQuestionAnswer(questionText: question, answer: instant)
         }
         
         // Update with enhanced response when available
@@ -1150,6 +1160,9 @@ extension TrueAmbientProcessor {
                     self.responseCache.cacheResponse(enhanced, for: question, bookContext: bookContext?.title, source: .cloud)
                 }
             }
+            
+            // Update in persistence layer with enhanced response
+            await persistenceLayer.updateQuestionAnswer(questionText: question, answer: enhanced)
         }
         
         // Fallback if no response available
