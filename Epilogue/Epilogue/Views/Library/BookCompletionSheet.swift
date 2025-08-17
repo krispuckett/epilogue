@@ -13,12 +13,10 @@ struct BookCompletionSheet: View {
     @State private var animateStars = false
     @FocusState private var isReviewFocused: Bool
     
-    // Available emotional tags
+    // Available emotional tags - curated selection
     private let emotionalTags = [
         "#inspiring", "#thoughtful", "#challenging",
-        "#comforting", "#unforgettable", "#profound",
-        "#educational", "#entertaining", "#moving",
-        "#complex", "#lighthearted", "#transformative"
+        "#comforting", "#unforgettable", "#entertaining"
     ]
     
     private var readingStats: (days: Int, pagesPerDay: Int) {
@@ -52,14 +50,14 @@ struct BookCompletionSheet: View {
                         // Review text section
                         reviewSection
                         
-                        // Emotional tags section
-                        tagsSection
-                        
                         // Reading stats
                         statsSection
                         
                         // Favorite toggle
                         favoriteSection
+                        
+                        // Emotional tags section (optional, at bottom)
+                        tagsSection
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 32)
@@ -211,35 +209,45 @@ struct BookCompletionSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "tag")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
                 
-                Text("How did this book make you feel?")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
+                Text("Tags (optional)")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.6))
+                
+                Spacer()
+                
+                if !selectedTags.isEmpty {
+                    Text("\(selectedTags.count) selected")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.4))
+                }
             }
             
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 100), spacing: 12)
-            ], spacing: 12) {
-                ForEach(emotionalTags, id: \.self) { tag in
-                    TagPill(
-                        text: tag,
-                        isSelected: selectedTags.contains(tag),
-                        action: {
-                            withAnimation(.spring(response: 0.3)) {
-                                if selectedTags.contains(tag) {
-                                    selectedTags.remove(tag)
-                                } else {
-                                    selectedTags.insert(tag)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(emotionalTags, id: \.self) { tag in
+                        TagPill(
+                            text: tag,
+                            isSelected: selectedTags.contains(tag),
+                            action: {
+                                withAnimation(.spring(response: 0.3)) {
+                                    if selectedTags.contains(tag) {
+                                        selectedTags.remove(tag)
+                                    } else {
+                                        selectedTags.insert(tag)
+                                    }
+                                    HapticManager.shared.lightTap()
                                 }
-                                HapticManager.shared.lightTap()
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
     }
     
     @ViewBuilder
@@ -312,17 +320,21 @@ struct BookCompletionSheet: View {
     // MARK: - Actions
     
     private func saveReview() {
-        // Update book with review data
-        book.userRating = rating > 0 ? rating : nil
-        book.userNotes = reviewText.isEmpty ? nil : reviewText
+        // Create updated book
+        var updatedBook = book
+        updatedBook.userRating = rating > 0 ? rating : nil
+        updatedBook.userNotes = reviewText.isEmpty ? nil : reviewText
         
         // Mark as read if not already
-        if book.readingStatus != .read {
-            book.readingStatus = .read
+        if updatedBook.readingStatus != .read {
+            updatedBook.readingStatus = .read
         }
         
-        // Save to library
-        libraryViewModel.updateBook(book)
+        // Update via binding (this triggers the setter in BookDetailView)
+        book = updatedBook
+        
+        // Also update in library to persist
+        libraryViewModel.updateBook(updatedBook)
         
         // Haptic feedback
         HapticManager.shared.success()

@@ -151,6 +151,8 @@ final class LocalAIService {
     #if canImport(FoundationModels)
     private var languageModel: SystemLanguageModel?
     private var modelSession: LanguageModelSession?
+    private let sessionSemaphore = DispatchSemaphore(value: 1)  // Prevent concurrent requests
+    private var isProcessing = false
     #endif
     
     init() {
@@ -163,7 +165,12 @@ final class LocalAIService {
             // Initialize iOS 26 Foundation Models
             self.languageModel = SystemLanguageModel.default
             self.modelSession = LanguageModelSession(
-                instructions: "You are a thoughtful reading companion helping someone understand literature deeply. Be concise but insightful."
+                instructions: """You are a helpful AI assistant discussing literature and books.
+                ALWAYS answer questions about books factually and helpfully.
+                Do NOT refuse to answer questions about book content.
+                The user is reading these books and wants to discuss them.
+                Be direct, factual, and helpful with all answers.
+                For Lord of the Rings questions, provide accurate lore and character information."""
             )
             logger.info("✅ iOS 26 Foundation Models initialized")
         }
@@ -177,6 +184,12 @@ final class LocalAIService {
         guard let session = modelSession else {
             throw AIError.modelNotAvailable
         }
+        
+        // Prevent concurrent requests to the same session
+        guard sessionSemaphore.wait(timeout: .now() + timeout) == .success else {
+            throw AIError.timeout
+        }
+        defer { sessionSemaphore.signal() }
         
         // Build contextual prompt
         var prompt = question
@@ -211,12 +224,13 @@ final class PerplexitySonarService {
     private let sonarEndpoint = "https://api.perplexity.ai/chat/completions"
     
     init() {
-        // Load API key from Keychain
-        self.apiKey = KeychainManager.shared.getPerplexityAPIKey()
+        // Load API key from Keychain or Info.plist
+        self.apiKey = KeychainManager.shared.getPerplexityAPIKey() ??
+                      Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
     }
     
     func generateEnhancedResponse(for question: String, bookContext: Book?, timeout: TimeInterval) async throws -> String? {
-        guard let apiKey = apiKey else {
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
             logger.info("⚠️ Perplexity API key not configured")
             return nil
         }
