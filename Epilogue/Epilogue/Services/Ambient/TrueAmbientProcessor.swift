@@ -242,8 +242,9 @@ public class TrueAmbientProcessor: ObservableObject {
         // Use appropriate deduplication based on content type
         if intent == .question {
             // For questions, use special deduplication that allows evolution
-            if deduplicator.isQuestionDuplicate(text, within: 2.0) {
-                logger.warning("⚠️ Duplicate question, skipping: \(text.prefix(30))...")
+            // Increased window to 5 seconds to prevent voice recognition duplicates
+            if deduplicator.isQuestionDuplicate(text, within: 5.0) {
+                logger.warning("⚠️ Duplicate question within 5s, skipping: \(text.prefix(30))...")
                 return
             }
         } else {

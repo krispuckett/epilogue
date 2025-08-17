@@ -117,9 +117,20 @@ class SmartEpilogueAI: ObservableObject {
             """
         }
         
-        // Create session with instructions
-        // TODO: Add tool support when Foundation Models API supports it
-        session = LanguageModelSession(instructions: instructions)
+        // Create session with instructions - but only if model is available
+        // Check model availability first
+        let model = SystemLanguageModel.default
+        switch model.availability {
+        case .available:
+            session = LanguageModelSession(instructions: instructions)
+            print("✅ Foundation Models session created successfully")
+        case .unavailable(let reason):
+            print("⚠️ Foundation Models unavailable: \(reason)")
+            session = nil
+        @unknown default:
+            print("⚠️ Foundation Models availability unknown")
+            session = nil
+        }
         #else
         print("⚠️ Foundation Models not available on this iOS version")
         #endif
@@ -249,8 +260,9 @@ class SmartEpilogueAI: ObservableObject {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
             guard let session = session else {
-                print("⚠️ No Foundation Models session - iOS 26 required")
-                return "Local AI requires iOS 26 or later. Please use Perplexity mode instead."
+                print("⚠️ No Foundation Models session - falling back to Perplexity")
+                // Automatically fallback to Perplexity when local model unavailable
+                return await queryWithPerplexity(question)
             }
             
             do {
