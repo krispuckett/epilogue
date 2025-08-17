@@ -38,7 +38,7 @@ class OptimizedPerplexityService: ObservableObject {
     private let maxReconnectAttempts = 3
     
     // Caching
-    private var responseCache: ResponseCache
+    private var responseCache: PerplexityResponseCache
     private let cacheExpiration: TimeInterval = 3600 // 1 hour
     
     // Rate limiting
@@ -52,7 +52,7 @@ class OptimizedPerplexityService: ObservableObject {
     private let tokenBatcher = TokenBatcher(batchInterval: 0.05) // 50ms batches
     
     private init() {
-        self.responseCache = ResponseCache()
+        self.responseCache = PerplexityResponseCache()
         setupAPIKey()
         Task {
             await responseCache.initialize()
@@ -570,7 +570,7 @@ private actor RateLimiter {
 
 // MARK: - Response Cache
 
-private actor ResponseCache {
+private actor PerplexityResponseCache {
     private var cache: [String: CachedResponse] = [:]
     private var db: OpaquePointer?
     private var hits = 0

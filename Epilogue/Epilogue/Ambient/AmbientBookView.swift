@@ -353,9 +353,4 @@ extension AmbientBookView {
 }
 
 // MARK: - Safe Array Extension
-
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        return index >= 0 && index < count ? self[index] : nil
-    }
-}
+// Array safe subscript is already defined in TrueAmbientProcessor
