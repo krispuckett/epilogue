@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUI
+import Combine
 import OSLog
 #if canImport(FoundationModels)
 import FoundationModels
@@ -8,7 +10,7 @@ private let logger = Logger(subsystem: "com.epilogue", category: "FoundationMode
 
 // MARK: - Book Response Structure for Guided Generation
 @Generable
-struct BookResponse: Codable {
+struct AIBookResponse: Codable {
     let answer: String
     let confidence: Double
     let needsWebSearch: Bool
@@ -17,7 +19,7 @@ struct BookResponse: Codable {
 }
 
 // MARK: - Partial Response for Streaming
-struct PartialBookResponse {
+struct PartialAIBookResponse {
     var text: String = ""
     var confidence: Double = 0.0
     var isComplete: Bool = false
@@ -47,20 +49,24 @@ enum ModelError: LocalizedError {
     }
 }
 
-// MARK: - Foundation Models Manager
+// MARK: - AI Foundation Models Manager (Renamed to avoid conflict with iOS26FoundationModels.swift)
 @MainActor
-class FoundationModelsManager: ObservableObject {
-    static let shared = FoundationModelsManager()
+class AIFoundationModelsManager: ObservableObject {
+    static let shared = AIFoundationModelsManager()
     
     #if canImport(FoundationModels)
-    private var model: LanguageModel?
+    #if canImport(FoundationModels)
+    private var model: SystemLanguageModel?
+    #else
+    private var model: Any?
+    #endif
     private var sessions: [String: LanguageModelSession] = [:] // Book-specific sessions
     private var sessionTokenCounts: [String: Int] = [:]
     #endif
     
     @Published var isAvailable = false
     @Published var modelState: ModelState = .checking
-    @Published var currentPartialResponse: PartialBookResponse?
+    @Published var currentPartialResponse: PartialAIBookResponse?
     
     private let maxTokensPerSession = 4096
     private let sessionTimeout: TimeInterval = 3600 // 1 hour
@@ -300,7 +306,7 @@ class FoundationModelsManager: ObservableObject {
                     
                     // Reset partial response
                     await MainActor.run {
-                        currentPartialResponse = PartialBookResponse()
+                        currentPartialResponse = PartialAIBookResponse()
                     }
                     
                     // Stream with progressive updates
@@ -397,7 +403,7 @@ class FoundationModelsManager: ObservableObject {
         
         do {
             let service = PerplexityService()
-            return try await service.chat(message: query, bookContext: bookContext)
+            return try await service.chat(with: query, bookContext: bookContext)
         } catch {
             logger.error("❌ Perplexity fallback failed: \(error)")
             return "I'm having trouble processing your question. Please try again."
@@ -407,7 +413,7 @@ class FoundationModelsManager: ObservableObject {
     private func fetchWebContext(_ query: String, bookContext: Book?) async -> String? {
         do {
             let service = PerplexityService()
-            return try await service.chat(message: query, bookContext: bookContext)
+            return try await service.chat(with: query, bookContext: bookContext)
         } catch {
             logger.error("❌ Web context fetch failed: \(error)")
             return nil
@@ -438,8 +444,11 @@ class FoundationModelsManager: ObservableObject {
     
     // MARK: - Public Methods
     
-    func isAvailable() -> Bool {
-        return modelState == .available
+    func checkAvailability() -> Bool {
+        if case .available = modelState {
+            return true
+        }
+        return false
     }
     
     func enhanceText(_ text: String) async -> String {
@@ -489,7 +498,7 @@ struct PerplexitySearchTool: LanguageModelTool {
         }
         
         let service = PerplexityService()
-        return try await service.chat(message: query, bookContext: nil)
+        return try await service.chat(with: query, bookContext: nil)
     }
     
     enum ToolError: Error {
@@ -499,7 +508,7 @@ struct PerplexitySearchTool: LanguageModelTool {
 #endif
 
 // MARK: - Extensions for Conditional Compilation
-extension FoundationModelsManager {
+extension AIFoundationModelsManager {
     func smartQuery(_ query: String) async -> String {
         let book = AmbientBookDetector.shared.detectedBook
         return await processWithConfidenceEscalation(query, bookContext: book)

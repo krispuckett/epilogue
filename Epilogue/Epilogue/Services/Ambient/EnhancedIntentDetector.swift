@@ -117,7 +117,7 @@ public struct EnhancedEntity {
 public class EnhancedIntentDetector {
     private let tagger = NLTagger(tagSchemes: [.lexicalClass, .nameType, .sentimentScore])
     private let sentimentClassifier: NLModel?
-    private let foundationModels = FoundationModelsManager.shared
+    private let foundationModels = FoundationModelsManager.shared  // This refers to iOS26FoundationModels wrapper
     
     // Pattern matchers
     private let questionPatterns = [

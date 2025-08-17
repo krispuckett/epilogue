@@ -84,7 +84,7 @@ public class TrueAmbientProcessor: ObservableObject {
     // Enhanced intelligence systems
     private let intentDetector = EnhancedIntentDetector()
     private let conversationMemory = ConversationMemory()
-    private let foundationModels = FoundationModelsManager.shared
+    private let foundationModels = FoundationModelsManager.shared  // This refers to iOS26FoundationModels wrapper
     
     // NEW: Optimized components for App Store quality
     private let deduplicator = ContentDeduplicator()
