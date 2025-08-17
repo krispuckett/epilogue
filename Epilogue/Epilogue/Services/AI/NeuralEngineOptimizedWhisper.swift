@@ -68,7 +68,6 @@ final class NeuralEngineOptimizedWhisper {
         do {
             // Initialize WhisperKit with optimized settings
             whisperKit = try await WhisperKit(
-                modelVariant: .tiny,  // Start with tiny for speed
                 verbose: false,
                 logLevel: .error,
                 prewarm: true,  // Critical for speed
@@ -144,7 +143,7 @@ final class NeuralEngineOptimizedWhisper {
             }
         }
         
-        logger.info("✅ Created \(ioSurfaceBuffers.count) IOSurface buffers")
+        logger.info("✅ Created \(self.ioSurfaceBuffers.count) IOSurface buffers")
     }
     
     // MARK: - Prewarm Model
@@ -190,7 +189,7 @@ final class NeuralEngineOptimizedWhisper {
         let cacheKey = computeCacheKey(for: audioBuffer)
         if let cachedResult = kvCache[cacheKey] as? String {
             logger.info("💨 KV-cache hit! Returning instantly")
-            lastInferenceTime = 0
+            self.lastInferenceTime = 0
             return cachedResult
         }
         
@@ -216,8 +215,8 @@ final class NeuralEngineOptimizedWhisper {
                     kvCache.removeAll()
                 }
                 
-                lastInferenceTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-                logger.info("⚡ Transcription completed in \(String(format: "%.1f", lastInferenceTime))ms")
+                self.lastInferenceTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+                logger.info("⚡ Transcription completed in \(String(format: "%.1f", self.lastInferenceTime))ms")
                 
                 return transcription
             }
@@ -282,7 +281,9 @@ final class NeuralEngineOptimizedWhisper {
     }
     
     func clearCache() {
+        #if canImport(WhisperKit)
         kvCache.removeAll()
+        #endif
         logger.info("🧹 Cleared KV-cache")
     }
 }
