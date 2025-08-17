@@ -445,27 +445,21 @@ public class TrueAmbientProcessor: ObservableObject {
     public func processAudioWithNeuralEngine(_ audioBuffer: [Float]) async -> String? {
         let startTime = CFAbsoluteTimeGetCurrent()
         
-        do {
-            // Use Neural Engine optimized transcription
-            let transcription = try await whisperOptimized.transcribeOptimized(
-                audioBuffer: audioBuffer
-            )
-            
-            let processingTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-            logger.info("⚡ Neural Engine transcription in \(String(format: "%.1f", processingTime))ms")
-            
-            // Process the transcription if we got one
-            if let text = transcription, !text.isEmpty {
-                // Use existing text processing pipeline
-                await processDetectedText(text, confidence: 0.95)
-            }
-            
-            return transcription
-            
-        } catch {
-            logger.error("❌ Neural Engine transcription failed: \(error)")
-            return nil
+        // Use Neural Engine optimized transcription (no longer throws)
+        let transcription = await whisperOptimized.transcribeOptimized(
+            audioBuffer: audioBuffer
+        )
+        
+        let processingTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        logger.info("⚡ Neural Engine transcription in \(String(format: "%.1f", processingTime))ms")
+        
+        // Process the transcription if we got one
+        if let text = transcription, !text.isEmpty {
+            // Use existing text processing pipeline
+            await processDetectedText(text, confidence: 0.95)
         }
+        
+        return transcription
     }
     
     /// Batch process multiple audio buffers for efficiency

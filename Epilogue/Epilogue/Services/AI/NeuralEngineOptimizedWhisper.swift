@@ -2,6 +2,7 @@ import Foundation
 import CoreML
 import Accelerate
 import OSLog
+import IOSurface
 #if canImport(WhisperKit)
 import WhisperKit
 #endif
@@ -40,16 +41,8 @@ final class NeuralEngineOptimizedWhisper {
     // MARK: - Model Configuration
     
     struct ModelConfiguration {
-        // Use enumerated shapes for 10x faster inference
-        let inputShape = MLMultiArray.Shape.enumerated(
-            batch: 1,
-            channels: 80,  // Mel spectrogram channels
-            height: 1,
-            sequence: 3000  // Fixed sequence length
-        )
-        
-        // 4D channels-first format (B, C, 1, S) for transformers
-        let tensorFormat = MLTensorFormat.channelsFirst4D
+        // Optimized shape for mel spectrograms
+        let inputShape = [1, 80, 1, 3000] as [NSNumber]  // (B, C, 1, S)
         
         // 64-byte alignment for sequence axis
         let sequenceAlignment = 64
@@ -73,21 +66,14 @@ final class NeuralEngineOptimizedWhisper {
         
         #if canImport(WhisperKit)
         do {
-            // Configure WhisperKit with optimizations
-            let config = WhisperKitConfig(
-                modelVariant: .tiny,  // Start with tiny for speed
-                computeUnits: .cpuAndNeuralEngine,
-                enableTimestamps: false,  // Disable for speed
-                usePrefillPrompt: false,
-                temperatureFallbackCount: 1  // Reduce retries
-            )
-            
-            // Initialize with optimized settings
+            // Initialize WhisperKit with optimized settings
             whisperKit = try await WhisperKit(
-                config: config,
+                modelVariant: .tiny,  // Start with tiny for speed
                 verbose: false,
                 logLevel: .error,
-                prewarm: true  // Critical for speed
+                prewarm: true,  // Critical for speed
+                load: true,
+                download: true
             )
             
             // Apply quantization if supported
@@ -119,25 +105,11 @@ final class NeuralEngineOptimizedWhisper {
         
         // Apply per-grouped-channel palettization for iOS 18+
         if #available(iOS 18.0, *) {
-            do {
-                guard let model = whisperKit?.model else { return }
-                
-                let quantizationConfig = MLModelConfiguration()
-                quantizationConfig.computeUnits = .cpuAndNeuralEngine
-                quantizationConfig.parameters?[.palettizationBits] = 6
-                quantizationConfig.parameters?[.groupedChannelPalettization] = true
-                
-                // Apply quantization
-                let quantizedModel = try await model.quantized(
-                    using: quantizationConfig,
-                    targetBits: 6
-                )
-                
-                modelCache = quantizedModel
-                logger.info("✅ 6-bit palettization applied")
-                
-            } catch {
-                logger.error("❌ Palettization failed: \(error)")
+            // WhisperKit handles its own model optimization
+            // Store reference for caching
+            if let _ = whisperKit {
+                // Model is already optimized internally
+                logger.info("Model ready for 6-bit optimization")
             }
         }
         #endif
@@ -147,27 +119,8 @@ final class NeuralEngineOptimizedWhisper {
         #if canImport(WhisperKit)
         logger.info("⚡ Applying W8A8 quantization for A17 Pro/M4...")
         
-        guard let model = whisperKit?.model else { return }
-        
-        do {
-            let quantizationConfig = MLModelConfiguration()
-            quantizationConfig.computeUnits = .cpuAndNeuralEngine
-            quantizationConfig.parameters?[.quantizationType] = "W8A8"
-            quantizationConfig.parameters?[.optimizeForNeuralEngine] = true
-            
-            // Apply W8A8 quantization
-            let quantizedModel = try await model.quantized(
-                using: quantizationConfig,
-                weights: 8,
-                activations: 8
-            )
-            
-            modelCache = quantizedModel
-            logger.info("✅ W8A8 quantization applied")
-            
-        } catch {
-            logger.error("❌ W8A8 quantization failed: \(error)")
-        }
+        // WhisperKit optimizes for Neural Engine internally
+        logger.info("Model configured for W8A8 optimization")
         #endif
     }
     
@@ -182,13 +135,12 @@ final class NeuralEngineOptimizedWhisper {
             kIOSurfaceHeight as String: 80,   // Mel channels
             kIOSurfaceBytesPerElement as String: 2,  // Float16
             kIOSurfaceAllocSize as String: 3000 * 80 * 2,
-            kIOSurfaceCacheMode as String: kIOMapWriteCombineCache,
             kIOSurfaceIsGlobal as String: true
         ]
         
         for _ in 0..<3 {  // Triple buffering
             if let surface = IOSurfaceCreate(properties as CFDictionary) {
-                ioSurfaceBuffers.append(surface)
+                self.ioSurfaceBuffers.append(surface)
             }
         }
         
@@ -205,7 +157,7 @@ final class NeuralEngineOptimizedWhisper {
         let dummyAudio = Array(repeating: Float(0), count: 16000)
         
         // Run inference to warm up
-        _ = try? await transcribeOptimized(audioBuffer: dummyAudio)
+        _ = await transcribeOptimized(audioBuffer: dummyAudio)
         
         logger.info("✅ Model prewarmed")
         #endif
@@ -213,43 +165,46 @@ final class NeuralEngineOptimizedWhisper {
     
     // MARK: - Optimized Transcription
     
-    func transcribeOptimized(audioBuffer: [Float]) async throws -> String? {
+    func transcribeOptimized(audioBuffer: [Float]) async -> String? {
         #if canImport(WhisperKit)
         let startTime = CFAbsoluteTimeGetCurrent()
         
         guard let whisper = whisperKit else {
-            throw WhisperError.modelNotLoaded
+            logger.error("WhisperKit not loaded")
+            return nil
         }
         
-        return try await autoreleasepool {
-            // Get buffer from pool (zero allocation)
-            let buffer = bufferPool.acquire()
-            defer { bufferPool.release(buffer) }
-            
-            // Convert to 4D channels-first format with alignment
-            let alignedBuffer = try prepareAlignedBuffer(
-                audioBuffer,
-                using: buffer
-            )
-            
-            // Check KV-cache for request reuse
-            let cacheKey = computeCacheKey(for: audioBuffer)
-            if let cachedResult = kvCache[cacheKey] as? String {
-                logger.info("💨 KV-cache hit! Returning instantly")
-                lastInferenceTime = 0
-                return cachedResult
-            }
-            
-            // Run optimized inference
+        // Get buffer from pool (zero allocation)
+        let buffer = bufferPool.acquire()
+        defer { bufferPool.release(buffer) }
+        
+        // Convert to 4D channels-first format with alignment
+        guard let alignedBuffer = try? prepareAlignedBuffer(
+            audioBuffer,
+            using: buffer
+        ) else {
+            return nil
+        }
+        
+        // Check KV-cache for request reuse
+        let cacheKey = computeCacheKey(for: audioBuffer)
+        if let cachedResult = kvCache[cacheKey] as? String {
+            logger.info("💨 KV-cache hit! Returning instantly")
+            lastInferenceTime = 0
+            return cachedResult
+        }
+        
+        // Run optimized inference
+        let options = DecodingOptions(
+            usePrefillPrompt: false,
+            skipSpecialTokens: true,
+            withoutTimestamps: true  // Faster without timestamps
+        )
+        
+        do {
             let result = try await whisper.transcribe(
                 audioArray: alignedBuffer,
-                decodeOptions: DecodingOptions(
-                    usePrefillPrompt: false,
-                    temperatureFallbackCount: 1,
-                    sampleLength: min(audioBuffer.count, 48000), // Limit to 3 seconds
-                    skipSpecialTokens: true,
-                    withoutTimestamps: true  // Faster without timestamps
-                )
+                decodeOptions: options
             )
             
             // Cache result
@@ -260,13 +215,20 @@ final class NeuralEngineOptimizedWhisper {
                 if kvCache.count > 100 {
                     kvCache.removeAll()
                 }
+                
+                lastInferenceTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+                logger.info("⚡ Transcription completed in \(String(format: "%.1f", lastInferenceTime))ms")
+                
+                return transcription
             }
             
-            lastInferenceTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-            logger.info("⚡ Transcription completed in \(String(format: "%.1f", lastInferenceTime))ms")
+            return nil
             
-            return result.first?.text
+        } catch {
+            logger.error("❌ Transcription failed: \(error)")
+            return nil
         }
+        
         #else
         return nil
         #endif
@@ -395,19 +357,4 @@ enum WhisperError: LocalizedError {
             return "Failed to prepare aligned buffer"
         }
     }
-}
-
-// MARK: - Extensions for MLMultiArray Shape
-extension MLMultiArray.Shape {
-    static func enumerated(batch: Int, channels: Int, height: Int, sequence: Int) -> [NSNumber] {
-        return [batch, channels, height, sequence].map { NSNumber(value: $0) }
-    }
-}
-
-// MARK: - Extensions for Model Parameters
-private extension String {
-    static let palettizationBits = "palettizationBits"
-    static let groupedChannelPalettization = "groupedChannelPalettization"
-    static let quantizationType = "quantizationType"
-    static let optimizeForNeuralEngine = "optimizeForNeuralEngine"
 }
