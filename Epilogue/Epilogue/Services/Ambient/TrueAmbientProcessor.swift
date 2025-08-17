@@ -270,8 +270,47 @@ public class TrueAmbientProcessor: ObservableObject {
         switch intent {
         case .question:
             logger.info("❓ Question detected: \(text)")
-            // Process the question - deduplication happens inside processQuestionWithFeedback
-            await processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
+            
+            // Revolutionary approach: Collect the COMPLETE question before processing
+            await MainActor.run {
+                // Remove old partials that this question extends
+                self.detectedContent.removeAll { content in
+                    content.type == .question && 
+                    content.response == nil &&
+                    text.contains(content.text)  // New contains old = old is partial
+                }
+                
+                // Add current question
+                let pendingQuestion = AmbientProcessedContent(
+                    text: text,
+                    type: .question,
+                    timestamp: Date(),
+                    confidence: confidence,
+                    response: nil,
+                    bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+                    bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+                )
+                self.detectedContent.append(pendingQuestion)
+                logger.info("📥 Stored question: \(text)")
+            }
+            
+            // Process after delay to ensure we have the complete question
+            Task {
+                try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
+                
+                // Check if this is still the latest question
+                let (stillLatest, finalText) = await MainActor.run {
+                    let latestQuestion = self.detectedContent.last { $0.type == .question && $0.response == nil }
+                    return (latestQuestion?.text == text, latestQuestion?.text ?? text)
+                }
+                
+                if stillLatest {
+                    logger.info("🎯 FINAL question ready: \(finalText)")
+                    await self.processQuestionWithEnhancedContext(finalText, confidence: confidence, enhancedIntent: enhancedIntent)
+                } else {
+                    logger.info("⏭ Skipping superseded partial: \(text)")
+                }
+            }
             
         case .quote:
             // Clean up quote text - extract the actual quote
@@ -1064,32 +1103,8 @@ extension TrueAmbientProcessor {
     
     // Process question with enhanced context
     private func processQuestionWithEnhancedContext(_ question: String, confidence: Float, enhancedIntent: EnhancedIntent) async {
-        // Wait for question to complete (voice recognition sends many partials)
-        try? await Task.sleep(nanoseconds: 800_000_000) // 0.8 seconds
-        
-        // Find the most complete version of this question
-        let mostCompleteQuestion = await MainActor.run { () -> String? in
-            // Find all related questions (partial or complete)
-            let relatedQuestions = self.detectedContent.filter { content in
-                content.type == .question &&
-                content.response == nil &&
-                (content.text.contains(question) || question.contains(content.text) ||
-                 content.text.lowercased().contains("elf") && question.lowercased().contains("elf"))
-            }
-            
-            // Return the longest one
-            return relatedQuestions.max(by: { $0.text.count < $1.text.count })?.text
-        }
-        
-        // If we found a more complete version, skip this partial
-        if let complete = mostCompleteQuestion, complete != question {
-            logger.info("🆙 Skipping partial, using complete: \(complete.prefix(50))")
-            // Remove this partial from detectedContent
-            await MainActor.run {
-                self.detectedContent.removeAll { $0.type == .question && $0.text == question }
-            }
-            return
-        }
+        // We already waited in processDetectedText, so process immediately
+        logger.info("🚀 Processing question immediately: \(question)")
         
         // Build context from conversation memory
         let conversationContext = conversationMemory.buildContextForResponse(currentIntent: enhancedIntent)
