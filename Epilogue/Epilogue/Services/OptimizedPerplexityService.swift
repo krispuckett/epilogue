@@ -210,11 +210,11 @@ class OptimizedPerplexityService: ObservableObject {
             
         } catch {
             // Handle reconnection
-            if reconnectAttempts < maxReconnectAttempts {
-                reconnectAttempts += 1
-                logger.warning("🔄 Reconnecting... (attempt \(reconnectAttempts))")
+            if self.reconnectAttempts < self.maxReconnectAttempts {
+                self.reconnectAttempts += 1
+                logger.warning("🔄 Reconnecting... (attempt \(self.reconnectAttempts))")
                 
-                try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(reconnectAttempts))) * 1_000_000_000)
+                try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(self.reconnectAttempts))) * 1_000_000_000)
                 try await streamWithReconnection(
                     request: request,
                     query: query,
@@ -343,7 +343,9 @@ class OptimizedPerplexityService: ObservableObject {
     }
     
     private func processQueue() async {
-        while !requestQueue.isEmpty && await !rateLimiter.shouldQueue() {
+        while !requestQueue.isEmpty {
+            let shouldQueue = await rateLimiter.shouldQueue()
+            if shouldQueue { break }
             guard let request = requestQueue.first else { break }
             requestQueue.removeFirst()
             
