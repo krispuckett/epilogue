@@ -86,6 +86,12 @@ public class TrueAmbientProcessor: ObservableObject {
     private let conversationMemory = ConversationMemory()
     private let foundationModels = FoundationModelsManager.shared
     
+    // NEW: Optimized components for App Store quality
+    private let deduplicator = ContentDeduplicator()
+    private let persistenceLayer = AmbientPersistenceLayer()
+    private let responseCache = AmbientResponseCache.shared
+    private let aiOrchestrator = AmbientAIOrchestrator()
+    
     // iOS 26 Foundation Models
     #if canImport(FoundationModels)
     private var languageModel: SystemLanguageModel?
@@ -123,7 +129,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var sessionStartTime: Date?
     private var modelContext: ModelContext?
     private var currentAmbientSession: AmbientSession?  // Not weak - we need to maintain the reference
-    private var processedTextHashes = Set<String>() // Prevent duplicate processing
+    // Removed - using ContentDeduplicator instead
     private var currentBook: Book? // Current book context
     
     // Processing state
@@ -318,9 +324,11 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
-            // Only add to detectedContent (single source of truth)
-            if !detectedContent.contains(where: { $0.text == content.text && $0.type == content.type }) {
+            // Use smart deduplication
+            if !deduplicator.isDuplicate(content.text) {
                 detectedContent.append(content)
+                // Save immediately through persistence layer
+                persistenceLayer.save(content)
             }
             logger.info("💭 Quote captured: \(cleanedText.prefix(50))...")
             
@@ -333,9 +341,11 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
-            // Only add to detectedContent (single source of truth)
-            if !detectedContent.contains(where: { $0.text == content.text && $0.type == content.type }) {
+            // Use smart deduplication
+            if !deduplicator.isDuplicate(content.text) {
                 detectedContent.append(content)
+                // Save immediately through persistence layer
+                persistenceLayer.save(content)
             }
             logger.info("📝 \(String(describing: intent)) captured: \(text.prefix(50))...")
             
@@ -837,10 +847,16 @@ public class TrueAmbientProcessor: ObservableObject {
     
     public func setModelContext(_ context: ModelContext) {
         self.modelContext = context
+        // Configure persistence layer with context
+        persistenceLayer.configure(modelContext: context, session: currentAmbientSession ?? AmbientSession(book: nil))
     }
     
     func setCurrentSession(_ session: AmbientSession) {
         self.currentAmbientSession = session
+        // Update persistence layer with new session
+        if let context = modelContext {
+            persistenceLayer.configure(modelContext: context, session: session)
+        }
     }
     
     public func setConfidenceThreshold(_ threshold: Float) {
@@ -1066,6 +1082,12 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback (OPTIMIZED FOR SPEED)
     func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
+        // Check for duplicate questions within 5 second window
+        if deduplicator.isQuestionDuplicate(question, within: 5.0) {
+            logger.info("⚠️ Duplicate question detected: \(question.prefix(30))...")
+            return
+        }
+        
         // SPEED: Immediately notify UI we're processing (shows thinking indicator)
         await MainActor.run {
             let pendingContent = AmbientProcessedContent(
@@ -1076,19 +1098,8 @@ extension TrueAmbientProcessor {
                 response: nil // No response yet - triggers thinking indicator
             )
             self.detectedContent.append(pendingContent)
-            print("💭 FAST: Thinking indicator shown for: \(question.prefix(30))...")
+            print("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
         }
-        
-        // Normalize question for better deduplication
-        let normalizedQuestion = normalizeQuestion(question)
-        let processedKey = "question_\(normalizedQuestion)"
-        
-        // Check if we've already processed this exact question
-        if processedTextHashes.contains(processedKey) {
-            logger.info("⚠️ Skipping duplicate: \(question.prefix(30))...")
-            return
-        }
-        processedTextHashes.insert(processedKey)
         
         // Default to true if not set (enable by default)
         let realTimeEnabled = UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true
@@ -1105,70 +1116,86 @@ extension TrueAmbientProcessor {
             return
         }
         
-        // Try Foundation Models first (iOS 26)
-        #if canImport(FoundationModels)
-        if let modelSession = modelSession {
-            do {
-                // Add book context to the question if available
-                let bookContext = AmbientBookDetector.shared.detectedBook
-                let contextualQuestion: String
-                if let book = bookContext {
-                    contextualQuestion = "Regarding the book '\(book.title)' by \(book.author): \(question)"
-                    logger.info("🧠 Using Foundation Models with book context for: \(question)")
-                } else {
-                    contextualQuestion = question
-                    logger.info("🧠 Using Foundation Models without book context for: \(question)")
-                }
-                
-                let response = try await modelSession.respond(to: contextualQuestion)
-                
-                // Process successful response
-                var content = AmbientProcessedContent(
-                    text: question,
-                    type: .question,
-                    timestamp: Date(),
-                    confidence: confidence,
-                    response: response.content
-                )
-                
-                // Update existing pending question instead of adding a new one
-                if let existingIndex = detectedContent.firstIndex(where: { 
+        // Use optimized AI orchestrator for instant + enhanced responses
+        let bookContext = AmbientBookDetector.shared.detectedBook
+        
+        // Get AI response with instant local + enhanced cloud strategy
+        let (instantResponse, enhancedResponse) = await aiOrchestrator.getResponse(
+            for: question,
+            bookContext: bookContext
+        )
+        
+        // Update UI with instant response (if available)
+        if let instant = instantResponse {
+            await MainActor.run {
+                // Update existing pending question with instant response
+                if let existingIndex = self.detectedContent.firstIndex(where: { 
                     $0.type == .question && 
                     $0.text == question && 
                     $0.response == nil 
                 }) {
-                    // Update the existing item with the response
-                    detectedContent[existingIndex].response = response.content
-                    logger.info("✅ Updated existing question with Foundation Models response")
-                } else {
-                    // Add as new if not found (shouldn't happen normally)
-                    detectedContent.append(content)
+                    self.detectedContent[existingIndex].response = instant
+                    logger.info("⚡ INSTANT response delivered: \(instant.prefix(50))...")
                 }
-                // Removed - using detectedContent as single source
-                // bookContext already declared above
-                _ = conversationMemory.addMemory(
-                    text: question,
-                    intent: EnhancedIntent(
-                        primary: .question(subtype: .factual),
-                        confidence: 0.9,
-                        entities: [],
-                        sentiment: .neutral,
-                        subIntents: []
-                    ),
-                    response: response.content,
-                    bookTitle: bookContext?.title,
-                    bookAuthor: bookContext?.author
-                )
-                
-                logger.info("✅ Foundation Models response received")
-                return
-            } catch {
-                logger.error("❌ Foundation Models failed, falling back to AI service: \(error)")
             }
         }
-        #endif
         
-        // Fall back to existing AI service
+        // Update with enhanced response when available
+        if let enhanced = enhancedResponse {
+            await MainActor.run {
+                if let existingIndex = self.detectedContent.firstIndex(where: { 
+                    $0.type == .question && 
+                    $0.text == question
+                }) {
+                    self.detectedContent[existingIndex].response = enhanced
+                    logger.info("✨ ENHANCED response delivered: \(enhanced.prefix(50))...")
+                    
+                    // Cache for future instant access
+                    self.responseCache.cacheResponse(enhanced, for: question, bookContext: bookContext?.title, source: .cloud)
+                }
+            }
+        }
+        
+        // Fallback if no response available
+        if instantResponse == nil && enhancedResponse == nil {
+            await MainActor.run {
+                if let existingIndex = self.detectedContent.firstIndex(where: { 
+                    $0.type == .question && 
+                    $0.text == question && 
+                    $0.response == nil 
+                }) {
+                    self.detectedContent[existingIndex].response = "I'm thinking about your question. Let me process that..."
+                    logger.warning("No AI response available for: \(question)")
+                }
+            }
+        }
+        
+        // Add to conversation memory for context
+        if let finalResponse = enhancedResponse ?? instantResponse {
+            _ = conversationMemory.addMemory(
+                text: question,
+                intent: EnhancedIntent(
+                    primary: .question(subtype: .factual),
+                    confidence: confidence,
+                    entities: [],
+                    sentiment: .neutral,
+                    subIntents: []
+                ),
+                response: finalResponse,
+                bookTitle: bookContext?.title,
+                bookAuthor: bookContext?.author
+            )
+        }
+        
+        // Audio feedback if enabled  
+        if QuestionSettings.audioFeedbackEnabled, let response = enhancedResponse ?? instantResponse {
+            await speakResponse(response)
+        }
+    }
+    
+    // Old fallback code removed - using orchestrator now
+    private func oldFallbackCode() {
+        // This is never called - kept for reference only
         guard AICompanionService.shared.isConfigured() else {
             logger.error("❌ AI service not configured")
             
@@ -1283,6 +1310,7 @@ extension TrueAmbientProcessor {
                 self.detectedContent.append(content)
             }
         }
+        return  // End of oldFallbackCode
     }
     
     // Helper to save question with response to SwiftData
