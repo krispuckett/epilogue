@@ -1240,17 +1240,16 @@ extension TrueAmbientProcessor {
             return
         }
         
-        do {
-            let response = try await AICompanionService.shared.processMessage(
-                question,
-                bookContext: bookContext,
-                conversationHistory: []
-            )
-            
-            logger.info("✅ Got AI response: \(response.prefix(50))...")
-            
-            // Update UI with response
-            await MainActor.run {
+        // Use IntelligentQueryRouter for ultra-fast routing
+        let response = await IntelligentQueryRouter.shared.processWithParallelism(
+            question,
+            bookContext: bookContext
+        )
+        
+        logger.info("✅ Got AI response: \(response.prefix(50))...")
+        
+        // Update UI with response
+        await MainActor.run {
                 // Update ALL matching questions (handles partial questions)
                 for index in self.detectedContent.indices {
                     if self.detectedContent[index].type == .question &&
@@ -1282,24 +1281,9 @@ extension TrueAmbientProcessor {
                 bookAuthor: bookContext?.author
             )
             
-            // Audio feedback if enabled  
-            if QuestionSettings.audioFeedbackEnabled {
-                await speakResponse(response)
-            }
-            
-        } catch {
-            logger.error("❌ AI processing failed: \(error)")
-            
-            await MainActor.run {
-                if let existingIndex = self.detectedContent.firstIndex(where: { 
-                    $0.type == .question && 
-                    $0.text == question && 
-                    $0.response == nil 
-                }) {
-                    self.detectedContent[existingIndex].response = "Error: \(error.localizedDescription)"
-                    logger.info("⚡ Updated question #\(existingIndex) with error")
-                }
-            }
+        // Audio feedback if enabled  
+        if QuestionSettings.audioFeedbackEnabled {
+            await speakResponse(response)
         }
     }
     
@@ -1332,98 +1316,79 @@ extension TrueAmbientProcessor {
         }
         
         // Process with AI
-        do {
-            logger.info("🤖 Requesting AI response for: \(question)")
-            
-            // Include context in the question if available
-            var enhancedQuestion = context.isEmpty ? question : "\(context)\n\nUser question: \(question)"
-            
-            // Use iOS 26 models to enhance the question if available
-            if foundationModels.isAvailable() {
-                enhancedQuestion = await foundationModels.enhanceText(enhancedQuestion)
-            }
-            
-            let response = try await AICompanionService.shared.processMessage(
-                enhancedQuestion,
-                bookContext: AmbientBookDetector.shared.detectedBook,
-                conversationHistory: []
-            )
-            
-            logger.info("✅ Got AI response: \(response.prefix(50))...")
-            
-            // Create content with response
-            let content = AmbientProcessedContent(
-                text: question,
-                type: .question,
-                timestamp: Date(),
-                confidence: confidence,
-                response: response,
-                bookTitle: AmbientBookDetector.shared.detectedBook?.title,
-                bookAuthor: AmbientBookDetector.shared.detectedBook?.author
-            )
-            
-            // Update memory with response
-            let bookContext = AmbientBookDetector.shared.detectedBook
-            conversationMemory.addMemory(
-                text: question,
-                intent: intentDetector.detectIntent(
-                    from: question,
-                    bookTitle: bookContext?.title,
-                    bookAuthor: bookContext?.author
-                ),
-                response: response,
+        logger.info("🤖 Requesting AI response for: \(question)")
+        
+        // Include context in the question if available
+        var enhancedQuestion = context.isEmpty ? question : "\(context)\n\nUser question: \(question)"
+        
+        // Use iOS 26 models to enhance the question if available
+        if foundationModels.isAvailable() {
+            enhancedQuestion = await foundationModels.enhanceText(enhancedQuestion)
+        }
+        
+        // Use IntelligentQueryRouter for ultra-fast routing
+        let response = await IntelligentQueryRouter.shared.processWithParallelism(
+            enhancedQuestion,
+            bookContext: AmbientBookDetector.shared.detectedBook
+        )
+        
+        logger.info("✅ Got AI response: \(response.prefix(50))...")
+        
+        // Create content with response
+        let content = AmbientProcessedContent(
+            text: question,
+            type: .question,
+            timestamp: Date(),
+            confidence: confidence,
+            response: response,
+            bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+            bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+        )
+        
+        // Update memory with response
+        let bookContext = AmbientBookDetector.shared.detectedBook
+        conversationMemory.addMemory(
+            text: question,
+            intent: intentDetector.detectIntent(
+                from: question,
                 bookTitle: bookContext?.title,
                 bookAuthor: bookContext?.author
-            )
-            
-            // Update existing question with response
-            await MainActor.run {
-                // Find and update the existing question
-                if let index = self.detectedContent.firstIndex(where: { 
-                    $0.type == .question && 
-                    $0.text == question && 
-                    $0.response == nil 
-                }) {
-                    // Create a new instance with the response (structs are immutable)
-                    let updatedContent = AmbientProcessedContent(
-                        text: question,
-                        type: .question,
-                        timestamp: self.detectedContent[index].timestamp,
-                        confidence: confidence,
-                        response: response,
-                        bookTitle: content.bookTitle,
-                        bookAuthor: content.bookAuthor
-                    )
-                    self.detectedContent[index] = updatedContent
-                    logger.info("✅ Updated question with AI response")
-                } else {
-                    // Add as new if not found
-                    self.detectedContent.append(content)
-                    logger.info("✅ Added question with AI response to detectedContent")
-                }
-            }
-            
-            // Audio feedback if enabled
-            if QuestionSettings.audioFeedbackEnabled {
-                await speakResponse(response)
-            }
-            
-        } catch {
-            logger.error("❌ AI processing failed: \(error)")
-            
-            let content = AmbientProcessedContent(
-                text: question,
-                type: .question,
-                timestamp: Date(),
-                confidence: confidence,
-                response: "Error: \(error.localizedDescription)",
-                bookTitle: AmbientBookDetector.shared.detectedBook?.title,
-                bookAuthor: AmbientBookDetector.shared.detectedBook?.author
-            )
-            
-            await MainActor.run {
+            ),
+            response: response,
+            bookTitle: bookContext?.title,
+            bookAuthor: bookContext?.author
+        )
+        
+        // Update existing question with response
+        await MainActor.run {
+            // Find and update the existing question
+            if let index = self.detectedContent.firstIndex(where: { 
+                $0.type == .question && 
+                $0.text == question && 
+                $0.response == nil 
+            }) {
+                // Create a new instance with the response (structs are immutable)
+                let updatedContent = AmbientProcessedContent(
+                    text: question,
+                    type: .question,
+                    timestamp: self.detectedContent[index].timestamp,
+                    confidence: confidence,
+                    response: response,
+                    bookTitle: content.bookTitle,
+                    bookAuthor: content.bookAuthor
+                )
+                self.detectedContent[index] = updatedContent
+                logger.info("✅ Updated question with AI response")
+            } else {
+                // Add as new if not found
                 self.detectedContent.append(content)
+                logger.info("✅ Added question with AI response to detectedContent")
             }
+        }
+            
+        // Audio feedback if enabled
+        if QuestionSettings.audioFeedbackEnabled {
+            await speakResponse(response)
         }
         return  // End of oldFallbackCode
     }
