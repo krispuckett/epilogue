@@ -113,9 +113,23 @@ struct BookDetailView: View {
     }
     
     private var accentColor: Color {
-        // ALWAYS use our warm orange for UI elements
-        // Never use book colors - they often clash horribly
-        return Color(red: 1.0, green: 0.55, blue: 0.26)
+        // Use smart accent color that adapts to the book
+        // Blues, purples, etc. stay; reds get transformed
+        let accent = SmartAccentColor.getSmartAccent(from: colorPalette)
+        
+        #if DEBUG
+        // Debug: Log color decision
+        if let originalAccent = colorPalette?.accent {
+            let analysis = SmartAccentColor.analyzeColorSuitability(originalAccent)
+            if !analysis.isSuitable {
+                print("🎨 Book: \(book.title)")
+                print("   Original color rejected: \(analysis.zone.description)")
+                print("   Using: \(accent == SmartAccentColor.defaultAccent ? "Default orange" : "Transformed color")")
+            }
+        }
+        #endif
+        
+        return accent
     }
     
     private var shadowColor: Color {
@@ -402,15 +416,15 @@ struct BookDetailView: View {
                         .tint(accentColor)
                     }
                 } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: Color(red: 1.0, green: 0.55, blue: 0.26), interactive: true)
-                        .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 8)
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                        .shadow(color: accentColor.opacity(0.3), radius: 8)
                 }
                 .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 // Page count and percentage removed per user request
                 
                 if let rating = book.userRating {
-                    StatusPill(text: "★ \(rating)", color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                    StatusPill(text: "★ \(rating)", color: accentColor, interactive: false)
                         .accessibilityLabel("Rating: \(rating) stars")
                 }
             }
@@ -640,7 +654,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("Recent Activity")
                     .font(.system(size: 18, weight: .semibold))
@@ -671,7 +685,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "sparkles")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("Reading Insights")
                     .font(.system(size: 18, weight: .semibold))
@@ -712,7 +726,7 @@ struct BookDetailView: View {
         VStack(spacing: 16) {
             Image(systemName: "book.pages")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .foregroundStyle(accentColor.opacity(0.8))
             
             Text("Ready to start reading?")
                 .font(.system(size: 20, weight: .semibold))
@@ -734,7 +748,7 @@ struct BookDetailView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .background(accentColor)
                     .clipShape(Capsule())
             }
         }
@@ -749,7 +763,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "text.book.closed")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("About This Book")
                     .font(.system(size: 18, weight: .semibold))
@@ -772,7 +786,7 @@ struct BookDetailView: View {
                 } label: {
                     Text(summaryExpanded ? "Show less" : "Read more")
                         .font(.caption)
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(accentColor)
                 }
             }
         }
@@ -786,7 +800,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "timer")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("Estimated Reading Time")
                     .font(.system(size: 18, weight: .semibold))
@@ -831,7 +845,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "star.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("Your Review")
                     .font(.system(size: 18, weight: .semibold))
@@ -845,7 +859,7 @@ struct BookDetailView: View {
                 } label: {
                     Text("Edit")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(accentColor)
                 }
             }
             
@@ -854,7 +868,7 @@ struct BookDetailView: View {
                     ForEach(1...5, id: \.self) { star in
                         Image(systemName: star <= rating ? "star.fill" : "star")
                             .font(.system(size: 20))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .foregroundStyle(accentColor)
                     }
                 }
                 .padding(.bottom, 8)
@@ -876,7 +890,7 @@ struct BookDetailView: View {
         VStack(spacing: 16) {
             Image(systemName: "star.leadinghalf.filled")
                 .font(.system(size: 48))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .foregroundStyle(accentColor.opacity(0.8))
             
             Text("How was this book?")
                 .font(.system(size: 20, weight: .semibold))
@@ -895,7 +909,7 @@ struct BookDetailView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .background(accentColor)
                     .clipShape(Capsule())
             }
         }
@@ -910,7 +924,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "quote.opening")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("Memorable Quotes")
                     .font(.system(size: 18, weight: .semibold))
@@ -945,7 +959,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "chart.bar.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("Reading Stats")
                     .font(.system(size: 18, weight: .semibold))
@@ -1000,7 +1014,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "note.text")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("All Notes")
                     .font(.system(size: 18, weight: .semibold))
@@ -1021,7 +1035,7 @@ struct BookDetailView: View {
                     .iOS26SwipeActions([
                         SwipeAction(
                             icon: "pencil",
-                            backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                            backgroundColor: accentColor,
                             handler: {
                                 NotificationCenter.default.post(
                                     name: Notification.Name("EditNote"),
@@ -1053,7 +1067,7 @@ struct BookDetailView: View {
             HStack {
                 Image(systemName: "quote.opening")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(accentColor)
                 
                 Text("All Quotes")
                     .font(.system(size: 18, weight: .semibold))
@@ -1115,7 +1129,7 @@ struct BookDetailView: View {
                         .iOS26SwipeActions([
                             SwipeAction(
                                 icon: "pencil",
-                                backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                                backgroundColor: accentColor,
                                 handler: {
                                     // Edit quote
                                     NotificationCenter.default.post(
@@ -1168,7 +1182,7 @@ struct BookDetailView: View {
                         .iOS26SwipeActions([
                             SwipeAction(
                                 icon: "pencil",
-                                backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                                backgroundColor: accentColor,
                                 handler: {
                                     // Edit note
                                     NotificationCenter.default.post(
@@ -1696,11 +1710,7 @@ struct StatusPill: View {
         .foregroundColor(.white)  // Always white text
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .glassEffect(in: Capsule())  // Use glass effect instead of color background
-        .overlay {
-            Capsule()
-                .strokeBorder(color.opacity(0.3), lineWidth: 0.5)
-        }
+        .glassEffect(in: Capsule(), tint: color.opacity(0.3))  // iOS 26 glass with tint
     }
 }
 

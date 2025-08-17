@@ -229,17 +229,19 @@ final class PerplexitySonarService {
         let key = KeychainManager.shared.getPerplexityAPIKey() ??
                   Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
         
-        // Validate the key isn't a placeholder
+        // Just check if we have a key that looks like an API key
         if let key = key,
            !key.isEmpty,
-           key != "your_actual_api_key_here",
-           !key.contains("$("),
-           key != "PLACEHOLDER_API_KEY" {
+           key.starts(with: "pplx-") {  // Perplexity keys start with pplx-
             self.apiKey = key
             logger.info("🔑 Perplexity API key loaded successfully")
+        } else if let key = key, !key.isEmpty {
+            // Try it anyway if it's not empty
+            self.apiKey = key
+            logger.warning("⚠️ API key doesn't match expected format, but will try it")
         } else {
             self.apiKey = nil
-            logger.warning("⚠️ No valid Perplexity API key found")
+            logger.error("❌ No Perplexity API key found")
         }
     }
     

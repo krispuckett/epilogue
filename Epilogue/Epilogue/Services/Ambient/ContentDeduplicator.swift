@@ -164,7 +164,7 @@ extension ContentDeduplicator {
         let cutoff = Date().addingTimeInterval(-timeWindow)
         for recent in recentContent.suffix(10) where recent.timestamp > cutoff {
             if recent.text == normalized {
-                logger.info("⚠️ Blocking exact duplicate question within \(timeWindow)s")
+                print("⚠️ Blocking exact duplicate question within \(timeWindow)s")
                 return true
             }
         }

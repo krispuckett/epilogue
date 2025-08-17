@@ -1064,6 +1064,24 @@ extension TrueAmbientProcessor {
     
     // Process question with enhanced context
     private func processQuestionWithEnhancedContext(_ question: String, confidence: Float, enhancedIntent: EnhancedIntent) async {
+        // Debounce - wait a bit to see if more text is coming
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Check if this question has been superseded by a longer version
+        let currentQuestion = await MainActor.run {
+            self.detectedContent.first { content in
+                content.type == .question &&
+                content.response == nil &&
+                (content.text == question || content.text.contains(question) || question.contains(content.text))
+            }?.text
+        }
+        
+        // If there's a longer version, skip this one
+        if let currentQuestion = currentQuestion, currentQuestion.count > question.count {
+            logger.info("🆙 Skipping partial question, longer version exists: \(currentQuestion.prefix(30))")
+            return
+        }
+        
         // Build context from conversation memory
         let conversationContext = conversationMemory.buildContextForResponse(currentIntent: enhancedIntent)
         
@@ -1116,18 +1134,24 @@ extension TrueAmbientProcessor {
         )
         
         await MainActor.run {
-            // Check if we already have a similar question being processed
-            let hasExisting = self.detectedContent.contains { content in
+            // Smart deduplication: Update existing partial question or add new
+            if let existingIndex = self.detectedContent.firstIndex(where: { content in
                 content.type == .question &&
                 content.response == nil &&  // Still processing
-                self.isSimilarQuestion(content.text, to: question)
-            }
-            
-            if !hasExisting {
-                self.detectedContent.append(pendingContent)
-                logger.info("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
+                (content.text.hasPrefix(question) ||  // Old is prefix of new (question evolved)
+                 question.hasPrefix(content.text))     // New is prefix of old (partial update)
+            }) {
+                // Replace the partial with the fuller question
+                if question.count > self.detectedContent[existingIndex].text.count {
+                    self.detectedContent[existingIndex] = pendingContent
+                    logger.info("🔄 Updated question to fuller version: \(question.prefix(30))...")
+                } else {
+                    logger.info("ℹ️ Keeping existing question, new is shorter")
+                }
             } else {
-                logger.info("✅ Similar question already processing: \(question.prefix(30))...")
+                // No similar question found, add it
+                self.detectedContent.append(pendingContent)
+                logger.info("💭 NEW: Question added for processing: \(question.prefix(30))...")
             }
         }
         
@@ -1165,14 +1189,16 @@ extension TrueAmbientProcessor {
         // Update UI with instant response (if available)
         if let instant = instantResponse {
             await MainActor.run {
-                // Update existing pending question with instant response
-                if let existingIndex = self.detectedContent.firstIndex(where: { 
-                    $0.type == .question && 
-                    $0.text == question && 
-                    $0.response == nil 
-                }) {
-                    self.detectedContent[existingIndex].response = instant
-                    logger.info("⚡ INSTANT response delivered: \(instant.prefix(50))...")
+                // Update ALL matching questions (handles partial questions)
+                for index in self.detectedContent.indices {
+                    if self.detectedContent[index].type == .question &&
+                       (self.detectedContent[index].text == question ||
+                        self.detectedContent[index].text.contains(question) ||
+                        question.contains(self.detectedContent[index].text)) &&
+                       self.detectedContent[index].response == nil {
+                        self.detectedContent[index].response = instant
+                        logger.info("⚡ Updated question #\(index) with response")
+                    }
                 }
             }
             
@@ -1183,16 +1209,19 @@ extension TrueAmbientProcessor {
         // Update with enhanced response when available
         if let enhanced = enhancedResponse {
             await MainActor.run {
-                if let existingIndex = self.detectedContent.firstIndex(where: { 
-                    $0.type == .question && 
-                    $0.text == question
-                }) {
-                    self.detectedContent[existingIndex].response = enhanced
-                    logger.info("✨ ENHANCED response delivered: \(enhanced.prefix(50))...")
-                    
-                    // Cache for future instant access
-                    self.responseCache.cacheResponse(enhanced, for: question, bookContext: bookContext?.title, source: .cloud)
+                // Update ALL matching questions
+                for index in self.detectedContent.indices {
+                    if self.detectedContent[index].type == .question &&
+                       (self.detectedContent[index].text == question ||
+                        self.detectedContent[index].text.contains(question) ||
+                        question.contains(self.detectedContent[index].text)) {
+                        self.detectedContent[index].response = enhanced
+                        logger.info("✨ Updated question #\(index) with enhanced response")
+                    }
                 }
+                
+                // Cache for future instant access
+                self.responseCache.cacheResponse(enhanced, for: question, bookContext: bookContext?.title, source: .cloud)
             }
             
             // Update in persistence layer with enhanced response
