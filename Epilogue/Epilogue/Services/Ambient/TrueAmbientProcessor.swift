@@ -328,7 +328,18 @@ public class TrueAmbientProcessor: ObservableObject {
                 )
                 
                 await MainActor.run {
-                    self.detectedContent.append(pendingQuestion)
+                    // FINAL duplicate check - absolutely no duplicates allowed
+                    let isDuplicate = self.detectedContent.contains { existing in
+                        existing.type == .question && 
+                        existing.text == pendingQuestion.text
+                    }
+                    
+                    if !isDuplicate {
+                        self.detectedContent.append(pendingQuestion)
+                        logger.info("✅ Added new question: \(text.prefix(30))...")
+                    } else {
+                        logger.warning("🚫 BLOCKED duplicate question at final check: \(text.prefix(30))...")
+                    }
                 }
                 
                 // Process after debounce
@@ -1243,24 +1254,18 @@ extension TrueAmbientProcessor {
         )
         
         await MainActor.run {
-            // Smart deduplication: Update existing partial question or add new
+            // Find the EXACT question we added earlier in processDetectedText
             if let existingIndex = self.detectedContent.firstIndex(where: { content in
                 content.type == .question &&
-                content.response == nil &&  // Still processing
-                (content.text.hasPrefix(question) ||  // Old is prefix of new (question evolved)
-                 question.hasPrefix(content.text))     // New is prefix of old (partial update)
+                content.text == question  // Must be EXACT match
             }) {
-                // Replace the partial with the fuller question
-                if question.count > self.detectedContent[existingIndex].text.count {
-                    self.detectedContent[existingIndex] = pendingContent
-                    logger.info("🔄 Updated question to fuller version: \(question.prefix(30))...")
-                } else {
-                    logger.info("ℹ️ Keeping existing question, new is shorter")
-                }
+                // Update the existing question with thinking state
+                self.detectedContent[existingIndex] = pendingContent
+                logger.info("📝 Updated existing question to thinking state: \(question.prefix(30))...")
             } else {
-                // No similar question found, add it
-                self.detectedContent.append(pendingContent)
-                logger.info("💭 NEW: Question added for processing: \(question.prefix(30))...")
+                logger.error("❌ CRITICAL: Question not found that should exist: \(question.prefix(30))...")
+                // This should NEVER happen because we add the question in processDetectedText
+                // But if it does, don't add a duplicate
             }
         }
         
@@ -1313,18 +1318,16 @@ extension TrueAmbientProcessor {
         
         // Update UI with response
         await MainActor.run {
-                // Update ALL matching questions (handles partial questions)
-                for index in self.detectedContent.indices {
-                    if self.detectedContent[index].type == .question &&
-                       (self.detectedContent[index].text == question ||
-                        self.detectedContent[index].text.contains(question) ||
-                        question.contains(self.detectedContent[index].text)) &&
-                       self.detectedContent[index].response == nil {
-                        self.detectedContent[index].response = response
-                        logger.info("⚡ Updated question #\(index) with response")
-                    }
-                }
+            // Update ONLY the EXACT question - no fuzzy matching
+            if let index = self.detectedContent.firstIndex(where: {
+                $0.type == .question && $0.text == question && $0.response == nil
+            }) {
+                self.detectedContent[index].response = response
+                logger.info("⚡ Updated question #\(index) with response")
+            } else {
+                logger.error("❌ Could not find question to update with response: \(question.prefix(30))...")
             }
+        }
             
             // Update in persistence layer
             await persistenceLayer.updateQuestionAnswer(questionText: question, answer: response)

@@ -1079,43 +1079,35 @@ struct AmbientModeView: View {
     }
     
     private func stopAndSaveSession() {
-        // INSTANT UI dismissal - don't wait for anything
-        dismiss()
+        // Stop recording immediately
+        isRecording = false
+        liveTranscription = ""
+        showLiveTranscription = false
+        transcriptionFadeTimer?.invalidate()
+        transcriptionFadeTimer = nil
         
-        // Process session end in background AFTER dismissal
+        // Create session BEFORE dismissal
+        if !processor.detectedContent.isEmpty {
+            let session = createSession()
+            
+            // Show summary if there's meaningful content
+            if session.capturedQuestions.count > 0 || session.capturedQuotes.count > 0 || session.capturedNotes.count > 0 {
+                currentSession = session
+                showingSessionSummary = true
+                logger.info("📊 Showing session summary with \(session.capturedQuestions.count) questions")
+            } else {
+                // No meaningful content - just dismiss
+                dismiss()
+            }
+        } else {
+            // No content at all - just dismiss
+            dismiss()
+        }
+        
+        // Clean up in background
         Task.detached {
-            // Capture values we need before dismissal
-            let processor = self.processor
-            let voiceManager = self.voiceManager
-            
-            // Stop voice first (non-blocking)
-            await voiceManager.stopListening()
-            
-            // Stop recording immediately
-            await MainActor.run { [self] in
-                self.isRecording = false
-                self.liveTranscription = ""
-                self.showLiveTranscription = false
-                self.transcriptionFadeTimer?.invalidate()
-                self.transcriptionFadeTimer = nil
-            }
-            
-            // Get summary data before ending session
-            let detectedContent = await MainActor.run { processor.detectedContent }
-            if !detectedContent.isEmpty {
-                // Create the session in background
-                let session = await MainActor.run { [self] in self.createSession() }
-                
-                // Only show summary if there's meaningful content
-                if session.capturedQuestions.count > 0 || session.capturedQuotes.count > 0 || session.capturedNotes.count > 0 {
-                    // Note: Cannot update view state after dismissal in a detached task
-                    // The summary should be handled before dismissal
-                    logger.info("Session has meaningful content but view is dismissed")
-                }
-            }
-            
-            // End session
-            await processor.endSession()
+            await self.voiceManager.stopListening()
+            await self.processor.endSession()
         }
     }
     
