@@ -546,38 +546,7 @@ struct FollowUpQuestionsSection: View {
                 .foregroundStyle(.secondary)
             
             ForEach(questions, id: \.self) { question in
-                Button {
-                    withAnimation {
-                        selectedQuestion = question
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "questionmark.circle")
-                            .foregroundStyle(.accentColor)
-                        
-                        Text(question)
-                            .font(.subheadline)
-                            .multilineTextAlignment(.leading)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "arrow.right.circle")
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.accentColor.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(
-                                selectedQuestion == question ? Color.accentColor : Color.clear,
-                                lineWidth: 2
-                            )
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
+                questionButton(for: question)
             }
         }
         .padding()
@@ -585,6 +554,48 @@ struct FollowUpQuestionsSection: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.primary.opacity(0.03))
         )
+    }
+    
+    @ViewBuilder
+    private func questionButton(for question: String) -> some View {
+        let isSelected = selectedQuestion == question
+        
+        Button {
+            withAnimation {
+                selectedQuestion = question
+            }
+        } label: {
+            HStack {
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.accentColor)
+                
+                Text(question)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
+                
+                Image(systemName: "arrow.right.circle")
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .background(questionBackground)
+            .overlay(questionOverlay(isSelected: isSelected))
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var questionBackground: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Color.accentColor.opacity(0.05))
+    }
+    
+    private func questionOverlay(isSelected: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 10)
+            .strokeBorder(
+                isSelected ? Color.accentColor : Color.clear,
+                lineWidth: 2
+            )
     }
 }
 
