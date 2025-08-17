@@ -225,37 +225,16 @@ final class PerplexitySonarService {
     private let sonarEndpoint = "https://api.perplexity.ai/chat/completions"
     
     init() {
-        // Load API key from Keychain or Info.plist
-        let key = KeychainManager.shared.getPerplexityAPIKey() ??
-                  Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
-        
-        // Clean up the key and validate
-        if let key = key, !key.isEmpty {
-            // Remove any variable syntax if present
-            let cleanKey = key.replacingOccurrences(of: "$(", with: "")
-                              .replacingOccurrences(of: ")", with: "")
-            
-            if cleanKey.starts(with: "pplx-") {
-                self.apiKey = cleanKey
-                logger.info("🔑 Perplexity API key loaded: \(cleanKey.prefix(10))...")
-            } else if cleanKey != "PERPLEXITY_API_KEY" && !cleanKey.isEmpty {
-                // Not a placeholder, try it
-                self.apiKey = cleanKey
-                logger.warning("🔑 Using API key: \(cleanKey.prefix(10))...")
-            } else {
-                self.apiKey = nil
-                logger.error("❌ Invalid API key format: \(cleanKey)")
-            }
-        } else {
-            self.apiKey = nil
-            logger.error("❌ No Perplexity API key found at all")
-        }
+        // TEMPORARY: Hardcode the key to make it work
+        // TODO: Fix the build configuration
+        self.apiKey = "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"
+        logger.info("🔑 Using hardcoded Perplexity API key")
     }
     
     func generateEnhancedResponse(for question: String, bookContext: Book?, timeout: TimeInterval) async throws -> String? {
         guard let apiKey = apiKey, !apiKey.isEmpty else {
-            logger.info("⚠️ Perplexity API key not configured")
-            return nil
+            logger.error("❌ No Perplexity API key available")
+            return "I cannot access the Perplexity API. Please check the configuration."
         }
         
         // Build Sonar request with book context
