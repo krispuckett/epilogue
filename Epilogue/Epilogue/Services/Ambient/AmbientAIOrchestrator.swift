@@ -33,13 +33,13 @@ actor AmbientAIOrchestrator {
             AmbientResponseCache.shared.getCachedResponse(for: question, bookContext: bookContext?.title)
         }
         if let cached = cached {
-            print("💨 Cache hit - returning instantly")
+            logger.info("💨 Cache hit - returning instantly")
             return (instant: cached, enhanced: nil)
         }
         
         // 2. Check if already processing
         if let existingTask = activeTasks[cacheKey] {
-            print("⏳ Already processing - waiting for result")
+            logger.info("⏳ Already processing - waiting for result")
             let result = await existingTask.value
             return (instant: result, enhanced: nil)
         }
@@ -110,11 +110,11 @@ actor AmbientAIOrchestrator {
             )
             
             let elapsed = Date().timeIntervalSince(startTime)
-            print("⚡ Local AI response in \(String(format: "%.2f", elapsed))s")
+            logger.info("⚡ Local AI response in \(String(format: "%.2f", elapsed))s")
             
             return response
         } catch {
-            print("❌ Local AI failed: \(error)")
+            logger.info("⚠️ Local AI not available, will use cloud AI: \(error)")
             return nil
         }
     }
@@ -131,12 +131,13 @@ actor AmbientAIOrchestrator {
             )
             
             let elapsed = Date().timeIntervalSince(startTime)
-            print("☁️ Cloud AI response in \(String(format: "%.2f", elapsed))s")
+            logger.info("☁️ Cloud AI response in \(String(format: "%.2f", elapsed))s")
             
             return response
         } catch {
-            print("❌ Cloud AI failed: \(error)")
-            return nil
+            logger.error("❌ Cloud AI failed: \(error)")
+            // Return a helpful fallback message
+            return "I'm processing your question about \(bookContext?.title ?? "your reading"). Please ensure your Perplexity API key is configured in Settings."
         }
     }
 }
@@ -160,8 +161,10 @@ final class LocalAIService {
             self.modelSession = LanguageModelSession(
                 instructions: "You are a thoughtful reading companion helping someone understand literature deeply. Be concise but insightful."
             )
-            print("✅ iOS 26 Foundation Models initialized")
+            logger.info("✅ iOS 26 Foundation Models initialized")
         }
+        #else
+        logger.info("⚠️ Foundation Models not available, will use cloud AI only")
         #endif
     }
     
@@ -182,13 +185,13 @@ final class LocalAIService {
             let response = try await session.respond(to: prompt)
             return response.content
         } catch {
-            print("⚠️ Foundation Models error: \(error)")
+            logger.error("⚠️ Foundation Models error: \(error)")
             throw error
         }
+        #else
+        // When Foundation Models not available, return nil to let cloud AI handle it
+        throw AIError.modelNotAvailable
         #endif
-        
-        // Fallback response
-        return "Let me think about '\(question)' in the context of your reading..."
     }
     
     enum AIError: Error {
@@ -210,7 +213,7 @@ class PerplexitySonarService {
     
     func generateEnhancedResponse(for question: String, bookContext: Book?, timeout: TimeInterval) async throws -> String? {
         guard let apiKey = apiKey else {
-            print("⚠️ Perplexity API key not configured")
+            logger.info("⚠️ Perplexity API key not configured")
             return nil
         }
         
