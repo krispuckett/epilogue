@@ -1076,35 +1076,43 @@ struct AmbientModeView: View {
     }
     
     private func stopAndSaveSession() {
-        // Stop recording
-        isRecording = false
-        liveTranscription = ""
-        showLiveTranscription = false
-        transcriptionFadeTimer?.invalidate()
-        transcriptionFadeTimer = nil
-        voiceManager.stopListening()
+        // INSTANT UI dismissal - don't wait for anything
+        dismiss()
         
-        // Create and save session if we have content
-        if !processor.detectedContent.isEmpty {
-            // Create the session first
-            let session = createSession()
+        // Process session end in background AFTER dismissal
+        Task.detached { [weak self] in
+            guard let self = self else { return }
             
-            // Set it as current for the sheet
-            currentSession = session
+            // Stop voice first (non-blocking)
+            await self.voiceManager.stopListening()
             
-            // Show the summary with a small delay to ensure UI is ready
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                print("🎬 Presenting session summary...")
-                showingSessionSummary = true
+            // Stop recording immediately
+            await MainActor.run {
+                self.isRecording = false
+                self.liveTranscription = ""
+                self.showLiveTranscription = false
+                self.transcriptionFadeTimer?.invalidate()
+                self.transcriptionFadeTimer = nil
             }
             
-            // DON'T dismiss yet - let the summary view handle that
-        } else {
-            // No content to save, just dismiss
-            Task {
-                await processor.endSession()
+            // Get summary data before ending session
+            if !self.processor.detectedContent.isEmpty {
+                // Create the session in background
+                let session = await MainActor.run { self.createSession() }
+                
+                // Only show summary if there's meaningful content
+                if session.capturedQuestions.count > 0 || session.capturedQuotes.count > 0 || session.capturedNotes.count > 0 {
+                    await MainActor.run {
+                        self.currentSession = session
+                        // Navigate to summary view or show sheet
+                        // This happens AFTER the view is already dismissed
+                        self.showingSessionSummary = true
+                    }
+                }
             }
-            dismiss()
+            
+            // End session
+            await self.processor.endSession()
         }
     }
     

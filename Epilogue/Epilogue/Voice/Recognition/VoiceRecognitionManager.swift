@@ -361,50 +361,51 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     func stopListening() {
-        // Process any pending transcription before stopping
-        if !pendingTranscription.isEmpty {
-            let finalThought = pendingTranscription
-            pendingTranscription = ""
-            Task {
-                logger.info("🎯 Processing final thought before stop: \(finalThought)")
-                await TrueAmbientProcessor.shared.processDetectedText(finalThought, confidence: Float(self.confidenceScore))
-            }
-        }
-        
-        // Cancel thought timer
-        thoughtTimer?.invalidate()
-        thoughtTimer = nil
-        
-        // Haptic feedback for voice recording stop
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        // IMMEDIATE state changes for instant UI response
         isListening = false
         recognitionState = .idle
         
+        // Stop audio engine immediately
         audioEngine.stop()
         inputNode?.removeTap(onBus: 0)
+        
+        // Cancel timers immediately
         silenceTimer?.invalidate()
         pauseDetectionTimer?.invalidate()
         whisperProcessingTimer?.invalidate()
         whisperProcessingTimer = nil
+        thoughtTimer?.invalidate()
+        thoughtTimer = nil
+        
+        // Clear buffers immediately (don't process)
+        audioBufferForWhisper.removeAll()
+        
+        // End recognition immediately
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         
-        // Reset pause detection state
+        // Reset state immediately
         reactionPhraseDetected = nil
         textBeforePause = ""
         
-        // DON'T BLOCK UI - Process Whisper in background if needed
-        // But don't wait for it - the UI should be responsive immediately
-        if !audioBufferForWhisper.isEmpty {
-            let bufferCount = audioBufferForWhisper.count
-            logger.info("Discarding \(bufferCount) unprocessed buffers for instant UI response")
-            // Clear buffers immediately - don't process on exit
-            audioBufferForWhisper.removeAll()
-            // If critical processing is needed, do it in detached task
-            // But NEVER block the UI
+        logger.info("Stopped listening instantly")
+        
+        // Process any final transcription in background (non-blocking)
+        if !pendingTranscription.isEmpty {
+            let finalThought = pendingTranscription
+            pendingTranscription = ""
+            Task.detached {
+                self.logger.info("🎯 Processing final thought in background: \(finalThought)")
+                await TrueAmbientProcessor.shared.processDetectedText(finalThought, confidence: Float(self.confidenceScore))
+            }
         }
         
-        logger.info("Stopped listening")
+        // Haptic feedback in background (non-blocking)
+        Task.detached {
+            await MainActor.run {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
     }
     
     // MARK: - Continuous Recognition with VAD

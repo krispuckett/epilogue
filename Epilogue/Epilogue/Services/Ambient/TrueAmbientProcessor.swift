@@ -269,16 +269,50 @@ public class TrueAmbientProcessor: ObservableObject {
         case .question:
             logger.info("❓ Question detected: \(text)")
             
-            // Revolutionary approach: Collect the COMPLETE question before processing
-            await MainActor.run {
-                // Remove old partials that this question extends
-                self.detectedContent.removeAll { content in
+            // Use ContentDeduplicator's enhanced question deduplication
+            let normalizedText = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Check if this is a partial that's evolving
+            let existingIndex = await MainActor.run {
+                self.detectedContent.firstIndex { content in
                     content.type == .question && 
                     content.response == nil &&
-                    text.contains(content.text)  // New contains old = old is partial
+                    (content.text.hasPrefix(text) || text.hasPrefix(content.text))
+                }
+            }
+            
+            if let existingIndex = existingIndex {
+                // This is an evolution of existing question
+                await MainActor.run {
+                    if text.count > self.detectedContent[existingIndex].text.count {
+                        // Update to longer version
+                        self.detectedContent[existingIndex] = AmbientProcessedContent(
+                            text: text,
+                            type: .question,
+                            timestamp: Date(),
+                            confidence: confidence,
+                            response: nil,
+                            bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+                            bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+                        )
+                    }
                 }
                 
-                // Add current question
+                // Debounce before processing
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+                    
+                    // Check if still the latest
+                    let stillLatest = await MainActor.run {
+                        self.detectedContent[safe: existingIndex]?.text == text
+                    }
+                    
+                    if stillLatest {
+                        await self.processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
+                    }
+                }
+            } else {
+                // New question
                 let pendingQuestion = AmbientProcessedContent(
                     text: text,
                     type: .question,
@@ -288,25 +322,15 @@ public class TrueAmbientProcessor: ObservableObject {
                     bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                     bookAuthor: AmbientBookDetector.shared.detectedBook?.author
                 )
-                self.detectedContent.append(pendingQuestion)
-                logger.info("📥 Stored question: \(text)")
-            }
-            
-            // Process after delay to ensure we have the complete question
-            Task {
-                try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
                 
-                // Check if this is still the latest question
-                let (stillLatest, finalText) = await MainActor.run {
-                    let latestQuestion = self.detectedContent.last { $0.type == .question && $0.response == nil }
-                    return (latestQuestion?.text == text, latestQuestion?.text ?? text)
+                await MainActor.run {
+                    self.detectedContent.append(pendingQuestion)
                 }
                 
-                if stillLatest {
-                    logger.info("🎯 FINAL question ready: \(finalText)")
-                    await self.processQuestionWithEnhancedContext(finalText, confidence: confidence, enhancedIntent: enhancedIntent)
-                } else {
-                    logger.info("⏭ Skipping superseded partial: \(text)")
+                // Process after debounce
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    await self.processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
                 }
             }
             
@@ -1527,4 +1551,11 @@ extension Notification.Name {
     static let questionProcessing = Notification.Name("questionProcessing")
     static let questionProcessed = Notification.Name("questionProcessed")
     static let contentSaved = Notification.Name("contentSaved")
+}
+
+// MARK: - Safe Array Subscript Extension
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
