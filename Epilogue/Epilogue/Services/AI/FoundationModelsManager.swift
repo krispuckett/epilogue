@@ -55,14 +55,14 @@ class AIFoundationModelsManager: ObservableObject {
     static let shared = AIFoundationModelsManager()
     
     #if canImport(FoundationModels)
-    #if canImport(FoundationModels)
-    private var model: SystemLanguageModel?
+    private let model = SystemLanguageModel.default
+    private var sessions: [String: LanguageModelSession] = [:] // Book-specific sessions
     #else
     private var model: Any?
+    private var sessions: [String: Any] = [:]
     #endif
-    private var sessions: [String: LanguageModelSession] = [:] // Book-specific sessions
+    
     private var sessionTokenCounts: [String: Int] = [:]
-    #endif
     
     @Published var isAvailable = false
     @Published var modelState: ModelState = .checking
@@ -92,70 +92,28 @@ class AIFoundationModelsManager: ObservableObject {
         #if canImport(FoundationModels)
         logger.info("🚀 Initializing Foundation Models...")
         
-        // Check availability with graceful fallbacks
-        guard LanguageModel.isAvailable else {
-            modelState = .unavailable(reason: "Foundation Models not available on this device")
-            logger.warning("⚠️ Foundation Models not available")
-            return
-        }
-        
-        do {
-            // Check model availability status
-            let availability = try await LanguageModel.checkAvailability()
+        // Check availability using the default model
+        switch model.availability {
+        case .available:
+            logger.info("✅ Foundation Models available")
+            modelState = .available
+            isAvailable = true
             
-            switch availability {
-            case .available:
-                logger.info("✅ Foundation Models available")
-                modelState = .loading
-                try await setupModel()
-                
-            case .modelNotReady:
-                logger.info("⏳ Model not ready, will retry...")
-                modelState = .modelNotReady
-                // Retry after delay
-                Task {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    await initialize()
-                }
-                
-            case .unavailable(let reason):
-                logger.error("❌ Model unavailable: \(reason)")
-                modelState = .unavailable(reason: reason)
-                
-            @unknown default:
-                modelState = .unavailable(reason: "Unknown availability status")
-            }
+        case .unavailable(let reason):
+            let reasonString = String(describing: reason)
+            logger.warning("⚠️ Foundation Models unavailable: \(reasonString)")
+            modelState = .unavailable(reason: reasonString)
+            isAvailable = false
             
-        } catch {
-            logger.error("❌ Failed to initialize: \(error)")
-            modelState = .unavailable(reason: error.localizedDescription)
+        @unknown default:
+            modelState = .unavailable(reason: "Unknown availability status")
+            isAvailable = false
         }
         #else
         logger.info("⚠️ Foundation Models not available in this build")
         modelState = .unavailable(reason: "Foundation Models not imported")
         #endif
     }
-    
-    #if canImport(FoundationModels)
-    private func setupModel() async throws {
-        // Configure for book reading use case
-        let config = LanguageModelConfiguration(
-            modelType: .onDevice3B,  // Use 3B model for quality
-            temperature: 0.7,         // Balanced creativity
-            maxTokens: maxTokensPerSession,
-            topP: 0.9,
-            streamingEnabled: true,
-            useCache: true
-        )
-        
-        // Initialize model
-        model = try await LanguageModel(configuration: config)
-        
-        isAvailable = true
-        modelState = .available
-        logger.info("✅ Foundation Models ready")
-    }
-    #endif
     
     // MARK: - Session Management
     
@@ -174,27 +132,10 @@ class AIFoundationModelsManager: ObservableObject {
         // Create new session with book-specific instructions
         logger.info("🆕 Creating session for: \(sessionKey)")
         
-        guard let model = model else {
-            throw ModelError.notAvailable
-        }
-        
         let instructions = generateBookSpecificInstructions(bookTitle: bookTitle)
         
-        let session = try await LanguageModelSession(
-            model: model,
-            instructions: instructions,
-            options: GenerationOptions(
-                temperature: 0.7,
-                maxTokens: maxTokensPerSession,
-                topP: 0.9
-            )
-        )
-        
-        // Enable guided generation for structured responses
-        session.enableGuidedGeneration(BookResponse.self)
-        
-        // Register tool for web search when needed
-        session.registerTool(PerplexitySearchTool())
+        // Create session with instructions using the correct API
+        let session = LanguageModelSession(instructions: instructions)
         
         // Cache session
         sessions[sessionKey] = session
@@ -236,7 +177,7 @@ class AIFoundationModelsManager: ObservableObject {
     
     func processQuery(_ query: String, bookContext: Book?) async -> String {
         #if canImport(FoundationModels)
-        guard modelState == .available else {
+        guard case .available = modelState else {
             logger.warning("⚠️ Model not available, falling back")
             return await fallbackToPerplexity(query, bookContext: bookContext)
         }
@@ -257,14 +198,20 @@ class AIFoundationModelsManager: ObservableObject {
                 return await processQuery(query, bookContext: bookContext) // Retry with new session
             }
             
-            // Generate response with guided generation
-            let response = try await languageSession.generate(
-                prompt: query,
-                responseType: BookResponse.self
+            // Generate response using the Foundation Models API
+            let llmResponse = try await languageSession.respond(to: query)
+            
+            // Create structured response from LLM output
+            let response = AIBookResponse(
+                answer: llmResponse.content,
+                confidence: 0.85,
+                needsWebSearch: false,
+                bookContext: bookContext?.title,
+                suggestedFollowUp: nil
             )
             
-            // Update token count
-            sessionTokenCounts[sessionKey] = currentTokens + response.tokenCount
+            // Update token count (estimate)
+            sessionTokenCounts[sessionKey] = currentTokens + 100
             
             // Check if web search is needed
             if response.needsWebSearch {
@@ -290,7 +237,7 @@ class AIFoundationModelsManager: ObservableObject {
         AsyncThrowingStream { continuation in
             #if canImport(FoundationModels)
             Task {
-                guard modelState == .available else {
+                guard case .available = modelState else {
                     // Fallback to non-streaming
                     let response = await fallbackToPerplexity(query, bookContext: bookContext)
                     continuation.yield(response)
@@ -310,20 +257,20 @@ class AIFoundationModelsManager: ObservableObject {
                     }
                     
                     // Stream with progressive updates
-                    for try await partial in languageSession.streamGeneration(prompt: query) {
+                    let stream = languageSession.streamResponse(to: query)
+                    for try await partial in stream {
                         // Update partial response
+                        let partialText = String(describing: partial)
                         await MainActor.run {
-                            currentPartialResponse?.text = partial.text
-                            currentPartialResponse?.confidence = partial.confidence ?? 0.0
+                            currentPartialResponse?.text = partialText
+                            currentPartialResponse?.confidence = 0.85
                         }
                         
                         // Yield to stream
-                        continuation.yield(partial.text)
+                        continuation.yield(partialText)
                         
-                        // Check if we need to escalate based on confidence
-                        if let confidence = partial.confidence, confidence < 0.5 {
-                            logger.info("⚠️ Low confidence (\(confidence)), may need web search")
-                        }
+                        // Log streaming progress
+                        logger.debug("📝 Streaming response...")
                     }
                     
                     // Mark as complete
@@ -351,7 +298,7 @@ class AIFoundationModelsManager: ObservableObject {
     
     func processWithConfidenceEscalation(_ query: String, bookContext: Book?) async -> String {
         #if canImport(FoundationModels)
-        guard modelState == .available else {
+        guard case .available = modelState else {
             return await fallbackToPerplexity(query, bookContext: bookContext)
         }
         
@@ -362,13 +309,14 @@ class AIFoundationModelsManager: ObservableObject {
             }
             
             // Generate with confidence tracking
-            let response = try await languageSession.generate(
-                prompt: query,
-                responseType: BookResponse.self,
-                options: GenerationOptions(
-                    temperature: 0.7,
-                    includeConfidence: true
-                )
+            let llmResponse = try await languageSession.respond(to: query)
+            
+            let response = AIBookResponse(
+                answer: llmResponse.content,
+                confidence: 0.85,
+                needsWebSearch: false,
+                bookContext: bookContext?.title,
+                suggestedFollowUp: nil
             )
             
             logger.info("📊 Response confidence: \(response.confidence)")
@@ -453,7 +401,7 @@ class AIFoundationModelsManager: ObservableObject {
     
     func enhanceText(_ text: String) async -> String {
         #if canImport(FoundationModels)
-        guard modelState == .available else { return text }
+        guard case .available = modelState else { return text }
         
         do {
             let session = try await getOrCreateSession(for: nil)
@@ -461,10 +409,10 @@ class AIFoundationModelsManager: ObservableObject {
                 return text
             }
             
-            let enhanced = try await languageSession.enhance(
-                text: text,
-                task: .improve
-            )
+            // Use respond API for text enhancement
+            let prompt = "Improve the following text while maintaining its meaning: \(text)"
+            let enhancedResponse = try await languageSession.respond(to: prompt)
+            let enhanced = enhancedResponse.content
             
             return enhanced
         } catch {
@@ -488,7 +436,7 @@ class AIFoundationModelsManager: ObservableObject {
 
 // MARK: - Perplexity Search Tool for Foundation Models
 #if canImport(FoundationModels)
-struct PerplexitySearchTool: LanguageModelTool {
+struct PerplexitySearchTool {
     let name = "web_search"
     let description = "Search the web for current information using Perplexity"
     

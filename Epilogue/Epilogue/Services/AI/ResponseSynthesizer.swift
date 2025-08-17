@@ -115,7 +115,7 @@ class ResponseSynthesizer: ObservableObject {
         let localStart = CFAbsoluteTimeGetCurrent()
         
         // Try Foundation Models first for instant response
-        if AIFoundationModelsManager.shared.isAvailable() {
+        if AIFoundationModelsManager.shared.checkAvailability() {
             let localResponse = await AIFoundationModelsManager.shared.processQuery(query, bookContext: bookContext)
             
             self.currentResponse.text = localResponse

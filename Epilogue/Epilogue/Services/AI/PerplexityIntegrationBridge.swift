@@ -22,7 +22,7 @@ extension IntelligentQueryRouter {
             
             // Check if Foundation Models are available for enhanced local processing
             // Using the renamed AIFoundationModelsManager to avoid conflicts
-            if AIFoundationModelsManager.shared.isAvailable() {
+            if AIFoundationModelsManager.shared.isAvailable {
                 return await AIFoundationModelsManager.shared.processQuery(query, bookContext: bookContext)
             } else {
                 return await SmartEpilogueAI.shared.smartQuery(query)
@@ -170,7 +170,7 @@ extension AICompanionService {
         
         // Try Foundation Models first for local processing
         // Using the renamed AIFoundationModelsManager to avoid conflicts
-        if AIFoundationModelsManager.shared.isAvailable() {
+        if AIFoundationModelsManager.shared.isAvailable {
             extensionLogger.info("🤖 Using Foundation Models for local processing")
             
             // Stream with Foundation Models
