@@ -118,17 +118,17 @@ class ResponseSynthesizer: ObservableObject {
         if FoundationModelsManager.shared.isAvailable() {
             let localResponse = await FoundationModelsManager.shared.processQuery(query, bookContext: bookContext)
             
-            currentResponse.text = localResponse
-            currentResponse.sources.append(ResponseSource(
+            self.currentResponse.text = localResponse
+            self.currentResponse.sources.append(ResponseSource(
                 model: "Foundation Models 3B",
                 confidence: 0.85,
                 latency: (CFAbsoluteTimeGetCurrent() - localStart) * 1000,
                 content: localResponse,
                 type: .foundationModel
             ))
-            currentResponse.enhancementLevel = .basic
+            self.currentResponse.enhancementLevel = .basic
             
-            onUpdate(currentResponse)
+            onUpdate(self.currentResponse)
             
             logger.info("⚡ Local response delivered in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - localStart) * 1000))ms")
         } else {
@@ -139,17 +139,17 @@ class ResponseSynthesizer: ObservableObject {
             
             let localResponse = await SmartEpilogueAI.shared.smartQuery(query)
             
-            currentResponse.text = localResponse
-            currentResponse.sources.append(ResponseSource(
+            self.currentResponse.text = localResponse
+            self.currentResponse.sources.append(ResponseSource(
                 model: "SmartEpilogue",
                 confidence: 0.7,
                 latency: (CFAbsoluteTimeGetCurrent() - localStart) * 1000,
                 content: localResponse,
                 type: .foundationModel
             ))
-            currentResponse.enhancementLevel = .basic
+            self.currentResponse.enhancementLevel = .basic
             
-            onUpdate(currentResponse)
+            onUpdate(self.currentResponse)
         }
     }
     
@@ -177,23 +177,23 @@ class ResponseSynthesizer: ObservableObject {
                     
                     // Merge web content intelligently
                     let merged = await mergeResponses(
-                        local: currentResponse.sources.first?.content ?? "",
+                        local: self.currentResponse.sources.first?.content ?? "",
                         web: webContent,
                         query: query,
                         bookContext: bookContext
                     )
                     
-                    currentResponse.text = merged.text
-                    currentResponse.citations = mergeCitations(
-                        local: currentResponse.citations,
+                    self.currentResponse.text = merged.text
+                    self.currentResponse.citations = mergeCitations(
+                        local: self.currentResponse.citations,
                         web: webCitations
                     )
-                    currentResponse.confidence = merged.confidence
-                    currentResponse.enhancementLevel = .enhanced
+                    self.currentResponse.confidence = merged.confidence
+                    self.currentResponse.enhancementLevel = .enhanced
                     
                     // Add web source
                     if !response.cached {
-                        currentResponse.sources.append(ResponseSource(
+                        self.currentResponse.sources.append(ResponseSource(
                             model: response.model,
                             confidence: response.confidence,
                             latency: (CFAbsoluteTimeGetCurrent() - webStart) * 1000,
@@ -202,7 +202,7 @@ class ResponseSynthesizer: ObservableObject {
                         ))
                     }
                     
-                    onUpdate(currentResponse)
+                    onUpdate(self.currentResponse)
                 }
                 
                 logger.info("✅ Web enhancements complete with \(webCitations.count) citations")
@@ -214,20 +214,20 @@ class ResponseSynthesizer: ObservableObject {
         
         // Extract insights in parallel
         Task {
-            let insights = await insightExtractor.extract(from: currentResponse.text, query: query)
-            currentResponse.keyInsights = insights
-            onUpdate(currentResponse)
+            let insights = await insightExtractor.extract(from: self.currentResponse.text, query: query)
+            self.currentResponse.keyInsights = insights
+            onUpdate(self.currentResponse)
         }
         
         // Generate follow-up questions
         Task {
             let followUps = await followUpGenerator.generate(
-                from: currentResponse.text,
+                from: self.currentResponse.text,
                 originalQuery: query,
                 bookContext: bookContext
             )
-            currentResponse.followUpQuestions = followUps
-            onUpdate(currentResponse)
+            self.currentResponse.followUpQuestions = followUps
+            onUpdate(self.currentResponse)
         }
     }
     
@@ -238,17 +238,17 @@ class ResponseSynthesizer: ObservableObject {
         onUpdate: @escaping (SynthesizedResponse) -> Void
     ) async {
         // Format the final response beautifully
-        currentResponse.text = formatResponseWithMarkdown(currentResponse)
+        self.currentResponse.text = formatResponseWithMarkdown(self.currentResponse)
         
         // Add any media embeds if relevant
         if let embeds = await findRelevantMedia(for: query) {
-            currentResponse.mediaEmbeds = embeds
+            self.currentResponse.mediaEmbeds = embeds
         }
         
-        currentResponse.enhancementLevel = .complete
-        onUpdate(currentResponse)
+        self.currentResponse.enhancementLevel = .complete
+        onUpdate(self.currentResponse)
         
-        logger.info("🎨 Response finalized with \(currentResponse.keyInsights.count) insights, \(currentResponse.followUpQuestions.count) follow-ups")
+        logger.info("🎨 Response finalized with \(self.currentResponse.keyInsights.count) insights, \(self.currentResponse.followUpQuestions.count) follow-ups")
     }
     
     // MARK: - Response Merging
@@ -269,7 +269,7 @@ class ResponseSynthesizer: ObservableObject {
         )
         
         if !contradictions.isEmpty {
-            currentResponse.contradictions = contradictions
+            self.currentResponse.contradictions = contradictions
             logger.info("⚠️ Found \(contradictions.count) contradictions to resolve")
         }
         
