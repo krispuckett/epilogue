@@ -137,6 +137,7 @@ struct BookDetailView: View {
     @State private var editedTitle = ""
     @State private var isEditingTitle = false
     @State private var showingProgressEditor = false
+    @State private var showingCompletionSheet = false
     
     // Computed properties for filtering notes by book
     private var progressPercentage: Double {
@@ -225,16 +226,17 @@ struct BookDetailView: View {
                             .padding(.top, 24)
                     }
                     
-                    // Session History Card
-                    BookSessionHistoryCard(book: book)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 24)
-                    
-                    // Content sections
-                    contentView
+                    // Contextual content based on reading status
+                    contextualContentSections
                         .padding(.horizontal, 24)
                         .padding(.top, 24)
                         .padding(.bottom, 100) // Space for tab bar
+                        .scrollTransition { content, phase in
+                            content
+                                .opacity(phase.isIdentity ? 1 : 0.8)
+                                .scaleEffect(phase.isIdentity ? 1 : 0.98)
+                                .blur(radius: phase.isIdentity ? 0 : 0.5)
+                        }
                     }
                 }
             }
@@ -272,6 +274,19 @@ struct BookDetailView: View {
                     libraryViewModel.replaceBook(originalBook: book, with: newBook)
                     showingBookSearch = false
                 }
+            )
+            .environmentObject(libraryViewModel)
+        }
+        .sheet(isPresented: $showingCompletionSheet) {
+            BookCompletionSheet(
+                book: Binding(
+                    get: { book },
+                    set: { updatedBook in
+                        // Update the book in the library when changes are made
+                        libraryViewModel.updateBook(updatedBook)
+                    }
+                ),
+                isPresented: $showingCompletionSheet
             )
             .environmentObject(libraryViewModel)
         }
@@ -330,11 +345,7 @@ struct BookDetailView: View {
             #if DEBUG
             .colorExtractionDebug(book: book, coverImage: coverImage)
             #endif
-            .rotation3DEffect(
-                Angle(degrees: 5),
-                axis: (x: 0, y: 1, z: 0),
-                perspective: 0.5
-            )
+            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
             .task(id: book.localId) {
                 // Color extraction now happens when image loads in SharedBookCoverView
             }
@@ -383,6 +394,13 @@ struct BookDetailView: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
                                 HapticManager.shared.lightTap()
+                                
+                                // Show completion sheet when marking as read
+                                if status == .read && book.readingStatus != .read {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        showingCompletionSheet = true
+                                    }
+                                }
                             }
                         } label: {
                             Label {
@@ -410,9 +428,7 @@ struct BookDetailView: View {
             
             // Progress bar removed per user request
             
-            // Icon-only segmented control
-            iconOnlySegmentedControl
-                .padding(.top, 20)
+            // Removed segmented control - using continuous scroll instead
         }
     }
     
@@ -484,18 +500,59 @@ struct BookDetailView: View {
         }
     }
     
-    private var contentView: some View {
-        Group {
-            switch selectedSection {
-            case .notes:
-                notesSection
-            case .quotes:
-                quotesSection
-            case .chat:
-                chatSection
+    @ViewBuilder
+    private var contextualContentSections: some View {
+        VStack(spacing: 32) {
+            // Content based on reading status
+            if book.readingStatus == .currentlyReading {
+                // Currently Reading sections
+                if !bookNotes.isEmpty || !bookQuotes.isEmpty {
+                    recentActivitySection
+                }
+                
+                BookSessionHistoryCard(book: book)
+                
+                readingInsightsSection
+                
+            } else if book.readingStatus == .wantToRead {
+                // Want to Read sections
+                startReadingSection
+                
+                if let description = book.description {
+                    aboutThisBookSection(description: description)
+                }
+                
+                if let pageCount = book.pageCount {
+                    estimatedReadingTimeSection(pageCount: pageCount)
+                }
+                
+            } else if book.readingStatus == .read {
+                // Finished Reading sections
+                if book.userRating != nil || book.userNotes != nil {
+                    yourReviewSection
+                } else {
+                    addReviewPromptSection
+                }
+                
+                if !bookQuotes.isEmpty {
+                    memorableQuotesSection
+                }
+                
+                BookSessionHistoryCard(book: book)
+                
+                readingStatsSection
+            }
+            
+            // Always show notes and quotes at the bottom if they exist
+            if !bookNotes.isEmpty {
+                allNotesSection
+            }
+            
+            if !bookQuotes.isEmpty && book.readingStatus != .read {
+                allQuotesSection
             }
         }
-        .animation(hasAppeared ? .easeInOut(duration: 0.2) : nil, value: selectedSection)
+        .animation(.easeInOut(duration: 0.3), value: book.readingStatus)
     }
     
     private func summarySection(description: String) -> some View {
@@ -583,6 +640,471 @@ struct BookDetailView: View {
             AmbientProgressSheet(book: book, isPresented: $showingProgressEditor, colorPalette: colorPalette)
                 .environmentObject(libraryViewModel)
         }
+    }
+    
+    // MARK: - Contextual Sections for Currently Reading
+    
+    @ViewBuilder
+    private var recentActivitySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Recent Activity")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+            }
+            
+            // Show last 2 notes and 2 quotes
+            let recentNotes = bookNotes.prefix(2)
+            let recentQuotes = bookQuotes.prefix(2)
+            
+            ForEach(recentNotes) { note in
+                BookNoteCard(note: note)
+            }
+            
+            ForEach(recentQuotes) { quote in
+                BookQuoteCard(quote: quote)
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private var readingInsightsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Reading Insights")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                if let pageCount = book.pageCount, pageCount > 0 {
+                    let pagesPerDay = max(1, book.currentPage / max(1, Calendar.current.dateComponents([.day], from: book.dateAdded, to: Date()).day ?? 1))
+                    let daysToFinish = (pageCount - book.currentPage) / max(1, pagesPerDay)
+                    
+                    Text("At your current pace of \(pagesPerDay) pages per day")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.8))
+                    
+                    Text("You'll finish in approximately \(daysToFinish) days")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                
+                if bookQuotes.count > 0 {
+                    Text("\(bookQuotes.count) quotes saved from this book")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: - Contextual Sections for Want to Read
+    
+    @ViewBuilder
+    private var startReadingSection: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "book.pages")
+                .font(.system(size: 48))
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+            
+            Text("Ready to start reading?")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+            
+            Button {
+                HapticManager.shared.mediumTap()
+                withAnimation(.spring(response: 0.3)) {
+                    libraryViewModel.updateReadingStatus(for: book.id, status: .currentlyReading)
+                }
+                
+                // Delayed success haptic
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    HapticManager.shared.success()
+                }
+            } label: {
+                Text("Start Reading")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(32)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private func aboutThisBookSection(description: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "text.book.closed")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("About This Book")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+            }
+            
+            Text(description)
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineSpacing(8)
+                .lineLimit(summaryExpanded ? nil : 6)
+            
+            if description.count > 300 {
+                Button {
+                    withAnimation {
+                        summaryExpanded.toggle()
+                    }
+                } label: {
+                    Text(summaryExpanded ? "Show less" : "Read more")
+                        .font(.caption)
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private func estimatedReadingTimeSection(pageCount: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "timer")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Estimated Reading Time")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+            }
+            
+            let avgPagesPerHour = 30 // Average reading speed
+            let hours = pageCount / avgPagesPerHour
+            let days = hours / 2 // Assuming 2 hours reading per day
+            
+            HStack(spacing: 24) {
+                VStack(alignment: .leading) {
+                    Text("\(hours)")
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("hours total")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("\(days)")
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("days at 2hr/day")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: - Contextual Sections for Finished Reading
+    
+    @ViewBuilder
+    private var yourReviewSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Your Review")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Button {
+                    showingCompletionSheet = true
+                    HapticManager.shared.lightTap()
+                } label: {
+                    Text("Edit")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                }
+            }
+            
+            if let rating = book.userRating {
+                HStack(spacing: 4) {
+                    ForEach(1...5, id: \.self) { star in
+                        Image(systemName: star <= rating ? "star.fill" : "star")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    }
+                }
+                .padding(.bottom, 8)
+            }
+            
+            if let notes = book.userNotes {
+                Text(notes)
+                    .font(.system(size: 15, design: .serif))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineSpacing(8)
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private var addReviewPromptSection: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "star.leadinghalf.filled")
+                .font(.system(size: 48))
+                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+            
+            Text("How was this book?")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+            
+            Text("Add your private rating and review")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.7))
+            
+            Button {
+                showingCompletionSheet = true
+                HapticManager.shared.lightTap()
+            } label: {
+                Text("Add Review")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(32)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private var memorableQuotesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "quote.opening")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Memorable Quotes")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Text("\(bookQuotes.count)")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .glassEffect(in: Capsule())
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(bookQuotes) { quote in
+                        BookQuoteCard(quote: quote)
+                            .frame(width: 280)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private var readingStatsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Reading Stats")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+            }
+            
+            let daysSinceStart = Calendar.current.dateComponents([.day], from: book.dateAdded, to: Date()).day ?? 1
+            let pagesPerDay = book.currentPage / max(1, daysSinceStart)
+            
+            HStack(spacing: 32) {
+                VStack(alignment: .leading) {
+                    Text("\(daysSinceStart)")
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("days to finish")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("\(pagesPerDay)")
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("pages per day")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                
+                if bookQuotes.count > 0 {
+                    VStack(alignment: .leading) {
+                        Text("\(bookQuotes.count)")
+                            .font(.system(size: 24, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                        Text("quotes saved")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: - Always Available Sections
+    
+    @ViewBuilder
+    private var allNotesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "note.text")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("All Notes")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Text("\(bookNotes.count)")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .glassEffect(in: Capsule())
+            }
+            
+            ForEach(bookNotes) { note in
+                BookNoteCard(note: note)
+                    .iOS26SwipeActions([
+                        SwipeAction(
+                            icon: "pencil",
+                            backgroundColor: Color(red: 1.0, green: 0.55, blue: 0.26),
+                            handler: {
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("EditNote"),
+                                    object: note
+                                )
+                                HapticManager.shared.lightTap()
+                            }
+                        ),
+                        SwipeAction(
+                            icon: "trash.fill",
+                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                            isDestructive: true,
+                            handler: {
+                                withAnimation(.spring(response: 0.4)) {
+                                    notesViewModel.deleteNote(note)
+                                }
+                            }
+                        )
+                    ])
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+    }
+    
+    @ViewBuilder
+    private var allQuotesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "quote.opening")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("All Quotes")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Text("\(bookQuotes.count)")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .glassEffect(in: Capsule())
+            }
+            
+            ForEach(bookQuotes) { quote in
+                BookQuoteCard(quote: quote)
+                    .iOS26SwipeActions([
+                        SwipeAction(
+                            icon: "square.and.arrow.up",
+                            backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                            handler: {
+                                ShareQuoteService.shareQuote(quote)
+                                HapticManager.shared.success()
+                            }
+                        ),
+                        SwipeAction(
+                            icon: "trash.fill",
+                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                            isDestructive: true,
+                            handler: {
+                                withAnimation(.spring(response: 0.4)) {
+                                    notesViewModel.deleteNote(quote)
+                                }
+                            }
+                        )
+                    ])
+            }
+        }
+        .padding(20)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
     
     private var quotesSection: some View {

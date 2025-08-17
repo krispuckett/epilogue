@@ -1,0 +1,390 @@
+import SwiftUI
+
+struct BookCompletionSheet: View {
+    @Binding var book: Book
+    @Binding var isPresented: Bool
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    
+    // State for the form
+    @State private var rating: Int = 0
+    @State private var reviewText: String = ""
+    @State private var selectedTags: Set<String> = []
+    @State private var isFavorite: Bool = false
+    @State private var animateStars = false
+    @FocusState private var isReviewFocused: Bool
+    
+    // Available emotional tags
+    private let emotionalTags = [
+        "#inspiring", "#thoughtful", "#challenging",
+        "#comforting", "#unforgettable", "#profound",
+        "#educational", "#entertaining", "#moving",
+        "#complex", "#lighthearted", "#transformative"
+    ]
+    
+    private var readingStats: (days: Int, pagesPerDay: Int) {
+        let days = Calendar.current.dateComponents([.day], from: book.dateAdded, to: Date()).day ?? 1
+        let pagesPerDay = (book.pageCount ?? 0) / max(1, days)
+        return (days, pagesPerDay)
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.11, green: 0.105, blue: 0.102),
+                        Color(red: 0.08, green: 0.075, blue: 0.072)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // Book cover and title
+                        headerSection
+                        
+                        // Rating section
+                        ratingSection
+                        
+                        // Review text section
+                        reviewSection
+                        
+                        // Emotional tags section
+                        tagsSection
+                        
+                        // Reading stats
+                        statsSection
+                        
+                        // Favorite toggle
+                        favoriteSection
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 32)
+                }
+            }
+            .navigationTitle("Complete Book")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        HapticManager.shared.lightTap()
+                        isPresented = false
+                    }
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveReview()
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                }
+            }
+        }
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .onAppear {
+            // Load existing data if editing
+            if let existingRating = book.userRating {
+                rating = existingRating
+            }
+            if let existingNotes = book.userNotes {
+                reviewText = existingNotes
+            }
+            
+            // Animate stars on appear
+            withAnimation(.easeInOut(duration: 0.5).delay(0.3)) {
+                animateStars = true
+            }
+        }
+    }
+    
+    // MARK: - View Components
+    
+    @ViewBuilder
+    private var headerSection: some View {
+        VStack(spacing: 16) {
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 120,
+                height: 180
+            )
+            .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+            
+            VStack(spacing: 8) {
+                Text(book.title)
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                
+                Text("by \(book.author)")
+                    .font(.system(size: 14, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var ratingSection: some View {
+        VStack(spacing: 16) {
+            Text("How would you rate this book?")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+            
+            HStack(spacing: 12) {
+                ForEach(1...5, id: \.self) { star in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            rating = star
+                            HapticManager.shared.lightTap()
+                        }
+                    } label: {
+                        Image(systemName: star <= rating ? "star.fill" : "star")
+                            .font(.system(size: 36))
+                            .foregroundStyle(
+                                star <= rating ? 
+                                Color(red: 1.0, green: 0.55, blue: 0.26) : 
+                                Color.white.opacity(0.3)
+                            )
+                            .scaleEffect(animateStars && star <= rating ? 1.0 : 0.8)
+                            .animation(
+                                .spring(response: 0.4, dampingFraction: 0.6)
+                                .delay(Double(star) * 0.05),
+                                value: rating
+                            )
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 20)
+            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+    
+    @ViewBuilder
+    private var reviewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "text.alignleft")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Your Private Review")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                
+                Spacer()
+                
+                if !reviewText.isEmpty {
+                    Text("\(reviewText.count) characters")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+            }
+            
+            TextEditor(text: $reviewText)
+                .font(.system(size: 15, design: .serif))
+                .foregroundStyle(.white)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .frame(minHeight: 120)
+                .padding(12)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                .focused($isReviewFocused)
+                .placeholder(when: reviewText.isEmpty) {
+                    Text("What did you think about this book?")
+                        .font(.system(size: 15, design: .serif))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 20)
+                        .allowsHitTesting(false)
+                }
+        }
+    }
+    
+    @ViewBuilder
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "tag")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("How did this book make you feel?")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            
+            LazyVGrid(columns: [
+                GridItem(.adaptive(minimum: 100), spacing: 12)
+            ], spacing: 12) {
+                ForEach(emotionalTags, id: \.self) { tag in
+                    TagPill(
+                        text: tag,
+                        isSelected: selectedTags.contains(tag),
+                        action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                if selectedTags.contains(tag) {
+                                    selectedTags.remove(tag)
+                                } else {
+                                    selectedTags.insert(tag)
+                                }
+                                HapticManager.shared.lightTap()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var statsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                
+                Text("Reading Statistics")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            
+            HStack(spacing: 32) {
+                VStack(alignment: .leading) {
+                    Text("\(readingStats.days)")
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("days to complete")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("\(readingStats.pagesPerDay)")
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("pages per day")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                
+                Spacer()
+            }
+            .padding(16)
+            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    @ViewBuilder
+    private var favoriteSection: some View {
+        HStack {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 20))
+                .foregroundStyle(
+                    isFavorite ? 
+                    Color(red: 1.0, green: 0.55, blue: 0.26) : 
+                    Color.white.opacity(0.5)
+                )
+            
+            Text("Mark as Favorite")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+            
+            Spacer()
+            
+            Toggle("", isOn: $isFavorite)
+                .labelsHidden()
+                .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .onChange(of: isFavorite) { _, _ in
+                    HapticManager.shared.lightTap()
+                }
+        }
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+    }
+    
+    // MARK: - Actions
+    
+    private func saveReview() {
+        // Update book with review data
+        book.userRating = rating > 0 ? rating : nil
+        book.userNotes = reviewText.isEmpty ? nil : reviewText
+        
+        // Mark as read if not already
+        if book.readingStatus != .read {
+            book.readingStatus = .read
+        }
+        
+        // Save to library
+        libraryViewModel.updateBook(book)
+        
+        // Haptic feedback
+        HapticManager.shared.success()
+        
+        // Dismiss
+        isPresented = false
+    }
+}
+
+// MARK: - Supporting Views
+
+struct TagPill: View {
+    let text: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(
+                    isSelected ? 
+                    .white : 
+                    .white.opacity(0.7)
+                )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .strokeBorder(
+                                        Color(red: 1.0, green: 0.55, blue: 0.26),
+                                        lineWidth: 1
+                                    )
+                            }
+                    } else {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.white.opacity(0.08))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                            }
+                    }
+                }
+        }
+    }
+}
+
+// MARK: - View Extensions
+
+extension View {
+    func placeholder<Content: View>(
+        when shouldShow: Bool,
+        alignment: Alignment = .leading,
+        @ViewBuilder placeholder: () -> Content
+    ) -> some View {
+        ZStack(alignment: alignment) {
+            placeholder().opacity(shouldShow ? 1 : 0)
+            self
+        }
+    }
+}

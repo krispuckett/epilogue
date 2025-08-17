@@ -229,16 +229,7 @@ public class TrueAmbientProcessor: ObservableObject {
             startSession()
         }
         
-        // Deduplication check using new deduplicator
-        if deduplicator.isDuplicate(text) {
-            logger.warning("⚠️ Already processed this text, skipping: \(text.prefix(30))...")
-            return
-        }
-        
-        // Use the same flow as Whisper transcription
-        logger.info("🎯 Processing detected text: \(text)")
-        
-        // Use enhanced intent detection
+        // Use enhanced intent detection FIRST to determine content type
         let bookContext = AmbientBookDetector.shared.detectedBook
         let enhancedIntent = intentDetector.detectIntent(
             from: text,
@@ -246,6 +237,23 @@ public class TrueAmbientProcessor: ObservableObject {
             bookAuthor: bookContext?.author
         )
         let intent = mapEnhancedToLegacyIntent(enhancedIntent)
+        
+        // Use appropriate deduplication based on content type
+        if intent == .question {
+            // For questions, use special deduplication that allows evolution
+            if deduplicator.isQuestionDuplicate(text, within: 2.0) {
+                logger.warning("⚠️ Duplicate question, skipping: \(text.prefix(30))...")
+                return
+            }
+        } else {
+            // For non-questions, use general deduplication
+            if deduplicator.isDuplicate(text) {
+                logger.warning("⚠️ Already processed this text, skipping: \(text.prefix(30))...")
+                return
+            }
+        }
+        
+        logger.info("🎯 Processing detected text: \(text)")
         
         // Add to conversation memory
         let memory = conversationMemory.addMemory(
@@ -1074,12 +1082,8 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback (OPTIMIZED FOR SPEED)
     func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
-        // Check for duplicate questions within 2 second window (reduced from 5)
-        // This prevents double-processing but allows intentional re-asking
-        if deduplicator.isQuestionDuplicate(question, within: 2.0) {
-            logger.info("⚠️ Duplicate question detected: \(question.prefix(30))...")
-            return
-        }
+        // Questions already deduplicated in processDetectedText
+        // No need to check again here
         
         // SPEED: Immediately notify UI we're processing (shows thinking indicator)
         let pendingContent = AmbientProcessedContent(
