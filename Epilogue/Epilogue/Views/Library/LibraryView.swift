@@ -1327,6 +1327,13 @@ class LibraryViewModel: ObservableObject {
         }
     }
     
+    func updateBook(_ book: Book) {
+        if let index = books.firstIndex(where: { $0.id == book.id }) {
+            books[index] = book
+            saveBooks()
+        }
+    }
+    
     func replaceBook(originalBook: Book, with newBook: Book) {
         if let index = books.firstIndex(where: { $0.id == originalBook.id }) {
             var updatedBook = newBook

@@ -1098,7 +1098,7 @@ extension TrueAmbientProcessor {
         
         await MainActor.run {
             self.detectedContent.append(pendingContent)
-            print("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
+            logger.info("💭 INSTANT: Thinking indicator shown for: \(question.prefix(30))...")
         }
         
         // Save question immediately (will be updated with response later)

@@ -156,25 +156,13 @@ public class ContentDeduplicator {
 // MARK: - Question-Specific Deduplication
 extension ContentDeduplicator {
     /// Special handling for questions to prevent duplicate AI calls
-    public func isQuestionDuplicate(_ question: String, within timeWindow: TimeInterval = 2.0) -> Bool {
-        let normalized = normalize(question)
+    public func isQuestionDuplicate(_ question: String, within timeWindow: TimeInterval = 1.0) -> Bool {
+        // Don't deduplicate questions at all - let them flow through
+        // The AI orchestrator handles caching and deduplication internally
+        // This allows natural question evolution and re-asking
         
-        // For questions, we want to allow natural evolution
-        // "Who is" -> "Who is the greatest" -> "Who is the greatest elf"
-        // Only block EXACT duplicates within the time window
-        
-        let cutoff = Date().addingTimeInterval(-timeWindow)
-        for recent in recentContent.suffix(5) where recent.timestamp > cutoff {
-            // Only check exact matches for questions, not similarity
-            if recent.text.contains("?") && normalized == recent.text {
-                logger.info("⚠️ Exact duplicate question detected within \(timeWindow)s window")
-                return true
-            }
-        }
-        
-        // Don't use the general isDuplicate for questions - it's too aggressive
-        // Just mark as seen and return false
-        markAsSeen(normalized)
+        // Mark as seen for tracking but never block
+        markAsSeen(normalize(question))
         return false
     }
 }
