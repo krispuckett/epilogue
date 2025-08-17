@@ -11,7 +11,7 @@ private let logger = Logger(subsystem: "com.epilogue", category: "AmbientAI")
 /// Provides instant local responses enhanced by cloud AI
 actor AmbientAIOrchestrator {
     // MARK: - Properties
-    private let responseCache = AmbientResponseCache.shared
+    // Note: responseCache access happens through MainActor.run
     private let localAI = LocalAIService()
     private let cloudAI = PerplexitySonarService()
     
@@ -143,6 +143,10 @@ actor AmbientAIOrchestrator {
 }
 
 // MARK: - Local AI Service (iOS 26 Foundation Models)
+@globalActor actor LocalAIActor {
+    static let shared = LocalAIActor()
+}
+
 final class LocalAIService {
     #if canImport(FoundationModels)
     private var languageModel: SystemLanguageModel?
@@ -201,7 +205,7 @@ final class LocalAIService {
 }
 
 // MARK: - Perplexity Sonar Service
-class PerplexitySonarService {
+final class PerplexitySonarService {
     private let apiKey: String?
     private let session = URLSession.shared
     private let sonarEndpoint = "https://api.perplexity.ai/chat/completions"
