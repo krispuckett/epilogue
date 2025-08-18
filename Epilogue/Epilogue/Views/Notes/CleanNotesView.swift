@@ -173,6 +173,50 @@ struct CleanNotesView: View {
         }
     }
     
+    @ViewBuilder
+    private var searchBarView: some View {
+        if showSearchBar {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.4))
+                
+                TextField("Search notes and quotes", text: $searchText)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .autocorrectionDisabled()
+                
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+            .transition(.asymmetric(
+                insertion: .move(edge: .top).combined(with: .opacity),
+                removal: .move(edge: .top).combined(with: .opacity)
+            ))
+            .padding(.bottom, 20)
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -183,51 +227,7 @@ struct CleanNotesView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         // Progressive Search Bar
-                        if showSearchBar {
-                            HStack(spacing: 12) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.white.opacity(0.4))
-                                
-                                TextField("Search notes and quotes", text: $searchText)
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(.white)
-                                    .autocorrectionDisabled()
-                                
-                                if !searchText.isEmpty {
-                                    Button {
-                                        searchText = ""
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 14))
-                                            .foregroundStyle(.white.opacity(0.3))
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white.opacity(0.05))
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .top).combined(with: .opacity),
-                                removal: .move(edge: .top).combined(with: .opacity)
-                            ))
-                        }
-                        
-                        // Filter Popover Button
-                        filterPopoverButton
-                            .padding(.horizontal, 20)
-                            .padding(.top, showSearchBar ? 8 : 16)
-                            .padding(.bottom, 20)
+                        searchBarView
                         
                         // Content
                         if filteredItems.isEmpty {
@@ -243,7 +243,7 @@ struct CleanNotesView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
-                        // Search button
+                        // Search button - simple
                         Button {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 showSearchBar.toggle()
@@ -254,37 +254,60 @@ struct CleanNotesView: View {
                             HapticManager.shared.lightTap()
                         } label: {
                             Image(systemName: showSearchBar ? "xmark.circle.fill" : "magnifyingglass")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(showSearchBar ? 0.1 : 0.05))
-                                )
-                                .overlay {
-                                    Circle()
-                                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                                .font(.system(size: 16, weight: showSearchBar ? .semibold : .regular))
+                                .foregroundStyle(showSearchBar ? Color.blue : .white.opacity(0.7))
+                        }
+                        
+                        // Filter selector - simple
+                        Menu {
+                            ForEach(FilterType.allCases, id: \.self) { filter in
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedFilter = filter
+                                    }
+                                    HapticManager.shared.lightTap()
+                                } label: {
+                                    Label {
+                                        HStack {
+                                            Text(filter.description)
+                                            Spacer()
+                                            if selectedFilter == filter {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                            }
+                                        }
+                                    } icon: {
+                                        Image(systemName: filter.icon)
+                                    }
                                 }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: selectedFilter.icon)
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("\(allItems.count)")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                            .foregroundStyle(.white.opacity(0.8))
                         }
-                        .buttonStyle(PlainButtonStyle())
                         
-                        // Stats badge
-                        HStack(spacing: 4) {
-                            Image(systemName: "note.text")
-                                .font(.system(size: 14))
-                            Text("\(allItems.count)")
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        }
-                        .foregroundStyle(.white.opacity(0.7))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: Capsule())
-                        
-                        // Settings button
-                        GlassOrbSettingsButton(isPressed: $settingsButtonPressed) {
+                        // Settings button - simple
+                        Button {
                             showingSettings = true
+                            HapticManager.shared.lightTap()
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white.opacity(0.8))
                         }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .opacity(0.3)
+                    )
                 }
             }
         }
@@ -328,73 +351,7 @@ struct CleanNotesView: View {
     }
     
     // Removed headerView - now using navigation title
-    
-    private var filterPopoverButton: some View {
-        HStack {
-            Menu {
-                ForEach(FilterType.allCases, id: \.self) { filter in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            selectedFilter = filter
-                        }
-                        HapticManager.shared.lightTap()
-                    } label: {
-                        Label {
-                            HStack {
-                                Text(filter.description)
-                                Spacer()
-                                if selectedFilter == filter {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                            }
-                        } icon: {
-                            Image(systemName: filter.icon)
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: selectedFilter.icon)
-                        .font(.system(size: 14, weight: .medium))
-                    
-                    Text(selectedFilter.description)
-                        .font(.system(size: 15, weight: .medium))
-                    
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background {
-                    // Clean glass effect with subtle tint
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.08))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(0.15),
-                                            Color.white.opacity(0.08)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                }
-                .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
-            }
-            .menuStyle(.automatic)
-            .menuIndicator(.hidden)
-            
-            Spacer()
-        }
-    }
+    // Removed filterPopoverButton - now integrated in toolbar
     
     private var contentSections: some View {
         VStack(spacing: 24) {

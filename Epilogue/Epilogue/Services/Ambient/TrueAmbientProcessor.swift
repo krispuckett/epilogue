@@ -137,6 +137,11 @@ public class TrueAmbientProcessor: ObservableObject {
     private var isInitialized = false
     private let processingDispatchQueue = DispatchQueue(label: "com.epilogue.trueprocessor", qos: .userInitiated)
     
+    // Professional-grade deduplication state tracking
+    private var activeQuestions: Set<String> = []  // Questions currently being processed
+    private var recentQuestions: [(text: String, timestamp: Date)] = []  // Recent questions with timestamps
+    private let questionDedupeWindow: TimeInterval = 3.0  // 3 second window for exact duplicates
+    
     private init() {
         setupNotificationObservers()
         Task {
@@ -237,19 +242,70 @@ public class TrueAmbientProcessor: ObservableObject {
             bookTitle: bookContext?.title,
             bookAuthor: bookContext?.author
         )
-        let intent = mapEnhancedToLegacyIntent(enhancedIntent)
+        var intent = mapEnhancedToLegacyIntent(enhancedIntent)
         
-        // Use appropriate deduplication based on content type
+        // OVERRIDE: If text contains a question, treat it as a question!
+        let lowerText = text.lowercased()
+        if (lowerText.contains("who is") || lowerText.contains("what is") || 
+            lowerText.contains("when") || lowerText.contains("where") ||
+            lowerText.contains("why") || lowerText.contains("how") ||
+            lowerText.contains("?")) && intent != .question {
+            logger.info("🔄 Overriding intent to question due to question keywords")
+            intent = .question
+        }
+        
+        // PROFESSIONAL DEDUPLICATION - Like ChatGPT/Perplexity/Anthropic
         if intent == .question {
-            // For questions, use special deduplication that allows evolution
-            // Increased window to 5 seconds to prevent voice recognition duplicates
-            if deduplicator.isQuestionDuplicate(text, within: 5.0) {
-                logger.warning("⚠️ Duplicate question within 5s, skipping: \(text.prefix(30))...")
+            // Step 1: Normalize the question text
+            let normalizedText = text.lowercased()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            
+            // Step 2: Check if we're actively processing this exact question
+            if activeQuestions.contains(normalizedText) {
+                logger.warning("🔒 Question already being processed, ignoring duplicate: \(text.prefix(30))...")
                 return
+            }
+            
+            // Step 3: Check recent questions within time window (3 seconds)
+            let now = Date()
+            let cutoff = now.addingTimeInterval(-questionDedupeWindow)
+            
+            // Clean old entries from recent questions
+            recentQuestions = recentQuestions.filter { $0.timestamp > cutoff }
+            
+            // Check if this exact question was asked recently
+            if recentQuestions.contains(where: { $0.text == normalizedText }) {
+                logger.warning("⏱️ Same question within \(self.questionDedupeWindow)s window, ignoring: \(text.prefix(30))...")
+                return
+            }
+            
+            // Step 4: Check if already in UI (final safety check)
+            let alreadyInUI = await MainActor.run {
+                self.detectedContent.contains { content in
+                    content.type == .question &&
+                    content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedText
+                }
+            }
+            
+            if alreadyInUI {
+                logger.warning("📱 Question already in UI, ignoring duplicate: \(text.prefix(30))...")
+                return
+            }
+            
+            // Step 5: Mark as active and recent
+            activeQuestions.insert(normalizedText)
+            recentQuestions.append((text: normalizedText, timestamp: now))
+            
+            // Clean up if too many recent questions
+            if recentQuestions.count > 20 {
+                recentQuestions = Array(recentQuestions.suffix(10))
             }
         } else {
             // For non-questions, use general deduplication
-            if deduplicator.isDuplicate(text) {
+            // Exception: Allow quotes to be processed even if duplicate (user might want to save again)
+            let isQuote = if case .quote = enhancedIntent.primary { true } else { false }
+            if !isQuote && deduplicator.isDuplicate(text) {
                 logger.warning("⚠️ Already processed this text, skipping: \(text.prefix(30))...")
                 return
             }
@@ -273,40 +329,62 @@ public class TrueAmbientProcessor: ObservableObject {
         case .question:
             logger.info("❓ Question detected: \(text)")
             
-            // Use ContentDeduplicator's enhanced question deduplication
-            let normalizedText = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            // Check if this is an evolution of an existing question
+            let normalizedNew = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // Check if this is a partial that's evolving
+            // Find if there's an existing question that this might be evolving from
             let existingIndex = await MainActor.run {
                 self.detectedContent.firstIndex { content in
-                    content.type == .question && 
-                    content.response == nil &&
-                    (content.text.hasPrefix(text) || text.hasPrefix(content.text))
+                    guard content.type == .question && content.response == nil else { return false }
+                    let normalizedExisting = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    // ULTRA-CONSERVATIVE EVOLUTION DETECTION - Fix for wrong questions
+                    // Only consider it an evolution if it's CLEARLY the same question getting longer
+                    
+                    // Must be a prefix expansion (old text is start of new text)
+                    // AND the difference is VERY small (less than 3 chars - just punctuation)
+                    // AND the old text must be substantial (more than 10 chars)
+                    if normalizedNew.hasPrefix(normalizedExisting) && 
+                       normalizedExisting.count > 10 &&  // Old must be very substantial
+                       (normalizedNew.count - normalizedExisting.count) <= 3 {  // TINY addition only (punctuation)
+                        // This handles cases like "Who is Gandalf" -> "Who is Gandalf?"
+                        // But NOT "Who is El" -> "Who is Elrond" (difference is 4+ chars)
+                        return true
+                    }
+                    
+                    // Exact same question (duplicate detection)
+                    if normalizedExisting == normalizedNew {
+                        return true
+                    }
+                    
+                    // DO NOT match different questions that happen to start similarly
+                    // "Who is Gandalf" and "Who is Elrond" are DIFFERENT questions
+                    // "What is the ring" and "What is the ring of power" IS an evolution
+                    return false
                 }
             }
             
             if let existingIndex = existingIndex {
-                // This is an evolution of existing question
+                // Update existing question to the latest version
                 await MainActor.run {
-                    if text.count > self.detectedContent[existingIndex].text.count {
-                        // Update to longer version
-                        self.detectedContent[existingIndex] = AmbientProcessedContent(
-                            text: text,
-                            type: .question,
-                            timestamp: Date(),
-                            confidence: confidence,
-                            response: nil,
-                            bookTitle: AmbientBookDetector.shared.detectedBook?.title,
-                            bookAuthor: AmbientBookDetector.shared.detectedBook?.author
-                        )
-                    }
+                    logger.info("📝 Updating evolving question from '\(self.detectedContent[existingIndex].text)' to '\(text)'")
+                    self.detectedContent[existingIndex] = AmbientProcessedContent(
+                        text: text,  // Use the newer, potentially longer version
+                        type: .question,
+                        timestamp: self.detectedContent[existingIndex].timestamp,  // Keep original timestamp
+                        confidence: max(confidence, self.detectedContent[existingIndex].confidence),
+                        response: nil,  // Still processing
+                        bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+                        bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+                    )
                 }
                 
-                // Debounce before processing
+                // Process the updated question
                 Task {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+                    // Longer delay for evolving questions to stabilize
+                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds - give more time for transcription to complete
                     
-                    // Check if still the latest
+                    // Check if it's still the latest version
                     let stillLatest = await MainActor.run {
                         self.detectedContent[safe: existingIndex]?.text == text
                     }
@@ -314,9 +392,15 @@ public class TrueAmbientProcessor: ObservableObject {
                     if stillLatest {
                         await self.processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
                     }
+                    
+                    // Remove from active questions
+                    let normalizedText = text.lowercased()
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                    self.activeQuestions.remove(normalizedText)
                 }
             } else {
-                // New question
+                // New question - add it
                 let pendingQuestion = AmbientProcessedContent(
                     text: text,
                     type: .question,
@@ -328,24 +412,20 @@ public class TrueAmbientProcessor: ObservableObject {
                 )
                 
                 await MainActor.run {
-                    // FINAL duplicate check - absolutely no duplicates allowed
-                    let isDuplicate = self.detectedContent.contains { existing in
-                        existing.type == .question && 
-                        existing.text == pendingQuestion.text
-                    }
-                    
-                    if !isDuplicate {
-                        self.detectedContent.append(pendingQuestion)
-                        logger.info("✅ Added new question: \(text.prefix(30))...")
-                    } else {
-                        logger.warning("🚫 BLOCKED duplicate question at final check: \(text.prefix(30))...")
-                    }
+                    self.detectedContent.append(pendingQuestion)
+                    logger.info("✅ Added new question to UI: \(text.prefix(30))...")
                 }
                 
-                // Process after debounce
+                // Process the question
                 Task {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 second delay - allow transcription to complete
                     await self.processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
+                    
+                    // Remove from active questions
+                    let normalizedText = text.lowercased()
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                    self.activeQuestions.remove(normalizedText)
                 }
             }
             
@@ -403,10 +483,12 @@ public class TrueAmbientProcessor: ObservableObject {
             // Use smart deduplication
             if !deduplicator.isDuplicate(content.text) {
                 detectedContent.append(content)
-                // Save immediately through persistence layer
-                persistenceLayer.save(content)
+                // DO NOT save here - AmbientModeView handles saving with better duplicate detection
+                // await saveQuote(content)
+                logger.info("✅ Quote detected and added to UI: \(cleanedText.prefix(50))...")
+            } else {
+                logger.info("💭 Quote already captured: \(cleanedText.prefix(50))...")
             }
-            logger.info("💭 Quote captured: \(cleanedText.prefix(50))...")
             
         case .note, .thought:
             let content = AmbientProcessedContent(
@@ -420,10 +502,16 @@ public class TrueAmbientProcessor: ObservableObject {
             // Use smart deduplication
             if !deduplicator.isDuplicate(content.text) {
                 detectedContent.append(content)
-                // Save immediately through persistence layer
-                persistenceLayer.save(content)
+                // Save immediately to SwiftData if context available
+                if intent == .note {
+                    await saveNote(content)
+                } else {
+                    await saveThought(content)
+                }
+                logger.info("✅ \(intent == .note ? "Note" : "Thought") saved to SwiftData: \(text.prefix(50))...")
+            } else {
+                logger.info("📝 \(intent == .note ? "Note" : "Thought") already captured: \(text.prefix(50))...")
             }
-            logger.info("📝 \(String(describing: intent)) captured: \(text.prefix(50))...")
             
         default:
             logger.info("🎤 Ambient content: \(text.prefix(50))...")
@@ -437,15 +525,15 @@ public class TrueAmbientProcessor: ObservableObject {
     
     private func initializeWhisper() async {
         do {
-            // Initialize WhisperKit with configuration
+            // Initialize WhisperKit with enhanced configuration for low volume
             let config = WhisperKitConfig(
-                model: "base", // Use base model for balance
+                model: "base.en",  // English-only model for better accuracy
                 modelRepo: "argmaxinc/whisperkit-coreml"
             )
             
             whisperModel = try await WhisperKit(config)
             isInitialized = true
-            logger.info("✅ WhisperKit initialized successfully")
+            logger.info("✅ WhisperKit initialized with low-volume optimization")
         } catch {
             logger.error("❌ Failed to initialize WhisperKit: \(error)")
         }
@@ -517,6 +605,8 @@ public class TrueAmbientProcessor: ObservableObject {
         sessionContent.removeAll()
         detectedContent.removeAll()
         deduplicator.clearHistory() // Clear deduplication history
+        activeQuestions.removeAll()  // Clear active questions tracking
+        recentQuestions.removeAll()  // Clear recent questions
         currentTranscript = ""
         currentBook = AmbientBookDetector.shared.detectedBook
         sessionStartTime = Date()
@@ -541,8 +631,8 @@ public class TrueAmbientProcessor: ObservableObject {
         
         sessionActive = false
         
-        // Process all quotes/notes at session end
-        await processSessionContent()
+        // DO NOT process here - AmbientModeView already saved everything with proper duplicate detection
+        // await processSessionContent()
         
         let duration = Date().timeIntervalSince(sessionStartTime ?? Date())
         let summary = SessionSummary(
@@ -581,12 +671,29 @@ public class TrueAmbientProcessor: ObservableObject {
         defer { isProcessing = false }
         
         do {
-            // Direct WhisperKit transcription
-            let audioArray = Array(UnsafeBufferPointer(start: audio.floatChannelData?[0], count: Int(audio.frameLength)))
+            // Direct WhisperKit transcription with volume boost for low voices
+            guard let channelData = audio.floatChannelData?[0] else { return }
+            let frameLength = Int(audio.frameLength)
+            let audioArray = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
             
-            // Save audio to temporary file for WhisperKit
+            // Apply volume boost for low volume voices (2x amplification)
+            let volumeBoost: Float = 2.0
+            let boostedArray = audioArray.map { sample -> Float in
+                let boosted = sample * volumeBoost
+                // Clip to prevent distortion
+                return max(-1.0, min(1.0, boosted))
+            }
+            
+            // Check if audio is above noise floor
+            let rms = sqrt(boostedArray.reduce(0) { $0 + $1 * $1 } / Float(frameLength))
+            guard rms > 0.01 else {
+                logger.debug("Audio below noise floor, skipping")
+                return
+            }
+            
+            // Save boosted audio to temporary file for WhisperKit
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
-            try saveAudioToFile(audioArray, url: tempURL)
+            try saveAudioToFile(boostedArray, url: tempURL)
             
             // Transcribe using file path
             // WhisperKit returns [[TranscriptionResult]?]
@@ -703,8 +810,8 @@ public class TrueAmbientProcessor: ObservableObject {
                 self?.detectedContent.append(content)
             }
             
-            // Save to SwiftData immediately
-            await saveContentImmediately(content)
+            // DO NOT save here - AmbientModeView handles all saving with proper duplicate detection
+            // await saveContentImmediately(content)
             
             // Also add to session for batch processing
             // Removed - using detectedContent as single source
@@ -885,14 +992,35 @@ public class TrueAmbientProcessor: ObservableObject {
     // MARK: - SwiftData Saves
     
     private func saveQuote(_ content: AmbientProcessedContent) async {
-        guard let modelContext = modelContext else { return }
+        guard let modelContext = modelContext else { 
+            logger.error("❌ Cannot save quote - no model context set! Make sure to call setModelContext()")
+            return 
+        }
         
         // Update state for debug
         currentState = .saving(content)
         
+        // Get or create BookModel if we have a current book
+        var bookModel: BookModel? = nil
+        if let book = currentBook ?? AmbientBookDetector.shared.detectedBook {
+            let fetchRequest = FetchDescriptor<BookModel>(
+                predicate: #Predicate { model in
+                    model.localId == book.localId.uuidString
+                }
+            )
+            
+            if let existingBook = try? modelContext.fetch(fetchRequest).first {
+                bookModel = existingBook
+            } else {
+                bookModel = BookModel(from: book)
+                modelContext.insert(bookModel!)
+            }
+        }
+        
         let quote = CapturedQuote(
             text: content.text,
-            book: nil, // Would need to query BookModel from title
+            book: bookModel,
+            author: content.bookAuthor,
             timestamp: content.timestamp,
             source: .ambient
         )
@@ -904,9 +1032,13 @@ public class TrueAmbientProcessor: ObservableObject {
         }
         
         modelContext.insert(quote)
-        try? modelContext.save()
         
-        logger.info("💾 Saved quote: \(String(content.text.prefix(50)))...")
+        do {
+            try modelContext.save()
+            logger.info("✅ Quote saved with session: \(String(content.text.prefix(50)))...")
+        } catch {
+            logger.error("❌ Failed to save quote: \(error)")
+        }
         
         // Add to recently saved for debug view
         recentlySaved.append(content)
@@ -919,14 +1051,34 @@ public class TrueAmbientProcessor: ObservableObject {
     }
     
     private func saveNote(_ content: AmbientProcessedContent) async {
-        guard let modelContext = modelContext else { return }
+        guard let modelContext = modelContext else { 
+            logger.error("❌ Cannot save note - no model context set! Make sure to call setModelContext()")
+            return 
+        }
         
         // Update state for debug
         currentState = .saving(content)
         
+        // Get or create BookModel if we have a current book
+        var bookModel: BookModel? = nil
+        if let book = currentBook ?? AmbientBookDetector.shared.detectedBook {
+            let fetchRequest = FetchDescriptor<BookModel>(
+                predicate: #Predicate { model in
+                    model.localId == book.localId.uuidString
+                }
+            )
+            
+            if let existingBook = try? modelContext.fetch(fetchRequest).first {
+                bookModel = existingBook
+            } else {
+                bookModel = BookModel(from: book)
+                modelContext.insert(bookModel!)
+            }
+        }
+        
         let note = CapturedNote(
             content: content.text,
-            book: nil, // Would need to query BookModel from title
+            book: bookModel,
             timestamp: content.timestamp,
             source: .ambient
         )
@@ -938,9 +1090,13 @@ public class TrueAmbientProcessor: ObservableObject {
         }
         
         modelContext.insert(note)
-        try? modelContext.save()
         
-        logger.info("💾 Saved note: \(String(content.text.prefix(50)))...")
+        do {
+            try modelContext.save()
+            logger.info("✅ Note saved with session: \(String(content.text.prefix(50)))...")
+        } catch {
+            logger.error("❌ Failed to save note: \(error)")
+        }
         
         // Add to recently saved for debug view
         recentlySaved.append(content)
@@ -1126,18 +1282,17 @@ extension TrueAmbientProcessor {
     
     // Helper function to normalize questions for deduplication
     private func normalizeQuestion(_ question: String) -> String {
-        var normalized = question.lowercased()
+        let normalized = question.lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "?", with: "")
             .replacingOccurrences(of: "!", with: "")
             .replacingOccurrences(of: ".", with: "")
             .replacingOccurrences(of: ",", with: "")
         
-        // Handle common variations (e.g., "Gand" vs "Gandalf")
-        if normalized.contains("gand") && !normalized.contains("gandalf") {
-            // Likely a truncated/misheard "Gandalf"
-            normalized = normalized.replacingOccurrences(of: "gand", with: "gandalf")
-        }
+        // REMOVED dangerous auto-corrections that were causing corruption
+        // "Dan" should NOT become "Gandalf"
+        // "Elon" should NOT become "Elrond"  
+        // Preserve the actual transcription!
         
         return normalized
     }
@@ -1145,6 +1300,28 @@ extension TrueAmbientProcessor {
     // Check if we have a similar question already processed
     private func hasSimilarProcessedQuestion(_ normalizedQuestion: String) -> Bool {
         // Disabled - too aggressive, causing duplicates
+        return false
+    }
+    
+    // Helper to check if two questions are asking the same thing
+    private func areSimilarQuestions(_ q1: String, _ q2: String) -> Bool {
+        // Remove common endings and punctuation
+        let clean1 = q1.replacingOccurrences(of: "[?!.,]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean2 = q2.replacingOccurrences(of: "[?!.,]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check if they're exactly the same
+        if clean1 == clean2 { return true }
+        
+        // Only consider similar if one is clearly a truncation of the other
+        // AND they're asking about the SAME subject
+        if clean1.hasPrefix(clean2) || clean2.hasPrefix(clean1) {
+            let diff = abs(clean1.count - clean2.count)
+            // Very conservative - only if difference is tiny (like punctuation or 1-2 words)
+            return diff < 5
+        }
+        
         return false
     }
     
@@ -1239,38 +1416,10 @@ extension TrueAmbientProcessor {
     
     // Enhanced question processing with audio feedback (OPTIMIZED FOR SPEED)
     func processQuestionWithFeedback(_ question: String, confidence: Float, context: String = "") async {
-        // Questions already deduplicated in processDetectedText
-        // No need to check again here
+        // Question is already in UI from processDetectedText
+        // Just need to get the response and update it
         
-        // SPEED: Immediately notify UI we're processing (shows thinking indicator)
-        let pendingContent = AmbientProcessedContent(
-            text: question,
-            type: .question,
-            timestamp: Date(),
-            confidence: confidence,
-            response: nil, // No response yet - triggers thinking indicator
-            bookTitle: AmbientBookDetector.shared.detectedBook?.title,
-            bookAuthor: AmbientBookDetector.shared.detectedBook?.author
-        )
-        
-        await MainActor.run {
-            // Find the EXACT question we added earlier in processDetectedText
-            if let existingIndex = self.detectedContent.firstIndex(where: { content in
-                content.type == .question &&
-                content.text == question  // Must be EXACT match
-            }) {
-                // Update the existing question with thinking state
-                self.detectedContent[existingIndex] = pendingContent
-                logger.info("📝 Updated existing question to thinking state: \(question.prefix(30))...")
-            } else {
-                logger.error("❌ CRITICAL: Question not found that should exist: \(question.prefix(30))...")
-                // This should NEVER happen because we add the question in processDetectedText
-                // But if it does, don't add a duplicate
-            }
-        }
-        
-        // Save question immediately (will be updated with response later)
-        persistenceLayer.save(pendingContent)
+        logger.info("🚀 Processing question for response: \(question.prefix(30))...")
         
         // Default to true if not set (enable by default)
         let realTimeEnabled = UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true
@@ -1316,11 +1465,19 @@ extension TrueAmbientProcessor {
         
         logger.info("✅ Got AI response: \(response.prefix(50))...")
         
-        // Update UI with response
+        // Update UI with response - find the question more flexibly
         await MainActor.run {
-            // Update ONLY the EXACT question - no fuzzy matching
-            if let index = self.detectedContent.firstIndex(where: {
-                $0.type == .question && $0.text == question && $0.response == nil
+            // Find the question that matches (could have evolved)
+            if let index = self.detectedContent.firstIndex(where: { content in
+                guard content.type == .question && content.response == nil else { return false }
+                
+                // Check if this is the question we're looking for
+                // Could be exact match OR a variation
+                let normalizedContent = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                let normalizedQuestion = question.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                return normalizedContent == normalizedQuestion ||
+                       self.areSimilarQuestions(normalizedContent, normalizedQuestion)
             }) {
                 self.detectedContent[index].response = response
                 logger.info("⚡ Updated question #\(index) with response")

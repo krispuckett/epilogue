@@ -136,49 +136,135 @@ struct LibraryView: View {
         )
     }
     
-    var body: some View {
-        ZStack {
-            backgroundView
-            
-            navigationLink
-            
-            // Content
-            ScrollViewReader { proxy in
-                ScrollView {
-                    ScrollViewTracker(isScrolling: $isScrolling)
-                    
-                    if viewModel.isLoading {
-                        // Show skeleton screens while loading
-                        ScrollView {
-                            if viewMode == .grid {
-                                SkeletonGrid(columns: 2, rows: 4)
-                            } else {
-                                SkeletonList(count: 6)
-                            }
-                        }
-                        .transition(.opacity)
-                    } else if viewModel.books.isEmpty {
-                        emptyStateView
-                    } else {
-                        ZStack {
-                            if viewMode == .grid {
-                                gridContent
-                                    .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                        removal: .opacity.combined(with: .scale(scale: 1.02))
-                                    ))
-                            } else {
-                                listContent
-                                    .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                        removal: .opacity.combined(with: .scale(scale: 1.02))
-                                    ))
-                            }
-                        }
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 12) {
+                // Grid button - simple
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        viewMode = .grid
+                        HapticManager.shared.lightTap()
                     }
+                } label: {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 16, weight: viewMode == .grid ? .semibold : .regular))
+                        .foregroundStyle(viewMode == .grid ? Color.orange : .white.opacity(0.7))
                 }
-            .ignoresSafeArea(edges: .bottom) // Allow scroll content to go under tab bar
+                
+                // List button - simple
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        viewMode = .list
+                        HapticManager.shared.lightTap()
+                    }
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 16, weight: viewMode == .list ? .semibold : .regular))
+                        .foregroundStyle(viewMode == .list ? Color.orange : .white.opacity(0.7))
+                }
+                
+                // Settings button - simple
+                Button {
+                    showingSettings = true
+                    HapticManager.shared.lightTap()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.3)
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var coverPickerSheet: some View {
+        if let book = selectedBookForEdit {
+            BookSearchSheet(
+                searchQuery: book.title,
+                onBookSelected: { newBook in
+                    viewModel.updateBookCover(book, newCoverURL: newBook.coverImageURL)
+                    showingCoverPicker = false
+                    selectedBookForEdit = nil
+                }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var settingsSheet: some View {
+        SettingsView()
+    }
+    
+    @ViewBuilder
+    private var bookSearchSheet: some View {
+        BookSearchSheet(
+            searchQuery: "",
+            onBookSelected: { book in
+                viewModel.addBook(book)
+                showingBookSearch = false
+            }
+        )
+    }
+    
+    @ViewBuilder
+    private var enhancedScannerSheet: some View {
+        EnhancedBookScannerView { book in
+            viewModel.addBook(book)
+            showingEnhancedScanner = false
+            
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowGlassToast"),
+                object: ["message": "Added \"\(book.title)\" to library"]
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                ScrollViewTracker(isScrolling: $isScrolling)
+                
+                if viewModel.isLoading {
+                    // Show skeleton screens while loading
+                    ScrollView {
+                        if viewMode == .grid {
+                            SkeletonGrid(columns: 2, rows: 4)
+                        } else {
+                            SkeletonList(count: 6)
+                        }
+                    }
+                    .transition(.opacity)
+                } else if viewModel.books.isEmpty {
+                    emptyStateView
+                } else {
+                    ZStack {
+                        if viewMode == .grid {
+                            gridContent
+                                .transition(.asymmetric(
+                                    insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                    removal: .opacity.combined(with: .scale(scale: 1.02))
+                                ))
+                        } else {
+                            listContent
+                                .transition(.asymmetric(
+                                    insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                    removal: .opacity.combined(with: .scale(scale: 1.02))
+                                ))
+                        }
+                    }
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
+                }
+            }
+            .ignoresSafeArea(edges: .bottom)
             .onChange(of: scrollToBookId) { _, bookId in
                 if let bookId = bookId {
                     withAnimation(.easeInOut(duration: 0.5)) {
@@ -190,58 +276,34 @@ struct LibraryView: View {
                     }
                 }
             }
-        } // End ScrollViewReader
         }
-        .navigationTitle("Library")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    ViewModeToggle(viewMode: $viewMode, namespace: viewModeAnimation)
-                    
-                    GlassOrbSettingsButton(isPressed: $settingsButtonPressed) {
-                        showingSettings = true
-                    }
-                }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                backgroundView
+                navigationLink
+                mainContent
+            }
+            .navigationTitle("Library")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                toolbarContent
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewMode) // Simpler animation
+        .animation(.easeInOut(duration: 0.2), value: viewMode)
         .sheet(isPresented: $showingCoverPicker) {
-            if let book = selectedBookForEdit {
-                BookSearchSheet(
-                    searchQuery: book.title,
-                    onBookSelected: { newBook in
-                        // Update the existing book with the new cover
-                        viewModel.updateBookCover(book, newCoverURL: newBook.coverImageURL)
-                        showingCoverPicker = false
-                        selectedBookForEdit = nil
-                    }
-                )
-            }
+            coverPickerSheet
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView()
+            settingsSheet
         }
         .sheet(isPresented: $showingBookSearch) {
-            BookSearchSheet(
-                searchQuery: "",
-                onBookSelected: { book in
-                    viewModel.addBook(book)
-                    showingBookSearch = false
-                }
-            )
+            bookSearchSheet
         }
         .sheet(isPresented: $showingEnhancedScanner) {
-            EnhancedBookScannerView { book in
-                viewModel.addBook(book)
-                showingEnhancedScanner = false
-                
-                // Show success toast
-                NotificationCenter.default.post(
-                    name: Notification.Name("ShowGlassToast"),
-                    object: ["message": "Added \"\(book.title)\" to library"]
-                )
-            }
+            enhancedScannerSheet
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {

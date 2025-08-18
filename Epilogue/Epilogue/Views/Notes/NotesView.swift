@@ -341,10 +341,17 @@ struct NotesView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { showingAddNote = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                GlassEffectContainer(spacing: 0) {
+                    Button(action: { showingAddNote = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .frame(width: 44, height: 44)
+                    }
+                    .glassEffect(
+                        .regular,
+                        in: Circle()
+                    )
                 }
             }
         }

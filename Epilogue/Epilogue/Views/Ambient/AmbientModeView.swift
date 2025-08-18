@@ -28,6 +28,10 @@ struct AmbientModeView: View {
     @State private var showBookCoverInChat = true
     @State private var savedItemsCount = 0
     @State private var showSaveAnimation = false
+    @State private var savedItemType: String? = nil
+    @State private var showBookCover = false
+    @State private var bookCoverTimer: Timer?
+    @State private var expandedMessageIds = Set<UUID>()  // Track expanded messages individually
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
     @State private var showLiveTranscription = true
@@ -122,8 +126,10 @@ struct AmbientModeView: View {
         // Removed - moved above transcription bar
         .statusBarHidden(true)
         .fullScreenCover(isPresented: $showingSessionSummary, onDismiss: {
-            // After summary is dismissed, close ambient mode
-            dismiss()
+            // After summary is dismissed, close ambient mode with a tiny delay to fix transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                dismiss()
+            }
         }) {
             if let session = currentSession {
                 AmbientSessionSummaryView(
@@ -152,6 +158,10 @@ struct AmbientModeView: View {
         .onReceive(bookDetector.$detectedBook) { book in
             handleBookDetection(book)
         }
+        .onDisappear {
+            bookCoverTimer?.invalidate()
+            transcriptionFadeTimer?.invalidate()
+        }
         .onReceive(voiceManager.$transcribedText) { text in
             // Only update if actually recording
             guard isRecording else {
@@ -167,6 +177,11 @@ struct AmbientModeView: View {
             // Debug log
             if !cleanedText.isEmpty {
                 print("📝 Live transcription received: \(cleanedText)")
+            }
+            
+            // Don't update transcription if we just detected a book (prevents double showing)
+            if cleanedText.lowercased() == "lord of the rings" && lastDetectedBookId != nil {
+                return
             }
             
             // Update live transcription
@@ -187,8 +202,15 @@ struct AmbientModeView: View {
                                    lowercased.contains("currently reading") ||
                                    lowercased.contains("just started") ||
                                    lowercased.contains("finished reading") ||
+                                   lowercased.contains("reading lord of the rings") ||
                                    lowercased.contains("reading") && libraryViewModel.books.contains { book in
-                                       lowercased.contains(book.title.lowercased())
+                                       let bookWords = book.title.lowercased().split(separator: " ")
+                                       let textWords = lowercased.split(separator: " ")
+                                       // Check if significant portion of book title is mentioned
+                                       let matchCount = bookWords.filter { word in
+                                           textWords.contains(word)
+                                       }.count
+                                       return matchCount >= min(2, bookWords.count)
                                    }
                 
                 // Also fade faster for progress updates
@@ -209,8 +231,8 @@ struct AmbientModeView: View {
                 }
             }
             
-            // Detect book mentions if text is substantial
-            if cleanedText.count > 10 {
+            // Detect book mentions - always check, even for short text
+            if cleanedText.count > 5 {
                 bookDetector.detectBookInText(cleanedText)
             }
         }
@@ -257,9 +279,8 @@ struct AmbientModeView: View {
     @ViewBuilder
     private var voiceGradientOverlay: some View {
         VStack {
-            // Book cover - only show when no messages (questions) are visible
-            let hasQuestions = messages.contains { !$0.content.contains("[Transcribing]") }
-            if let book = currentBookContext, let coverURL = book.coverImageURL, !hasQuestions {
+            // Book cover - show when book is detected, fade after 10 seconds
+            if showBookCover, let book = currentBookContext, let coverURL = book.coverImageURL {
                 SharedBookCoverView(
                     coverURL: coverURL,
                     width: 140,
@@ -269,13 +290,13 @@ struct AmbientModeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
                 .scaleEffect(isRecording ? 1.0 : 0.9)
-                .opacity(isRecording ? 1.0 : 0.3)
+                .opacity(isRecording ? 1.0 : 0.8)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isRecording)
                 .transition(.asymmetric(
-                    insertion: .scale(scale: 0.5).combined(with: .opacity),
-                    removal: .scale(scale: 0.5).combined(with: .opacity)
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 1.1).combined(with: .opacity)
                 ))
-                .padding(.top, 140) // Position below navigation buttons with more space
+                .padding(.top, 140)
             }
             
             Spacer()
@@ -299,28 +320,40 @@ struct AmbientModeView: View {
         VStack {
             Spacer()
             
-            // Save indicator above transcription
-            if showSaveAnimation {
-                HStack(spacing: 6) {
-                    Image(systemName: detectionState.icon)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .symbolEffect(.pulse)
+            // Save indicator above transcription with proper type
+            if showSaveAnimation, let itemType = savedItemType {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                        .symbolEffect(.bounce, value: showSaveAnimation)
                     
-                    Text("Saved")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                    Text("Saved \(itemType)")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .glassEffect()
-                .glassEffectTransition(.materialize)
                 .clipShape(Capsule())
                 .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                    insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .bottom)),
+                    removal: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .top))
                 ))
-                .padding(.bottom, 10)
+                .padding(.bottom, 12)
+                .zIndex(200) // Higher z-index to ensure visibility
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
+            }
+            
+            // Thinking indicator floating above stop button (smaller and closer)
+            if isWaitingForAIResponse {
+                SubtleLiquidThinking(bookColor: adaptiveUIColor)
+                    .scaleEffect(0.7) // Make it smaller
+                    .padding(.bottom, 8) // Much closer to transcription
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 1.1).combined(with: .opacity)
+                    ))
             }
             
             // Live transcription with animated glass container (editable)
@@ -335,6 +368,10 @@ struct AmbientModeView: View {
                             .onSubmit {
                                 liveTranscription = editableTranscription
                                 isEditingTranscription = false
+                                // Process the edited transcription
+                                Task {
+                                    await processor.processDetectedText(editableTranscription, confidence: 0.95)
+                                }
                             }
                     } else {
                         Text(liveTranscription)
@@ -403,9 +440,11 @@ struct AmbientModeView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // Small top spacer since header uses safeAreaInset
-                    Color.clear
-                        .frame(height: 20)
+                    // Proper top spacing to prevent scrolling above content
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(height: 1)
+                        .id("top")
                     
                     let hasRealContent = messages.contains { msg in
                         !msg.content.contains("[Transcribing]")
@@ -419,38 +458,51 @@ struct AmbientModeView: View {
                         }
                     }
                     
-                    // Messages
-                    ForEach(messages) { message in
-                        ChatMessageView(
-                            message: message,
-                            currentBookContext: currentBookContext,
-                            colorPalette: colorPalette ?? defaultColorPalette
-                        )
-                        .id(message.id)
-                    }
-                    
-                    // Subtle thinking indicator for pending questions
-                    if isWaitingForAIResponse, let question = pendingQuestion {
-                        HStack {
-                            SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                            Spacer()
+                    // Conversation section in minimal thread style
+                    if !messages.isEmpty {
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Section header if we have multiple messages
+                            if messages.count > 1 {
+                                Text("CONVERSATION")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.5))
+                                    .tracking(1.2)
+                                    .padding(.horizontal, 20)
+                            }
+                            
+                            // Thread-style messages
+                            VStack(spacing: 1) {
+                                ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                                    AmbientMessageThreadView(
+                                        message: message,
+                                        index: index,
+                                        isExpanded: expandedMessageIds.contains(message.id),
+                                        onToggle: {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                if expandedMessageIds.contains(message.id) {
+                                                    expandedMessageIds.remove(message.id)
+                                                } else {
+                                                    expandedMessageIds.insert(message.id)
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 20)
                         }
-                        .padding(.horizontal, 20)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 1.1).combined(with: .opacity)
-                        ))
                     }
                     
-                    // Bottom spacer for input area
+                    // Bottom spacer for input area with more padding
                     Color.clear
-                        .frame(height: 80)
+                        .frame(height: 100)
                         .id("bottom")
                 }
-                .padding(.horizontal, 20)
             }
-            .scrollBounceBehavior(.basedOnSize) // Prevent excessive bouncing
+            .scrollBounceBehavior(.basedOnSize, axes: .vertical) // Prevent excessive bouncing
             .scrollDismissesKeyboard(.immediately)
+            .contentMargins(.top, 0, for: .scrollContent) // Prevent scrolling above content
+            .scrollClipDisabled(false) // Ensure content doesn't scroll outside bounds
             .onAppear {
                 scrollProxy = proxy
             }
@@ -464,6 +516,7 @@ struct AmbientModeView: View {
                     }
                 }
             }
+            .scrollBounceBehavior(isRecording ? .automatic : .basedOnSize)
         }
     }
     
@@ -618,24 +671,69 @@ struct AmbientModeView: View {
                 }
             }
             
-            // SAVE TO SWIFTDATA IMMEDIATELY
+            // Smart filtering - automatically filter out non-book content
+            if item.type == .question {
+                let questionLower = item.text.lowercased()
+                
+                // Keywords that indicate non-book conversation
+                let nonBookKeywords = ["chewy box", "shoe box", "bring", "brought", "aftership", "tracking", "package", "delivery"]
+                let isNonBookContent = nonBookKeywords.contains { questionLower.contains($0) }
+                
+                // Keywords that indicate book-related content
+                let bookRelatedKeywords = ["book", "character", "story", "plot", "chapter", "page", "author", "reading",
+                                          "frodo", "gandalf", "bilbo", "ring", "hobbit", "shire", "middle-earth", 
+                                          "protagonist", "antagonist", "theme", "ending", "beginning"]
+                let seemsBookRelated = bookRelatedKeywords.contains { questionLower.contains($0) } ||
+                                       (currentBookContext != nil && 
+                                        currentBookContext!.title.lowercased().split(separator: " ").contains { 
+                                            questionLower.contains($0) && $0.count > 3 
+                                        })
+                
+                // Filter out if it's clearly non-book content and not book-related
+                if isNonBookContent && !seemsBookRelated {
+                    logger.info("🚫 Auto-filtering non-book question: \(item.text.prefix(50))...")
+                    continue
+                }
+            }
+            
+            // Show save animation for quotes and notes (saving is handled by processor)
             switch item.type {
             case .quote:
+                // Save quote to SwiftData with session relationship
                 saveQuoteToSwiftData(item)
                 savedItemsCount += 1
-                showSaveAnimation = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    showSaveAnimation = false
+                savedItemType = "Quote"
+                print("🎯 SAVE ANIMATION: Setting showSaveAnimation = true for Quote")
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showSaveAnimation = true
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        print("🎯 SAVE ANIMATION: Hiding save animation for Quote")
+                        showSaveAnimation = false
+                        savedItemType = nil
+                    }
+                }
+                logger.info("💾 Quote detected and saved: \(item.text.prefix(50))...")
             case .note, .thought:
+                // Save note to SwiftData with session relationship
                 saveNoteToSwiftData(item)
                 savedItemsCount += 1
-                showSaveAnimation = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    showSaveAnimation = false
+                savedItemType = item.type == .note ? "Note" : "Thought"
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showSaveAnimation = true
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        showSaveAnimation = false
+                        savedItemType = nil
+                    }
+                }
+                logger.info("💾 \(item.type == .note ? "Note" : "Thought") detected and saved: \(item.text.prefix(50))...")
             case .question:
+                // Save question to SwiftData with session relationship
                 saveQuestionToSwiftData(item)
+                logger.info("❓ Question detected and saved: \(item.text.prefix(50))...")
             default:
                 break
             }
@@ -663,6 +761,8 @@ struct AmbientModeView: View {
                             messageType: .text
                         )
                         messages.append(aiMessage)
+                        // Auto-expand new questions
+                        expandedMessageIds.insert(aiMessage.id)
                         print("✅ Added AI response for question: \(item.text.prefix(30))...")
                     } else {
                         print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
@@ -685,16 +785,58 @@ struct AmbientModeView: View {
     }
     
     private func saveQuoteToSwiftData(_ content: AmbientProcessedContent) {
-        // Check for existing duplicate before saving
-        let cleanText = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Clean the quote text - remove common prefixes
+        var quoteText = content.text
+        let prefixesToRemove = [
+            "i love this quote.",
+            "i love this quote",
+            "quote...",
+            "quote:",
+            "quote "
+        ]
+        
+        for prefix in prefixesToRemove {
+            if quoteText.lowercased().hasPrefix(prefix) {
+                quoteText = String(quoteText.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                break
+            }
+        }
+        
+        // Check for duplicates
         let fetchRequest = FetchDescriptor<CapturedQuote>(
             predicate: #Predicate { quote in
-                quote.text == cleanText
+                quote.text == quoteText
             }
         )
         
         if let existingQuotes = try? modelContext.fetch(fetchRequest), !existingQuotes.isEmpty {
-            print("⚠️ Quote already exists, skipping save: \(cleanText.prefix(30))...")
+            print("⚠️ Quote already exists: \(quoteText.prefix(30))...")
+            
+            // Show graceful reminder to user
+            savedItemsCount += 1
+            savedItemType = "Quote (Already Saved)"
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showSaveAnimation = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation {
+                    showSaveAnimation = false
+                    savedItemType = nil
+                }
+            }
+            
+            // Still link to session if not already linked
+            if let session = currentSession, let existingQuote = existingQuotes.first {
+                if existingQuote.ambientSession == nil || !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
+                    existingQuote.ambientSession = session
+                    // Check if quote is already in session's captured quotes before adding
+                    if !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
+                        session.capturedQuotes.append(existingQuote)
+                    }
+                    try? modelContext.save()
+                    print("✅ Linked existing quote to current session")
+                }
+            }
             return
         }
         
@@ -715,10 +857,6 @@ struct AmbientModeView: View {
             }
         }
         
-        // The text should already be cleaned by TrueAmbientProcessor
-        // Just use it as-is since the processor handles the cleanup
-        let quoteText = content.text
-        
         let capturedQuote = CapturedQuote(
             text: quoteText,
             book: bookModel,
@@ -728,11 +866,20 @@ struct AmbientModeView: View {
             source: .ambient
         )
         
+        // CRITICAL: Set the session relationship immediately
+        if let session = currentSession {
+            capturedQuote.ambientSession = session
+            // Check for duplicates before adding (defensive programming)
+            if !session.capturedQuotes.contains(where: { $0.text == capturedQuote.text }) {
+                session.capturedQuotes.append(capturedQuote)
+            }
+        }
+        
         modelContext.insert(capturedQuote)
         
         do {
             try modelContext.save()
-            print("✅ Quote saved to SwiftData: \(content.text.prefix(50))...")
+            print("✅ Quote saved to SwiftData with session: \(quoteText.prefix(50))...")
             HapticManager.shared.success()
         } catch {
             print("❌ Failed to save quote: \(error)")
@@ -740,16 +887,16 @@ struct AmbientModeView: View {
     }
     
     private func saveNoteToSwiftData(_ content: AmbientProcessedContent) {
-        // Check for existing duplicate before saving
-        let cleanText = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Use the raw text as-is for consistency
+        let noteText = content.text
         let fetchRequest = FetchDescriptor<CapturedNote>(
             predicate: #Predicate { note in
-                note.content == cleanText
+                note.content == noteText
             }
         )
         
         if let existingNotes = try? modelContext.fetch(fetchRequest), !existingNotes.isEmpty {
-            print("⚠️ Note already exists, skipping save: \(cleanText.prefix(30))...")
+            print("⚠️ Note already exists, skipping save: \(noteText.prefix(30))...")
             return
         }
         
@@ -777,11 +924,17 @@ struct AmbientModeView: View {
             source: .ambient
         )
         
+        // CRITICAL: Set the session relationship immediately
+        if let session = currentSession {
+            capturedNote.ambientSession = session
+            session.capturedNotes.append(capturedNote)
+        }
+        
         modelContext.insert(capturedNote)
         
         do {
             try modelContext.save()
-            print("✅ Note saved to SwiftData: \(content.text.prefix(50))...")
+            print("✅ Note saved to SwiftData with session: \(content.text.prefix(50))...")
             HapticManager.shared.success()
         } catch {
             print("❌ Failed to save note: \(error)")
@@ -789,28 +942,40 @@ struct AmbientModeView: View {
     }
     
     private func saveQuestionToSwiftData(_ content: AmbientProcessedContent) {
-        // Check for existing duplicate before saving
-        let cleanText = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Use the raw text as-is for consistency
+        let questionText = content.text
         let fetchRequest = FetchDescriptor<CapturedQuestion>(
             predicate: #Predicate { question in
-                question.content == cleanText
+                question.content == questionText
             }
         )
         
         if let existingQuestions = try? modelContext.fetch(fetchRequest), 
            let existingQuestion = existingQuestions.first {
+            // Link to session if not already linked
+            if let session = currentSession {
+                if existingQuestion.ambientSession == nil {
+                    existingQuestion.ambientSession = session
+                    // Check if question is already in session before adding
+                    if !session.capturedQuestions.contains(where: { $0.id == existingQuestion.id }) {
+                        session.capturedQuestions.append(existingQuestion)
+                    }
+                    print("📎 Linked existing question to session: \(questionText.prefix(30))...")
+                }
+            }
+            
             // Update answer if we have a response
             if let response = content.response, existingQuestion.answer == nil {
                 existingQuestion.answer = response
                 existingQuestion.isAnswered = true
-                do {
-                    try modelContext.save()
-                    print("✅ Updated question with answer: \(cleanText.prefix(30))...")
-                } catch {
-                    print("❌ Failed to update question: \(error)")
-                }
-            } else {
-                print("⚠️ Question already exists with answer: \(cleanText.prefix(30))...")
+            }
+            
+            do {
+                try modelContext.save()
+                print("✅ Updated existing question: \(questionText.prefix(30))...")
+                print("   Session now has \(currentSession?.capturedQuestions.count ?? 0) questions")
+            } catch {
+                print("❌ Failed to update question: \(error)")
             }
             return
         }
@@ -832,7 +997,7 @@ struct AmbientModeView: View {
         }
         
         let capturedQuestion = CapturedQuestion(
-            content: content.text,
+            content: questionText,
             book: bookModel,
             timestamp: content.timestamp,
             source: .ambient
@@ -844,11 +1009,21 @@ struct AmbientModeView: View {
             capturedQuestion.isAnswered = true
         }
         
+        // CRITICAL: Set the session relationship immediately
+        if let session = currentSession {
+            capturedQuestion.ambientSession = session
+            // Check for duplicates before adding (defensive programming)
+            if !session.capturedQuestions.contains(where: { $0.content == capturedQuestion.content }) {
+                session.capturedQuestions.append(capturedQuestion)
+            }
+        }
+        
         modelContext.insert(capturedQuestion)
         
         do {
             try modelContext.save()
-            print("✅ Question saved to SwiftData: \(content.text.prefix(50))...")
+            print("✅ Question saved to SwiftData with session: \(questionText.prefix(50))...")
+            print("   Session now has \(currentSession?.capturedQuestions.count ?? 0) questions")
         } catch {
             print("❌ Failed to save question: \(error)")
         }
@@ -992,8 +1167,25 @@ struct AmbientModeView: View {
         print("📚 Book detected: \(book.title)")
         lastDetectedBookId = book.localId
         
+        // Clear the transcription immediately to prevent double appearance
+        liveTranscription = ""
+        showLiveTranscription = false
+        
+        // Cancel any pending fade timer
+        transcriptionFadeTimer?.invalidate()
+        transcriptionFadeTimer = nil
+        
         withAnimation(.easeInOut(duration: 0.5)) {
             currentBookContext = book
+            showBookCover = true
+        }
+        
+        // Start timer to hide book cover after 10 seconds
+        bookCoverTimer?.invalidate()
+        bookCoverTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
+            withAnimation(.easeOut(duration: 0.8)) {
+                showBookCover = false
+            }
         }
         
         // Update the TrueAmbientProcessor with the new book context
@@ -1086,98 +1278,61 @@ struct AmbientModeView: View {
         transcriptionFadeTimer?.invalidate()
         transcriptionFadeTimer = nil
         
-        // Create session BEFORE dismissal
-        if !processor.detectedContent.isEmpty {
-            let session = createSession()
+        // Stop voice manager first
+        voiceManager.stopListening()
+        
+        // Clean up processor in background
+        Task {
+            await processor.endSession()
+        }
+        
+        // Finalize the session
+        if let session = currentSession {
+            session.endTime = Date()
+            
+            // Force save to ensure all relationships are persisted
+            do {
+                try modelContext.save()
+                print("✅ Session saved with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
+            } catch {
+                print("❌ Failed to save session: \(error)")
+            }
             
             // Show summary if there's meaningful content
             if session.capturedQuestions.count > 0 || session.capturedQuotes.count > 0 || session.capturedNotes.count > 0 {
-                currentSession = session
+                // Present the session summary sheet
                 showingSessionSummary = true
-                logger.info("📊 Showing session summary with \(session.capturedQuestions.count) questions")
+                logger.info("📊 Showing session summary with \(session.capturedQuestions.count) questions, \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes")
             } else {
                 // No meaningful content - just dismiss
+                logger.info("📊 No meaningful content in session, dismissing directly")
                 dismiss()
             }
         } else {
-            // No content at all - just dismiss
+            // No session - just dismiss
+            logger.info("❌ No session found, dismissing")
             dismiss()
-        }
-        
-        // Clean up in background
-        Task.detached {
-            await self.voiceManager.stopListening()
-            await self.processor.endSession()
         }
     }
     
     private func createSession() -> AmbientSession {
-        // Use existing session or create new one if somehow missing
-        let session = currentSession ?? AmbientSession(book: currentBookContext)
-        
-        // Ensure the correct start and end times
-        if let startTime = sessionStartTime {
-            session.startTime = startTime
+        // Use existing session - it was created at start and items were added during saving
+        guard let session = currentSession else {
+            print("❌ No current session found!")
+            return AmbientSession(book: currentBookContext)
         }
+        
+        // Just set the end time
         session.endTime = Date()
         
-        print("📊 Creating session with \(processor.detectedContent.count) items")
+        print("📊 Finalizing session with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
         
-        // Add captured content to session
-        for item in processor.detectedContent {
-            switch item.type {
-            case .quote:
-                if let quote = findQuote(matching: item.text) {
-                    quote.ambientSession = session
-                    session.capturedQuotes.append(quote)
-                    print("✅ Added quote to session")
-                }
-            case .note, .thought:
-                if let note = findNote(matching: item.text) {
-                    note.ambientSession = session
-                    session.capturedNotes.append(note)
-                    print("✅ Added note to session")
-                }
-            case .question:
-                // For questions, also check if it's saved with answer property
-                if let question = findQuestion(matching: item.text) {
-                    // Make sure the question has the latest answer
-                    if let response = item.response, question.answer == nil {
-                        question.answer = response
-                        question.isAnswered = true
-                    }
-                    question.ambientSession = session
-                    session.capturedQuestions.append(question)
-                    print("✅ Added question to session: \(item.text) with answer: \(question.answer != nil)")
-                } else {
-                    // Create a new question if not found
-                    let bookModel: BookModel? = nil // We'd need to convert Book to BookModel
-                    let newQuestion = CapturedQuestion(
-                        content: item.text,
-                        book: bookModel,
-                        timestamp: item.timestamp,
-                        source: .ambient
-                    )
-                    newQuestion.answer = item.response
-                    newQuestion.isAnswered = item.response != nil
-                    modelContext.insert(newQuestion)
-                    session.capturedQuestions.append(newQuestion)
-                    print("✅ Created and added new question to session")
-                }
-            default:
-                break
-            }
-        }
-        
-        // Save session to SwiftData (only insert if not already inserted)
-        if currentSession == nil {
-            modelContext.insert(session)
-        }
+        // Save final state
         do {
             try modelContext.save()
-            print("✅ Session saved to SwiftData with all relationships")
+            print("✅ Session finalized in SwiftData")
         } catch {
-            print("❌ Failed to save session: \(error)")
+            print("❌ Failed to finalize session: \(error)")
         }
         
         // End processor session in background
@@ -1312,5 +1467,88 @@ struct AmbientModeView: View {
             }
         }
         .transition(.opacity)
+    }
+}
+
+// MARK: - Ambient Message Thread View (Minimal Style)
+struct AmbientMessageThreadView: View {
+    let message: UnifiedChatMessage
+    let index: Int
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Question/response row
+            HStack(alignment: .center, spacing: 16) {
+                Text(String(format: "%02d", index + 1))
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(width: 24)
+                
+                if message.isUser {
+                    Text(message.content)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    // Extract question from AI response if formatted
+                    let content = extractContent(from: message.content)
+                    Text(content.question)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                
+                if !message.isUser {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+            }
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if !message.isUser {
+                    onToggle()
+                }
+            }
+            
+            // Answer (expandable for AI responses)
+            if !message.isUser && isExpanded {
+                let content = extractContent(from: message.content)
+                if !content.answer.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(height: 0.5)
+                        
+                        Text(try! AttributedString(markdown: content.answer))
+                            .font(.custom("Georgia", size: 15))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 40)
+                            .padding(.trailing, 20)  // Add right padding for better spacing
+                            .padding(.vertical, 12)
+                            .padding(.bottom, 4)  // Extra padding at bottom since we removed the line
+                    }
+                }
+            }
+        }
+    }
+    
+    private func extractContent(from text: String) -> (question: String, answer: String) {
+        // Check if the content is formatted with question and answer
+        if text.contains("**") && text.contains("\n\n") {
+            let parts = text.components(separatedBy: "\n\n")
+            if parts.count >= 2 {
+                let question = parts[0].replacingOccurrences(of: "**", with: "")
+                let answer = parts.dropFirst().joined(separator: "\n\n")
+                return (question, answer)
+            }
+        }
+        // Otherwise return the full text as the question
+        return (text, "")
     }
 }

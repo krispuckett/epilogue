@@ -348,6 +348,53 @@ class NotesViewModel: ObservableObject {
         loadNotes()
     }
     
+    // Sync with SwiftData to bring in ambient session quotes/notes  
+    // Remove this - it causes ambiguity issues with Note type
+    /*
+    func syncWithSwiftData(quotes: [CapturedQuote], notes: [CapturedNote]) {
+        print("🔄 Syncing with SwiftData: \(quotes.count) quotes, \(notes.count) notes")
+        
+        // Convert SwiftData quotes to Note model
+        for quote in quotes {
+            // Check if already exists
+            if !self.notes.contains(where: { $0.content == quote.text }) {
+                let note = Note(
+                    type: .quote,
+                    content: quote.text,
+                    bookId: quote.book?.id,
+                    bookTitle: quote.book?.title,
+                    author: quote.author,
+                    pageNumber: nil,
+                    dateCreated: quote.timestamp,
+                    id: UUID()
+                )
+                self.notes.append(note)
+            }
+        }
+        
+        // Convert SwiftData notes to Note model
+        for capturedNote in notes {
+            // Check if already exists
+            if !self.notes.contains(where: { $0.content == capturedNote.content }) {
+                let note = Note(
+                    type: .note,
+                    content: capturedNote.content,
+                    bookId: capturedNote.book?.id,
+                    bookTitle: capturedNote.book?.title,
+                    author: nil,
+                    pageNumber: capturedNote.pageNumber,
+                    dateCreated: capturedNote.timestamp,
+                    id: UUID()
+                )
+                self.notes.append(note)
+            }
+        }
+        
+        // Save the synced notes
+        saveNotes()
+    }
+    */
+    
     // Handle book replacement by updating note bookId references
     private func handleBookReplacement(_ notification: Notification) {
         guard let userInfo = notification.userInfo,

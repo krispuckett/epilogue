@@ -69,40 +69,95 @@ class AmbientBookDetector: ObservableObject {
         print("📚 Detecting book in text: \(text)")
         let lowercased = text.lowercased()
         
-        // Check for trigger phrases
-        let containsTrigger = bookTriggerPhrases.contains { lowercased.contains($0) }
+        // ALWAYS check against known books first (even without trigger phrases)
+        checkAgainstKnownBooks(text)
         
-        if containsTrigger {
-            // Extract potential book title
-            if let bookTitle = extractBookTitle(from: text) {
-                findBookInLibrary(title: bookTitle)
-            }
+        // If no book detected yet, check for trigger phrases
+        if detectedBook == nil {
+            let containsTrigger = bookTriggerPhrases.contains { lowercased.contains($0) }
             
-            // Also check against known books
-            checkAgainstKnownBooks(text)
+            if containsTrigger || lowercased.contains("reading") {
+                // Extract potential book title
+                if let bookTitle = extractBookTitle(from: text) {
+                    findBookInLibrary(title: bookTitle)
+                }
+            }
         }
     }
     
     private func extractBookTitle(from text: String) -> String? {
         let lowercased = text.lowercased()
         
-        // Pattern: "reading [book title]"
-        if let range = lowercased.range(of: "reading ") {
-            let afterReading = String(text[range.upperBound...])
-            
-            // Extract until common delimiters
-            let delimiters = CharacterSet(charactersIn: ",.!?;:")
-            if let endIndex = afterReading.rangeOfCharacter(from: delimiters) {
-                return String(afterReading[..<endIndex.lowerBound]).trimmingCharacters(in: .whitespaces)
-            } else {
-                // Take first few words
-                let words = afterReading.split(separator: " ").prefix(5)
-                return words.joined(separator: " ")
+        // SMART PATTERNS - like how ChatGPT understands context
+        
+        // Pattern 1: "reading [book title]" - but flexible
+        let readingPatterns = ["reading ", "i'm reading ", "currently reading ", "just started ", "finishing "]
+        for pattern in readingPatterns {
+            if let range = lowercased.range(of: pattern) {
+                let afterPattern = String(text[range.upperBound...])
+                
+                // Extract until common delimiters
+                let delimiters = CharacterSet(charactersIn: ",.!?;:")
+                if let endIndex = afterPattern.rangeOfCharacter(from: delimiters) {
+                    let title = String(afterPattern[..<endIndex.lowerBound]).trimmingCharacters(in: .whitespaces)
+                    if !title.isEmpty {
+                        return title
+                    }
+                } else {
+                    // Take the rest as title
+                    let title = afterPattern.trimmingCharacters(in: .whitespaces)
+                    if !title.isEmpty && title.count < 100 {
+                        return title
+                    }
+                }
             }
         }
         
-        // Pattern: quotes around title
-        let quotePatterns = ["\"", "\u{201C}", "'"]
+        // Pattern 2: Just saying the book title directly (most natural!)
+        // Check if the ENTIRE text might be a book title
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // If it's short enough and doesn't look like a question/statement
+        if trimmedText.count <= 50 && 
+           !trimmedText.contains("?") && 
+           !trimmedText.lowercased().starts(with: "who") &&
+           !trimmedText.lowercased().starts(with: "what") &&
+           !trimmedText.lowercased().starts(with: "when") &&
+           !trimmedText.lowercased().starts(with: "where") &&
+           !trimmedText.lowercased().starts(with: "why") &&
+           !trimmedText.lowercased().starts(with: "how") {
+            
+            // Check if it matches a known book
+            for book in libraryBooks {
+                let bookTitleLower = book.title.lowercased()
+                let textLower = trimmedText.lowercased()
+                
+                // Exact match or very close match
+                if bookTitleLower == textLower ||
+                   bookTitleLower.contains(textLower) ||
+                   textLower.contains(bookTitleLower) {
+                    return book.title  // Return the proper title
+                }
+                
+                // Fuzzy match - at least 70% of words match
+                let bookWords = Set(bookTitleLower.split(separator: " ").map(String.init))
+                let textWords = Set(textLower.split(separator: " ").map(String.init))
+                let intersection = bookWords.intersection(textWords)
+                
+                if !bookWords.isEmpty && 
+                   Double(intersection.count) / Double(bookWords.count) >= 0.7 {
+                    return book.title
+                }
+            }
+            
+            // Even if not in library, might still be a book title
+            if trimmedText.split(separator: " ").count <= 10 {
+                return trimmedText
+            }
+        }
+        
+        // Pattern 3: quotes around title
+        let quotePatterns = ["\"", "\u{201C}", "'", "\u{201C}", "\u{201D}"]
         for quote in quotePatterns {
             if let firstQuote = text.range(of: quote),
                let secondQuote = text.range(of: quote, range: firstQuote.upperBound..<text.endIndex) {
@@ -129,11 +184,21 @@ class AmbientBookDetector: ObservableObject {
                 return
             }
             
-            // Check partial title match (at least 3 words)
-            let titleWords = titleLower.split(separator: " ")
-            if titleWords.count >= 3 {
+            // Special case for "Lord of the Rings" variations
+            if titleLower.contains("lord of the rings") || titleLower.contains("fellowship") || titleLower.contains("two towers") || titleLower.contains("return of the king") {
+                if lowercased.contains("lord") && lowercased.contains("rings") {
+                    print("📚 Found Lord of the Rings match: \(book.title)")
+                    setDetectedBook(book, confidence: 0.85)
+                    return
+                }
+            }
+            
+            // Check partial title match (at least 2 significant words)
+            let titleWords = titleLower.split(separator: " ").filter { $0.count > 3 } // Filter out small words
+            if titleWords.count >= 2 {
                 let matchingWords = titleWords.filter { lowercased.contains($0) }
-                if Double(matchingWords.count) / Double(titleWords.count) > 0.6 {
+                if Double(matchingWords.count) / Double(titleWords.count) > 0.5 {
+                    print("📚 Found partial match: \(book.title)")
                     setDetectedBook(book, confidence: 0.7)
                     return
                 }

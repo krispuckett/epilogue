@@ -7,6 +7,7 @@ struct AmbientSessionSummaryView: View {
     let colorPalette: ColorPalette?
     
     @State private var expandedQuestions = Set<String>()
+    @State private var hasInitializedExpanded = false
     @State private var continuationText = ""
     @State private var isProcessingFollowUp = false
     @State private var additionalMessages: [UnifiedChatMessage] = []
@@ -21,7 +22,7 @@ struct AmbientSessionSummaryView: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Subtle, almost invisible gradient
                 minimalGradientBackground
@@ -80,8 +81,16 @@ struct AmbientSessionSummaryView: View {
             .safeAreaInset(edge: .bottom) {
                 minimalInputBar
             }
+            .onAppear {
+                // Auto-expand all questions on first load
+                if !hasInitializedExpanded {
+                    for question in session.capturedQuestions {
+                        expandedQuestions.insert(question.id.uuidString)
+                    }
+                    hasInitializedExpanded = true
+                }
+            }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
         .overlay {
             if showingCommandPalette {
                 commandPaletteOverlay
@@ -247,10 +256,22 @@ struct AmbientSessionSummaryView: View {
                             .foregroundStyle(.white.opacity(0.4))
                     }
                     
-                    Text(question.content)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .multilineTextAlignment(.leading)
+                    // Show a smart summary instead of just the question
+                    if let answer = question.answer {
+                        // Extract the first meaningful sentence from the answer as the insight
+                        let insight = extractKeyInsight(from: answer, question: question.content)
+                        Text(insight)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                    } else {
+                        // Fallback to question if no answer
+                        Text(question.content)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .multilineTextAlignment(.leading)
+                    }
                 }
                 .padding(24)
             }
@@ -465,6 +486,64 @@ struct AmbientSessionSummaryView: View {
     
     private func shareInsights() {
         // Share implementation
+    }
+    
+    private func extractKeyInsight(from answer: String, question: String) -> String {
+        // Remove markdown formatting
+        let cleanAnswer = answer
+            .replacingOccurrences(of: "**", with: "")
+            .replacingOccurrences(of: "*", with: "")
+            .replacingOccurrences(of: "#", with: "")
+        
+        // Split into sentences
+        let sentences = cleanAnswer.components(separatedBy: ". ")
+            .filter { !$0.isEmpty }
+        
+        // Look for the most insightful sentence
+        for sentence in sentences {
+            // Skip sentences that are just restating the question
+            if sentence.lowercased().contains(question.lowercased()) {
+                continue
+            }
+            
+            // Prefer sentences with key information
+            let keyPhrases = ["is a", "is the", "was a", "was the", "represents", "lives in", "resides", "known for", "famous for"]
+            for phrase in keyPhrases {
+                if sentence.lowercased().contains(phrase) {
+                    // Clean up and return this sentence
+                    let cleaned = sentence
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "\n", with: " ")
+                    
+                    // Add period if missing
+                    if !cleaned.hasSuffix(".") && !cleaned.hasSuffix("!") && !cleaned.hasSuffix("?") {
+                        return cleaned + "."
+                    }
+                    return cleaned
+                }
+            }
+        }
+        
+        // Fallback: return first non-question sentence or a summary
+        if let firstGoodSentence = sentences.first(where: { !$0.lowercased().contains(question.lowercased()) }) {
+            let cleaned = firstGoodSentence
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\n", with: " ")
+            
+            if !cleaned.hasSuffix(".") && !cleaned.hasSuffix("!") && !cleaned.hasSuffix("?") {
+                return cleaned + "."
+            }
+            return cleaned
+        }
+        
+        // Ultimate fallback - create a summary from question
+        if question.lowercased().starts(with: "who is") {
+            let subject = question.replacingOccurrences(of: "Who is ", with: "")
+                .replacingOccurrences(of: "?", with: "")
+            return "\(subject) is a key character in the story."
+        }
+        
+        return "An important insight from your reading session."
     }
 }
 

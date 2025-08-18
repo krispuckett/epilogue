@@ -230,10 +230,20 @@ public class EnhancedIntentDetector {
     
     // MARK: - Question Detection
     private func detectQuestionType(from text: String) -> EnhancedIntent.QuestionType? {
-        // Check for question mark first
-        guard text.contains("?") || text.starts(with: "what") || text.starts(with: "who") ||
-              text.starts(with: "where") || text.starts(with: "when") || text.starts(with: "why") ||
-              text.starts(with: "how") else {
+        let lowercased = text.lowercased()
+        
+        // Check for various question patterns
+        let isQuestion = text.contains("?") || 
+                        text.starts(with: "what") || text.starts(with: "who") ||
+                        text.starts(with: "where") || text.starts(with: "when") || 
+                        text.starts(with: "why") || text.starts(with: "how") ||
+                        lowercased.starts(with: "tell me") ||
+                        lowercased.starts(with: "can you explain") ||
+                        lowercased.starts(with: "i'm curious about") ||
+                        lowercased.starts(with: "i want to know") ||
+                        lowercased.starts(with: "explain")
+        
+        guard isQuestion else {
             return nil
         }
         

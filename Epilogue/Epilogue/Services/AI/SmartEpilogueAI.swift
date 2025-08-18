@@ -124,8 +124,17 @@ class SmartEpilogueAI: ObservableObject {
         case .available:
             session = LanguageModelSession(instructions: instructions)
             print("✅ Foundation Models session created successfully")
-        case .unavailable(let reason):
-            print("⚠️ Foundation Models unavailable: \(reason)")
+        case .unavailable(.deviceNotEligible):
+            print("⚠️ Device not eligible for Apple Intelligence")
+            session = nil
+        case .unavailable(.appleIntelligenceNotEnabled):
+            print("⚠️ Apple Intelligence not enabled in Settings")
+            session = nil
+        case .unavailable(.modelNotReady):
+            print("⚠️ Model is downloading or not ready")
+            session = nil
+        case .unavailable(let other):
+            print("⚠️ Foundation Models unavailable: \(other)")
             session = nil
         @unknown default:
             print("⚠️ Foundation Models availability unknown")
