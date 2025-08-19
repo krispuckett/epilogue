@@ -786,7 +786,7 @@ struct AmbientModeView: View {
             }
             .frame(height: 100)
             .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(.bottom, inputMode == .textInput ? 6 : 24)  // Only 6px padding when keyboard is shown
             
             // Long press for quick keyboard
             .onLongPressGesture(minimumDuration: 0.5) {
