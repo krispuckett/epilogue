@@ -142,9 +142,16 @@ struct AmbientModeView: View {
         // Bottom gradient and input controls
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {
-                // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
-                voiceGradientOverlay
-                    .allowsHitTesting(false) // Ensure gradient doesn't block touches
+                // Bottom gradient - ALWAYS VISIBLE IN ALL MODES, NEVER DIMS OR HIDES
+                VoiceResponsiveBottomGradient(
+                    colorPalette: colorPalette,
+                    audioLevel: audioLevel,
+                    isRecording: isRecording,
+                    bookContext: currentBookContext
+                )
+                .opacity(1.0) // FORCE FULL OPACITY ALWAYS
+                .allowsHitTesting(false) // Ensure gradient doesn't block touches
+                .animation(nil, value: inputMode) // NO ANIMATION ON GRADIENT
                 
                 // Input controls overlay on top of gradient
                 bottomInputArea
@@ -404,16 +411,7 @@ struct AmbientModeView: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
             }
             
-            // Thinking indicator - only show when recording and waiting
-            if isWaitingForAIResponse && isRecording {
-                SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                    .scaleEffect(0.5) // Smaller
-                    .padding(.bottom, 8)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 1.1).combined(with: .opacity)
-                    ))
-            }
+            // REMOVED duplicate thinking indicator - only need one in bottomInputArea
             
             // Live transcription with animated glass container (editable)
             if isRecording && !liveTranscription.isEmpty {
@@ -652,8 +650,8 @@ struct AmbientModeView: View {
                     .scaleEffect(inputMode == .textInput && currentSession != nil ? 1 : 0.8)
                     .allowsHitTesting(inputMode == .textInput && currentSession != nil)
                 
-                // Waveform/Stop button - hide when text input is active
-                if inputMode != .textInput {
+                // Waveform/Stop button - COMPLETELY HIDDEN when text input is active
+                if inputMode != .textInput && !isKeyboardFocused {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                             if inputMode == .listening && isRecording {
@@ -1158,6 +1156,21 @@ struct AmbientModeView: View {
     private func saveQuestionToSwiftData(_ content: AmbientProcessedContent) {
         // Use the raw text as-is for consistency
         let questionText = content.text
+        
+        // CRITICAL: Check for duplicate questions FIRST
+        let duplicateCheck = FetchDescriptor<CapturedQuestion>(
+            predicate: #Predicate<CapturedQuestion> { question in
+                question.content == questionText &&
+                question.session?.id == currentSession?.id
+            }
+        )
+        
+        if let existingQuestions = try? modelContext.fetch(duplicateCheck),
+           !existingQuestions.isEmpty {
+            print("⚠️ DUPLICATE QUESTION DETECTED - NOT SAVING: \(questionText)")
+            return // EXIT EARLY - DO NOT SAVE DUPLICATE
+        }
+        
         let fetchRequest = FetchDescriptor<CapturedQuestion>(
             predicate: #Predicate { question in
                 question.content == questionText
