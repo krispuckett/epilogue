@@ -528,7 +528,11 @@ struct AmbientModeView: View {
                         isKeyboardFocused = false
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
                             keyboardText = ""
-                            inputMode = .paused
+                            inputMode = .listening
+                        }
+                        // Resume recording after animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            startRecording()
                         }
                         HapticManager.shared.lightTap()
                     }
