@@ -636,7 +636,8 @@ struct AmbientModeView: View {
                 SubtleLiquidThinking(bookColor: adaptiveUIColor)
                     .scaleEffect(0.5) // Smaller
                     .padding(.bottom, 12)
-                    .glassEffect(.thin, in: Capsule())
+                    .glassEffect()
+                    .clipShape(Capsule())
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 1.1).combined(with: .opacity)
