@@ -488,31 +488,7 @@ struct AmbientModeView: View {
                     ))
             }
             
-            // Clean stop button with red glass tint
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                    stopRecording()
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.red.opacity(0.2))
-                        .frame(width: 64, height: 64)
-                        .glassEffect()
-                        .glassEffectTransition(.materialize)
-                    
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.red)
-                        .frame(width: 20, height: 20)
-                        .animation(.easeInOut(duration: 0.2), value: isRecording)
-                }
-            }
-            .padding(.bottom, 50)
-            .scaleEffect(1.0)
-            .transition(.asymmetric(
-                insertion: .scale(scale: 1.2).combined(with: .opacity),
-                removal: .scale(scale: 0.8).combined(with: .opacity).combined(with: .push(from: .top))
-            ))
+            // REMOVED duplicate stop button - now handled in bottomInputArea
         }
     }
     
