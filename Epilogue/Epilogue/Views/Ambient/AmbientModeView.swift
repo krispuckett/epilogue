@@ -649,23 +649,79 @@ struct AmbientModeView: View {
                 .transition(.opacity)
             }
             
-            // Single morphing control area
-            if inputMode == .textInput && currentSession != nil {
-                // Text input mode with waveform button
-                ambientTextInputBar
+            // Unified morphing control - stop button morphs INTO input bar
+            HStack(spacing: 12) {
+                // Input field - expands from nothing
+                if inputMode == .textInput && currentSession != nil {
+                    HStack(spacing: 8) {
+                        // Camera button
+                        Button {
+                            showImagePicker = true
+                        } label: {
+                            Image(systemName: "camera")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Text field
+                        TextField("", text: $keyboardText, axis: .vertical)
+                            .placeholder(when: keyboardText.isEmpty) {
+                                Text("Ask, capture, or type...")
+                                    .foregroundColor(.white.opacity(0.35))
+                                    .font(.system(size: 16))
+                            }
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                            .tint(.white.opacity(0.8))
+                            .focused($isKeyboardFocused)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.plain)
+                            .onSubmit {
+                                if !keyboardText.isEmpty {
+                                    sendTextMessage()
+                                }
+                            }
+                        
+                        // Send button
+                        if !keyboardText.isEmpty {
+                            Button {
+                                sendTextMessage()
+                            } label: {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.black, .white.opacity(0.9))
+                            }
+                            .buttonStyle(.plain)
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .glassEffect()
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 1.2).combined(with: .opacity)
+                        insertion: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity),
+                        removal: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity)
                     ))
-            } else {
-                // Voice mode with stop/waveform button
+                }
+                
+                // Stop/Waveform button - always present, morphs between states
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                        if inputMode == .listening && isRecording {
-                            // Tap to stop recording
+                        if inputMode == .textInput {
+                            // Return to voice mode
+                            isKeyboardFocused = false
+                            keyboardText = ""
+                            inputMode = .listening
+                            startRecording()
+                        } else if inputMode == .listening && isRecording {
+                            // Stop recording
                             handleMicrophoneTap()
                         } else if inputMode == .paused {
-                            // Continue to text input
+                            // Enter text input mode
                             inputMode = .textInput
                             isKeyboardFocused = true
                         } else {
@@ -677,39 +733,39 @@ struct AmbientModeView: View {
                     ZStack {
                         Circle()
                             .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                            .frame(width: 64, height: 64)
+                            .frame(width: inputMode == .textInput ? 48 : 64, height: inputMode == .textInput ? 48 : 64)
                             .glassEffect()
                         
-                        Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
-                            .font(.system(size: 28, weight: .medium))
+                        Image(systemName: inputMode == .textInput ? "waveform" : (inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform")))
+                            .font(.system(size: inputMode == .textInput ? 20 : 28, weight: .medium))
                             .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
                             .symbolEffect(.bounce, value: isRecording)
                     }
                 }
                 .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 1.2).combined(with: .opacity)
-                ))
-                // Long press gesture for keyboard
+                // Long press for quick keyboard access
                 .onLongPressGesture(minimumDuration: 0.5) {
-                    if isRecording {
-                        stopRecording()
+                    if inputMode != .textInput {
+                        if isRecording {
+                            stopRecording()
+                        }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            inputMode = .textInput
+                            isKeyboardFocused = true
+                        }
+                        HapticManager.shared.mediumTap()
                     }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        inputMode = .textInput
-                        isKeyboardFocused = true
-                    }
-                    HapticManager.shared.mediumTap()
                 }
-                .padding(.bottom, 50)
             }
+            .padding(.horizontal, inputMode == .textInput ? 16 : 0)
+            .padding(.bottom, inputMode == .textInput ? 24 : 50)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
     }
     
-    // MARK: - Text Input Bar Component (Raycast-style)
-    private var ambientTextInputBar: some View {
+    // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
+    // Keeping for reference but no longer used
+    private var ambientTextInputBar_DEPRECATED: some View {
         HStack(spacing: 12) {
             // Minimal Raycast-style input field
             HStack(spacing: 8) {
