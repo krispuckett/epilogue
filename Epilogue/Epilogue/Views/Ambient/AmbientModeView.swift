@@ -1157,23 +1157,17 @@ struct AmbientModeView: View {
         // Use the raw text as-is for consistency
         let questionText = content.text
         
-        // CRITICAL: Check for duplicate questions FIRST
-        // Simplified predicate to help compiler type-checking
-        guard let sessionId = currentSession?.id else { return }
+        // CRITICAL: Check for duplicate questions in current session
+        guard let session = currentSession else { return }
         
-        let duplicateCheck = FetchDescriptor<CapturedQuestion>(
-            predicate: #Predicate<CapturedQuestion> { question in
-                question.content == questionText
-            }
-        )
+        // Check if question already exists in this session
+        let isDuplicate = session.capturedQuestions.contains { question in
+            question.content == questionText
+        }
         
-        if let existingQuestions = try? modelContext.fetch(duplicateCheck) {
-            // Check session match manually to avoid complex predicate
-            let duplicates = existingQuestions.filter { $0.session?.id == sessionId }
-            if !duplicates.isEmpty {
-                print("⚠️ DUPLICATE QUESTION DETECTED - NOT SAVING: \(questionText)")
-                return // EXIT EARLY - DO NOT SAVE DUPLICATE
-            }
+        if isDuplicate {
+            print("⚠️ DUPLICATE QUESTION DETECTED - NOT SAVING: \(questionText)")
+            return // EXIT EARLY - DO NOT SAVE DUPLICATE
         }
         
         let fetchRequest = FetchDescriptor<CapturedQuestion>(
