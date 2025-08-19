@@ -603,71 +603,74 @@ struct AmbientModeView: View {
                     ))
             }
             
-            // Award-winning control with waveform orb outside input bar
+            // iOS Search-style expanding input field
             if inputMode == .textInput && currentSession != nil {
-                // Text input mode - input bar with separate waveform orb
                 HStack(spacing: 12) {
-                    // Input field container
-                    HStack(spacing: 8) {
-                        // Camera button
-                        Button {
-                            showImagePicker = true
-                        } label: {
-                            Image(systemName: "camera")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.6))
-                                .frame(width: 32, height: 32)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .opacity(inputMode == .textInput ? 1 : 0)
-                        .scaleEffect(inputMode == .textInput ? 1 : 0.5)
-                        .animation(.smooth(duration: 0.25).delay(inputMode == .textInput ? 0.15 : 0), value: inputMode) // Smooth fade in
+                    // Expanding search field container
+                    ZStack {
+                        // Background pill that expands
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
+                            .frame(height: 44)
+                            .frame(width: inputMode == .textInput ? nil : 60)
+                            .glassEffect()
                         
-                        // Text field with glowing amber caret
-                        TextField("", text: $keyboardText, axis: .vertical)
-                            .placeholder(when: keyboardText.isEmpty) {
-                                Text("Ask, capture, or type...")
-                                    .foregroundColor(.white.opacity(0.35))
-                                    .font(.system(size: 16))
-                            }
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white)
-                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26)) // Amber caret
-                            .focused($isKeyboardFocused)
-                            .lineLimit(1...3)
-                            .textFieldStyle(.plain)
-                            .onSubmit {
-                                if !keyboardText.isEmpty {
-                                    sendTextMessage()
-                                }
-                            }
-                        
-                        // Send button
-                        if !keyboardText.isEmpty {
+                        // Content that fades in
+                        HStack(spacing: 8) {
+                            // Camera button
                             Button {
-                                sendTextMessage()
+                                showImagePicker = true
                             } label: {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(.black, .white.opacity(0.9))
+                                Image(systemName: "camera")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.3).combined(with: .opacity),
-                                removal: .scale(scale: 0.3).combined(with: .opacity)
-                            ))
+                            .opacity(inputMode == .textInput ? 1 : 0)
+                            .scaleEffect(inputMode == .textInput ? 1 : 0.7)
+                            .animation(.smooth(duration: 0.35).delay(inputMode == .textInput ? 0.2 : 0), value: inputMode)
+                            
+                            // Text field with amber caret
+                            TextField("", text: $keyboardText, axis: .vertical)
+                                .placeholder(when: keyboardText.isEmpty) {
+                                    Text("Ask, capture, or type...")
+                                        .foregroundColor(.white.opacity(0.35))
+                                        .font(.system(size: 16))
+                                }
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white)
+                                .tint(Color(red: 1.0, green: 0.55, blue: 0.26)) // Amber caret
+                                .focused($isKeyboardFocused)
+                                .lineLimit(1...3)
+                                .textFieldStyle(.plain)
+                                .opacity(inputMode == .textInput ? 1 : 0)
+                                .animation(.smooth(duration: 0.35).delay(inputMode == .textInput ? 0.25 : 0), value: inputMode)
+                                .onSubmit {
+                                    if !keyboardText.isEmpty {
+                                        sendTextMessage()
+                                    }
+                                }
+                            
+                            // Send button
+                            if !keyboardText.isEmpty {
+                                Button {
+                                    sendTextMessage()
+                                } label: {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundStyle(.black, .white.opacity(0.9))
+                                }
+                                .buttonStyle(.plain)
+                                .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            }
                         }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .glassEffect()
-                    // iOS search-style horizontal expansion
-                    .frame(height: 44) // Consistent height
-                    .scaleEffect(x: inputMode == .textInput ? 1 : 0.2, y: inputMode == .textInput ? 1 : 0.9, anchor: .trailing)
-                    .opacity(inputMode == .textInput ? 1 : 0)
-                    .blur(radius: inputMode == .textInput ? 0 : 3) // Subtle blur during transition
+                    .frame(maxWidth: inputMode == .textInput ? .infinity : 60)
                     
                     // Waveform orb - separate from input bar
                     Button {
