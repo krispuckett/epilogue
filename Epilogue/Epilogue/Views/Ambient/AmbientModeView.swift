@@ -670,14 +670,11 @@ struct AmbientModeView: View {
                     
                     // Waveform orb - separate from input bar
                     Button {
-                        // First hide keyboard, then animate
-                        isKeyboardFocused = false
                         withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25)) {
+                            // Return to voice mode
+                            isKeyboardFocused = false
                             keyboardText = ""
                             inputMode = .listening
-                        }
-                        // Delay recording start to let animation complete
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                             startRecording()
                         }
                     } label: {
@@ -686,18 +683,22 @@ struct AmbientModeView: View {
                                 .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
                                 .frame(width: 48, height: 48)
                                 .glassEffect()
-                                .matchedGeometryEffect(id: "morphButton", in: buttonMorphNamespace)
+                                .matchedGeometryEffect(id: "morphButton.background", in: buttonMorphNamespace)
                             
                             Image(systemName: "waveform")
                                 .font(.system(size: 20, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                                 .contentTransition(.interpolate)
                         }
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
-                .transition(.identity)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
             } else {
                 // Voice mode - stop/waveform button in center
                 Button {
@@ -723,17 +724,21 @@ struct AmbientModeView: View {
                             .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
                             .frame(width: 64, height: 64)
                             .glassEffect()
-                            .matchedGeometryEffect(id: "morphButton", in: buttonMorphNamespace)
+                            .matchedGeometryEffect(id: "morphButton.background", in: buttonMorphNamespace)
                         
                         Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
                             .font(.system(size: 28, weight: .medium, design: .rounded))
                             .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                             .contentTransition(.interpolate)
                     }
                 }
                 .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
                 .padding(.bottom, 50)
-                .transition(.identity)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
                 // Long press gesture for quick keyboard access
                 .onLongPressGesture(minimumDuration: 0.5) {
                     if isRecording {
