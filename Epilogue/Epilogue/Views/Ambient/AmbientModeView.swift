@@ -142,16 +142,9 @@ struct AmbientModeView: View {
         // Bottom gradient and input controls
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {
-                // Bottom gradient - ALWAYS VISIBLE IN ALL MODES, NEVER DIMS OR HIDES
-                VoiceResponsiveBottomGradient(
-                    colorPalette: colorPalette,
-                    audioLevel: audioLevel,
-                    isRecording: isRecording,
-                    bookContext: currentBookContext
-                )
-                .opacity(1.0) // FORCE FULL OPACITY ALWAYS
-                .allowsHitTesting(false) // Ensure gradient doesn't block touches
-                .animation(nil, value: inputMode) // NO ANIMATION ON GRADIENT
+                // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
+                voiceGradientOverlay
+                    .allowsHitTesting(false) // Ensure gradient doesn't block touches
                 
                 // Input controls overlay on top of gradient
                 bottomInputArea
