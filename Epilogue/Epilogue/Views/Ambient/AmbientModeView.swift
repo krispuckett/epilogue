@@ -1521,6 +1521,9 @@ struct AmbientModeView: View {
             )
             processor.detectedContent.append(content)
             
+            // Save question to SwiftData immediately
+            saveQuestionToSwiftData(content)
+            
             // For questions, show thinking and get AI response
             isWaitingForAIResponse = true
             pendingQuestion = messageText
