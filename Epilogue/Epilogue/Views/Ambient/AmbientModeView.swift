@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import Combine
 import OSLog
+import UIKit
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
@@ -46,6 +47,12 @@ struct AmbientModeView: View {
     @State private var lastProcessedCount = 0
     @State private var debounceTimer: Timer?
     
+    // New keyboard input states
+    @State private var inputMode: AmbientInputMode = .listening
+    @State private var keyboardText = ""
+    @FocusState private var isKeyboardFocused: Bool
+    @State private var keyboardHeight: CGFloat = 0
+    
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
@@ -69,6 +76,13 @@ struct AmbientModeView: View {
         }
     }
     
+    // Input mode for keyboard/voice switching
+    enum AmbientInputMode {
+        case listening          // Voice active
+        case paused            // Voice paused, ready for input
+        case textInput         // Keyboard active
+    }
+    
     // Adaptive UI color based on current palette
     private var adaptiveUIColor: Color {
         if let palette = colorPalette {
@@ -85,6 +99,20 @@ struct AmbientModeView: View {
             
             // Main scroll content
             mainScrollContent
+        }
+        // Double tap gesture to show keyboard
+        .onTapGesture(count: 2) {
+            // Double tap anywhere to show keyboard
+            if inputMode != .textInput {
+                if isRecording {
+                    stopRecording()
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    inputMode = .textInput
+                    isKeyboardFocused = true
+                }
+                HapticManager.shared.lightTap()
+            }
         }
         // Top gradient overlay for fake blur effect (like BookView)
         .overlay(alignment: .top) {
@@ -105,15 +133,15 @@ struct AmbientModeView: View {
             .allowsHitTesting(false)
             .blur(radius: 0.5)  // Subtle blur to soften the gradient edge
         }
-        // Voice gradient overlay - appears on top when recording
+        // Voice gradient overlay and input controls
         .overlay(alignment: .bottom) {
-            if isRecording {
-                voiceGradientOverlay
-            }
-        }
-        // Clean minimal input bar
-        .safeAreaInset(edge: .bottom) {
-            if !isRecording {
+            ZStack(alignment: .bottom) {
+                // Voice gradient when recording
+                if isRecording {
+                    voiceGradientOverlay
+                }
+                
+                // Input controls (waveform button or text input)
                 bottomInputArea
             }
         }
@@ -143,6 +171,17 @@ struct AmbientModeView: View {
         }
         .onAppear {
             startAmbientExperience()
+            setupKeyboardObservers()
+        }
+        .onChange(of: inputMode) { _, newMode in
+            // Handle focus changes when switching modes
+            if newMode == .textInput {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isKeyboardFocused = true
+                }
+            } else {
+                isKeyboardFocused = false
+            }
         }
         .onReceive(processor.$detectedContent.debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)) { newContent in
             // Only process if there are actual new items
@@ -358,7 +397,7 @@ struct AmbientModeView: View {
             
             // Live transcription with animated glass container (editable)
             if isRecording && !liveTranscription.isEmpty {
-                Group {
+                VStack {
                     if isEditingTranscription {
                         TextField("Edit transcription...", text: $editableTranscription)
                             .font(.system(size: 18, weight: .medium))
@@ -366,11 +405,34 @@ struct AmbientModeView: View {
                             .multilineTextAlignment(.center)
                             .focused($isTranscriptionFocused)
                             .onSubmit {
-                                liveTranscription = editableTranscription
+                                let finalText = editableTranscription
+                                liveTranscription = ""  // Clear to prevent duplicate processing
                                 isEditingTranscription = false
-                                // Process the edited transcription
-                                Task {
-                                    await processor.processDetectedText(editableTranscription, confidence: 0.95)
+                                
+                                // Process as a single complete thought
+                                let contentType = determineContentType(finalText)
+                                
+                                if contentType == .question {
+                                    // Handle as question with AI response
+                                    let userMessage = UnifiedChatMessage(
+                                        content: finalText,
+                                        isUser: true,
+                                        timestamp: Date(),
+                                        bookContext: currentBookContext
+                                    )
+                                    messages.append(userMessage)
+                                    
+                                    isWaitingForAIResponse = true
+                                    pendingQuestion = finalText
+                                    
+                                    Task {
+                                        await getAIResponse(for: finalText)
+                                    }
+                                } else {
+                                    // Process as note/quote
+                                    Task {
+                                        await processor.processDetectedText(finalText, confidence: 1.0)
+                                    }
                                 }
                             }
                     } else {
@@ -379,9 +441,18 @@ struct AmbientModeView: View {
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                             .onTapGesture {
+                                // Pause any pending AI processing
+                                debounceTimer?.invalidate()
+                                
                                 editableTranscription = liveTranscription
                                 isEditingTranscription = true
                                 isTranscriptionFocused = true
+                                
+                                // Clear any pending questions
+                                if isWaitingForAIResponse {
+                                    isWaitingForAIResponse = false
+                                    pendingQuestion = nil
+                                }
                             }
                     }
                 }
@@ -537,35 +608,111 @@ struct AmbientModeView: View {
     // MARK: - Clean Bottom Input Area
     @ViewBuilder
     private var bottomInputArea: some View {
-        VStack {
+        VStack(spacing: 0) {
             Spacer()
             
-            // Waveform button with smooth morphing animation
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                    handleMicrophoneTap()
+            // AI thinking indicator - shows above input when processing
+            if isWaitingForAIResponse {
+                HStack(spacing: 8) {
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(isWaitingForAIResponse ? 1.0 : 0.5)
+                            .animation(
+                                Animation.easeInOut(duration: 0.6)
+                                    .repeatForever()
+                                    .delay(Double(index) * 0.2),
+                                value: isWaitingForAIResponse
+                            )
+                    }
                 }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                        .frame(width: 64, height: 64)
-                        .glassEffect()
-                        .glassEffectTransition(.materialize)
-                    
-                    Image(systemName: "waveform")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                        .symbolEffect(.bounce, value: isRecording)
+                .padding(.bottom, 12)
+                .transition(.opacity.combined(with: .scale))
+            }
+            
+            // Text input bar (slides up from bottom when in text mode)
+            if inputMode == .textInput {
+                ambientTextInputBar
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+            } else {
+                // Waveform/Stop button - the original beautiful implementation
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        if inputMode == .listening && isRecording {
+                            // Tap to stop recording
+                            handleMicrophoneTap()
+                        } else if inputMode == .paused {
+                            // Continue to text input
+                            inputMode = .textInput
+                            isKeyboardFocused = true
+                        } else {
+                            // Start recording
+                            handleMicrophoneTap()
+                        }
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                            .frame(width: 64, height: 64)
+                            .glassEffect()
+                            .glassEffectTransition(.materialize)
+                        
+                        Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .symbolEffect(.bounce, value: isRecording)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
+                    }
+                }
+                .padding(.bottom, 50)
+                .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
+                .opacity(inputMode == .paused ? 0.9 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
+                // Long press gesture for keyboard
+                .onLongPressGesture(minimumDuration: 0.5) {
+                    // Long press to show keyboard
+                    if isRecording {
+                        stopRecording()
+                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        inputMode = .textInput
+                        isKeyboardFocused = true
+                    }
+                    HapticManager.shared.mediumTap()
                 }
             }
-            .padding(.bottom, 50)
-            .scaleEffect(1.0)
-            .transition(.asymmetric(
-                insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .push(from: .bottom)),
-                removal: .scale(scale: 1.2).combined(with: .opacity)
-            ))
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
+    }
+    
+    // MARK: - Text Input Bar Component
+    private var ambientTextInputBar: some View {
+        UniversalInputBar(
+            messageText: $keyboardText,
+            showingCommandPalette: .constant(false),
+            isInputFocused: $isKeyboardFocused,
+            context: currentBookContext != nil ? .bookDetail(book: currentBookContext!) : .quickActions,
+            onSend: {
+                sendTextMessage()
+            },
+            onMicrophoneTap: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    returnToVoiceMode()
+                }
+            },
+            onCommandTap: nil, // No command palette in ambient mode
+            isRecording: .constant(false),
+            colorPalette: nil,
+            isAmbientMode: true // Use ambient mode styling
+        )
+        .padding(.horizontal, 16)
     }
     
     // MARK: - BookView-Style Header
@@ -1031,6 +1178,31 @@ struct AmbientModeView: View {
     
     // MARK: - Actions
     
+    private func setupKeyboardObservers() {
+        // Observe keyboard notifications
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillShowNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    keyboardHeight = keyboardFrame.height
+                }
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                keyboardHeight = 0
+            }
+        }
+    }
+    
     private func startAmbientExperience() {
         // Record when the session actually starts
         sessionStartTime = Date()
@@ -1056,6 +1228,9 @@ struct AmbientModeView: View {
         
         // Update library for book detection
         bookDetector.updateLibrary(libraryViewModel.books)
+        
+        // Set initial input mode
+        inputMode = .listening
         
         // Auto-start recording after short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -1093,6 +1268,107 @@ struct AmbientModeView: View {
         // The onChange handler will scroll when new messages arrive
     }
     
+    // MARK: - Input Mode Management
+    
+    private func pauseForTextInput() {
+        // Pause recording but keep session active
+        if isRecording {
+            stopRecording()
+        }
+        
+        // First transition to paused state
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            inputMode = .paused
+        }
+        
+        HapticManager.shared.lightTap()
+    }
+    
+    private func resumeVoiceInput() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            inputMode = .listening
+        }
+        startRecording()
+    }
+    
+    private func returnToVoiceMode() {
+        // Clear keyboard
+        isKeyboardFocused = false
+        keyboardText = ""
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            inputMode = .listening
+        }
+        
+        // Resume recording after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            startRecording()
+        }
+    }
+    
+    private func sendTextMessage() {
+        guard !keyboardText.isEmpty else { return }
+        
+        let messageText = keyboardText
+        keyboardText = "" // Clear immediately
+        
+        // Determine content type
+        let contentType = determineContentType(messageText)
+        
+        if contentType == .question {
+            // For questions, add to messages and get AI response
+            let userMessage = UnifiedChatMessage(
+                content: messageText,
+                isUser: true,
+                timestamp: Date(),
+                bookContext: currentBookContext
+            )
+            messages.append(userMessage)
+            
+            // Show thinking indicator
+            isWaitingForAIResponse = true
+            pendingQuestion = messageText
+            
+            // Get AI response
+            Task {
+                await getAIResponse(for: messageText)
+            }
+        }
+        
+        // Also process through ambient pipeline for saving
+        let content = AmbientProcessedContent(
+            text: messageText,
+            type: contentType,
+            timestamp: Date(),
+            confidence: 1.0,
+            response: nil,
+            bookTitle: currentBookContext?.title,
+            bookAuthor: currentBookContext?.author
+        )
+        
+        // Add to processor's detected content for unified handling
+        processor.detectedContent.append(content)
+        
+        // Optionally return to voice mode after sending
+        if UserDefaults.standard.bool(forKey: "returnToVoiceAfterText") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                returnToVoiceMode()
+            }
+        }
+    }
+    
+    private func determineContentType(_ text: String) -> AmbientProcessedContent.ContentType {
+        // Reuse existing logic for determining content type
+        if text.hasSuffix("?") || text.lowercased().contains("what") || 
+           text.lowercased().contains("how") || text.lowercased().contains("why") {
+            return .question
+        } else if text.hasPrefix("\"") && text.hasSuffix("\"") {
+            return .quote
+        } else {
+            return .note
+        }
+    }
+    
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
         
@@ -1116,6 +1392,7 @@ struct AmbientModeView: View {
         
         guard aiService.isConfigured() else {
             await MainActor.run {
+                isWaitingForAIResponse = false
                 let configMessage = UnifiedChatMessage(
                     content: "Please configure your AI service.",
                     isUser: false,
@@ -1135,6 +1412,7 @@ struct AmbientModeView: View {
             )
             
             await MainActor.run {
+                isWaitingForAIResponse = false  // Clear thinking indicator
                 let aiMessage = UnifiedChatMessage(
                     content: response,
                     isUser: false,
@@ -1142,9 +1420,25 @@ struct AmbientModeView: View {
                     bookContext: currentBookContext
                 )
                 messages.append(aiMessage)
+                
+                // Update the processed content with the response
+                if let pendingQ = pendingQuestion,
+                   let index = processor.detectedContent.firstIndex(where: { $0.text == pendingQ && $0.type == .question }) {
+                    processor.detectedContent[index] = AmbientProcessedContent(
+                        text: pendingQ,
+                        type: .question,
+                        timestamp: processor.detectedContent[index].timestamp,
+                        confidence: 1.0,
+                        response: response,
+                        bookTitle: currentBookContext?.title,
+                        bookAuthor: currentBookContext?.author
+                    )
+                }
+                pendingQuestion = nil
             }
         } catch {
             await MainActor.run {
+                isWaitingForAIResponse = false  // Clear thinking indicator
                 let errorMessage = UnifiedChatMessage(
                     content: "Sorry, I couldn't process your message.",
                     isUser: false,
@@ -1152,6 +1446,7 @@ struct AmbientModeView: View {
                     bookContext: currentBookContext
                 )
                 messages.append(errorMessage)
+                pendingQuestion = nil
             }
         }
     }
