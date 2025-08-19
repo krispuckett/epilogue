@@ -14,6 +14,9 @@ struct AmbientModeView: View {
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var bookDetector = AmbientBookDetector.shared
     
+    // Namespace for matched geometry morphing animation
+    @Namespace private var buttonMorphNamespace
+    
     @State private var messages: [UnifiedChatMessage] = []
     @State private var currentBookContext: Book?
     @State private var colorPalette: ColorPalette?
@@ -682,7 +685,7 @@ struct AmbientModeView: View {
                     
                     // Waveform button to return to voice
                     Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75, blendDuration: 0)) {
                             // Return to voice mode
                             isKeyboardFocused = false
                             keyboardText = ""
@@ -695,23 +698,25 @@ struct AmbientModeView: View {
                                 .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
                                 .frame(width: 48, height: 48)
                                 .glassEffect()
+                                .matchedGeometryEffect(id: "morphButton.background", in: buttonMorphNamespace)
                             
                             Image(systemName: "waveform")
                                 .font(.system(size: 20, weight: .medium))
                                 .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                         }
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
                 .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 1.2).combined(with: .opacity)
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
                 ))
             } else {
                 // Voice mode - stop/waveform button only
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75, blendDuration: 0)) {
                         if inputMode == .listening && isRecording {
                             // Stop recording
                             handleMicrophoneTap()
@@ -730,18 +735,20 @@ struct AmbientModeView: View {
                             .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
                             .frame(width: 64, height: 64)
                             .glassEffect()
+                            .matchedGeometryEffect(id: "morphButton.background", in: buttonMorphNamespace)
                         
                         Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
                             .font(.system(size: 28, weight: .medium))
                             .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                            .symbolEffect(.bounce, value: isRecording)
+                            .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
+                            .contentTransition(.symbolEffect(.automatic))
                     }
                 }
                 .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
                 .padding(.bottom, 50)
                 .transition(.asymmetric(
-                    insertion: .scale(scale: 1.2).combined(with: .opacity),
-                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
                 ))
                 // Long press for quick keyboard access
                 .onLongPressGesture(minimumDuration: 0.5) {
@@ -756,7 +763,7 @@ struct AmbientModeView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
+        .animation(.spring(response: 0.4, dampingFraction: 0.75, blendDuration: 0), value: inputMode)
     }
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
