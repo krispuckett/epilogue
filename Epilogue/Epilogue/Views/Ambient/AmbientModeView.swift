@@ -633,64 +633,77 @@ struct AmbientModeView: View {
                     ))
             }
             
-            // Single input control that transitions between states
-            ZStack {
-                // Text input bar - always present but hidden when not in text mode or on summary
+            // Fake blur gradient for input bar area
+            if inputMode == .textInput {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0),
+                        Color.black.opacity(0.3),
+                        Color.black.opacity(0.5)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 120)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+            
+            // Single morphing control area
+            if inputMode == .textInput && currentSession != nil {
+                // Text input mode with waveform button
                 ambientTextInputBar
-                    .opacity(inputMode == .textInput && currentSession != nil ? 1 : 0)
-                    .scaleEffect(inputMode == .textInput && currentSession != nil ? 1 : 0.8)
-                    .allowsHitTesting(inputMode == .textInput && currentSession != nil)
-                    .zIndex(inputMode == .textInput ? 1 : 0) // Ensure text input is on top
-                
-                // Waveform/Stop button - COMPLETELY HIDDEN when text input is active
-                if inputMode != .textInput {
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                            if inputMode == .listening && isRecording {
-                                // Tap to stop recording
-                                handleMicrophoneTap()
-                            } else if inputMode == .paused {
-                                // Continue to text input
-                                inputMode = .textInput
-                                isKeyboardFocused = true
-                            } else {
-                                // Start recording
-                                handleMicrophoneTap()
-                            }
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                                .frame(width: 64, height: 64)
-                                .glassEffect()
-                                .glassEffectTransition(.materialize)
-                            
-                            Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
-                                .font(.system(size: 28, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                                .symbolEffect(.bounce, value: isRecording)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
-                        }
-                    }
-                    .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
-                    .opacity(inputMode == .textInput ? 0 : 1) // Hide when text input
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
-                    // Long press gesture for keyboard
-                    .onLongPressGesture(minimumDuration: 0.5) {
-                        // Long press to show keyboard
-                        if isRecording {
-                            stopRecording()
-                        }
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 1.2).combined(with: .opacity)
+                    ))
+            } else {
+                // Voice mode with stop/waveform button
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        if inputMode == .listening && isRecording {
+                            // Tap to stop recording
+                            handleMicrophoneTap()
+                        } else if inputMode == .paused {
+                            // Continue to text input
                             inputMode = .textInput
                             isKeyboardFocused = true
+                        } else {
+                            // Start recording
+                            handleMicrophoneTap()
                         }
-                        HapticManager.shared.mediumTap()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                            .frame(width: 64, height: 64)
+                            .glassEffect()
+                        
+                        Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .symbolEffect(.bounce, value: isRecording)
                     }
                 }
+                .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 1.2).combined(with: .opacity)
+                ))
+                // Long press gesture for keyboard
+                .onLongPressGesture(minimumDuration: 0.5) {
+                    if isRecording {
+                        stopRecording()
+                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        inputMode = .textInput
+                        isKeyboardFocused = true
+                    }
+                    HapticManager.shared.mediumTap()
+                }
+                .padding(.bottom, 50)
             }
-            .padding(.bottom, 50) // Single padding for the entire ZStack
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
     }
@@ -746,10 +759,8 @@ struct AmbientModeView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .glassEffect(
-                .regular,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-            )
+            .glassEffect()
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             
             // Voice return button - proper liquid glass
             Button {
@@ -761,10 +772,8 @@ struct AmbientModeView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white.opacity(0.8))
                     .frame(width: 44, height: 44)
-                    .glassEffect(
-                        .regular,
-                        in: Circle()
-                    )
+                    .glassEffect()
+                    .clipShape(Circle())
             }
             .buttonStyle(.plain)
         }
@@ -1006,6 +1015,16 @@ struct AmbientModeView: View {
                 break
             }
         }
+        
+        // CRITICAL: Remove quotation marks for proper formatting
+        // The quote card will add its own drop cap quotation mark
+        quoteText = quoteText
+            .replacingOccurrences(of: "\"", with: "")
+            .replacingOccurrences(of: """, with: "")
+            .replacingOccurrences(of: """, with: "")
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "'", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Check for duplicates
         let fetchRequest = FetchDescriptor<CapturedQuote>(
