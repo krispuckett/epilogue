@@ -622,13 +622,11 @@ struct AmbientModeView: View {
         VStack(spacing: 0) {
             Spacer()
             
-            // AI thinking indicator - single, smaller, with glass tint
+            // AI thinking indicator - using our existing component
             if isWaitingForAIResponse {
                 SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                    .scaleEffect(0.5) // Smaller
-                    .padding(.bottom, 12)
-                    .glassEffect()
-                    .clipShape(Capsule())
+                    .scaleEffect(0.6) // Proper size
+                    .padding(.bottom, 16)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 1.1).combined(with: .opacity)
@@ -642,9 +640,10 @@ struct AmbientModeView: View {
                     .opacity(inputMode == .textInput && currentSession != nil ? 1 : 0)
                     .scaleEffect(inputMode == .textInput && currentSession != nil ? 1 : 0.8)
                     .allowsHitTesting(inputMode == .textInput && currentSession != nil)
+                    .zIndex(inputMode == .textInput ? 1 : 0) // Ensure text input is on top
                 
                 // Waveform/Stop button - COMPLETELY HIDDEN when text input is active
-                if inputMode != .textInput && !isKeyboardFocused {
+                if inputMode != .textInput {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                             if inputMode == .listening && isRecording {
@@ -675,6 +674,7 @@ struct AmbientModeView: View {
                         }
                     }
                     .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
+                    .opacity(inputMode == .textInput ? 0 : 1) // Hide when text input
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
                     // Long press gesture for keyboard
                     .onLongPressGesture(minimumDuration: 0.5) {
@@ -1391,11 +1391,23 @@ struct AmbientModeView: View {
         print("📝 Processing typed message: '\(messageText)' as \(contentType)")
         
         if contentType == .question {
+            // Save the question immediately for the session
+            let content = AmbientProcessedContent(
+                text: messageText,
+                type: .question,
+                timestamp: Date(),
+                confidence: 1.0,
+                response: nil,
+                bookTitle: currentBookContext?.title,
+                bookAuthor: currentBookContext?.author
+            )
+            processor.detectedContent.append(content)
+            
             // For questions, show thinking and get AI response
             isWaitingForAIResponse = true
             pendingQuestion = messageText
             
-            // Get AI response - it will handle saving with the response
+            // Get AI response - it will handle updating with the response
             Task {
                 await getAIResponseForAmbientQuestion(messageText)
             }
