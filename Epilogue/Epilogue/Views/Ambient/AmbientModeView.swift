@@ -706,8 +706,8 @@ struct AmbientModeView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .glassEffect()
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .glassEffect()
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity),
                             removal: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity)
