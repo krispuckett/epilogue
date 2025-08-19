@@ -393,20 +393,43 @@ public class TrueAmbientProcessor: ObservableObject {
                     self.activeQuestions.remove(normalizedText)
                 }
             } else {
-                // New question - add it
-                let pendingQuestion = AmbientProcessedContent(
-                    text: text,
-                    type: .question,
-                    timestamp: Date(),
-                    confidence: confidence,
-                    response: nil,
-                    bookTitle: AmbientBookDetector.shared.detectedBook?.title,
-                    bookAuthor: AmbientBookDetector.shared.detectedBook?.author
-                )
+                // Check if we already have a very similar question (fuzzy match)
+                let alreadyHasSimilar = await MainActor.run {
+                    self.detectedContent.contains { content in
+                        guard content.type == .question else { return false }
+                        let existingNorm = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        // Check if one is a substring of the other (with reasonable difference)
+                        // This catches "Who is Tom Bam?" vs "Who is Tom Bamba?"
+                        if normalizedNew.contains(existingNorm) || existingNorm.contains(normalizedNew) {
+                            let diff = abs(normalizedNew.count - existingNorm.count)
+                            // If difference is small (typo/evolution), consider it the same
+                            return diff < 5
+                        }
+                        
+                        return false
+                    }
+                }
                 
-                await MainActor.run {
-                    self.detectedContent.append(pendingQuestion)
-                    logger.info("✅ Added new question to UI: \(text.prefix(30))...")
+                // Only add if we don't have a similar question already
+                if !alreadyHasSimilar {
+                    // New question - add it
+                    let pendingQuestion = AmbientProcessedContent(
+                        text: text,
+                        type: .question,
+                        timestamp: Date(),
+                        confidence: confidence,
+                        response: nil,
+                        bookTitle: AmbientBookDetector.shared.detectedBook?.title,
+                        bookAuthor: AmbientBookDetector.shared.detectedBook?.author
+                    )
+                    
+                    await MainActor.run {
+                        self.detectedContent.append(pendingQuestion)
+                        logger.info("✅ Added new question to UI: \(text.prefix(30))...")
+                    }
+                } else {
+                    logger.info("⚠️ Skipping similar question: \(text.prefix(30))...")
                 }
                 
                 // Process the question

@@ -534,28 +534,30 @@ struct CleanNotesView: View {
                 }
             }
             .contextMenu {
-                Button {
-                    if let captured = capturedNote {
-                        startEdit(note: captured)
+                if !isSelectionMode {  // Only show context menu when NOT in selection mode
+                    Button {
+                        if let captured = capturedNote {
+                            startEdit(note: captured)
+                        }
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
                     }
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-                
-                Button {
-                    shareNote(note)
-                } label: {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-                
-                Divider()
-                
-                Button(role: .destructive) {
-                    if let captured = capturedNote {
-                        deleteNote(captured)
+                    
+                    Button {
+                        shareNote(note)
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
                     }
-                } label: {
-                    Label("Delete", systemImage: "trash")
+                    
+                    Divider()
+                    
+                    Button(role: .destructive) {
+                        if let captured = capturedNote {
+                            deleteNote(captured)
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
     }
@@ -697,24 +699,26 @@ struct CleanNotesView: View {
                 }
             }
         .contextMenu {
-                Button {
-                    startEdit(quote: quote)
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-                
-                Button {
-                    shareQuote(quote)
-                } label: {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-                
-                Divider()
-                
-                Button(role: .destructive) {
-                    deleteQuote(quote)
-                } label: {
-                    Label("Delete", systemImage: "trash")
+                if !isSelectionMode {  // Only show context menu when NOT in selection mode
+                    Button {
+                        startEdit(quote: quote)
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    
+                    Button {
+                        shareQuote(quote)
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    
+                    Divider()
+                    
+                    Button(role: .destructive) {
+                        deleteQuote(quote)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
     }

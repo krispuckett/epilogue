@@ -139,13 +139,14 @@ struct AmbientModeView: View {
             .allowsHitTesting(false)
             .blur(radius: 0.5)  // Subtle blur to soften the gradient edge
         }
-        // Voice gradient overlay and input controls
+        // Bottom gradient and input controls
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {
-                // Bottom gradient - ALWAYS FULL STRENGTH
+                // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
                 voiceGradientOverlay
+                    .allowsHitTesting(false) // Ensure gradient doesn't block touches
                 
-                // Input controls (waveform button or text input)
+                // Input controls overlay on top of gradient
                 bottomInputArea
             }
         }
@@ -403,11 +404,11 @@ struct AmbientModeView: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
             }
             
-            // Thinking indicator floating above stop button (smaller and closer)
-            if isWaitingForAIResponse {
+            // Thinking indicator - only show when recording and waiting
+            if isWaitingForAIResponse && isRecording {
                 SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                    .scaleEffect(0.7) // Make it smaller
-                    .padding(.bottom, 8) // Much closer to transcription
+                    .scaleEffect(0.5) // Smaller
+                    .padding(.bottom, 8)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 1.1).combined(with: .opacity)
@@ -630,11 +631,12 @@ struct AmbientModeView: View {
         VStack(spacing: 0) {
             Spacer()
             
-            // AI thinking indicator - use existing SubtleLiquidThinking
+            // AI thinking indicator - single, smaller, with glass tint
             if isWaitingForAIResponse {
                 SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                    .scaleEffect(0.6) // Small size above input
+                    .scaleEffect(0.5) // Smaller
                     .padding(.bottom, 12)
+                    .glassEffect(.thin, in: Capsule())
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 1.1).combined(with: .opacity)
@@ -649,51 +651,51 @@ struct AmbientModeView: View {
                     .scaleEffect(inputMode == .textInput && currentSession != nil ? 1 : 0.8)
                     .allowsHitTesting(inputMode == .textInput && currentSession != nil)
                 
-                // Waveform/Stop button - always present but hidden when in text mode
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                        if inputMode == .listening && isRecording {
-                            // Tap to stop recording
-                            handleMicrophoneTap()
-                        } else if inputMode == .paused {
-                            // Continue to text input
-                            inputMode = .textInput
-                            isKeyboardFocused = true
-                        } else {
-                            // Start recording
-                            handleMicrophoneTap()
+                // Waveform/Stop button - hide when text input is active
+                if inputMode != .textInput {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            if inputMode == .listening && isRecording {
+                                // Tap to stop recording
+                                handleMicrophoneTap()
+                            } else if inputMode == .paused {
+                                // Continue to text input
+                                inputMode = .textInput
+                                isKeyboardFocused = true
+                            } else {
+                                // Start recording
+                                handleMicrophoneTap()
+                            }
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                                .frame(width: 64, height: 64)
+                                .glassEffect()
+                                .glassEffectTransition(.materialize)
+                            
+                            Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
+                                .font(.system(size: 28, weight: .medium))
+                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .symbolEffect(.bounce, value: isRecording)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
                         }
                     }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                            .frame(width: 64, height: 64)
-                            .glassEffect()
-                            .glassEffectTransition(.materialize)
-                        
-                        Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                            .symbolEffect(.bounce, value: isRecording)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
+                    .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
+                    // Long press gesture for keyboard
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        // Long press to show keyboard
+                        if isRecording {
+                            stopRecording()
+                        }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            inputMode = .textInput
+                            isKeyboardFocused = true
+                        }
+                        HapticManager.shared.mediumTap()
                     }
-                }
-                .opacity(inputMode == .textInput ? 0 : 1)
-                .scaleEffect(inputMode == .textInput ? 0.8 : (inputMode == .paused ? 0.9 : 1.0))
-                .allowsHitTesting(inputMode != .textInput)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
-                // Long press gesture for keyboard
-                .onLongPressGesture(minimumDuration: 0.5) {
-                    // Long press to show keyboard
-                    if isRecording {
-                        stopRecording()
-                    }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        inputMode = .textInput
-                        isKeyboardFocused = true
-                    }
-                    HapticManager.shared.mediumTap()
                 }
             }
             .padding(.bottom, 50) // Single padding for the entire ZStack
@@ -970,8 +972,10 @@ struct AmbientModeView: View {
                             messageType: .text
                         )
                         messages.append(aiMessage)
-                        // Auto-expand new questions
-                        expandedMessageIds.insert(aiMessage.id)
+                        
+                        // Auto-expand new question and close others
+                        expandedMessageIds.removeAll() // Close all previous
+                        expandedMessageIds.insert(aiMessage.id) // Open new one
                         print("✅ Added AI response for question: \(item.text.prefix(30))...")
                     } else {
                         print("⚠️ Response already exists for question: \(item.text.prefix(30))...")

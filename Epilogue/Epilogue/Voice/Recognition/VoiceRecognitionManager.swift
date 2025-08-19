@@ -831,10 +831,10 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 pendingTranscription = text
                 lastSpeechTime = Date()
                 
-                // Start or restart thought timer (3.5 seconds of silence = complete thought)
-                // Increased from 2.5 to prevent cutting off questions like "Who is Elrond?"
+                // Start or restart thought timer (4.5 seconds of silence = complete thought)
+                // Increased to 4.5 to ensure questions are FULLY complete before processing
                 thoughtTimer?.invalidate()
-                thoughtTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { _ in
+                thoughtTimer = Timer.scheduledTimer(withTimeInterval: 4.5, repeats: false) { _ in
                     // User has been silent - process the complete thought
                     if !self.pendingTranscription.isEmpty {
                         let completeThought = self.pendingTranscription
