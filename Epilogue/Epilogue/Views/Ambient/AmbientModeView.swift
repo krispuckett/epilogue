@@ -519,11 +519,26 @@ struct AmbientModeView: View {
     // MARK: - Clean Bottom Input Area
     @ViewBuilder
     private var bottomInputArea: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ZStack {
+            // Invisible tap area to dismiss keyboard/input mode
+            if inputMode == .textInput {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        isKeyboardFocused = false
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
+                            keyboardText = ""
+                            inputMode = .paused
+                        }
+                        HapticManager.shared.lightTap()
+                    }
+            }
             
-            // Live transcription - ALWAYS above the button
-            if isRecording && !liveTranscription.isEmpty && showLiveTranscription {
+            VStack(spacing: 0) {
+                Spacer()
+                
+                // Live transcription - ALWAYS above the button
+                if isRecording && !liveTranscription.isEmpty && showLiveTranscription {
                 VStack {
                     if isEditingTranscription {
                         TextField("Edit transcription...", text: $editableTranscription)
@@ -622,7 +637,7 @@ struct AmbientModeView: View {
                         .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
                         .frame(
                             width: inputMode == .textInput ? geometry.size.width - 80 : 64,
-                            height: inputMode == .textInput ? 44 : 64
+                            height: inputMode == .textInput ? 48 : 64  // Match waveform orb height
                         )
                         .glassEffect() // Glass effect on the morphing container
                         .overlay(
@@ -702,14 +717,21 @@ struct AmbientModeView: View {
                                             }
                                         }
                                     
-                                    // Send button
+                                    // Send button - amber tinted glass
                                     if !keyboardText.isEmpty {
                                         Button {
                                             sendTextMessage()
                                         } label: {
-                                            Image(systemName: "arrow.up.circle.fill")
-                                                .font(.system(size: 24))
-                                                .foregroundStyle(.black, .white.opacity(0.9))
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                                                    .frame(width: 32, height: 32)
+                                                    .glassEffect()
+                                                
+                                                Image(systemName: "arrow.up")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                            }
                                         }
                                         .buttonStyle(.plain)
                                         .transition(.scale(scale: 0.5).combined(with: .opacity))
@@ -717,7 +739,7 @@ struct AmbientModeView: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
+                                .frame(height: 48)  // Match container height
                             }
                         }
                     }
@@ -775,7 +797,8 @@ struct AmbientModeView: View {
                 }
                 HapticManager.shared.mediumTap()
             }
-        }
+            }  // Close VStack
+        }  // Close ZStack
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode) // Smooth Dynamic Island-style spring
     }
     

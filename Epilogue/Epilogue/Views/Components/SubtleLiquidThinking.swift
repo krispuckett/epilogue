@@ -8,34 +8,35 @@ struct SubtleLiquidThinking: View {
     @State private var morphPhase: CGFloat = 0
     
     var body: some View {
-        // Simple message bubble with subtle morph
-        RoundedRectangle(cornerRadius: 20)
-            .fill(.clear)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 20 + morphPhase * 3))
-            .overlay {
-                // Subtle animated dots
-                HStack(spacing: 8) {
-                    ForEach(0..<3) { index in
+        // Vibrant amber glass dots animation
+        HStack(spacing: 4) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                    .frame(width: 12, height: 12)
+                    .glassEffect()
+                    .overlay {
                         Circle()
-                            .fill(bookColor.opacity(0.6))
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(1.0 + morphPhase * 0.2)
-                            .opacity(0.4 + morphPhase * 0.3)
-                            .animation(
-                                .easeInOut(duration: 0.8)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.2),
-                                value: morphPhase
-                            )
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .frame(width: 4, height: 4)
+                            .opacity(0.6 + morphPhase * 0.4)
                     }
-                }
+                    .scaleEffect(1.0 + morphPhase * 0.3)
+                    .animation(
+                        .easeInOut(duration: 0.6)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.15),
+                        value: morphPhase
+                    )
             }
-            .frame(width: 80, height: 40)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                    morphPhase = 1.0
-                }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                morphPhase = 1.0
             }
+        }
     }
 }
 
