@@ -113,23 +113,9 @@ struct BookDetailView: View {
     }
     
     private var accentColor: Color {
-        // Use smart accent color that adapts to the book
-        // Blues, purples, etc. stay; reds get transformed
-        let accent = SmartAccentColor.getSmartAccent(from: colorPalette)
-        
-        #if DEBUG
-        // Debug: Log color decision
-        if let originalAccent = colorPalette?.accent {
-            let analysis = SmartAccentColor.analyzeColorSuitability(originalAccent)
-            if !analysis.isSuitable {
-                print("🎨 Book: \(book.title)")
-                print("   Original color rejected: \(analysis.zone.description)")
-                print("   Using: \(accent == SmartAccentColor.defaultAccent ? "Default orange" : "Transformed color")")
-            }
-        }
-        #endif
-        
-        return accent
+        // Always use consistent warm amber accent for better UI coherence
+        // This ensures all UI elements have a unified, polished appearance
+        return Color(red: 1.0, green: 0.55, blue: 0.26)
     }
     
     private var shadowColor: Color {
@@ -250,16 +236,6 @@ struct BookDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 16) {
-                    Button {
-                        EpilogueAmbientCoordinator.shared.launch(
-                            from: .bookDetail,
-                            book: book
-                        )
-                    } label: {
-                        Image(systemName: "waveform.circle")
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                    
                     Button("Edit Book") {
                         editedTitle = book.title
                         showingBookSearch = true
@@ -843,10 +819,6 @@ struct BookDetailView: View {
     private var yourReviewSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(accentColor)
-                
                 Text("Your Review")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)

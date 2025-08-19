@@ -158,8 +158,6 @@ struct BookCompletionSheet: View {
                 }
             }
             .padding(.vertical, 8)
-            .padding(.horizontal, 20)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         }
     }
     
@@ -171,7 +169,7 @@ struct BookCompletionSheet: View {
                     .font(.system(size: 16))
                     .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
                 
-                Text("Your Private Review")
+                Text("Review")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
                 
