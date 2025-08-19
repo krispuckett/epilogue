@@ -622,7 +622,7 @@ struct AmbientModeView: View {
                         .buttonStyle(.plain)
                         .opacity(inputMode == .textInput ? 1 : 0)
                         .scaleEffect(inputMode == .textInput ? 1 : 0.5)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.5).delay(inputMode == .textInput ? 0.1 : 0), value: inputMode) // Bouncy appearance
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8).delay(inputMode == .textInput ? 0.2 : 0), value: inputMode) // Smooth appearance
                         
                         // Text field with glowing amber caret
                         TextField("", text: $keyboardText, axis: .vertical)
@@ -663,16 +663,16 @@ struct AmbientModeView: View {
                     .padding(.vertical, 12)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .glassEffect()
-                    .scaleEffect(inputMode == .textInput ? 1 : 0.3, anchor: .trailing) // More dramatic scale
+                    .matchedGeometryEffect(id: "inputFieldContainer", in: buttonMorphNamespace, properties: .position, anchor: .trailing, isSource: false)
+                    .scaleEffect(inputMode == .textInput ? 1 : 0.1, anchor: .trailing)
                     .opacity(inputMode == .textInput ? 1 : 0)
-                    .rotationEffect(.degrees(inputMode == .textInput ? 0 : 90), anchor: .trailing) // Spin in from side
                     
                     // Waveform orb - separate from input bar
                     Button {
                         // Choreographed return to voice mode
                         isKeyboardFocused = false
                         
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.5, blendDuration: 0)) { // Bouncy return
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) { // Smooth return
                             keyboardText = ""
                             inputMode = .listening
                         }
@@ -695,9 +695,7 @@ struct AmbientModeView: View {
                                 .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                                 .contentTransition(.interpolate)
                         }
-                        .scaleEffect(inputMode == .textInput ? 1 : 0.6) // More dramatic size change
-                        .rotationEffect(.degrees(inputMode == .textInput ? 0 : -360)) // Full spin
-                        .offset(y: inputMode == .textInput ? 0 : 10) // Slight vertical movement
+                        // Clean morphing without excessive effects
                     }
                 }
                 .padding(.horizontal, 16)
@@ -706,7 +704,7 @@ struct AmbientModeView: View {
             } else {
                 // Voice mode - stop/waveform button in center
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.5, blendDuration: 0)) { // Snappy and bouncy
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) { // Smooth morphing
                         if inputMode == .listening && isRecording {
                             // Stop recording
                             handleMicrophoneTap()
@@ -735,11 +733,10 @@ struct AmbientModeView: View {
                             .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
                             .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                             .contentTransition(.interpolate)
-                            .symbolEffect(.bounce.up.byLayer, value: inputMode) // More dynamic bounce
+                            // Symbol morphs naturally via matchedGeometryEffect
                     }
                 }
-                .scaleEffect(inputMode == .paused ? 0.85 : (isRecording ? 1.05 : 1.0)) // Subtle pulse when recording
-                .animation(isRecording ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .spring(response: 0.35, dampingFraction: 0.5), value: isRecording) // Breathing effect when recording
+                .scaleEffect(inputMode == .paused ? 0.95 : 1.0)
                 .padding(.bottom, 50)
                 .transition(.identity)
                 // Long press gesture for quick keyboard access
@@ -747,7 +744,7 @@ struct AmbientModeView: View {
                     if isRecording {
                         stopRecording()
                     }
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.5, blendDuration: 0)) { // Bouncy transition
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) { // Smooth transition
                         inputMode = .textInput
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                             isKeyboardFocused = true
@@ -757,7 +754,7 @@ struct AmbientModeView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: inputMode) // Bouncier animation
+        .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode) // Smooth Dynamic Island-style spring
     }
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
