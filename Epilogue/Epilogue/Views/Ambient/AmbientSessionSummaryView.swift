@@ -38,9 +38,9 @@ struct AmbientSessionSummaryView: View {
                         metricsSection
                             .padding(.bottom, 32)
                         
-                        // Primary content card
-                        if let firstQuestion = session.capturedQuestions.first {
-                            primaryInsightCard(question: firstQuestion)
+                        // Primary content card - show most recent or most relevant question
+                        if let mostRelevantQuestion = findMostRelevantQuestion() {
+                            primaryInsightCard(question: mostRelevantQuestion)
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 24)
                         }
@@ -486,6 +486,61 @@ struct AmbientSessionSummaryView: View {
     
     private func shareInsights() {
         // Share implementation
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func findMostRelevantQuestion() -> CapturedQuestion? {
+        guard !session.capturedQuestions.isEmpty else { return nil }
+        
+        // Strategy: Find the question with the longest, most substantive answer
+        // This is likely to be the most interesting/insightful one
+        let questionsWithAnswers = session.capturedQuestions.filter { $0.answer != nil }
+        
+        if questionsWithAnswers.isEmpty {
+            return session.capturedQuestions.last // Return most recent if no answers
+        }
+        
+        // Sort by answer length and quality
+        let sorted = questionsWithAnswers.sorted { q1, q2 in
+            let answer1 = q1.answer ?? ""
+            let answer2 = q2.answer ?? ""
+            
+            // Prefer answers with more substance
+            let score1 = calculateAnswerQuality(answer1)
+            let score2 = calculateAnswerQuality(answer2)
+            
+            return score1 > score2
+        }
+        
+        return sorted.first ?? session.capturedQuestions.last
+    }
+    
+    private func calculateAnswerQuality(_ answer: String) -> Int {
+        var score = answer.count
+        
+        // Bonus for containing character names (indicates specific content)
+        let characterNames = ["Aragorn", "Frodo", "Gandalf", "Bilbo", "Sauron", "Gimli", "Legolas", "Boromir", "Sam", "Merry", "Pippin"]
+        for name in characterNames {
+            if answer.contains(name) {
+                score += 100
+            }
+        }
+        
+        // Bonus for containing important items/places
+        let importantTerms = ["Andúril", "Narsil", "Sting", "Ring", "Gondor", "Rohan", "Mordor", "Shire", "sword", "throne"]
+        for term in importantTerms {
+            if answer.lowercased().contains(term.lowercased()) {
+                score += 50
+            }
+        }
+        
+        // Prefer answers that explain something (not just list facts)
+        if answer.contains("symbolizes") || answer.contains("represents") || answer.contains("meaning") {
+            score += 200
+        }
+        
+        return score
     }
     
     private func extractKeyInsight(from answer: String, question: String) -> String {

@@ -142,10 +142,9 @@ struct AmbientModeView: View {
         // Voice gradient overlay and input controls
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {
-                // Voice gradient when recording
-                if isRecording {
-                    voiceGradientOverlay
-                }
+                // Bottom gradient - ALWAYS visible
+                voiceGradientOverlay
+                    .opacity(isRecording ? 1.0 : 0.7) // Slightly dimmer when not recording
                 
                 // Input controls (waveform button or text input)
                 bottomInputArea
@@ -632,33 +631,24 @@ struct AmbientModeView: View {
         VStack(spacing: 0) {
             Spacer()
             
-            // AI thinking indicator - shows above input when processing
+            // AI thinking indicator - use existing SubtleLiquidThinking
             if isWaitingForAIResponse {
-                HStack(spacing: 8) {
-                    ForEach(0..<3) { index in
-                        Circle()
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(isWaitingForAIResponse ? 1.0 : 0.5)
-                            .animation(
-                                Animation.easeInOut(duration: 0.6)
-                                    .repeatForever()
-                                    .delay(Double(index) * 0.2),
-                                value: isWaitingForAIResponse
-                            )
-                    }
-                }
-                .padding(.bottom, 12)
-                .transition(.opacity.combined(with: .scale))
+                SubtleLiquidThinking(bookColor: adaptiveUIColor)
+                    .scaleEffect(0.6) // Small size above input
+                    .padding(.bottom, 12)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 1.1).combined(with: .opacity)
+                    ))
             }
             
             // Single input control that transitions between states
             ZStack {
-                // Text input bar - always present but hidden when not in text mode
+                // Text input bar - always present but hidden when not in text mode or on summary
                 ambientTextInputBar
-                    .opacity(inputMode == .textInput ? 1 : 0)
-                    .scaleEffect(inputMode == .textInput ? 1 : 0.8)
-                    .allowsHitTesting(inputMode == .textInput)
+                    .opacity(inputMode == .textInput && currentSession != nil ? 1 : 0)
+                    .scaleEffect(inputMode == .textInput && currentSession != nil ? 1 : 0.8)
+                    .allowsHitTesting(inputMode == .textInput && currentSession != nil)
                 
                 // Waveform/Stop button - always present but hidden when in text mode
                 Button {
