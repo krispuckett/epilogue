@@ -41,6 +41,18 @@ extension Color {
     static let warmWhite = Color(red: 0.98, green: 0.97, blue: 0.96) // #FAF8F5
     static let warmAmber = Color(red: 1.0, green: 0.549, blue: 0.259) // #FF8C42
     
+    func adjustBrightness(to targetBrightness: CGFloat) -> Color {
+        let uiColor = UIColor(self)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        return Color(UIColor(hue: hue, saturation: saturation, brightness: targetBrightness, alpha: alpha))
+    }
+    
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
@@ -113,8 +125,43 @@ struct BookDetailView: View {
     }
     
     private var accentColor: Color {
-        // Always use consistent warm amber accent for better UI coherence
-        // This ensures all UI elements have a unified, polished appearance
+        // Smart accent color that adapts to book colors while ensuring readability
+        guard let palette = colorPalette else {
+            return Color(red: 1.0, green: 0.55, blue: 0.26) // Default warm amber
+        }
+        
+        // Try to use the book's actual colors if they're suitable
+        if let bookAccent = palette.accent {
+            // Check if the color is readable and pleasant
+            let uiColor = UIColor(bookAccent)
+            var hue: CGFloat = 0
+            var saturation: CGFloat = 0  
+            var brightness: CGFloat = 0
+            var alpha: CGFloat = 0
+            uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+            
+            // Accept blues, teals, purples, and greens directly - they look great
+            let hueDegrees = hue * 360
+            if (hueDegrees >= 180 && hueDegrees <= 280) || // Blues and purples
+               (hueDegrees >= 150 && hueDegrees <= 180) || // Teals
+               (hueDegrees >= 80 && hueDegrees <= 150) {   // Greens
+                // Ensure minimum brightness for visibility
+                if brightness < 0.5 {
+                    return bookAccent.adjustBrightness(to: 0.6)
+                }
+                return bookAccent
+            }
+            
+            // For warm colors (reds, oranges, yellows), shift to our amber
+            if hueDegrees <= 80 || hueDegrees >= 280 {
+                // But preserve some of the original hue character
+                if hueDegrees >= 20 && hueDegrees <= 60 { // Oranges and yellows
+                    return Color(red: 1.0, green: 0.55 + (0.15 * saturation), blue: 0.26)
+                }
+            }
+        }
+        
+        // Fallback to warm amber for unsuitable colors
         return Color(red: 1.0, green: 0.55, blue: 0.26)
     }
     
@@ -242,7 +289,7 @@ struct BookDetailView: View {
                         HapticManager.shared.lightTap()
                     }
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
                 }
             }
         }
