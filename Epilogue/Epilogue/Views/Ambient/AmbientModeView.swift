@@ -603,124 +603,135 @@ struct AmbientModeView: View {
                     ))
             }
             
-            // Dynamic Island-inspired unified control
-            ZStack {
-                // Base button that morphs (always present)
-                HStack {
-                    Spacer()
-                    
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8, blendDuration: 0)) {
-                            if inputMode == .textInput {
-                                // Return to voice mode
-                                isKeyboardFocused = false
-                                keyboardText = ""
-                                inputMode = .listening
-                                startRecording()
-                            } else if inputMode == .listening && isRecording {
-                                // Stop recording
-                                handleMicrophoneTap()
-                            } else if inputMode == .paused {
-                                // Enter text input mode
-                                inputMode = .textInput
-                                isKeyboardFocused = true
-                            } else {
-                                // Start recording
-                                handleMicrophoneTap()
-                            }
-                        }
-                    } label: {
-                        ZStack {
-                            // Morphing background
-                            RoundedRectangle(cornerRadius: inputMode == .textInput ? 24 : 32, style: .continuous)
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                                .frame(
-                                    width: inputMode == .textInput ? 48 : 64,
-                                    height: inputMode == .textInput ? 48 : 64
-                                )
-                                .glassEffect()
-                            
-                            // Icon that changes
-                            Image(systemName: inputMode == .textInput ? "waveform" : (inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform")))
-                                .font(.system(size: inputMode == .textInput ? 20 : 28, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                                .contentTransition(.symbolEffect(.automatic))
-                        }
-                    }
-                    .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
-                    .offset(x: inputMode == .textInput ? 0 : 0) // Keep button in place
-                    
-                    if inputMode != .textInput {
-                        Spacer()
-                    }
-                }
-                
-                // Input field that expands from button (only in text mode)
+            // Award-winning Dynamic Island-inspired control with perfect morphing
+            ZStack(alignment: .trailing) {
+                // Input field (behind button, reveals as button moves)
                 if inputMode == .textInput && currentSession != nil {
-                    HStack(spacing: 12) {
-                        // Input field container
-                        HStack(spacing: 8) {
-                            // Camera button
+                    HStack(spacing: 8) {
+                        // Camera button
+                        Button {
+                            showImagePicker = true
+                        } label: {
+                            Image(systemName: "camera")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(inputMode == .textInput ? 1 : 0)
+                        .scaleEffect(inputMode == .textInput ? 1 : 0.5)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(inputMode == .textInput ? 0.1 : 0), value: inputMode)
+                        
+                        // Text field
+                        TextField("", text: $keyboardText, axis: .vertical)
+                            .placeholder(when: keyboardText.isEmpty) {
+                                Text("Ask, capture, or type...")
+                                    .foregroundColor(.white.opacity(0.35))
+                                    .font(.system(size: 16))
+                            }
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                            .tint(.white.opacity(0.8))
+                            .focused($isKeyboardFocused)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.plain)
+                            .onSubmit {
+                                if !keyboardText.isEmpty {
+                                    sendTextMessage()
+                                }
+                            }
+                        
+                        // Send button
+                        if !keyboardText.isEmpty {
                             Button {
-                                showImagePicker = true
+                                sendTextMessage()
                             } label: {
-                                Image(systemName: "camera")
-                                    .font(.system(size: 17, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.6))
-                                    .frame(width: 32, height: 32)
-                                    .contentShape(Rectangle())
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.black, .white.opacity(0.9))
                             }
                             .buttonStyle(.plain)
-                            
-                            // Text field
-                            TextField("", text: $keyboardText, axis: .vertical)
-                                .placeholder(when: keyboardText.isEmpty) {
-                                    Text("Ask, capture, or type...")
-                                        .foregroundColor(.white.opacity(0.35))
-                                        .font(.system(size: 16))
-                                }
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white)
-                                .tint(.white.opacity(0.8))
-                                .focused($isKeyboardFocused)
-                                .lineLimit(1...3)
-                                .textFieldStyle(.plain)
-                                .onSubmit {
-                                    if !keyboardText.isEmpty {
-                                        sendTextMessage()
-                                    }
-                                }
-                            
-                            // Send button
-                            if !keyboardText.isEmpty {
-                                Button {
-                                    sendTextMessage()
-                                } label: {
-                                    Image(systemName: "arrow.up.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundStyle(.black, .white.opacity(0.9))
-                                }
-                                .buttonStyle(.plain)
-                                .transition(.scale.combined(with: .opacity))
-                            }
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.3).combined(with: .opacity),
+                                removal: .scale(scale: 0.3).combined(with: .opacity)
+                            ))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .glassEffect()
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity),
-                            removal: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity)
-                        ))
                         
-                        // Spacer to push waveform button to the right
-                        Spacer(minLength: 48)
+                        // Spacer for button area
+                        Spacer()
+                            .frame(width: inputMode == .textInput ? 48 : 0)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .glassEffect()
+                    .matchedGeometryEffect(id: "inputContainer", in: buttonMorphNamespace)
+                }
+                
+                // Morphing button (on top, slides to reveal input)
+                Button {
+                    withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        if inputMode == .textInput {
+                            // Return to voice mode
+                            isKeyboardFocused = false
+                            keyboardText = ""
+                            inputMode = .listening
+                            startRecording()
+                        } else if inputMode == .listening && isRecording {
+                            // Stop recording
+                            handleMicrophoneTap()
+                        } else if inputMode == .paused {
+                            // Enter text input mode
+                            inputMode = .textInput
+                            // Delay keyboard to let animation complete
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                isKeyboardFocused = true
+                            }
+                        } else {
+                            // Start recording
+                            handleMicrophoneTap()
+                        }
+                    }
+                } label: {
+                    ZStack {
+                        // Background that morphs
+                        RoundedRectangle(
+                            cornerRadius: inputMode == .textInput ? 24 : 32,
+                            style: .continuous
+                        )
+                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                        .frame(
+                            width: inputMode == .textInput ? 48 : 64,
+                            height: inputMode == .textInput ? 48 : 64
+                        )
+                        .glassEffect()
+                        .matchedGeometryEffect(
+                            id: inputMode == .textInput ? "buttonInInput" : "buttonAlone",
+                            in: buttonMorphNamespace,
+                            properties: .position,
+                            anchor: .center
+                        )
+                        
+                        // Icon with smooth transitions
+                        Image(systemName: inputMode == .textInput ? "waveform" : (inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform")))
+                            .font(.system(
+                                size: inputMode == .textInput ? 20 : 28,
+                                weight: .medium,
+                                design: .rounded
+                            ))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .contentTransition(.interpolate)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
                     }
                 }
+                .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
+                .frame(maxWidth: inputMode == .textInput ? nil : .infinity)
+                .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25), value: inputMode)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, inputMode == .textInput ? 24 : 50)
-            
             // Long press gesture for quick keyboard access
             .onLongPressGesture(minimumDuration: 0.5) {
                 if inputMode != .textInput && isRecording {
@@ -733,7 +744,7 @@ struct AmbientModeView: View {
                 HapticManager.shared.mediumTap()
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.75, blendDuration: 0), value: inputMode)
+        .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25), value: inputMode)
     }
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
