@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Simple Quote Card for Award Winning Notes View
+// Note: This uses the pressEvents modifier from HeroTransitionView
 struct SimpleQuoteCard: View {
     let note: Note
     @Environment(\.sizeCategory) var sizeCategory
