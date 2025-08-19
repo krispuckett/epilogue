@@ -408,90 +408,7 @@ struct AmbientModeView: View {
             }
             
             // REMOVED duplicate thinking indicator - only need one in bottomInputArea
-            
-            // Live transcription with animated glass container (editable)
-            if isRecording && !liveTranscription.isEmpty {
-                VStack {
-                    if isEditingTranscription {
-                        TextField("Edit transcription...", text: $editableTranscription)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                            .focused($isTranscriptionFocused)
-                            .onSubmit {
-                                let finalText = editableTranscription
-                                liveTranscription = ""  // Clear to prevent duplicate processing
-                                isEditingTranscription = false
-                                
-                                // Process as a single complete thought
-                                let contentType = determineContentType(finalText)
-                                
-                                if contentType == .question {
-                                    // Handle as question with AI response
-                                    let userMessage = UnifiedChatMessage(
-                                        content: finalText,
-                                        isUser: true,
-                                        timestamp: Date(),
-                                        bookContext: currentBookContext
-                                    )
-                                    messages.append(userMessage)
-                                    
-                                    isWaitingForAIResponse = true
-                                    pendingQuestion = finalText
-                                    
-                                    Task {
-                                        await getAIResponse(for: finalText)
-                                    }
-                                } else {
-                                    // Process as note/quote
-                                    Task {
-                                        await processor.processDetectedText(finalText, confidence: 1.0)
-                                    }
-                                }
-                            }
-                    } else {
-                        Text(liveTranscription)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                            .onTapGesture {
-                                // Pause any pending AI processing
-                                debounceTimer?.invalidate()
-                                
-                                editableTranscription = liveTranscription
-                                isEditingTranscription = true
-                                isTranscriptionFocused = true
-                                
-                                // Clear any pending questions
-                                if isWaitingForAIResponse {
-                                    isWaitingForAIResponse = false
-                                    pendingQuestion = nil
-                                }
-                            }
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
-                .frame(maxWidth: UIScreen.main.bounds.width - 80)
-                .glassEffect()
-                .glassEffectTransition(.materialize)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 12  // Fixed corner radius for polished look
-                    )
-                )
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: liveTranscription.count)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-                .opacity(showLiveTranscription ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: showLiveTranscription)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.8).combined(with: .opacity)
-                    ))
-            }
-            
-            // REMOVED duplicate stop button - now handled in bottomInputArea
+            // REMOVED duplicate transcription - now in bottomInputArea above stop button
         }
     }
     
@@ -601,6 +518,80 @@ struct AmbientModeView: View {
         VStack(spacing: 0) {
             Spacer()
             
+            // Live transcription - ALWAYS above the button
+            if isRecording && !liveTranscription.isEmpty && showLiveTranscription {
+                VStack {
+                    if isEditingTranscription {
+                        TextField("Edit transcription...", text: $editableTranscription)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .focused($isTranscriptionFocused)
+                            .onSubmit {
+                                let finalText = editableTranscription
+                                liveTranscription = ""  // Clear to prevent duplicate processing
+                                isEditingTranscription = false
+                                
+                                // Process as a single complete thought
+                                let contentType = determineContentType(finalText)
+                                
+                                if contentType == .question {
+                                    // Handle as question with AI response
+                                    let userMessage = UnifiedChatMessage(
+                                        content: finalText,
+                                        isUser: true,
+                                        timestamp: Date(),
+                                        bookContext: currentBookContext
+                                    )
+                                    messages.append(userMessage)
+                                    
+                                    isWaitingForAIResponse = true
+                                    pendingQuestion = finalText
+                                    
+                                    Task {
+                                        await getAIResponse(for: finalText)
+                                    }
+                                } else {
+                                    // Process as note/quote
+                                    Task {
+                                        await processor.processDetectedText(finalText, confidence: 1.0)
+                                    }
+                                }
+                            }
+                    } else {
+                        Text(liveTranscription)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .onTapGesture {
+                                // Pause any pending AI processing
+                                debounceTimer?.invalidate()
+                                
+                                editableTranscription = liveTranscription
+                                isEditingTranscription = true
+                                isTranscriptionFocused = true
+                                
+                                // Clear any pending questions
+                                if isWaitingForAIResponse {
+                                    isWaitingForAIResponse = false
+                                    pendingQuestion = nil
+                                }
+                            }
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .frame(maxWidth: UIScreen.main.bounds.width - 80)
+                .glassEffect()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                ))
+            }
+            
             // AI thinking indicator - using our existing component
             if isWaitingForAIResponse {
                 SubtleLiquidThinking(bookColor: adaptiveUIColor)
@@ -610,22 +601,6 @@ struct AmbientModeView: View {
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 1.1).combined(with: .opacity)
                     ))
-            }
-            
-            // Fake blur gradient for input bar area
-            if inputMode == .textInput {
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0),
-                        Color.black.opacity(0.3),
-                        Color.black.opacity(0.5)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 120)
-                .allowsHitTesting(false)
-                .transition(.opacity)
             }
             
             // Dynamic Island-inspired unified control
