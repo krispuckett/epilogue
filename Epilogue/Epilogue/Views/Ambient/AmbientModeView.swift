@@ -1020,10 +1020,10 @@ struct AmbientModeView: View {
         // The quote card will add its own drop cap quotation mark
         quoteText = quoteText
             .replacingOccurrences(of: "\"", with: "")
-            .replacingOccurrences(of: """, with: "")
-            .replacingOccurrences(of: """, with: "")
-            .replacingOccurrences(of: "'", with: "")
-            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "\u{201C}", with: "") // Left double quotation mark
+            .replacingOccurrences(of: "\u{201D}", with: "") // Right double quotation mark
+            .replacingOccurrences(of: "\u{2018}", with: "") // Left single quotation mark
+            .replacingOccurrences(of: "\u{2019}", with: "") // Right single quotation mark
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Check for duplicates
