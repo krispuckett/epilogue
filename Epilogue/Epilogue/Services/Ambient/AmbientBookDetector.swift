@@ -58,6 +58,12 @@ class AmbientBookDetector: ObservableObject {
         print("📚 Book detection stopped")
     }
     
+    func resetDetection() {
+        detectedBook = nil
+        confidence = 0.0
+        print("📚 Book detection reset")
+    }
+    
     // MARK: - Natural Language Processing
     
     func detectBookInText(_ text: String) {
@@ -251,8 +257,16 @@ class AmbientBookDetector: ObservableObject {
     
     private func setDetectedBook(_ book: Book, confidence: Double) {
         DispatchQueue.main.async { [weak self] in
-            self?.detectedBook = book
-            self?.confidence = confidence
+            guard let self = self else { return }
+            
+            // CRITICAL: Only set if it's a different book to prevent duplicate triggers
+            if self.detectedBook?.localId == book.localId {
+                print("📖 Book already detected: \(book.title) - skipping duplicate")
+                return
+            }
+            
+            self.detectedBook = book
+            self.confidence = confidence
             
             print("📖 Book detected: \(book.title) (confidence: \(Int(confidence * 100))%)")
             

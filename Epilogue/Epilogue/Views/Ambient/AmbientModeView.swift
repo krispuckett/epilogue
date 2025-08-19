@@ -1660,8 +1660,15 @@ struct AmbientModeView: View {
     private func handleBookDetection(_ book: Book?) {
         guard let book = book else { return }
         
-        // Prevent duplicate detections
+        // CRITICAL: Prevent duplicate detections for the same book
         if lastDetectedBookId == book.localId {
+            print("📚 Ignoring duplicate book detection: \(book.title)")
+            return
+        }
+        
+        // Also check if it's the same as current book context
+        if currentBookContext?.localId == book.localId {
+            print("📚 Book already set as current context: \(book.title)")
             return
         }
         
