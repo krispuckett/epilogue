@@ -24,6 +24,8 @@ struct CleanNotesView: View {
     @State private var selectedSessionNote: CapturedNote?
     @State private var selectedSessionQuote: CapturedQuote?
     @State private var collapsedSections: Set<String> = []
+    @State private var isSelectionMode = false
+    @State private var selectedItems: Set<UUID> = []
     @Namespace private var animation
     
     enum FilterType: String, CaseIterable {
@@ -243,6 +245,30 @@ struct CleanNotesView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
+                        // Selection mode button (only show when in selection mode)
+                        if isSelectionMode {
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    isSelectionMode = false
+                                    selectedItems.removeAll()
+                                }
+                                HapticManager.shared.lightTap()
+                            } label: {
+                                Text("Done")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            }
+                            
+                            if !selectedItems.isEmpty {
+                                Button {
+                                    deleteSelectedItems()
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(.red.opacity(0.8))
+                                }
+                            }
+                        }
                         // Search button - simple
                         Button {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -253,9 +279,23 @@ struct CleanNotesView: View {
                             }
                             HapticManager.shared.lightTap()
                         } label: {
-                            Image(systemName: showSearchBar ? "xmark.circle.fill" : "magnifyingglass")
-                                .font(.system(size: 16, weight: showSearchBar ? .semibold : .regular))
-                                .foregroundStyle(showSearchBar ? Color.blue : .white.opacity(0.7))
+                            if showSearchBar {
+                                // Liquid glass close button with amber tint
+                                ZStack {
+                                    Circle()
+                                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                                        .frame(width: 28, height: 28)
+                                        .glassEffect()
+                                    
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                }
+                            } else {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16, weight: .regular))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
                         }
                         
                         // Filter selector - simple
@@ -446,8 +486,53 @@ struct CleanNotesView: View {
     
     private func noteCard(note: Note) -> some View {
         let capturedNote = capturedNotes.first { $0.id == note.id }
+        let isSelected = selectedItems.contains(note.id)
+        
         return noteCardContent(note: note, capturedNote: capturedNote)
+            .overlay(alignment: .topLeading) {
+                // Selection checkbox when in selection mode
+                if isSelectionMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+                        .padding(12)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                if isSelected {
+                                    selectedItems.remove(note.id)
+                                } else {
+                                    selectedItems.insert(note.id)
+                                }
+                            }
+                            HapticManager.shared.lightTap()
+                        }
+                }
+            }
+            .scaleEffect(isSelected ? 0.98 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isSelected)
             .contentShape(Rectangle())
+            .onTapGesture {
+                if isSelectionMode {
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                        if isSelected {
+                            selectedItems.remove(note.id)
+                        } else {
+                            selectedItems.insert(note.id)
+                        }
+                    }
+                    HapticManager.shared.lightTap()
+                }
+            }
+            .onLongPressGesture(minimumDuration: 0.5) {
+                if !isSelectionMode {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isSelectionMode = true
+                        selectedItems.insert(note.id)
+                    }
+                    HapticManager.shared.mediumTap()
+                }
+            }
             .contextMenu {
                 Button {
                     if let captured = capturedNote {
@@ -495,41 +580,22 @@ struct CleanNotesView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .lineSpacing(6)
             
-            // Book context with refined styling
+            // Book context with refined styling (no divider line)
             if let bookTitle = note.bookTitle {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Subtle divider
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0),
-                                    Color.white.opacity(0.1),
-                                    Color.white.opacity(0)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(height: 0.5)
-                        .padding(.vertical, 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bookTitle.uppercased())
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .kerning(0.8)
+                        .foregroundStyle(.white.opacity(0.7))
                     
-                    // Attribution stack
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(bookTitle.uppercased())
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .kerning(0.8)
-                            .foregroundStyle(.white.opacity(0.7))
-                        
-                        if let author = note.author {
-                            Text(author.uppercased())
-                                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                .kerning(0.6)
-                                .foregroundStyle(.white.opacity(0.5))
-                        }
+                    if let author = note.author {
+                        Text(author.uppercased())
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .kerning(0.6)
+                            .foregroundStyle(.white.opacity(0.5))
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 12) // Add spacing instead of divider line
             }
         }
         .padding(24)
@@ -575,8 +641,53 @@ struct CleanNotesView: View {
             id: quote.id
         )
         
+        let isSelected = selectedItems.contains(quote.id)
+        
         return SimpleQuoteCard(note: note)
+            .overlay(alignment: .topLeading) {
+                // Selection checkbox when in selection mode
+                if isSelectionMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+                        .padding(12)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                if isSelected {
+                                    selectedItems.remove(quote.id)
+                                } else {
+                                    selectedItems.insert(quote.id)
+                                }
+                            }
+                            HapticManager.shared.lightTap()
+                        }
+                }
+            }
+            .scaleEffect(isSelected ? 0.98 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isSelected)
             .contentShape(Rectangle())
+            .onTapGesture {
+                if isSelectionMode {
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                        if isSelected {
+                            selectedItems.remove(quote.id)
+                        } else {
+                            selectedItems.insert(quote.id)
+                        }
+                    }
+                    HapticManager.shared.lightTap()
+                }
+            }
+            .onLongPressGesture(minimumDuration: 0.5) {
+                if !isSelectionMode {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isSelectionMode = true
+                        selectedItems.insert(quote.id)
+                    }
+                    HapticManager.shared.mediumTap()
+                }
+            }
             .onTapGesture(count: 2) {
                 // Double tap to show session summary for ambient quotes
                 if quote.source == .ambient {
@@ -746,6 +857,25 @@ struct CleanNotesView: View {
     private func deleteQuote(_ quote: CapturedQuote) {
         modelContext.delete(quote)
         try? modelContext.save()
+        HapticManager.shared.success()
+    }
+    
+    private func deleteSelectedItems() {
+        for id in selectedItems {
+            if let note = capturedNotes.first(where: { $0.id == id }) {
+                modelContext.delete(note)
+            } else if let quote = capturedQuotes.first(where: { $0.id == id }) {
+                modelContext.delete(quote)
+            }
+        }
+        
+        try? modelContext.save()
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            selectedItems.removeAll()
+            isSelectionMode = false
+        }
+        
         HapticManager.shared.success()
     }
     

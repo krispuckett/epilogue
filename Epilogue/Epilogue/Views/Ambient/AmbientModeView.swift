@@ -652,16 +652,15 @@ struct AmbientModeView: View {
                 .transition(.opacity.combined(with: .scale))
             }
             
-            // Text input bar (overlays in same position as voice button)
-            if inputMode == .textInput {
+            // Single input control that transitions between states
+            ZStack {
+                // Text input bar - always present but hidden when not in text mode
                 ambientTextInputBar
-                    .padding(.bottom, 50) // Same bottom padding as voice button
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.8).combined(with: .opacity)
-                    ))
-            } else {
-                // Waveform/Stop button - the original beautiful implementation
+                    .opacity(inputMode == .textInput ? 1 : 0)
+                    .scaleEffect(inputMode == .textInput ? 1 : 0.8)
+                    .allowsHitTesting(inputMode == .textInput)
+                
+                // Waveform/Stop button - always present but hidden when in text mode
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                         if inputMode == .listening && isRecording {
@@ -691,9 +690,9 @@ struct AmbientModeView: View {
                             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
                     }
                 }
-                .padding(.bottom, 50)
-                .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
-                .opacity(inputMode == .paused ? 0.9 : 1.0)
+                .opacity(inputMode == .textInput ? 0 : 1)
+                .scaleEffect(inputMode == .textInput ? 0.8 : (inputMode == .paused ? 0.9 : 1.0))
+                .allowsHitTesting(inputMode != .textInput)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
                 // Long press gesture for keyboard
                 .onLongPressGesture(minimumDuration: 0.5) {
@@ -708,6 +707,7 @@ struct AmbientModeView: View {
                     HapticManager.shared.mediumTap()
                 }
             }
+            .padding(.bottom, 50) // Single padding for the entire ZStack
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
     }
@@ -805,7 +805,6 @@ struct AmbientModeView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 20) // Match the voice button's horizontal positioning
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: keyboardText.isEmpty)
     }
     
     // MARK: - BookView-Style Header
@@ -1393,8 +1392,9 @@ struct AmbientModeView: View {
             inputMode = .listening
         }
         
-        // Resume recording after animation
+        // Resume recording after animation - maintain book context
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Don't change currentBookContext - maintain it
             startRecording()
         }
     }
@@ -1402,38 +1402,25 @@ struct AmbientModeView: View {
     private func sendTextMessage() {
         guard !keyboardText.isEmpty else { return }
         
-        let messageText = keyboardText
+        let messageText = keyboardText.trimmingCharacters(in: .whitespacesAndNewlines)
         keyboardText = "" // Clear immediately
         
-        // Determine content type
+        // Smart content type detection
         let contentType = determineContentType(messageText)
         
+        print("📝 Processing typed message: '\(messageText)' as \(contentType)")
+        
         if contentType == .question {
-            // For questions, handle them like voice questions - don't add user message to UI
-            // Just show thinking indicator and get AI response
+            // For questions, show thinking and get AI response
             isWaitingForAIResponse = true
             pendingQuestion = messageText
             
-            // Create ambient content that will be processed and saved properly
-            let content = AmbientProcessedContent(
-                text: messageText,
-                type: .question,
-                timestamp: Date(),
-                confidence: 1.0,
-                response: nil,
-                bookTitle: currentBookContext?.title,
-                bookAuthor: currentBookContext?.author
-            )
-            
-            // Add to processor's detected content first (for saving)
-            processor.detectedContent.append(content)
-            
-            // Get AI response and update the content with response
+            // Get AI response first, then save with response
             Task {
                 await getAIResponseForAmbientQuestion(messageText)
             }
         } else {
-            // For notes and quotes, just process through ambient pipeline
+            // For notes and quotes, save immediately
             let content = AmbientProcessedContent(
                 text: messageText,
                 type: contentType,
@@ -1444,28 +1431,60 @@ struct AmbientModeView: View {
                 bookAuthor: currentBookContext?.author
             )
             
-            // Add to processor's detected content for unified handling
+            // Add to processor for saving
             processor.detectedContent.append(content)
-        }
-        
-        // Optionally return to voice mode after sending
-        if UserDefaults.standard.bool(forKey: "returnToVoiceAfterText") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                returnToVoiceMode()
+            
+            // Show appropriate save animation
+            savedItemsCount += 1
+            savedItemType = contentType == .quote ? "Quote" : "Note"
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showSaveAnimation = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation {
+                    showSaveAnimation = false
+                    savedItemType = nil
+                }
             }
         }
+        
+        // Don't auto-return to voice - let user control this
     }
     
     private func determineContentType(_ text: String) -> AmbientProcessedContent.ContentType {
-        // Reuse existing logic for determining content type
-        if text.hasSuffix("?") || text.lowercased().contains("what") || 
-           text.lowercased().contains("how") || text.lowercased().contains("why") {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercased = trimmed.lowercased()
+        
+        // Check for questions - be comprehensive
+        if trimmed.hasSuffix("?") ||
+           lowercased.starts(with: "who ") ||
+           lowercased.starts(with: "what ") ||
+           lowercased.starts(with: "where ") ||
+           lowercased.starts(with: "when ") ||
+           lowercased.starts(with: "why ") ||
+           lowercased.starts(with: "how ") ||
+           lowercased.starts(with: "is ") ||
+           lowercased.starts(with: "are ") ||
+           lowercased.starts(with: "can ") ||
+           lowercased.starts(with: "could ") ||
+           lowercased.starts(with: "would ") ||
+           lowercased.starts(with: "should ") ||
+           lowercased.starts(with: "tell me about") ||
+           lowercased.starts(with: "explain") {
             return .question
-        } else if text.hasPrefix("\"") && text.hasSuffix("\"") {
-            return .quote
-        } else {
-            return .note
         }
+        
+        // Check for quotes - with or without quotation marks
+        if (trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"")) ||
+           (trimmed.hasPrefix("\u{201C}") && trimmed.hasSuffix("\u{201D}")) ||
+           (trimmed.hasPrefix("'") && trimmed.hasSuffix("'")) ||
+           lowercased.starts(with: "quote:") {
+            return .quote
+        }
+        
+        // Everything else is a note
+        return .note
     }
     
     private func sendMessage() {
