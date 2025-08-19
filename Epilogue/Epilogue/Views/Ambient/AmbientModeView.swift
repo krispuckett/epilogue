@@ -740,6 +740,7 @@ struct AmbientModeView: View {
                             .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                             .contentTransition(.interpolate)
                             .symbolEffect(.bounce, value: inputMode)
+                    }
                 }
                 .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
                 .padding(.bottom, 50)
