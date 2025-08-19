@@ -3,6 +3,8 @@ import SwiftData
 import Combine
 import OSLog
 import UIKit
+import Vision
+import PhotosUI
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
@@ -33,6 +35,10 @@ struct AmbientModeView: View {
     @State private var showBookCover = false
     @State private var bookCoverTimer: Timer?
     @State private var expandedMessageIds = Set<UUID>()  // Track expanded messages individually
+    @State private var showImagePicker = false
+    @State private var capturedImage: UIImage?
+    @State private var extractedText: String = ""
+    @State private var showQuoteHighlighter = false
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
     @State private var showLiveTranscription = true
@@ -200,6 +206,21 @@ struct AmbientModeView: View {
         .onDisappear {
             bookCoverTimer?.invalidate()
             transcriptionFadeTimer?.invalidate()
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $capturedImage)
+                .onDisappear {
+                    if let image = capturedImage {
+                        processImageForText(image)
+                    }
+                }
+        }
+        .sheet(isPresented: $showQuoteHighlighter) {
+            QuoteHighlighterView(
+                image: capturedImage,
+                extractedText: extractedText,
+                onSave: saveHighlightedQuote
+            )
         }
         .onReceive(voiceManager.$transcribedText) { text in
             // Only update if actually recording
@@ -631,14 +652,13 @@ struct AmbientModeView: View {
                 .transition(.opacity.combined(with: .scale))
             }
             
-            // Text input bar (slides up from bottom when in text mode)
+            // Text input bar (overlays in same position as voice button)
             if inputMode == .textInput {
                 ambientTextInputBar
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 50) // Same bottom padding as voice button
                     .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .move(edge: .bottom).combined(with: .opacity)
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
                     ))
             } else {
                 // Waveform/Stop button - the original beautiful implementation
@@ -692,27 +712,100 @@ struct AmbientModeView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
     }
     
-    // MARK: - Text Input Bar Component
+    // MARK: - Text Input Bar Component (Raycast-style)
     private var ambientTextInputBar: some View {
-        UniversalInputBar(
-            messageText: $keyboardText,
-            showingCommandPalette: .constant(false),
-            isInputFocused: $isKeyboardFocused,
-            context: currentBookContext != nil ? .bookDetail(book: currentBookContext!) : .quickActions,
-            onSend: {
-                sendTextMessage()
-            },
-            onMicrophoneTap: {
+        HStack(spacing: 12) {
+            // Minimal Raycast-style input field
+            HStack(spacing: 8) {
+                // Camera button for page capture
+                Button {
+                    showImagePicker = true
+                } label: {
+                    Image(systemName: "camera")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                
+                // Text field with minimal styling
+                TextField("", text: $keyboardText, axis: .vertical)
+                    .placeholder(when: keyboardText.isEmpty) {
+                        Text("Ask, capture, or type...")
+                            .foregroundColor(.white.opacity(0.35))
+                            .font(.system(size: 16))
+                    }
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .tint(.white.opacity(0.8))
+                    .focused($isKeyboardFocused)
+                    .lineLimit(1...3)
+                    .textFieldStyle(.plain)
+                    .onSubmit {
+                        if !keyboardText.isEmpty {
+                            sendTextMessage()
+                        }
+                    }
+                
+                // Send button (only visible with text)
+                if !keyboardText.isEmpty {
+                    Button {
+                        sendTextMessage()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.black, .white.opacity(0.9))
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                // Raycast-style ultra-minimal glass
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.black.opacity(0.3))
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .opacity(0.3)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+                    )
+            )
+            
+            // Voice return button - separated like Raycast
+            Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     returnToVoiceMode()
                 }
-            },
-            onCommandTap: nil, // No command palette in ambient mode
-            isRecording: .constant(false),
-            colorPalette: nil,
-            isAmbientMode: true // Use ambient mode styling
-        )
-        .padding(.horizontal, 16)
+            } label: {
+                Image(systemName: "waveform")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(.black.opacity(0.3))
+                            .background(
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .opacity(0.3)
+                            )
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20) // Match the voice button's horizontal positioning
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: keyboardText.isEmpty)
     }
     
     // MARK: - BookView-Style Header
@@ -1316,38 +1409,44 @@ struct AmbientModeView: View {
         let contentType = determineContentType(messageText)
         
         if contentType == .question {
-            // For questions, add to messages and get AI response
-            let userMessage = UnifiedChatMessage(
-                content: messageText,
-                isUser: true,
-                timestamp: Date(),
-                bookContext: currentBookContext
-            )
-            messages.append(userMessage)
-            
-            // Show thinking indicator
+            // For questions, handle them like voice questions - don't add user message to UI
+            // Just show thinking indicator and get AI response
             isWaitingForAIResponse = true
             pendingQuestion = messageText
             
-            // Get AI response
+            // Create ambient content that will be processed and saved properly
+            let content = AmbientProcessedContent(
+                text: messageText,
+                type: .question,
+                timestamp: Date(),
+                confidence: 1.0,
+                response: nil,
+                bookTitle: currentBookContext?.title,
+                bookAuthor: currentBookContext?.author
+            )
+            
+            // Add to processor's detected content first (for saving)
+            processor.detectedContent.append(content)
+            
+            // Get AI response and update the content with response
             Task {
-                await getAIResponse(for: messageText)
+                await getAIResponseForAmbientQuestion(messageText)
             }
+        } else {
+            // For notes and quotes, just process through ambient pipeline
+            let content = AmbientProcessedContent(
+                text: messageText,
+                type: contentType,
+                timestamp: Date(),
+                confidence: 1.0,
+                response: nil,
+                bookTitle: currentBookContext?.title,
+                bookAuthor: currentBookContext?.author
+            )
+            
+            // Add to processor's detected content for unified handling
+            processor.detectedContent.append(content)
         }
-        
-        // Also process through ambient pipeline for saving
-        let content = AmbientProcessedContent(
-            text: messageText,
-            type: contentType,
-            timestamp: Date(),
-            confidence: 1.0,
-            response: nil,
-            bookTitle: currentBookContext?.title,
-            bookAuthor: currentBookContext?.author
-        )
-        
-        // Add to processor's detected content for unified handling
-        processor.detectedContent.append(content)
         
         // Optionally return to voice mode after sending
         if UserDefaults.standard.bool(forKey: "returnToVoiceAfterText") {
@@ -1385,6 +1484,69 @@ struct AmbientModeView: View {
         }
         
         messageText = ""
+    }
+    
+    // MARK: - Photo Capture & OCR
+    private func processImageForText(_ image: UIImage) {
+        guard let cgImage = image.cgImage else { return }
+        
+        let requestHandler = VNImageRequestHandler(cgImage: cgImage)
+        let request = VNRecognizeTextRequest { request, error in
+            guard let observations = request.results as? [VNRecognizedTextObservation],
+                  error == nil else { return }
+            
+            let recognizedStrings = observations.compactMap { observation in
+                observation.topCandidates(1).first?.string
+            }
+            
+            DispatchQueue.main.async {
+                self.extractedText = recognizedStrings.joined(separator: "\n")
+                self.showQuoteHighlighter = true
+            }
+        }
+        
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        
+        do {
+            try requestHandler.perform([request])
+        } catch {
+            print("Failed to perform OCR: \(error)")
+        }
+    }
+    
+    private func saveHighlightedQuote(_ quote: String, pageNumber: Int? = nil) {
+        // Save as a quote through the ambient processor
+        let content = AmbientProcessedContent(
+            text: quote,
+            type: .quote,
+            timestamp: Date(),
+            confidence: 1.0,
+            response: nil,
+            bookTitle: currentBookContext?.title,
+            bookAuthor: currentBookContext?.author
+        )
+        
+        processor.detectedContent.append(content)
+        
+        // Show save animation
+        savedItemsCount += 1
+        savedItemType = "Quote from Photo"
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            showSaveAnimation = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation {
+                showSaveAnimation = false
+                savedItemType = nil
+            }
+        }
+        
+        // Clear the captured image
+        capturedImage = nil
+        showQuoteHighlighter = false
+        extractedText = ""
     }
     
     private func getAIResponse(for text: String) async {
@@ -1447,6 +1609,51 @@ struct AmbientModeView: View {
                 )
                 messages.append(errorMessage)
                 pendingQuestion = nil
+            }
+        }
+    }
+    
+    private func getAIResponseForAmbientQuestion(_ text: String) async {
+        let aiService = AICompanionService.shared
+        
+        guard aiService.isConfigured() else {
+            await MainActor.run {
+                isWaitingForAIResponse = false
+                pendingQuestion = nil
+            }
+            return
+        }
+        
+        do {
+            let response = try await aiService.processMessage(
+                text,
+                bookContext: currentBookContext,
+                conversationHistory: messages
+            )
+            
+            await MainActor.run {
+                isWaitingForAIResponse = false
+                pendingQuestion = nil
+                
+                // Update the processed content with the response
+                if let index = processor.detectedContent.firstIndex(where: { $0.text == text && $0.type == .question && $0.response == nil }) {
+                    processor.detectedContent[index] = AmbientProcessedContent(
+                        text: text,
+                        type: .question,
+                        timestamp: processor.detectedContent[index].timestamp,
+                        confidence: 1.0,
+                        response: response,
+                        bookTitle: currentBookContext?.title,
+                        bookAuthor: currentBookContext?.author
+                    )
+                    print("✅ Updated ambient question with AI response: \(text.prefix(30))...")
+                }
+            }
+        } catch {
+            await MainActor.run {
+                isWaitingForAIResponse = false
+                pendingQuestion = nil
+                print("❌ Failed to get AI response for ambient question: \(error)")
             }
         }
     }

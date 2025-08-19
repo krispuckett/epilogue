@@ -338,17 +338,17 @@ public class TrueAmbientProcessor: ObservableObject {
                     guard content.type == .question && content.response == nil else { return false }
                     let normalizedExisting = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                     
-                    // ULTRA-CONSERVATIVE EVOLUTION DETECTION - Fix for wrong questions
-                    // Only consider it an evolution if it's CLEARLY the same question getting longer
+                    // EXTREMELY CONSERVATIVE EVOLUTION DETECTION - Fix for wrong questions
+                    // Only consider it an evolution if adding punctuation or 1-2 chars MAX
                     
                     // Must be a prefix expansion (old text is start of new text)
-                    // AND the difference is VERY small (less than 3 chars - just punctuation)
-                    // AND the old text must be substantial (more than 10 chars)
+                    // AND the difference is MINIMAL (1-2 chars max - punctuation only)
+                    // AND the old text must be complete (more than 15 chars)
                     if normalizedNew.hasPrefix(normalizedExisting) && 
-                       normalizedExisting.count > 10 &&  // Old must be very substantial
-                       (normalizedNew.count - normalizedExisting.count) <= 3 {  // TINY addition only (punctuation)
+                       normalizedExisting.count > 15 &&  // Old must be a complete question
+                       (normalizedNew.count - normalizedExisting.count) <= 2 {  // ONLY punctuation/typo fix
                         // This handles cases like "Who is Gandalf" -> "Who is Gandalf?"
-                        // But NOT "Who is El" -> "Who is Elrond" (difference is 4+ chars)
+                        // But NOT "Who is Bobo Bagg" -> "Who is Bobo Baggins" (4+ char difference)
                         return true
                     }
                     
