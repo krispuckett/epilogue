@@ -603,10 +603,11 @@ struct AmbientModeView: View {
                     ))
             }
             
-            // Award-winning Dynamic Island-inspired control with perfect morphing
-            ZStack(alignment: .trailing) {
-                // Input field (behind button, reveals as button moves)
-                if inputMode == .textInput && currentSession != nil {
+            // Award-winning control with waveform orb outside input bar
+            if inputMode == .textInput && currentSession != nil {
+                // Text input mode - input bar with separate waveform orb
+                HStack(spacing: 12) {
+                    // Input field container
                     HStack(spacing: 8) {
                         // Camera button
                         Button {
@@ -621,7 +622,7 @@ struct AmbientModeView: View {
                         .buttonStyle(.plain)
                         .opacity(inputMode == .textInput ? 1 : 0)
                         .scaleEffect(inputMode == .textInput ? 1 : 0.5)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(inputMode == .textInput ? 0.1 : 0), value: inputMode)
+                        .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8).delay(inputMode == .textInput ? 0.15 : 0), value: inputMode)
                         
                         // Text field
                         TextField("", text: $keyboardText, axis: .vertical)
@@ -657,29 +658,52 @@ struct AmbientModeView: View {
                                 removal: .scale(scale: 0.3).combined(with: .opacity)
                             ))
                         }
-                        
-                        // Spacer for button area
-                        Spacer()
-                            .frame(width: inputMode == .textInput ? 48 : 0)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .glassEffect()
-                    .matchedGeometryEffect(id: "inputContainer", in: buttonMorphNamespace)
-                }
-                
-                // Morphing button (on top, slides to reveal input)
-                Button {
-                    withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25)) {
-                        if inputMode == .textInput {
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity),
+                        removal: .scale(scale: 0.1, anchor: .trailing).combined(with: .opacity)
+                    ))
+                    
+                    // Waveform orb - separate from input bar
+                    Button {
+                        withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25)) {
                             // Return to voice mode
                             isKeyboardFocused = false
                             keyboardText = ""
                             inputMode = .listening
                             startRecording()
-                        } else if inputMode == .listening && isRecording {
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                                .frame(width: 48, height: 48)
+                                .glassEffect()
+                                .matchedGeometryEffect(id: "morphButton.background", in: buttonMorphNamespace)
+                            
+                            Image(systemName: "waveform")
+                                .font(.system(size: 20, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
+                                .contentTransition(.interpolate)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
+            } else {
+                // Voice mode - stop/waveform button in center
+                Button {
+                    withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        if inputMode == .listening && isRecording {
                             // Stop recording
                             handleMicrophoneTap()
                         } else if inputMode == .paused {
@@ -696,42 +720,26 @@ struct AmbientModeView: View {
                     }
                 } label: {
                     ZStack {
-                        // Background that morphs
-                        RoundedRectangle(
-                            cornerRadius: inputMode == .textInput ? 24 : 32,
-                            style: .continuous
-                        )
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                        .frame(
-                            width: inputMode == .textInput ? 48 : 64,
-                            height: inputMode == .textInput ? 48 : 64
-                        )
-                        .glassEffect()
-                        .matchedGeometryEffect(
-                            id: inputMode == .textInput ? "buttonInInput" : "buttonAlone",
-                            in: buttonMorphNamespace,
-                            properties: .position,
-                            anchor: .center
-                        )
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                            .frame(width: 64, height: 64)
+                            .glassEffect()
+                            .matchedGeometryEffect(id: "morphButton.background", in: buttonMorphNamespace)
                         
-                        // Icon with smooth transitions
-                        Image(systemName: inputMode == .textInput ? "waveform" : (inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform")))
-                            .font(.system(
-                                size: inputMode == .textInput ? 20 : 28,
-                                weight: .medium,
-                                design: .rounded
-                            ))
+                        Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
+                            .font(.system(size: 28, weight: .medium, design: .rounded))
                             .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .matchedGeometryEffect(id: "morphButton.icon", in: buttonMorphNamespace)
                             .contentTransition(.interpolate)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: inputMode)
                     }
                 }
                 .scaleEffect(inputMode == .paused ? 0.9 : 1.0)
-                .frame(maxWidth: inputMode == .textInput ? nil : .infinity)
-                .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25), value: inputMode)
+                .padding(.bottom, 50)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, inputMode == .textInput ? 24 : 50)
             // Long press gesture for quick keyboard access
             .onLongPressGesture(minimumDuration: 0.5) {
                 if inputMode != .textInput && isRecording {
