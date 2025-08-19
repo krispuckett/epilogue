@@ -739,17 +739,19 @@ struct AmbientModeView: View {
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .trailing).combined(with: .opacity)
                 ))
-            }
-            // Long press gesture for quick keyboard access
-            .onLongPressGesture(minimumDuration: 0.5) {
-                if inputMode != .textInput && isRecording {
-                    stopRecording()
+                // Long press gesture for quick keyboard access
+                .onLongPressGesture(minimumDuration: 0.5) {
+                    if isRecording {
+                        stopRecording()
+                    }
+                    withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        inputMode = .textInput
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isKeyboardFocused = true
+                        }
+                    }
+                    HapticManager.shared.mediumTap()
                 }
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8, blendDuration: 0)) {
-                    inputMode = .textInput
-                    isKeyboardFocused = true
-                }
-                HapticManager.shared.mediumTap()
             }
         }
         .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.86, blendDuration: 0.25), value: inputMode)
