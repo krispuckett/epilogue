@@ -142,9 +142,8 @@ struct AmbientModeView: View {
         // Voice gradient overlay and input controls
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {
-                // Bottom gradient - ALWAYS visible
+                // Bottom gradient - ALWAYS FULL STRENGTH
                 voiceGradientOverlay
-                    .opacity(isRecording ? 1.0 : 0.7) // Slightly dimmer when not recording
                 
                 // Input controls (waveform button or text input)
                 bottomInputArea
@@ -751,24 +750,14 @@ struct AmbientModeView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                // Raycast-style ultra-minimal glass
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.black.opacity(0.3))
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .opacity(0.3)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-                    )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .glassEffect(
+                .regular,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
             
-            // Voice return button - separated like Raycast
+            // Voice return button - proper liquid glass
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     returnToVoiceMode()
@@ -776,20 +765,11 @@ struct AmbientModeView: View {
             } label: {
                 Image(systemName: "waveform")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.8))
                     .frame(width: 44, height: 44)
-                    .background(
-                        Circle()
-                            .fill(.black.opacity(0.3))
-                            .background(
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .opacity(0.3)
-                            )
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-                            )
+                    .glassEffect(
+                        .regular,
+                        in: Circle()
                     )
             }
             .buttonStyle(.plain)
@@ -1405,7 +1385,7 @@ struct AmbientModeView: View {
             isWaitingForAIResponse = true
             pendingQuestion = messageText
             
-            // Get AI response first, then save with response
+            // Get AI response - it will handle saving with the response
             Task {
                 await getAIResponseForAmbientQuestion(messageText)
             }
