@@ -698,6 +698,7 @@ struct AmbientModeView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(inputMode == .textInput ? 1 : 0)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.5)
                                     .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.15), value: inputMode)
                                     
                                     // Text field
@@ -714,6 +715,7 @@ struct AmbientModeView: View {
                                         .lineLimit(1...3)
                                         .textFieldStyle(.plain)
                                         .opacity(inputMode == .textInput ? 1 : 0)
+                                        .scaleEffect(inputMode == .textInput ? 1 : 0.8)
                                         .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.2), value: inputMode)
                                         .onSubmit {
                                             if !keyboardText.isEmpty {

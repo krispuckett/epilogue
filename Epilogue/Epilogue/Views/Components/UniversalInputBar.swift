@@ -62,10 +62,10 @@ struct UniversalInputBar: View {
         HStack(spacing: 12) {
             // Main input bar - EXACT copy from UnifiedChatInputBar
             HStack(spacing: 0) {
-                // Command icon - white in ambient mode
+                // Command icon - amber accent
                 Image(systemName: "command")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(isAmbientMode ? .white : adaptiveUIColor)
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
                     .frame(height: 36)
                     .padding(.leading, 12)
                     .padding(.trailing, 8)
@@ -78,11 +78,11 @@ struct UniversalInputBar: View {
                         }
                     }
                 
-                // Text input - using standardized styles
+                // Text input with amber theme
                 ZStack(alignment: .leading) {
                     if messageText.isEmpty {
                         Text(placeholderText)
-                            .foregroundColor(isAmbientMode ? .white.opacity(0.5) : .secondary)
+                            .foregroundColor(.white.opacity(0.5))
                             .font(.system(size: 16))
                             .lineLimit(1)
                     }
@@ -90,8 +90,8 @@ struct UniversalInputBar: View {
                     TextField("", text: $messageText, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
-                        .foregroundStyle(isAmbientMode ? .white : (Color.primary))
-                        .accentColor(isAmbientMode ? .white : Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(.white)
+                        .accentColor(Color(red: 1.0, green: 0.55, blue: 0.26))
                         .focused($isInputFocused)
                         .lineLimit(1...5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -106,32 +106,20 @@ struct UniversalInputBar: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 
-                // Action buttons
-                HStack(spacing: 8) {
-                    // Waveform toggle button (always shows waveform)
-                    Button {
-                        onMicrophoneTap()
-                    } label: {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(
-                                isAmbientMode ? .white : (
-                                    isRecording ? 
-                                    adaptiveUIColor : 
-                                    adaptiveUIColor.opacity(0.7)
-                                )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .frame(minWidth: 44, minHeight: 44)
-                    
-                    // Send button (visible when text is entered) 
+                // Send button only (waveform moved outside)
+                HStack {
                     if !messageText.isEmpty {
                         Button(action: onSend) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.white, isAmbientMode ? .white : adaptiveUIColor)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.001))
+                                    .frame(width: 32, height: 32)
+                                    .glassEffect()
+                                
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            }
                         }
                         .buttonStyle(.plain)
                         .transition(.asymmetric(
@@ -146,19 +134,32 @@ struct UniversalInputBar: View {
             .glassEffect(in: RoundedRectangle(cornerRadius: 22))
             .overlay {
                 RoundedRectangle(cornerRadius: 22)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                adaptiveUIColor.opacity(0.3),
-                                adaptiveUIColor.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.5
-                    )
-                    .allowsHitTesting(false) // Don't intercept button taps
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                    .allowsHitTesting(false)
             }
+            
+            // Separate waveform orb - amber glass design
+            Button {
+                onMicrophoneTap()
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.001))
+                        .frame(width: 44, height: 44)
+                        .glassEffect()
+                    
+                    Image(systemName: "waveform")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(
+                            isRecording ? 
+                            Color(red: 1.0, green: 0.55, blue: 0.26) : 
+                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
+                        )
+                        .scaleEffect(isRecording ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: isRecording)
+                }
+            }
+            .buttonStyle(.plain)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
     }
