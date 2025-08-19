@@ -131,33 +131,33 @@ struct BookDetailView: View {
         }
         
         // Try to use the book's actual colors if they're suitable
-        if let bookAccent = palette.accent {
-            // Check if the color is readable and pleasant
-            let uiColor = UIColor(bookAccent)
-            var hue: CGFloat = 0
-            var saturation: CGFloat = 0  
-            var brightness: CGFloat = 0
-            var alpha: CGFloat = 0
-            uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-            
-            // Accept blues, teals, purples, and greens directly - they look great
-            let hueDegrees = hue * 360
-            if (hueDegrees >= 180 && hueDegrees <= 280) || // Blues and purples
-               (hueDegrees >= 150 && hueDegrees <= 180) || // Teals
-               (hueDegrees >= 80 && hueDegrees <= 150) {   // Greens
-                // Ensure minimum brightness for visibility
-                if brightness < 0.5 {
-                    return bookAccent.adjustBrightness(to: 0.6)
-                }
-                return bookAccent
+        let bookAccent = palette.accent
+        
+        // Check if the color is readable and pleasant
+        let uiColor = UIColor(bookAccent)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0  
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Accept blues, teals, purples, and greens directly - they look great
+        let hueDegrees = hue * 360
+        if (hueDegrees >= 180 && hueDegrees <= 280) || // Blues and purples
+           (hueDegrees >= 150 && hueDegrees <= 180) || // Teals
+           (hueDegrees >= 80 && hueDegrees <= 150) {   // Greens
+            // Ensure minimum brightness for visibility
+            if brightness < 0.5 {
+                return bookAccent.adjustBrightness(to: 0.6)
             }
-            
-            // For warm colors (reds, oranges, yellows), shift to our amber
-            if hueDegrees <= 80 || hueDegrees >= 280 {
-                // But preserve some of the original hue character
-                if hueDegrees >= 20 && hueDegrees <= 60 { // Oranges and yellows
-                    return Color(red: 1.0, green: 0.55 + (0.15 * saturation), blue: 0.26)
-                }
+            return bookAccent
+        }
+        
+        // For warm colors (reds, oranges, yellows), shift to our amber
+        if hueDegrees <= 80 || hueDegrees >= 280 {
+            // But preserve some of the original hue character
+            if hueDegrees >= 20 && hueDegrees <= 60 { // Oranges and yellows
+                return Color(red: 1.0, green: 0.55 + (0.15 * saturation), blue: 0.26)
             }
         }
         
