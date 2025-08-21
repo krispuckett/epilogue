@@ -341,13 +341,6 @@ struct CleanNotesView: View {
                                 .foregroundStyle(.white.opacity(0.8))
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .opacity(0.3)
-                    )
                 }
             }
         }

@@ -184,6 +184,11 @@ struct AmbientModeView: View {
         .onAppear {
             startAmbientExperience()
             setupKeyboardObservers()
+            
+            // Auto-expand the first AI response if it exists
+            if let firstAIResponse = messages.first(where: { !$0.isUser }) {
+                expandedMessageIds.insert(firstAIResponse.id)
+            }
         }
         .onChange(of: inputMode) { _, newMode in
             // Handle focus changes when switching modes
@@ -385,34 +390,7 @@ struct AmbientModeView: View {
         // Minimal recording UI
         VStack {
             Spacer()
-            
-            // Save indicator above transcription with proper type
-            if showSaveAnimation, let itemType = savedItemType {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
-                        .symbolEffect(.bounce, value: showSaveAnimation)
-                    
-                    Text("Saved \(itemType)")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect()
-                .clipShape(Capsule())
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .bottom)),
-                    removal: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .top))
-                ))
-                .padding(.bottom, 12)
-                .zIndex(200) // Higher z-index to ensure visibility
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
-            }
-            
-            // REMOVED duplicate thinking indicator - only need one in bottomInputArea
-            // REMOVED duplicate transcription - now in bottomInputArea above stop button
+            // All UI elements moved to bottomInputArea for proper positioning
         }
     }
     
@@ -422,10 +400,10 @@ struct AmbientModeView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // Proper top spacing to prevent scrolling above content
+                    // Proper top spacing below navigation area and safe zone
                     Rectangle()
                         .fill(Color.clear)
-                        .frame(height: 1)
+                        .frame(height: 100) // Space for navigation + safe area
                         .id("top")
                     
                     let hasRealContent = messages.contains { msg in
@@ -455,29 +433,35 @@ struct AmbientModeView: View {
                             // Thread-style messages
                             VStack(spacing: 1) {
                                 ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                                    AmbientMessageThreadView(
-                                        message: message,
-                                        index: index,
-                                        isExpanded: expandedMessageIds.contains(message.id),
-                                        onToggle: {
-                                            withAnimation(.easeInOut(duration: 0.2)) {
-                                                if expandedMessageIds.contains(message.id) {
-                                                    expandedMessageIds.remove(message.id)
-                                                } else {
-                                                    expandedMessageIds.insert(message.id)
+                                    // Display quotes with special formatting
+                                    if case .quote(let capturedQuote) = message.messageType {
+                                        AmbientQuoteView(quote: capturedQuote, index: index)
+                                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else {
+                                        AmbientMessageThreadView(
+                                            message: message,
+                                            index: index,
+                                            isExpanded: expandedMessageIds.contains(message.id),
+                                            onToggle: {
+                                                withAnimation(.easeInOut(duration: 0.2)) {
+                                                    if expandedMessageIds.contains(message.id) {
+                                                        expandedMessageIds.remove(message.id)
+                                                    } else {
+                                                        expandedMessageIds.insert(message.id)
+                                                    }
                                                 }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
                             .padding(.horizontal, 20)
                         }
                     }
                     
-                    // Bottom spacer for input area with more padding
+                    // Bottom spacer for input area - adjusted for keyboard mode
                     Color.clear
-                        .frame(height: 100)
+                        .frame(height: inputMode == .textInput ? 20 : 100)
                         .id("bottom")
                 }
             }
@@ -541,90 +525,125 @@ struct AmbientModeView: View {
             VStack(spacing: 0) {
                 Spacer()
                 
-                // Live transcription - ALWAYS above the button
-                if isRecording && !liveTranscription.isEmpty && showLiveTranscription {
-                VStack {
-                    if isEditingTranscription {
-                        TextField("Edit transcription...", text: $editableTranscription)
-                            .font(.system(size: 18, weight: .medium))
+                // Save indicator - positioned above everything else
+                if showSaveAnimation, let itemType = savedItemType {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                            .focused($isTranscriptionFocused)
-                            .onSubmit {
-                                let finalText = editableTranscription
-                                liveTranscription = ""  // Clear to prevent duplicate processing
-                                isEditingTranscription = false
-                                
-                                // Process as a single complete thought
-                                let contentType = determineContentType(finalText)
-                                
-                                if contentType == .question {
-                                    // Handle as question with AI response
-                                    let userMessage = UnifiedChatMessage(
-                                        content: finalText,
-                                        isUser: true,
-                                        timestamp: Date(),
-                                        bookContext: currentBookContext
-                                    )
-                                    messages.append(userMessage)
-                                    
-                                    isWaitingForAIResponse = true
-                                    pendingQuestion = finalText
-                                    
-                                    Task {
-                                        await getAIResponse(for: finalText)
-                                    }
-                                } else {
-                                    // Process as note/quote
-                                    Task {
-                                        await processor.processDetectedText(finalText, confidence: 1.0)
-                                    }
-                                }
-                            }
-                    } else {
-                        Text(liveTranscription)
-                            .font(.system(size: 18, weight: .medium))
+                            .symbolEffect(.bounce, value: showSaveAnimation)
+                        
+                        Text("Saved \(itemType)")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                            .onTapGesture {
-                                // Pause any pending AI processing
-                                debounceTimer?.invalidate()
-                                
-                                editableTranscription = liveTranscription
-                                isEditingTranscription = true
-                                isTranscriptionFocused = true
-                                
-                                // Clear any pending questions
-                                if isWaitingForAIResponse {
-                                    isWaitingForAIResponse = false
-                                    pendingQuestion = nil
-                                }
-                            }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect()
+                    .clipShape(Capsule())
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .bottom)),
+                        removal: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .top))
+                    ))
+                    .padding(.bottom, 12)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
-                .frame(maxWidth: UIScreen.main.bounds.width - 80)
-                .glassEffect()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                    removal: .scale(scale: 0.8).combined(with: .opacity)
-                ))
-            }
-            
-            // AI thinking indicator - using our existing component
-            if isWaitingForAIResponse {
-                SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                    .scaleEffect(0.6) // Proper size
+                
+                // AI thinking indicator - above transcription
+                if isWaitingForAIResponse {
+                    SubtleLiquidThinking(bookColor: adaptiveUIColor)
+                        .scaleEffect(0.6) // Proper size
+                        .padding(.bottom, 12)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 1.1).combined(with: .opacity)
+                        ))
+                }
+                
+                // Live transcription - glass container with proper multiline
+                if isRecording && !liveTranscription.isEmpty && showLiveTranscription {
+                    VStack {
+                        if isEditingTranscription {
+                            // SIRI-STYLE LAYOUT FOR EDIT MODE (keeping our glass effect)
+                            HStack {
+                                Spacer(minLength: 0)
+                                
+                                TextField("Edit transcription...", text: $editableTranscription, axis: .vertical)
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1...4)
+                                    .textFieldStyle(.plain)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: 280)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 12)
+                                    .glassEffect() // Keep our glass effect
+                                    .clipShape(
+                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    )
+                                    .focused($isTranscriptionFocused)
+                                
+                                Spacer(minLength: 0)
+                            }
+                                .onSubmit {
+                                    let finalText = editableTranscription
+                                    liveTranscription = ""  // Clear to prevent duplicate processing
+                                    isEditingTranscription = false
+                                    
+                                    // Process as a single complete thought
+                                    let contentType = determineContentType(finalText)
+                                    
+                                    if contentType == .question {
+                                        // Handle as question with AI response
+                                        let userMessage = UnifiedChatMessage(
+                                            content: finalText,
+                                            isUser: true,
+                                            timestamp: Date(),
+                                            bookContext: currentBookContext
+                                        )
+                                        messages.append(userMessage)
+                                        
+                                        isWaitingForAIResponse = true
+                                        pendingQuestion = finalText
+                                        
+                                        Task {
+                                            await getAIResponse(for: finalText)
+                                        }
+                                    } else {
+                                        // Process as note/quote
+                                        Task {
+                                            await processor.processDetectedText(finalText, confidence: 1.0)
+                                        }
+                                    }
+                                }
+                        } else {
+                            // iOS 26 FLUID TRANSCRIPTION BUBBLE
+                            TranscriptionBubble(text: liveTranscription)
+                                .onTapGesture {
+                                    // Pause any pending AI processing
+                                    debounceTimer?.invalidate()
+                                    
+                                    editableTranscription = liveTranscription
+                                    isEditingTranscription = true
+                                    isTranscriptionFocused = true
+                                    
+                                    // Clear any pending questions
+                                    if isWaitingForAIResponse {
+                                        isWaitingForAIResponse = false
+                                        pendingQuestion = nil
+                                    }
+                                }
+                        }
+                    }
                     .padding(.bottom, 16)
                     .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 1.1).combined(with: .opacity)
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
                     ))
-            }
+                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: liveTranscription)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showLiveTranscription)
+                }
             
             // Unified morphing container - like morph-surface example
             GeometryReader { geometry in
@@ -943,7 +962,32 @@ struct AmbientModeView: View {
                         bookContext: currentBookContext,
                         messageType: .text
                     )
+                    
+                    // Check if this is the first response BEFORE adding it
+                    let isFirstResponse = messages.filter { !$0.isUser }.count == 0
+                    
                     messages.append(aiMessage)
+                    
+                    // Apply the same auto-expansion logic as in processAndSaveDetectedContent
+                    if isFirstResponse {
+                        // First question - just expand it
+                        expandedMessageIds.insert(aiMessage.id)
+                    } else {
+                        // Keep first question expanded and expand new one
+                        let firstAIResponseId = messages.first(where: { !$0.isUser })?.id
+                        
+                        // Clear all expanded except first
+                        expandedMessageIds.removeAll()
+                        
+                        // Always keep first question expanded
+                        if let firstId = firstAIResponseId {
+                            expandedMessageIds.insert(firstId)
+                        }
+                        
+                        // And expand the new one
+                        expandedMessageIds.insert(aiMessage.id)
+                    }
+                    
                     print("✅ Added AI response via update check: \(item.text.prefix(30))...")
                 }
             }
@@ -1012,22 +1056,36 @@ struct AmbientModeView: View {
             // Show save animation for quotes and notes (saving is handled by processor)
             switch item.type {
             case .quote:
-                // Save quote to SwiftData with session relationship
-                saveQuoteToSwiftData(item)
-                savedItemsCount += 1
-                savedItemType = "Quote"
-                print("🎯 SAVE ANIMATION: Setting showSaveAnimation = true for Quote")
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showSaveAnimation = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        print("🎯 SAVE ANIMATION: Hiding save animation for Quote")
-                        showSaveAnimation = false
-                        savedItemType = nil
+                // Save quote to SwiftData with session relationship and get the CapturedQuote
+                if let capturedQuote = saveQuoteToSwiftData(item) {
+                    savedItemsCount += 1
+                    savedItemType = "Quote"
+                    
+                    // Add formatted quote to messages for display using the CapturedQuote
+                    let quoteMessage = UnifiedChatMessage(
+                        content: capturedQuote.text,
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .quote(capturedQuote)  // Use quote type with the CapturedQuote object
+                    )
+                    messages.append(quoteMessage)
+                    
+                    print("🎯 SAVE ANIMATION: Setting showSaveAnimation = true for Quote")
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        showSaveAnimation = true
                     }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            print("🎯 SAVE ANIMATION: Hiding save animation for Quote")
+                            showSaveAnimation = false
+                            savedItemType = nil
+                        }
+                    }
+                    logger.info("💾 Quote detected and saved: \(item.text.prefix(50))...")
+                } else {
+                    logger.warning("⚠️ Failed to save quote: \(item.text.prefix(50))...")
                 }
-                logger.info("💾 Quote detected and saved: \(item.text.prefix(50))...")
             case .note, .thought:
                 // Save note to SwiftData with session relationship
                 saveNoteToSwiftData(item)
@@ -1073,11 +1131,32 @@ struct AmbientModeView: View {
                             bookContext: currentBookContext,
                             messageType: .text
                         )
+                        // Check if this is the first response BEFORE adding it
+                        let isFirstResponse = messages.filter { !$0.isUser }.count == 0
+                        
                         messages.append(aiMessage)
                         
-                        // Auto-expand new question and close others
-                        expandedMessageIds.removeAll() // Close all previous
-                        expandedMessageIds.insert(aiMessage.id) // Open new one
+                        // Auto-expand questions strategy:
+                        // If this is the first AI response, keep it expanded
+                        // Otherwise, keep first expanded and expand new one
+                        if isFirstResponse {
+                            // First question - just expand it
+                            expandedMessageIds.insert(aiMessage.id)
+                        } else {
+                            // Subsequent questions - keep first one expanded and open new one
+                            let firstAIResponseId = messages.first(where: { !$0.isUser })?.id
+                            
+                            // Clear all expanded except first
+                            expandedMessageIds.removeAll()
+                            
+                            // Always keep first question expanded
+                            if let firstId = firstAIResponseId {
+                                expandedMessageIds.insert(firstId)
+                            }
+                            
+                            // And expand the new one
+                            expandedMessageIds.insert(aiMessage.id)
+                        }
                         print("✅ Added AI response for question: \(item.text.prefix(30))...")
                     } else {
                         print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
@@ -1099,7 +1178,8 @@ struct AmbientModeView: View {
         }
     }
     
-    private func saveQuoteToSwiftData(_ content: AmbientProcessedContent) {
+    @discardableResult
+    private func saveQuoteToSwiftData(_ content: AmbientProcessedContent) -> CapturedQuote? {
         // Clean the quote text - remove common prefixes
         var quoteText = content.text
         let prefixesToRemove = [
@@ -1162,7 +1242,7 @@ struct AmbientModeView: View {
                     print("✅ Linked existing quote to current session")
                 }
             }
-            return
+            return existingQuotes.first
         }
         
         var bookModel: BookModel? = nil
@@ -1206,8 +1286,10 @@ struct AmbientModeView: View {
             try modelContext.save()
             print("✅ Quote saved to SwiftData with session: \(quoteText.prefix(50))...")
             HapticManager.shared.success()
+            return capturedQuote
         } catch {
             print("❌ Failed to save quote: \(error)")
+            return nil
         }
     }
     
@@ -1821,6 +1903,17 @@ struct AmbientModeView: View {
         withAnimation(.easeInOut(duration: 0.5)) {
             currentBookContext = book
             showBookCover = true
+            
+            // Update the current session with the detected book
+            if let session = currentSession {
+                session.bookModel = BookModel(from: book)
+                do {
+                    try modelContext.save()
+                    print("📚 Updated session with detected book: \(book.title)")
+                } catch {
+                    print("❌ Failed to update session with detected book: \(error)")
+                }
+            }
         }
         
         // Start timer to hide book cover after 10 seconds
@@ -2083,6 +2176,17 @@ struct AmbientModeView: View {
                                 currentBookContext = book
                                 showingBookStrip = false
                                 lastDetectedBookId = book.localId
+                                
+                                // Update the current session with the selected book
+                                if let session = currentSession {
+                                    session.bookModel = BookModel(from: book)
+                                    do {
+                                        try modelContext.save()
+                                        print("📚 Updated session with book: \(book.title)")
+                                    } catch {
+                                        print("❌ Failed to update session with book: \(error)")
+                                    }
+                                }
                             }
                             Task {
                                 await extractColorsForBook(book)
@@ -2114,6 +2218,56 @@ struct AmbientModeView: View {
 }
 
 // MARK: - Ambient Message Thread View (Minimal Style)
+// MARK: - Quote View for Live Ambient Mode
+struct AmbientQuoteView: View {
+    let quote: CapturedQuote
+    let index: Int
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Text(String(format: "%02d", index + 1))
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 24)
+                .padding(.top, 2)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                // Quote icon
+                HStack(spacing: 6) {
+                    Image(systemName: "quote.opening")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                    
+                    Text("QUOTE")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .tracking(1.2)
+                    
+                    Spacer()
+                }
+                
+                // Quote text with elegant typography
+                Text(quote.text)
+                    .font(.custom("Georgia", size: 16))
+                    .italic()
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineSpacing(5)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Author attribution if available
+                if let author = quote.author {
+                    Text("— \(author)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .padding(.top, 4)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 16)
+    }
+}
+
 struct AmbientMessageThreadView: View {
     let message: UnifiedChatMessage
     let index: Int
@@ -2193,5 +2347,50 @@ struct AmbientMessageThreadView: View {
         }
         // Otherwise return the full text as the question
         return (text, "")
+    }
+}
+
+// MARK: - Clean Siri-Style Transcription Bubble
+struct TranscriptionBubble: View {
+    let text: String
+    @State private var displayedText: String = ""
+    @State private var animationIndex: Int = 0
+    
+    var body: some View {
+        HStack {
+            Spacer(minLength: 0)
+            
+            Text(displayedText)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.leading)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(minWidth: displayedText.isEmpty ? 0 : 60)
+                .glassEffect()
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.9), value: displayedText)
+            
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .onAppear {
+            // Smooth character streaming, not word-by-word!
+            Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+                if animationIndex < text.count {
+                    let index = text.index(text.startIndex, offsetBy: animationIndex)
+                    displayedText = String(text[..<text.index(after: index)])
+                    animationIndex += 1
+                } else {
+                    timer.invalidate()
+                }
+            }
+        }
+        .onChange(of: text) { _, newText in
+            displayedText = ""
+            animationIndex = 0
+        }
     }
 }

@@ -16,7 +16,7 @@ struct ChatMessage: Identifiable {
 struct ChatView: View {
     var body: some View {
         NavigationStack {
-            UnifiedChatView()
+            ChatSessionsViewRefined()
         }
     }
 }
