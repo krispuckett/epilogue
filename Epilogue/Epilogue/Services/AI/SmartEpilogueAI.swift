@@ -83,12 +83,19 @@ class SmartEpilogueAI: ObservableObject {
                 Key Information about Lord of the Rings:
                 - Main characters: Frodo Baggins (hobbit, ring-bearer), Sam Gamgee (Frodo's loyal companion), Aragorn/Strider (ranger, true king), Gandalf (wizard), Legolas (elf), Gimli (dwarf), Boromir, Merry, Pippin
                 - Plot: Frodo must destroy the One Ring in Mount Doom to save Middle-earth from Sauron
+                - GANDALF'S TRANSFORMATION:
+                  * Gandalf the Grey falls fighting the Balrog in Moria (Fellowship of the Ring)
+                  * He dies but is sent back by Eru Ilúvatar as Gandalf the White
+                  * Returns in The Two Towers with greater power and authority
+                  * Takes Saruman's place as head of the Istari (wizards)
+                  * This happens IN THE TWO TOWERS, NOT The Silmarillion!
                 - Important Swords:
                   * Sting: Frodo's sword (given by Bilbo, glows blue when orcs are near)
                   * Glamdring: Gandalf's sword (also called Foe-hammer)
                   * Andúril: Aragorn's sword (reforged from Narsil, the sword that cut the Ring from Sauron)
                   * NOT Frodo's sword - Frodo has Sting, not Andúril!
                 - The One Ring: Forged by Sauron, corrupts the bearer, must be destroyed
+                - Key Events: Battle of Helm's Deep, Battle of Pelennor Fields, Battle at the Black Gate
                 - Themes: Good vs evil, friendship, sacrifice, corruption of power, hope against despair
                 """
             } else if book.title.lowercased().contains("the silmarillion") {
@@ -103,17 +110,32 @@ class SmartEpilogueAI: ObservableObject {
             
             instructions = bookInfo + """
             
-            When answering questions:
-            1. ALWAYS assume questions are about \(book.title) unless explicitly stated otherwise
-            2. ALWAYS answer factually - do NOT refuse to answer about book content
-            3. This is NOT about avoiding spoilers - the user is reading this book!
-            4. Provide specific, accurate information about THIS book
-            5. Be direct and helpful - answer what was asked
-            6. Give DETAILED, COMPREHENSIVE answers with context and examples
-            7. Include relevant quotes, character motivations, and themes when applicable
-            8. Connect the answer to broader themes in the book
-            9. If you don't know specific details about \(book.title), say so clearly
-            10. Aim for responses that are at least 2-3 paragraphs when answering substantial questions
+            CRITICAL INSTRUCTIONS FOR ANY BOOK:
+            
+            Context: The user is actively reading '\(book.title)' by \(book.author).
+            They are using Epilogue's ambient mode to ask questions while reading.
+            
+            Core Rules:
+            1. DEFAULT ASSUMPTION: Every question is about '\(book.title)' unless explicitly about something else
+            2. NEVER REFUSE: Do not say "I can't assist" or "I cannot help" - always provide useful information
+            3. NO SPOILER CONCERNS: The user is currently reading this book - answer everything
+            4. STAY IN CONTEXT: Focus on THIS specific book, not other books in a series unless asked
+            
+            Response Guidelines:
+            - If you know the answer from the book, provide it with confidence
+            - If you're uncertain, say "Based on what I recall from '\(book.title)'..." 
+            - If genuinely unsure, say "I don't have that specific detail about '\(book.title)'"
+            - NEVER make up facts or claim events happen in different books
+            - Draw from your general knowledge about '\(book.title)' even without specific context
+            
+            Answer Structure:
+            - Start with a direct answer to the question
+            - Provide supporting details and context
+            - Connect to themes or character development when relevant
+            - Aim for 2-3 paragraphs for substantial questions
+            
+            Remember: You are a knowledgeable reading companion for '\(book.title)'.
+            The user trusts you to enhance their reading experience with accurate information.
             """
         }
         
@@ -194,35 +216,20 @@ class SmartEpilogueAI: ObservableObject {
             return true
         }
         
-        // ULTRA-FAST book-specific detection - check these FIRST
-        // Questions about plot, characters, or story elements should ALWAYS use local
-        if questionLower.contains("sword") || 
-           questionLower.contains("character") ||
-           questionLower.contains("happen") ||
-           questionLower.contains("plot") ||
-           questionLower.contains("die") ||
-           questionLower.contains("end") ||
-           questionLower.starts(with: "who") ||
-           questionLower.starts(with: "what") ||
-           questionLower.starts(with: "when does") ||
-           questionLower.starts(with: "where") ||
-           questionLower.starts(with: "why") ||
-           questionLower.starts(with: "how") {
-            print("⚡ FAST: Book-specific question detected - using local Foundation Models")
-            return false
-        }
+        // SYSTEMATIC APPROACH FOR ANY BOOK
         
-        // Keywords that DEFINITELY need external knowledge
+        // 1. Keywords that DEFINITELY need external/current knowledge
         let externalKeywords = [
-            "latest", "current", "recent", "news", "2024", "2025",
-            "real world", "actually happened", "true story",
-            "author died", "author born", "author's life",
-            "movie", "film", "tv show", "adaptation",
-            "published", "sales", "awards", "reviews",
-            "other books", "similar books", "compare"
+            "latest", "current", "recent", "news", "2024", "2025", "2026",
+            "real world", "actually happened", "true story", "historical",
+            "author died", "author born", "author's life", "biography",
+            "movie", "film", "tv show", "adaptation", "netflix", "amazon",
+            "published", "sales", "awards", "reviews", "bestseller",
+            "other books", "similar books", "compare", "recommend",
+            "sequel", "prequel", "next book", "series order"
         ]
         
-        // Fast check for external needs
+        // Check for external needs FIRST
         for keyword in externalKeywords {
             if questionLower.contains(keyword) {
                 print("🌐 External knowledge required for: \(keyword)")
@@ -230,8 +237,37 @@ class SmartEpilogueAI: ObservableObject {
             }
         }
         
-        // Default: Use local for book context questions
-        print("📚 Using local Foundation Models for book context")
+        // 2. Question patterns that are ALWAYS about the book content
+        let bookQuestionPatterns = [
+            "who is", "who are", "who was", "who were",
+            "what is", "what are", "what was", "what were",
+            "what happens", "what happened",
+            "when does", "when did", "when is", "when was",
+            "where does", "where did", "where is", "where was",
+            "why does", "why did", "why is", "why was",
+            "how does", "how did", "how is", "how was",
+            "tell me about", "explain", "describe",
+            "dies", "died", "death", "kill", "killed",
+            "marry", "married", "marriage",
+            "fight", "battle", "war",
+            "love", "romance", "relationship",
+            "power", "magic", "ability",
+            "chapter", "part", "book", "volume",
+            "beginning", "middle", "end", "ending",
+            "main", "protagonist", "antagonist", "villain", "hero",
+            "theme", "symbol", "meaning", "represents"
+        ]
+        
+        // Check if it matches book question patterns
+        for pattern in bookQuestionPatterns {
+            if questionLower.contains(pattern) {
+                print("📚 Book content question detected: '\(pattern)' - using local AI")
+                return false // Use local AI with book context
+            }
+        }
+        
+        // 3. Default: Assume it's about the book (when in reading mode)
+        print("📚 Default: Treating as book question - using local AI")
         return false
     }
     
@@ -317,33 +353,39 @@ class SmartEpilogueAI: ObservableObject {
         // For ANY question when we have a book context, make it explicit
         let questionLower = question.lowercased()
         
-        // Questions that definitely need book context
-        let needsContext = questionLower.starts(with: "who") ||
-                          questionLower.starts(with: "what") ||
-                          questionLower.starts(with: "when") ||
-                          questionLower.starts(with: "where") ||
-                          questionLower.starts(with: "why") ||
-                          questionLower.starts(with: "how") ||
-                          questionLower.contains("character") ||
-                          questionLower.contains("plot") ||
-                          questionLower.contains("theme") ||
-                          questionLower.contains("ending") ||
-                          questionLower.contains("chapter") ||
-                          questionLower.contains("happen")
+        // Questions that are clearly NOT about the book
+        let generalQuestions = [
+            "what time is it",
+            "what's the weather",
+            "what day is it",
+            "how are you",
+            "hello",
+            "hi"
+        ]
         
-        if needsContext {
-            // Make it VERY explicit what book we're discussing
-            if questionLower == "who is the main character" || questionLower == "who is the main character?" {
-                return "Who is the main character in the book '\(book.title)' by \(book.author)?"
-            } else if questionLower.starts(with: "who is") || questionLower.starts(with: "who are") {
-                return "In the book '\(book.title)' by \(book.author): \(question)"
-            } else {
-                return "Regarding the book '\(book.title)' by \(book.author): \(question)"
+        // Check if it's a general question
+        for general in generalQuestions {
+            if questionLower == general || questionLower == general + "?" {
+                return question // Don't add book context
             }
         }
         
-        // For other questions, still add context but more subtly
-        return question
+        // For EVERYTHING ELSE, assume it's about the book
+        // This is the key insight - when reading a book, 99% of questions are about that book
+        
+        // Add clear book context to help the AI understand
+        if questionLower.starts(with: "who is") || 
+           questionLower.starts(with: "what is") ||
+           questionLower.starts(with: "what happens") ||
+           questionLower.starts(with: "how does") ||
+           questionLower.starts(with: "why does") ||
+           questionLower.starts(with: "when does") ||
+           questionLower.starts(with: "where does") {
+            return "In the book '\(book.title)' by \(book.author), \(question)"
+        }
+        
+        // For other questions, still make context clear
+        return "Regarding '\(book.title)': \(question)"
     }
     
     // MARK: - Stream Response

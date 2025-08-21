@@ -853,7 +853,7 @@ struct AmbientModeView: View {
                                 }
                         } else {
                             // iOS 26 FLUID TRANSCRIPTION BUBBLE
-                            TranscriptionBubble(text: liveTranscription)
+                            LiveTranscriptionBubble(text: liveTranscription, isDissolving: isWaitingForAIResponse)
                                 .onTapGesture {
                                     // Pause any pending AI processing
                                     debounceTimer?.invalidate()

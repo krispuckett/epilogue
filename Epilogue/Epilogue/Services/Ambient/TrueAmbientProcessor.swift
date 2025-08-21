@@ -141,6 +141,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var activeQuestions: Set<String> = []  // Questions currently being processed
     private var recentQuestions: [(text: String, timestamp: Date)] = []  // Recent questions with timestamps
     private let questionDedupeWindow: TimeInterval = 3.0  // 3 second window for exact duplicates
+    private var evolvingQuestion: (base: String, timestamp: Date)? = nil  // Track evolving questions like "Who is gone" → "Who is Gollum"
     
     private init() {
         setupNotificationObservers()
@@ -218,13 +219,29 @@ public class TrueAmbientProcessor: ObservableObject {
     }
     
     @objc private func handleNaturalReaction(_ notification: Notification) {
-        guard let text = notification.object as? String else { return }
+        // Handle both old format (String) and new format (Dictionary with confidence)
+        var text: String = ""
+        var confidence: Float = 0.9  // Default confidence
         
-        logger.info("📝 Received natural reaction: \(text)")
+        if let textString = notification.object as? String {
+            // Old format - just text
+            text = textString
+        } else if let data = notification.object as? [String: Any],
+                  let textString = data["text"] as? String {
+            // New format - text with confidence
+            text = textString
+            if let conf = data["confidence"] as? Double {
+                confidence = Float(conf)
+            }
+        } else {
+            return
+        }
+        
+        logger.info("📝 Received natural reaction: \(text) (confidence: \(confidence))")
         
         Task {
-            // Process using the main flow
-            await processDetectedText(text, confidence: 0.9)
+            // Process using the main flow with actual confidence
+            await processDetectedText(text, confidence: confidence)
         }
     }
     
@@ -235,40 +252,139 @@ public class TrueAmbientProcessor: ObservableObject {
             startSession()
         }
         
-        // Use enhanced intent detection FIRST to determine content type
+        // CRITICAL: Don't process low-confidence questions to avoid duplicates
+        // Whisper often mis-transcribes then corrects itself
+        let lowerTextCheck = text.lowercased()
+        let isQuestion = lowerTextCheck.contains("?") || 
+                        lowerTextCheck.starts(with: "who") ||
+                        lowerTextCheck.starts(with: "what") ||
+                        lowerTextCheck.starts(with: "where") ||
+                        lowerTextCheck.starts(with: "when") ||
+                        lowerTextCheck.starts(with: "why") ||
+                        lowerTextCheck.starts(with: "how")
+        
+        if isQuestion && confidence < 0.5 {
+            logger.warning("⚠️ Ignoring low-confidence question (conf: \(confidence)): \(text)")
+            return // Wait for higher confidence version
+        }
+        
+        // Apply book-specific autocorrection
         let bookContext = AmbientBookDetector.shared.detectedBook
+        let correctedText = applyBookContextCorrection(text, bookContext: bookContext)
+        
+        // Use enhanced intent detection FIRST to determine content type
         let enhancedIntent = intentDetector.detectIntent(
-            from: text,
+            from: correctedText,
             bookTitle: bookContext?.title,
             bookAuthor: bookContext?.author
         )
         var intent = mapEnhancedToLegacyIntent(enhancedIntent)
         
         // OVERRIDE: If text contains a question, treat it as a question!
-        let lowerText = text.lowercased()
-        if (lowerText.contains("who is") || lowerText.contains("what is") || 
-            lowerText.contains("when") || lowerText.contains("where") ||
-            lowerText.contains("why") || lowerText.contains("how") ||
-            lowerText.contains("?")) && intent != .question {
-            logger.info("🔄 Overriding intent to question due to question keywords")
+        let lowerText = correctedText.lowercased()
+        // IMPROVED: More precise question detection to avoid false positives
+        // Only override to question if it starts with question words OR ends with ?
+        let startsWithQuestionWord = lowerText.hasPrefix("who ") || lowerText.hasPrefix("what ") ||
+                                     lowerText.hasPrefix("when ") || lowerText.hasPrefix("where ") ||
+                                     lowerText.hasPrefix("why ") || lowerText.hasPrefix("how ") ||
+                                     lowerText.hasPrefix("is ") || lowerText.hasPrefix("are ") ||
+                                     lowerText.hasPrefix("can ") || lowerText.hasPrefix("could ") ||
+                                     lowerText.hasPrefix("should ") || lowerText.hasPrefix("would ") ||
+                                     lowerText.hasPrefix("do ") || lowerText.hasPrefix("does ")
+        
+        // Check for explicit question indicators
+        let hasQuestionMark = correctedText.contains("?")
+        let hasQuestionPhrase = lowerText.contains("who is") || lowerText.contains("what is") ||
+                                lowerText.contains("what does") || lowerText.contains("how does") ||
+                                lowerText.contains("why does") || lowerText.contains("where is")
+        
+        // Don't override quotes that mention "I love this quote" or similar
+        let isExplicitQuote = lowerText.contains("quote") || lowerText.contains("passage") ||
+                             lowerText.contains("excerpt") || lowerText.contains("line")
+        
+        if (startsWithQuestionWord || hasQuestionMark || hasQuestionPhrase) && 
+           intent != .question && !isExplicitQuote {
+            logger.info("🔄 Overriding intent to question due to question indicators")
             intent = .question
+        } else if isExplicitQuote && intent == .question {
+            // If it explicitly mentions a quote but was detected as question, fix it
+            logger.info("🔄 Correcting question to quote due to explicit quote mention")
+            intent = .quote
         }
         
         // PROFESSIONAL DEDUPLICATION - Like ChatGPT/Perplexity/Anthropic
         if intent == .question {
             // Step 1: Normalize the question text
-            let normalizedText = text.lowercased()
+            let normalizedText = correctedText.lowercased()
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             
+            // CRITICAL: Detect evolving questions (e.g., "Who is the leader of God" → "Who is the leader of Gondor")
+            // This happens when Whisper corrects itself mid-transcription
+            let now = Date()
+            if let evolving = evolvingQuestion {
+                let timeSinceBase = now.timeIntervalSince(evolving.timestamp)
+                
+                // If within 5 seconds (longer window for corrections)
+                if timeSinceBase < 5.0 {
+                    // Use fuzzy matching to detect corrections
+                    let baseWords = evolving.base.split(separator: " ").map { String($0) }
+                    let newWords = normalizedText.split(separator: " ").map { String($0) }
+                    
+                    // Calculate similarity - if most words match, it's likely a correction
+                    let matchingWords = baseWords.filter { baseWord in
+                        newWords.contains { newWord in
+                            // Allow for small spelling differences
+                            baseWord == newWord || 
+                            (baseWord.count > 3 && newWord.count > 3 && 
+                             baseWord.prefix(3) == newWord.prefix(3))
+                        }
+                    }
+                    
+                    let similarity = Double(matchingWords.count) / Double(max(baseWords.count, newWords.count))
+                    
+                    // If 60% similar or starts with same question word, it's likely a correction
+                    if similarity > 0.6 || 
+                       (evolving.base.hasPrefix("who is") && normalizedText.hasPrefix("who is")) ||
+                       (evolving.base.hasPrefix("what is") && normalizedText.hasPrefix("what is")) ||
+                       (evolving.base.hasPrefix("where is") && normalizedText.hasPrefix("where is")) ||
+                       (evolving.base.hasPrefix("when is") && normalizedText.hasPrefix("when is")) ||
+                       (evolving.base.hasPrefix("why is") && normalizedText.hasPrefix("why is")) ||
+                       (evolving.base.hasPrefix("how is") && normalizedText.hasPrefix("how is")) {
+                        
+                        // This is likely a correction - remove the old question
+                        logger.info("🔄 Detected question evolution: '\(evolving.base)' → '\(normalizedText)'")
+                        
+                        // Remove from active questions
+                        activeQuestions.remove(evolving.base)
+                        
+                        // Remove from UI if present - search more broadly
+                        await MainActor.run {
+                            // Look for any question that starts similarly
+                            if let index = self.detectedContent.firstIndex(where: { content in
+                                content.type == .question && 
+                                (content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == evolving.base ||
+                                 content.text.lowercased().hasPrefix(evolving.base.prefix(20)))
+                            }) {
+                                self.detectedContent.remove(at: index)
+                                logger.info("✅ Removed evolving question from UI")
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Track this as potential base for evolution
+            evolvingQuestion = (base: normalizedText, timestamp: now)
+            
             // Step 2: Check if we're actively processing this exact question
             if activeQuestions.contains(normalizedText) {
-                logger.warning("🔒 Question already being processed, ignoring duplicate: \(text.prefix(30))...")
+                logger.warning("🔒 Question already being processed, ignoring duplicate: \(correctedText.prefix(30))...")
                 return
             }
             
             // Step 3: Check recent questions within time window (3 seconds)
-            let now = Date()
+            // (now already declared above for evolution detection)
             let cutoff = now.addingTimeInterval(-questionDedupeWindow)
             
             // Clean old entries from recent questions
@@ -276,7 +392,7 @@ public class TrueAmbientProcessor: ObservableObject {
             
             // Check if this exact question was asked recently
             if recentQuestions.contains(where: { $0.text == normalizedText }) {
-                logger.warning("⏱️ Same question within \(self.questionDedupeWindow)s window, ignoring: \(text.prefix(30))...")
+                logger.warning("⏱️ Same question within \(self.questionDedupeWindow)s window, ignoring: \(correctedText.prefix(30))...")
                 return
             }
             
@@ -289,7 +405,7 @@ public class TrueAmbientProcessor: ObservableObject {
             }
             
             if alreadyInUI {
-                logger.warning("📱 Question already in UI, ignoring duplicate: \(text.prefix(30))...")
+                logger.warning("📱 Question already in UI, ignoring duplicate: \(correctedText.prefix(30))...")
                 return
             }
             
@@ -305,32 +421,32 @@ public class TrueAmbientProcessor: ObservableObject {
             // For non-questions, use general deduplication
             // Exception: Allow quotes to be processed even if duplicate (user might want to save again)
             let isQuote = if case .quote = enhancedIntent.primary { true } else { false }
-            if !isQuote && deduplicator.isDuplicate(text) {
-                logger.warning("⚠️ Already processed this text, skipping: \(text.prefix(30))...")
+            if !isQuote && deduplicator.isDuplicate(correctedText) {
+                logger.warning("⚠️ Already processed this text, skipping: \(correctedText.prefix(30))...")
                 return
             }
         }
         
-        logger.info("🎯 Processing detected text: \(text)")
+        logger.info("🎯 Processing detected text: \(correctedText)")
         
         // Add to conversation memory
         let memory = conversationMemory.addMemory(
-            text: text,
+            text: correctedText,
             intent: enhancedIntent,
             bookTitle: bookContext?.title,
             bookAuthor: bookContext?.author
         )
         
         // Update state
-        currentState = .processing(intent, text)
+        currentState = .processing(intent, correctedText)
         
         // Process based on intent
         switch intent {
         case .question:
-            logger.info("❓ Question detected: \(text)")
+            logger.info("❓ Question detected: \(correctedText)")
             
             // Check if this is an evolution of an existing question
-            let normalizedNew = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalizedNew = correctedText.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             
             // Find if there's an existing question that this might be evolving from
             let existingIndex = await MainActor.run {
@@ -383,7 +499,7 @@ public class TrueAmbientProcessor: ObservableObject {
                     }
                     
                     if stillLatest {
-                        await self.processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
+                        await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
                     }
                     
                     // Remove from active questions
@@ -435,7 +551,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 // Process the question
                 Task {
                     try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 second delay - allow transcription to complete
-                    await self.processQuestionWithEnhancedContext(text, confidence: confidence, enhancedIntent: enhancedIntent)
+                    await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
                     
                     // Remove from active questions
                     let normalizedText = text.lowercased()
@@ -614,6 +730,101 @@ public class TrueAmbientProcessor: ObservableObject {
         logger.info("🧹 Cleared Neural Engine cache")
     }
     
+    // MARK: - Book Context Autocorrection
+    
+    private func applyBookContextCorrection(_ text: String, bookContext: Book?) -> String {
+        guard let book = bookContext else { return text }
+        
+        // LOTR-specific character name corrections
+        if book.title.lowercased().contains("lord of the rings") || 
+           book.title.lowercased().contains("hobbit") ||
+           book.title.lowercased().contains("silmarillion") {
+            
+            var corrected = text
+            
+            // Common misrecognitions -> correct names
+            let corrections = [
+                // Samwise corrections
+                "Samwise Genji": "Samwise Gamgee",
+                "Sam Wise Genji": "Samwise Gamgee",
+                "Sam Genji": "Sam Gamgee",
+                "Samwise Ganji": "Samwise Gamgee",
+                "Samwise Gandhi": "Samwise Gamgee",
+                
+                // Gandalf corrections
+                "Dan Dolph": "Gandalf",
+                "Gan Dolph": "Gandalf",
+                "Gandoff": "Gandalf",
+                
+                // Frodo corrections
+                "Froto": "Frodo",
+                "Frobo": "Frodo",
+                "Photo": "Frodo",
+                
+                // Aragorn corrections
+                "Eric Horn": "Aragorn",
+                "Air A Gorn": "Aragorn",
+                "Aragon": "Aragorn",
+                
+                // Legolas corrections
+                "Lego Las": "Legolas",
+                "Legless": "Legolas",
+                
+                // Gimli corrections
+                "Gimley": "Gimli",
+                "Gimbly": "Gimli",
+                
+                // Boromir corrections
+                "Bore A Mir": "Boromir",
+                "Boramir": "Boromir",
+                
+                // Sauron corrections
+                "Soron": "Sauron",
+                "Soren": "Sauron",
+                
+                // Saruman corrections
+                "Sarah Man": "Saruman",
+                "Saru Mon": "Saruman",
+                
+                // Gollum corrections
+                "Golem": "Gollum",
+                "Galom": "Gollum",
+                
+                // Place names
+                "More Door": "Mordor",
+                "Gondor": "Gondor",  // Often correct but just in case
+                "Rohan": "Rohan",
+                "The Shire": "the Shire",
+                "Eisengard": "Isengard",
+                "Rivendale": "Rivendell",
+                "River Dell": "Rivendell"
+            ]
+            
+            // Apply corrections (case-insensitive)
+            for (wrong, right) in corrections {
+                let pattern = "\\b\(NSRegularExpression.escapedPattern(for: wrong))\\b"
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                    corrected = regex.stringByReplacingMatches(
+                        in: corrected,
+                        options: [],
+                        range: NSRange(corrected.startIndex..., in: corrected),
+                        withTemplate: right
+                    )
+                }
+            }
+            
+            if corrected != text {
+                logger.info("📚 Applied LOTR autocorrection: '\(text)' → '\(corrected)'")
+            }
+            
+            return corrected
+        }
+        
+        // Add more book-specific corrections here as needed
+        
+        return text
+    }
+    
     // MARK: - Session Management
     
     public func startSession() {
@@ -623,6 +834,7 @@ public class TrueAmbientProcessor: ObservableObject {
         deduplicator.clearHistory() // Clear deduplication history
         activeQuestions.removeAll()  // Clear active questions tracking
         recentQuestions.removeAll()  // Clear recent questions
+        evolvingQuestion = nil       // Clear evolving question tracker
         currentTranscript = ""
         currentBook = AmbientBookDetector.shared.detectedBook
         sessionStartTime = Date()

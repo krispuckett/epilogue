@@ -486,6 +486,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             }
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
+            // Remove any existing tap before installing new one
+            inputNode.removeTap(onBus: 0)
+            
             // Install tap for audio analysis
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                 guard let self = self else { return }
@@ -1062,10 +1065,10 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         logger.info("Processing natural reaction: '\(text)'")
         
-        // Post reaction for AI processing
+        // Post reaction for AI processing with confidence
         NotificationCenter.default.post(
             name: Notification.Name("NaturalReactionDetected"),
-            object: text
+            object: ["text": text, "confidence": self.confidenceScore]
         )
     }
     

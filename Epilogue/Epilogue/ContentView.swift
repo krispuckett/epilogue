@@ -283,7 +283,7 @@ struct ContentView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 // Enhanced Quick Actions Bar with advanced gestures
-                if selectedTab != 2 && !showCommandInput && !notesViewModel.isEditingNote {
+                if !showCommandInput && !notesViewModel.isEditingNote {
                     EnhancedQuickActionsBar()
                         .environmentObject(libraryViewModel)
                         .environmentObject(notesViewModel)
