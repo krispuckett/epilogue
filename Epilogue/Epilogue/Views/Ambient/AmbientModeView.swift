@@ -8,6 +8,201 @@ import PhotosUI
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
+// MARK: - Siri Style Transcription with Character-by-Character Blur Animation
+struct SiriStyleTranscription: View {
+    let currentText: String
+    let isDissolving: Bool // New parameter for fade-out state
+    
+    @State private var visibleText: String = ""
+    @State private var previousText: String = ""
+    @State private var revealedCharacterCount: Int = 0
+    @State private var animationTimer: Timer?
+    
+    private let maxCharacters = 80 // About 2-3 lines worth
+    private let characterDelay: TimeInterval = 0.04 // 40ms between characters
+    
+    // Ethereal dissolve effect properties
+    private var dissolveOpacity: Double {
+        isDissolving ? 0.0 : 1.0
+    }
+    
+    private var dissolveBlur: Double {
+        isDissolving ? 15.0 : 0.0
+    }
+    
+    private var dissolveScale: CGFloat {
+        isDissolving ? 0.95 : 1.0
+    }
+    
+    private var dissolveOffset: CGFloat {
+        isDissolving ? -10 : 0
+    }
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            // Fading out previous line
+            if !previousText.isEmpty {
+                Text(previousText)
+                    .font(.system(size: 19, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.3))
+                    .multilineTextAlignment(.center)
+                    .blur(radius: 2)
+                    .transition(.asymmetric(
+                        insertion: .opacity,
+                        removal: .opacity.combined(with: .move(edge: .top))
+                    ))
+            }
+            
+            // Current visible text with ethereal character animation
+            if !visibleText.isEmpty {
+                ZStack {
+                    // Full text for layout
+                    Text(visibleText)
+                        .font(.system(size: 19, weight: .medium, design: .rounded))
+                        .foregroundColor(.clear)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                    
+                    // Animated characters overlay
+                    HStack(spacing: 0) {
+                        ForEach(Array(visibleText.enumerated()), id: \.offset) { index, character in
+                            Text(String(character))
+                                .font(.system(size: 19, weight: .medium, design: .rounded))
+                                .foregroundColor(.white)
+                                .opacity(index < revealedCharacterCount ? 1.0 : 0.0)
+                                .blur(radius: index < revealedCharacterCount ? 0 : 8)
+                                .animation(
+                                    .easeOut(duration: 0.3)
+                                    .delay(Double(index) * characterDelay),
+                                    value: revealedCharacterCount
+                                )
+                        }
+                    }
+                }
+                .multilineTextAlignment(.center)
+                // Apply ethereal dissolve effect
+                .opacity(dissolveOpacity)
+                .blur(radius: dissolveBlur)
+                .scaleEffect(dissolveScale)
+                .offset(y: dissolveOffset)
+                .animation(.easeOut(duration: 0.8), value: isDissolving)
+            }
+        }
+        .frame(maxWidth: UIScreen.main.bounds.width - 80)
+        .frame(minHeight: 60, maxHeight: 80) // FIXED HEIGHT
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .glassEffect()
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .onChange(of: currentText) { _, newText in
+            updateVisibleText(newText)
+        }
+        .onAppear {
+            if !currentText.isEmpty {
+                updateVisibleText(currentText)
+            }
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+        }
+    }
+    
+    private func updateVisibleText(_ newText: String) {
+        // Cancel existing animation
+        animationTimer?.invalidate()
+        
+        // Handle overflow
+        let textToDisplay: String
+        if newText.count > maxCharacters {
+            // Move old text up
+            withAnimation(.easeOut(duration: 0.3)) {
+                previousText = String(visibleText.prefix(40))
+            }
+            // Show only recent text
+            textToDisplay = "..." + String(newText.suffix(maxCharacters - 3))
+        } else {
+            withAnimation(.easeOut(duration: 0.3)) {
+                previousText = ""
+            }
+            textToDisplay = newText
+        }
+        
+        // Reset for new text
+        revealedCharacterCount = 0
+        visibleText = textToDisplay
+        
+        // Start character revelation animation
+        animateCharacters()
+    }
+    
+    private func animateCharacters() {
+        // Reset revealed count
+        revealedCharacterCount = 0
+        
+        // Gradually reveal characters
+        animationTimer = Timer.scheduledTimer(withTimeInterval: characterDelay, repeats: true) { timer in
+            if revealedCharacterCount < visibleText.count {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    revealedCharacterCount += 1
+                }
+            } else {
+                timer.invalidate()
+            }
+        }
+    }
+}
+
+// MARK: - Clean Siri-Style Transcription Bubble
+struct TranscriptionBubble: View {
+    let text: String
+    @State private var displayedText: String = ""
+    @State private var animationTimer: Timer?
+    
+    var body: some View {
+        HStack {
+            Spacer(minLength: 0)
+            
+            Text(displayedText.isEmpty ? text : displayedText) // Fallback to show text immediately
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(minWidth: 60)
+                .glassEffect()
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.9), value: displayedText)
+            
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .onAppear {
+            displayedText = text // Show text immediately
+            animateText()
+        }
+        .onChange(of: text) { oldValue, newText in
+            animationTimer?.invalidate()
+            displayedText = newText // Show new text immediately
+            animateText()
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+        }
+    }
+    
+    private func animateText() {
+        // Simple fade animation instead of character-by-character
+        guard !text.isEmpty else { return }
+        
+        // Just show the text with a smooth animation
+        withAnimation(.easeInOut(duration: 0.3)) {
+            displayedText = text
+        }
+    }
+}
+
 // MARK: - Fixed Ambient Mode View (Keeping Original Gradients!)
 struct AmbientModeView: View {
     @StateObject private var processor = TrueAmbientProcessor.shared
@@ -45,6 +240,7 @@ struct AmbientModeView: View {
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
     @State private var showLiveTranscription = true
+    @State private var isTranscriptionDissolving = false
     @State private var currentSession: AmbientSession?
     @State private var showingSessionSummary = false
     @State private var sessionStartTime: Date?
@@ -52,6 +248,7 @@ struct AmbientModeView: View {
     @State private var editableTranscription = ""
     @FocusState private var isTranscriptionFocused: Bool
     @State private var isWaitingForAIResponse = false
+    @State private var shouldCollapseThinking = false
     @State private var pendingQuestion: String?
     @State private var lastProcessedCount = 0
     @State private var debounceTimer: Timer?
@@ -59,6 +256,12 @@ struct AmbientModeView: View {
     // New keyboard input states
     @State private var inputMode: AmbientInputMode = .listening
     @State private var keyboardText = ""
+    @State private var placeholderBlur: Double = 0
+    @State private var containerBlur: Double = 0
+    @State private var textFieldBlur: Double = 0
+    @State private var submitBlurWave: Double = 0
+    @State private var lastCharacterCount: Int = 0
+    @State private var breathingTimer: Timer?
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
     
@@ -217,6 +420,7 @@ struct AmbientModeView: View {
         .onDisappear {
             bookCoverTimer?.invalidate()
             transcriptionFadeTimer?.invalidate()
+            breathingTimer?.invalidate()
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $capturedImage)
@@ -262,6 +466,7 @@ struct AmbientModeView: View {
             if !cleanedText.isEmpty {
                 withAnimation(.easeIn(duration: 0.2)) {
                     showLiveTranscription = true
+                    isTranscriptionDissolving = false // Reset dissolve state for new text
                 }
                 
                 // Cancel existing timer
@@ -294,10 +499,28 @@ struct AmbientModeView: View {
                 // Use shorter fade time for contextual mentions (1.5s) vs normal content (5s)
                 let fadeDelay = (isBookMention || isProgressUpdate) ? 1.5 : 5.0
                 
-                // Start timer for fade out
+                // Start timer for fade out with ethereal dissolve effect
                 transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: fadeDelay, repeats: false) { _ in
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        showLiveTranscription = false
+                    // Check for accessibility setting
+                    let reduceMotion = UIAccessibility.isReduceMotionEnabled
+                    
+                    if reduceMotion {
+                        // Simple opacity fade for accessibility
+                        withAnimation(.easeOut(duration: 0.5)) {
+                            showLiveTranscription = false
+                        }
+                    } else {
+                        // Ethereal dissolve effect - trigger dissolving state first
+                        withAnimation(.easeOut(duration: 0.8)) {
+                            isTranscriptionDissolving = true
+                        }
+                        
+                        // After dissolve animation completes, hide the view and clear text
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            showLiveTranscription = false
+                            isTranscriptionDissolving = false
+                            liveTranscription = "" // Clear text after animation
+                        }
                     }
                 }
             }
@@ -443,7 +666,7 @@ struct AmbientModeView: View {
                                             index: index,
                                             isExpanded: expandedMessageIds.contains(message.id),
                                             onToggle: {
-                                                withAnimation(.easeInOut(duration: 0.2)) {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                                     if expandedMessageIds.contains(message.id) {
                                                         expandedMessageIds.remove(message.id)
                                                     } else {
@@ -549,15 +772,25 @@ struct AmbientModeView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
                 }
                 
-                // AI thinking indicator - above transcription
+                // Simple AI thinking indicator
                 if isWaitingForAIResponse {
-                    SubtleLiquidThinking(bookColor: adaptiveUIColor)
-                        .scaleEffect(0.6) // Proper size
-                        .padding(.bottom, 12)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 1.1).combined(with: .opacity)
-                        ))
+                    HStack(spacing: 8) {
+                        LiquidGlassThinkingIndicator(color: adaptiveUIColor)
+                            .scaleEffect(0.8)
+                        
+                        Text("Thinking...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect()
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.bottom, 12)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
                 }
                 
                 // Live transcription - glass container with proper multiline
@@ -604,6 +837,7 @@ struct AmbientModeView: View {
                                         )
                                         messages.append(userMessage)
                                         
+                                        shouldCollapseThinking = false  // Reset collapse state
                                         isWaitingForAIResponse = true
                                         pendingQuestion = finalText
                                         
@@ -630,7 +864,12 @@ struct AmbientModeView: View {
                                     
                                     // Clear any pending questions
                                     if isWaitingForAIResponse {
-                                        isWaitingForAIResponse = false
+                                        // Trigger collapse animation before hiding
+                                        shouldCollapseThinking = true
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            isWaitingForAIResponse = false
+                                            shouldCollapseThinking = false
+                                        }
                                         pendingQuestion = nil
                                     }
                                 }
@@ -652,7 +891,7 @@ struct AmbientModeView: View {
                     
                     // Single morphing container that expands/contracts
                     ZStack {
-                        // Morphing background - this IS the button and input field
+                        // Morphing background with ambient blur
                         RoundedRectangle(
                             cornerRadius: inputMode == .textInput ? 22 : 32,
                             style: .continuous
@@ -662,15 +901,33 @@ struct AmbientModeView: View {
                             width: inputMode == .textInput ? geometry.size.width - 80 : 64,
                             height: inputMode == .textInput ? 48 : 64  // Match waveform orb height
                         )
+                        .blur(radius: containerBlur) // Ambient container blur
                         .glassEffect() // Glass effect on the morphing container
                         .overlay(
-                            // Glass tint overlay
+                            // Glass tint overlay with submit wave effect
                             RoundedRectangle(
                                 cornerRadius: inputMode == .textInput ? 22 : 32,
                                 style: .continuous
                             )
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(inputMode == .textInput ? 0 : 0.2))
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(inputMode == .textInput ? submitBlurWave * 0.3 : 0.2))
+                            .blur(radius: submitBlurWave)
+                            .scaleEffect(1 + submitBlurWave * 0.05)
                         )
+                        .onAppear {
+                            // Start subtle idle breathing animation
+                            startContainerBreathing()
+                        }
+                        .onChange(of: inputMode) { _, newMode in
+                            if newMode == .textInput {
+                                // Breathing to life animation when switching to text
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                    containerBlur = 3
+                                }
+                                withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
+                                    containerBlur = 0.5
+                                }
+                            }
+                        }
                         
                         // Content that transitions inside the morphing container
                         ZStack {
@@ -720,32 +977,60 @@ struct AmbientModeView: View {
                                     .scaleEffect(inputMode == .textInput ? 1 : 0.5)
                                     .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.15), value: inputMode)
                                     
-                                    // Text field
-                                    TextField("", text: $keyboardText, axis: .vertical)
-                                        .placeholder(when: keyboardText.isEmpty) {
+                                    // Enhanced text field with ambient blur
+                                    ZStack(alignment: .leading) {
+                                        // Breathing placeholder
+                                        if keyboardText.isEmpty {
                                             Text("Ask, capture, or type...")
                                                 .foregroundColor(.white.opacity(0.35))
                                                 .font(.system(size: 16))
+                                                .blur(radius: placeholderBlur)
+                                                .onAppear {
+                                                    startPlaceholderBreathing()
+                                                }
                                         }
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(.white)
-                                        .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
-                                        .focused($isKeyboardFocused)
-                                        .lineLimit(1...3)
-                                        .textFieldStyle(.plain)
-                                        .opacity(inputMode == .textInput ? 1 : 0)
-                                        .scaleEffect(inputMode == .textInput ? 1 : 0.8)
-                                        .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.2), value: inputMode)
-                                        .onSubmit {
-                                            if !keyboardText.isEmpty {
-                                                sendTextMessage()
+                                        
+                                        TextField("", text: $keyboardText, axis: .vertical)
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(.white)
+                                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                            .focused($isKeyboardFocused)
+                                            .lineLimit(1...3)
+                                            .textFieldStyle(.plain)
+                                            .blur(radius: textFieldBlur)
+                                            .onChange(of: keyboardText) { oldValue, newValue in
+                                                // Character blur-in effect
+                                                if newValue.count > oldValue.count {
+                                                    withAnimation(.easeOut(duration: 0.2)) {
+                                                        textFieldBlur = 3
+                                                    }
+                                                    withAnimation(.easeOut(duration: 0.2).delay(0.05)) {
+                                                        textFieldBlur = 0
+                                                    }
+                                                }
+                                                lastCharacterCount = newValue.count
                                             }
-                                        }
+                                            .onSubmit {
+                                                if !keyboardText.isEmpty {
+                                                    // Trigger blur wave before sending
+                                                    triggerSubmitBlurWave()
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                        sendTextMessage()
+                                                    }
+                                                }
+                                            }
+                                    }
+                                    .opacity(inputMode == .textInput ? 1 : 0)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.8)
+                                    .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.2), value: inputMode)
                                     
                                     // Send button - amber tinted glass
                                     if !keyboardText.isEmpty {
                                         Button {
-                                            sendTextMessage()
+                                            triggerSubmitBlurWave()
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                sendTextMessage()
+                                            }
                                         } label: {
                                             ZStack {
                                                 Circle()
@@ -949,8 +1234,12 @@ struct AmbientModeView: View {
                 if !processedContentHashes.contains(responseKey) {
                     processedContentHashes.insert(responseKey)
                     
-                    // Hide thinking indicator and show response
-                    isWaitingForAIResponse = false
+                    // Hide thinking indicator and show response with collapse animation
+                    shouldCollapseThinking = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isWaitingForAIResponse = false
+                        shouldCollapseThinking = false
+                    }
                     pendingQuestion = nil
                     
                     // Format and display the response
@@ -1119,8 +1408,9 @@ struct AmbientModeView: View {
                     }
                     
                     if !responseExists {
-                        // Hide thinking indicator when we have a response
+                        // Hide thinking indicator immediately when we have a response
                         isWaitingForAIResponse = false
+                        shouldCollapseThinking = false
                         
                         // Format the response with the question for context
                         let formattedResponse = "**\(item.text)**\n\n\(item.response!)"
@@ -1164,6 +1454,7 @@ struct AmbientModeView: View {
                 } else {
                     // Question detected but no response yet - show thinking indicator
                     pendingQuestion = item.text
+                    shouldCollapseThinking = false  // Reset collapse state
                     isWaitingForAIResponse = true
                     print("💭 Showing thinking indicator for question: \(item.text.prefix(30))...")
                 }
@@ -1581,6 +1872,33 @@ struct AmbientModeView: View {
         }
     }
     
+    // MARK: - Ambient Blur Animations
+    private func startContainerBreathing() {
+        // Subtle idle breathing effect on container
+        breathingTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 3.0)) {
+                containerBlur = containerBlur == 0.5 ? 0 : 0.5
+            }
+        }
+    }
+    
+    private func startPlaceholderBreathing() {
+        // Gentle breathing effect on placeholder text
+        withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+            placeholderBlur = 2
+        }
+    }
+    
+    private func triggerSubmitBlurWave() {
+        // Create outward blur wave effect on submit
+        withAnimation(.easeOut(duration: 0.3)) {
+            submitBlurWave = 15
+        }
+        withAnimation(.easeIn(duration: 0.5).delay(0.3)) {
+            submitBlurWave = 0
+        }
+    }
+    
     private func sendTextMessage() {
         guard !keyboardText.isEmpty else { return }
         
@@ -1609,6 +1927,7 @@ struct AmbientModeView: View {
             saveQuestionToSwiftData(content)
             
             // For questions, show thinking and get AI response
+            shouldCollapseThinking = false  // Reset collapse state
             isWaitingForAIResponse = true
             pendingQuestion = messageText
             
@@ -1770,7 +2089,9 @@ struct AmbientModeView: View {
         
         guard aiService.isConfigured() else {
             await MainActor.run {
+                // Clear thinking indicator immediately
                 isWaitingForAIResponse = false
+                shouldCollapseThinking = false
                 let configMessage = UnifiedChatMessage(
                     content: "Please configure your AI service.",
                     isUser: false,
@@ -1790,7 +2111,11 @@ struct AmbientModeView: View {
             )
             
             await MainActor.run {
-                isWaitingForAIResponse = false  // Clear thinking indicator
+                // Clear thinking indicator immediately
+                isWaitingForAIResponse = false
+                shouldCollapseThinking = false
+                pendingQuestion = nil
+                
                 let aiMessage = UnifiedChatMessage(
                     content: response,
                     isUser: false,
@@ -1816,7 +2141,9 @@ struct AmbientModeView: View {
             }
         } catch {
             await MainActor.run {
-                isWaitingForAIResponse = false  // Clear thinking indicator
+                // Clear thinking indicator immediately  
+                isWaitingForAIResponse = false
+                shouldCollapseThinking = false
                 let errorMessage = UnifiedChatMessage(
                     content: "Sorry, I couldn't process your message.",
                     isUser: false,
@@ -1834,7 +2161,9 @@ struct AmbientModeView: View {
         
         guard aiService.isConfigured() else {
             await MainActor.run {
+                // Clear thinking indicator immediately
                 isWaitingForAIResponse = false
+                shouldCollapseThinking = false
                 pendingQuestion = nil
             }
             return
@@ -1848,7 +2177,9 @@ struct AmbientModeView: View {
             )
             
             await MainActor.run {
+                // Clear thinking indicator immediately
                 isWaitingForAIResponse = false
+                shouldCollapseThinking = false
                 pendingQuestion = nil
                 
                 // Update the processed content with the response
@@ -1867,7 +2198,9 @@ struct AmbientModeView: View {
             }
         } catch {
             await MainActor.run {
+                // Clear thinking indicator immediately
                 isWaitingForAIResponse = false
+                shouldCollapseThinking = false
                 pendingQuestion = nil
                 print("❌ Failed to get AI response for ambient question: \(error)")
             }
@@ -2223,6 +2556,10 @@ struct AmbientQuoteView: View {
     let quote: CapturedQuote
     let index: Int
     
+    @State private var quoteOpacity: Double = 0.3
+    @State private var quoteBlur: Double = 12
+    @State private var quoteScale: CGFloat = 0.96
+    
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Text(String(format: "%02d", index + 1))
@@ -2265,6 +2602,27 @@ struct AmbientQuoteView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 16)
+        .opacity(quoteOpacity)
+        .blur(radius: quoteBlur)
+        .scaleEffect(quoteScale)
+        .onAppear {
+            // Check for reduced motion preference
+            let reduceMotion = UIAccessibility.isReduceMotionEnabled
+            
+            if reduceMotion {
+                // Simple fade for accessibility
+                withAnimation(.easeOut(duration: 0.3)) {
+                    quoteOpacity = 1.0
+                }
+            } else {
+                // Sophisticated blur revelation for quotes
+                withAnimation(.timingCurve(0.215, 0.61, 0.355, 1, duration: 0.5)) {
+                    quoteOpacity = 1.0
+                    quoteBlur = 0
+                    quoteScale = 1.0
+                }
+            }
+        }
     }
 }
 
@@ -2274,9 +2632,54 @@ struct AmbientMessageThreadView: View {
     let isExpanded: Bool
     let onToggle: () -> Void
     
+    @State private var messageOpacity: Double = 0.3
+    @State private var messageBlur: Double = 12
+    @State private var messageScale: CGFloat = 0.96
+    @State private var showThinkingParticles = false
+    
+    // Check if this is the first AI response in the session
+    private var isFirstAIResponse: Bool {
+        // Simplified check - you can make this more robust based on your needs
+        !message.isUser && index < 2
+    }
+    
+    private var animationDelay: Double {
+        if message.isUser {
+            return 0 // User messages appear immediately
+        } else {
+            return isFirstAIResponse ? 0.6 : 0.4 // AI responses have delay
+        }
+    }
+    
+    private var animationDuration: Double {
+        isFirstAIResponse ? 0.8 : 0.6
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Question/response row
+            // Thinking particles for AI messages (before message appears)
+            if !message.isUser && showThinkingParticles {
+                HStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 4, height: 4)
+                            .blur(radius: 1)
+                            .scaleEffect(showThinkingParticles ? 1.2 : 0.8)
+                            .animation(
+                                .easeInOut(duration: 0.6)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.2),
+                                value: showThinkingParticles
+                            )
+                    }
+                }
+                .padding(.leading, 40)
+                .opacity(messageOpacity < 1 ? 1 : 0)
+                .animation(.easeOut(duration: 0.3), value: messageOpacity)
+            }
+            
+            // Question/response row with blur revelation
             HStack(alignment: .center, spacing: 16) {
                 Text(String(format: "%02d", index + 1))
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -2305,13 +2708,43 @@ struct AmbientMessageThreadView: View {
             }
             .padding(.vertical, 16)
             .contentShape(Rectangle())
+            .opacity(messageOpacity)
+            .blur(radius: messageBlur)
+            .scaleEffect(messageScale)
             .onTapGesture {
                 if !message.isUser {
                     onToggle()
                 }
             }
+            .onAppear {
+                // Check for reduced motion preference
+                let reduceMotion = UIAccessibility.isReduceMotionEnabled
+                
+                if reduceMotion {
+                    // Simple fade for accessibility
+                    withAnimation(.easeOut(duration: 0.3).delay(animationDelay)) {
+                        messageOpacity = 1.0
+                    }
+                } else {
+                    // Show thinking particles for AI messages
+                    if !message.isUser {
+                        showThinkingParticles = true
+                    }
+                    
+                    // Sophisticated blur revelation animation
+                    withAnimation(
+                        .timingCurve(0.215, 0.61, 0.355, 1, duration: animationDuration)
+                        .delay(animationDelay)
+                    ) {
+                        messageOpacity = 1.0
+                        messageBlur = 0
+                        messageScale = 1.0
+                        showThinkingParticles = false
+                    }
+                }
+            }
             
-            // Answer (expandable for AI responses)
+            // Answer (expandable for AI responses) with blur transition
             if !message.isUser && isExpanded {
                 let content = extractContent(from: message.content)
                 if !content.answer.isEmpty {
@@ -2326,10 +2759,12 @@ struct AmbientMessageThreadView: View {
                             .lineSpacing(6)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.leading, 40)
-                            .padding(.trailing, 20)  // Add right padding for better spacing
+                            .padding(.trailing, 20)
                             .padding(.vertical, 12)
-                            .padding(.bottom, 4)  // Extra padding at bottom since we removed the line
+                            .padding(.bottom, 4)
                     }
+                    .transition(.etherealAppear
+                    )
                 }
             }
         }
@@ -2350,47 +2785,4 @@ struct AmbientMessageThreadView: View {
     }
 }
 
-// MARK: - Clean Siri-Style Transcription Bubble
-struct TranscriptionBubble: View {
-    let text: String
-    @State private var displayedText: String = ""
-    @State private var animationIndex: Int = 0
-    
-    var body: some View {
-        HStack {
-            Spacer(minLength: 0)
-            
-            Text(displayedText)
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.leading)
-                .lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .frame(minWidth: displayedText.isEmpty ? 0 : 60)
-                .glassEffect()
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.9), value: displayedText)
-            
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 20)
-        .onAppear {
-            // Smooth character streaming, not word-by-word!
-            Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
-                if animationIndex < text.count {
-                    let index = text.index(text.startIndex, offsetBy: animationIndex)
-                    displayedText = String(text[..<text.index(after: index)])
-                    animationIndex += 1
-                } else {
-                    timer.invalidate()
-                }
-            }
-        }
-        .onChange(of: text) { _, newText in
-            displayedText = ""
-            animationIndex = 0
-        }
-    }
-}
+
