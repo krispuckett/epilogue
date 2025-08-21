@@ -8,197 +8,49 @@ import PhotosUI
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
-// MARK: - Siri Style Transcription with Character-by-Character Blur Animation
-struct SiriStyleTranscription: View {
-    let currentText: String
-    let isDissolving: Bool // New parameter for fade-out state
+// MARK: - Scrolling Book Messages for Loading State
+struct ScrollingBookMessages: View {
+    @State private var currentMessageIndex = 0
+    @State private var opacity: Double = 1.0
     
-    @State private var visibleText: String = ""
-    @State private var previousText: String = ""
-    @State private var revealedCharacterCount: Int = 0
-    @State private var animationTimer: Timer?
-    
-    private let maxCharacters = 80 // About 2-3 lines worth
-    private let characterDelay: TimeInterval = 0.04 // 40ms between characters
-    
-    // Ethereal dissolve effect properties
-    private var dissolveOpacity: Double {
-        isDissolving ? 0.0 : 1.0
-    }
-    
-    private var dissolveBlur: Double {
-        isDissolving ? 15.0 : 0.0
-    }
-    
-    private var dissolveScale: CGFloat {
-        isDissolving ? 0.95 : 1.0
-    }
-    
-    private var dissolveOffset: CGFloat {
-        isDissolving ? -10 : 0
-    }
+    let messages = [
+        "Reading all known books",
+        "Consulting the archives",
+        "Searching ancient texts",
+        "Analyzing the narrative",
+        "Cross-referencing chapters",
+        "Decoding the mythology",
+        "Examining character arcs",
+        "Reviewing plot threads",
+        "Studying the lore",
+        "Parsing the chronicles",
+        "Scanning epic tales",
+        "Interpreting the saga",
+        "Unraveling the story"
+    ]
     
     var body: some View {
-        VStack(spacing: 4) {
-            // Fading out previous line
-            if !previousText.isEmpty {
-                Text(previousText)
-                    .font(.system(size: 19, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.3))
-                    .multilineTextAlignment(.center)
-                    .blur(radius: 2)
-                    .transition(.asymmetric(
-                        insertion: .opacity,
-                        removal: .opacity.combined(with: .move(edge: .top))
-                    ))
+        Text(messages[currentMessageIndex])
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(.white.opacity(0.6))
+            .opacity(opacity)
+            .onAppear {
+                startCycling()
             }
-            
-            // Current visible text with ethereal character animation
-            if !visibleText.isEmpty {
-                ZStack {
-                    // Full text for layout
-                    Text(visibleText)
-                        .font(.system(size: 19, weight: .medium, design: .rounded))
-                        .foregroundColor(.clear)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                    
-                    // Animated characters overlay
-                    HStack(spacing: 0) {
-                        ForEach(Array(visibleText.enumerated()), id: \.offset) { index, character in
-                            Text(String(character))
-                                .font(.system(size: 19, weight: .medium, design: .rounded))
-                                .foregroundColor(.white)
-                                .opacity(index < revealedCharacterCount ? 1.0 : 0.0)
-                                .blur(radius: index < revealedCharacterCount ? 0 : 8)
-                                .animation(
-                                    .easeOut(duration: 0.3)
-                                    .delay(Double(index) * characterDelay),
-                                    value: revealedCharacterCount
-                                )
-                        }
-                    }
-                }
-                .multilineTextAlignment(.center)
-                // Apply ethereal dissolve effect
-                .opacity(dissolveOpacity)
-                .blur(radius: dissolveBlur)
-                .scaleEffect(dissolveScale)
-                .offset(y: dissolveOffset)
-                .animation(.easeOut(duration: 0.8), value: isDissolving)
-            }
-        }
-        .frame(maxWidth: UIScreen.main.bounds.width - 80)
-        .frame(minHeight: 60, maxHeight: 80) // FIXED HEIGHT
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .onChange(of: currentText) { _, newText in
-            updateVisibleText(newText)
-        }
-        .onAppear {
-            if !currentText.isEmpty {
-                updateVisibleText(currentText)
-            }
-        }
-        .onDisappear {
-            animationTimer?.invalidate()
-        }
     }
     
-    private func updateVisibleText(_ newText: String) {
-        // Cancel existing animation
-        animationTimer?.invalidate()
-        
-        // Handle overflow
-        let textToDisplay: String
-        if newText.count > maxCharacters {
-            // Move old text up
+    private func startCycling() {
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             withAnimation(.easeOut(duration: 0.3)) {
-                previousText = String(visibleText.prefix(40))
+                opacity = 0
             }
-            // Show only recent text
-            textToDisplay = "..." + String(newText.suffix(maxCharacters - 3))
-        } else {
-            withAnimation(.easeOut(duration: 0.3)) {
-                previousText = ""
-            }
-            textToDisplay = newText
-        }
-        
-        // Reset for new text
-        revealedCharacterCount = 0
-        visibleText = textToDisplay
-        
-        // Start character revelation animation
-        animateCharacters()
-    }
-    
-    private func animateCharacters() {
-        // Reset revealed count
-        revealedCharacterCount = 0
-        
-        // Gradually reveal characters
-        animationTimer = Timer.scheduledTimer(withTimeInterval: characterDelay, repeats: true) { timer in
-            if revealedCharacterCount < visibleText.count {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    revealedCharacterCount += 1
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                currentMessageIndex = (currentMessageIndex + 1) % messages.count
+                withAnimation(.easeIn(duration: 0.3)) {
+                    opacity = 1.0
                 }
-            } else {
-                timer.invalidate()
             }
-        }
-    }
-}
-
-// MARK: - Clean Siri-Style Transcription Bubble
-struct TranscriptionBubble: View {
-    let text: String
-    @State private var displayedText: String = ""
-    @State private var animationTimer: Timer?
-    
-    var body: some View {
-        HStack {
-            Spacer(minLength: 0)
-            
-            Text(displayedText.isEmpty ? text : displayedText) // Fallback to show text immediately
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .frame(minWidth: 60)
-                .glassEffect()
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.9), value: displayedText)
-            
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 20)
-        .onAppear {
-            displayedText = text // Show text immediately
-            animateText()
-        }
-        .onChange(of: text) { oldValue, newText in
-            animationTimer?.invalidate()
-            displayedText = newText // Show new text immediately
-            animateText()
-        }
-        .onDisappear {
-            animationTimer?.invalidate()
-        }
-    }
-    
-    private func animateText() {
-        // Simple fade animation instead of character-by-character
-        guard !text.isEmpty else { return }
-        
-        // Just show the text with a smooth animation
-        withAnimation(.easeInOut(duration: 0.3)) {
-            displayedText = text
         }
     }
 }
@@ -252,6 +104,7 @@ struct AmbientModeView: View {
     @State private var pendingQuestion: String?
     @State private var lastProcessedCount = 0
     @State private var debounceTimer: Timer?
+    @AppStorage("showLiveTranscriptionBubble") private var showTranscriptionBubble = true
     
     // New keyboard input states
     @State private var inputMode: AmbientInputMode = .listening
@@ -305,6 +158,33 @@ struct AmbientModeView: View {
             return palette.adaptiveUIColor
         } else {
             return Color(red: 1.0, green: 0.55, blue: 0.26)
+        }
+    }
+    
+    // MARK: - Simple Live Transcription View
+    private var liveTranscriptionView: some View {
+        VStack {
+            if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
+                HStack {
+                    Spacer()
+                    
+                    // Simple text that just appears
+                    Text(liveTranscription)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: UIScreen.main.bounds.width - 100)
+                        .glassEffect()
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .animation(.easeInOut(duration: 0.3), value: liveTranscription)
+            }
         }
     }
     
@@ -437,95 +317,66 @@ struct AmbientModeView: View {
                 onSave: saveHighlightedQuote
             )
         }
-        .onReceive(voiceManager.$transcribedText) { text in
-            // Only update if actually recording
-            guard isRecording else {
+        .onChange(of: isRecording) { _, newValue in
+            // Clear transcription when recording stops
+            if !newValue {
                 liveTranscription = ""
                 showLiveTranscription = false
                 transcriptionFadeTimer?.invalidate()
+                transcriptionFadeTimer = nil
+                // Also clear the voice manager's text
+                voiceManager.transcribedText = ""
+            }
+        }
+        .onReceive(voiceManager.$transcribedText) { text in
+            // CRITICAL: Only update if actually recording
+            guard isRecording else {
+                // Clear everything when not recording
+                if !liveTranscription.isEmpty || showLiveTranscription {
+                    liveTranscription = ""
+                    showLiveTranscription = false
+                    transcriptionFadeTimer?.invalidate()
+                    transcriptionFadeTimer = nil
+                }
                 return
             }
             
             // Clean transcription - only show new content
             let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // Debug log
+            // Update live transcription only if there's text
             if !cleanedText.isEmpty {
-                print("📝 Live transcription received: \(cleanedText)")
-            }
-            
-            // Don't update transcription if we just detected a book (prevents double showing)
-            if cleanedText.lowercased() == "lord of the rings" && lastDetectedBookId != nil {
-                return
-            }
-            
-            // Update live transcription
-            liveTranscription = cleanedText
-            
-            // Show transcription immediately when new text arrives
-            if !cleanedText.isEmpty {
-                withAnimation(.easeIn(duration: 0.2)) {
-                    showLiveTranscription = true
-                    isTranscriptionDissolving = false // Reset dissolve state for new text
-                }
+                liveTranscription = cleanedText
+                showLiveTranscription = true
                 
-                // Cancel existing timer
+                // Debug log
+                print("📝 Live transcription received: \(cleanedText)")
+            } else {
+                // Empty text means clear everything
+                liveTranscription = ""
+                showLiveTranscription = false
+                transcriptionFadeTimer?.invalidate()
+                transcriptionFadeTimer = nil
+            }
+            
+            // Simple fade timer - no complex logic
+            if !cleanedText.isEmpty {
+                // Cancel any existing timer
                 transcriptionFadeTimer?.invalidate()
                 
-                // Check if this is a book mention or progress update - fade faster
-                let lowercased = cleanedText.lowercased()
-                let isBookMention = lowercased.contains("i'm reading") ||
-                                   lowercased.contains("currently reading") ||
-                                   lowercased.contains("just started") ||
-                                   lowercased.contains("finished reading") ||
-                                   lowercased.contains("reading lord of the rings") ||
-                                   lowercased.contains("reading") && libraryViewModel.books.contains { book in
-                                       let bookWords = book.title.lowercased().split(separator: " ")
-                                       let textWords = lowercased.split(separator: " ")
-                                       // Check if significant portion of book title is mentioned
-                                       let matchCount = bookWords.filter { word in
-                                           textWords.contains(word)
-                                       }.count
-                                       return matchCount >= min(2, bookWords.count)
-                                   }
-                
-                // Also fade faster for progress updates
-                let isProgressUpdate = lowercased.contains("chapter") ||
-                                      lowercased.contains("page") ||
-                                      lowercased.contains("finished") ||
-                                      lowercased.contains("i'm on") ||
-                                      lowercased.contains("just got to")
-                
-                // Use shorter fade time for contextual mentions (1.5s) vs normal content (5s)
-                let fadeDelay = (isBookMention || isProgressUpdate) ? 1.5 : 5.0
-                
-                // Start timer for fade out with ethereal dissolve effect
-                transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: fadeDelay, repeats: false) { _ in
-                    // Check for accessibility setting
-                    let reduceMotion = UIAccessibility.isReduceMotionEnabled
-                    
-                    if reduceMotion {
-                        // Simple opacity fade for accessibility
-                        withAnimation(.easeOut(duration: 0.5)) {
-                            showLiveTranscription = false
-                        }
-                    } else {
-                        // Ethereal dissolve effect - trigger dissolving state first
-                        withAnimation(.easeOut(duration: 0.8)) {
-                            isTranscriptionDissolving = true
-                        }
-                        
-                        // After dissolve animation completes, hide the view and clear text
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            showLiveTranscription = false
-                            isTranscriptionDissolving = false
-                            liveTranscription = "" // Clear text after animation
-                        }
+                // Set a simple timer to fade after 3 seconds
+                transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showLiveTranscription = false
+                    }
+                    // Clear text after fade
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        liveTranscription = ""
                     }
                 }
             }
             
-            // Detect book mentions - always check, even for short text
+            // Detect book mentions - always check, even for short text  
             if cleanedText.count > 5 {
                 bookDetector.detectBookInText(cleanedText)
             }
@@ -623,10 +474,10 @@ struct AmbientModeView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // Proper top spacing below navigation area and safe zone
+                    // Increased top spacing for better message positioning
                     Rectangle()
                         .fill(Color.clear)
-                        .frame(height: 100) // Space for navigation + safe area
+                        .frame(height: 200) // More space for messages to appear lower
                         .id("top")
                     
                     let hasRealContent = messages.contains { msg in
@@ -778,9 +629,8 @@ struct AmbientModeView: View {
                         LiquidGlassThinkingIndicator(color: adaptiveUIColor)
                             .scaleEffect(0.8)
                         
-                        Text("Thinking...")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
+                        ScrollingBookMessages()
+                            .frame(width: 150)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
@@ -793,96 +643,9 @@ struct AmbientModeView: View {
                     ))
                 }
                 
-                // Live transcription - glass container with proper multiline
-                if isRecording && !liveTranscription.isEmpty && showLiveTranscription {
-                    VStack {
-                        if isEditingTranscription {
-                            // SIRI-STYLE LAYOUT FOR EDIT MODE (keeping our glass effect)
-                            HStack {
-                                Spacer(minLength: 0)
-                                
-                                TextField("Edit transcription...", text: $editableTranscription, axis: .vertical)
-                                    .font(.system(size: 17, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(1...4)
-                                    .textFieldStyle(.plain)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: 280)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                                    .glassEffect() // Keep our glass effect
-                                    .clipShape(
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    )
-                                    .focused($isTranscriptionFocused)
-                                
-                                Spacer(minLength: 0)
-                            }
-                                .onSubmit {
-                                    let finalText = editableTranscription
-                                    liveTranscription = ""  // Clear to prevent duplicate processing
-                                    isEditingTranscription = false
-                                    
-                                    // Process as a single complete thought
-                                    let contentType = determineContentType(finalText)
-                                    
-                                    if contentType == .question {
-                                        // Handle as question with AI response
-                                        let userMessage = UnifiedChatMessage(
-                                            content: finalText,
-                                            isUser: true,
-                                            timestamp: Date(),
-                                            bookContext: currentBookContext
-                                        )
-                                        messages.append(userMessage)
-                                        
-                                        shouldCollapseThinking = false  // Reset collapse state
-                                        isWaitingForAIResponse = true
-                                        pendingQuestion = finalText
-                                        
-                                        Task {
-                                            await getAIResponse(for: finalText)
-                                        }
-                                    } else {
-                                        // Process as note/quote
-                                        Task {
-                                            await processor.processDetectedText(finalText, confidence: 1.0)
-                                        }
-                                    }
-                                }
-                        } else {
-                            // iOS 26 FLUID TRANSCRIPTION BUBBLE
-                            LiveTranscriptionBubble(text: liveTranscription, isDissolving: isWaitingForAIResponse)
-                                .onTapGesture {
-                                    // Pause any pending AI processing
-                                    debounceTimer?.invalidate()
-                                    
-                                    editableTranscription = liveTranscription
-                                    isEditingTranscription = true
-                                    isTranscriptionFocused = true
-                                    
-                                    // Clear any pending questions
-                                    if isWaitingForAIResponse {
-                                        // Trigger collapse animation before hiding
-                                        shouldCollapseThinking = true
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                            isWaitingForAIResponse = false
-                                            shouldCollapseThinking = false
-                                        }
-                                        pendingQuestion = nil
-                                    }
-                                }
-                        }
-                    }
+                // Simple live transcription display
+                liveTranscriptionView
                     .padding(.bottom, 16)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.9).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: liveTranscription)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showLiveTranscription)
-                }
             
             // Unified morphing container - like morph-surface example
             GeometryReader { geometry in
@@ -1813,6 +1576,14 @@ struct AmbientModeView: View {
     
     private func startRecording() {
         isRecording = true
+        
+        // Immediately collapse any pending questions
+        if isWaitingForAIResponse {
+            shouldCollapseThinking = true
+            isWaitingForAIResponse = false
+            pendingQuestion = nil
+        }
+        
         processor.startSession()
         voiceManager.startAmbientListeningMode()
         bookDetector.startDetection()

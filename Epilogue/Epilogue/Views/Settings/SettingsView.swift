@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("enableAnimations") private var enableAnimations = true
     @AppStorage("defaultCaptureType") private var defaultCaptureType = "quote"
     @AppStorage("voiceQuality") private var voiceQuality = "high"
+    @AppStorage("showLiveTranscriptionBubble") private var showLiveTranscriptionBubble = true
     @AppStorage("aiProvider") private var aiProvider = "apple"
     @AppStorage("perplexityModel") private var perplexityModel = "sonar"
     @AppStorage("enableAnalytics") private var enableAnalytics = false
@@ -178,6 +179,9 @@ struct SettingsView: View {
                         Text("Medium").tag("medium")
                         Text("High").tag("high")
                     }
+                    
+                    Toggle("Show Live Transcription", isOn: $showLiveTranscriptionBubble)
+                        .tint(.orange)
                 } header: {
                     Text("Reading Preferences")
                 }
