@@ -288,9 +288,15 @@ struct AmbientModeView: View {
             voiceGradientOverlay
                 .allowsHitTesting(false) // Ensure gradient doesn't block touches
         }
-        // iOS 26 safeAreaBar for bottom input with proper blur inheritance
-        .safeAreaBar(edge: .bottom) {
+        // Use safeAreaInset for AmbientModeView to avoid layout issues
+        .safeAreaInset(edge: .bottom) {
             bottomInputArea
+                .background {
+                    // Glass background for input area
+                    Rectangle()
+                        .fill(.regularMaterial)
+                        .ignoresSafeArea(edges: .bottom)
+                }
         }
         // Top navigation bar with BookView-style header
         .safeAreaInset(edge: .top) {
@@ -1018,8 +1024,8 @@ struct AmbientModeView: View {
     
     // MARK: - BookView-Style Header
     private var bookStyleHeader: some View {
-        HStack(spacing: 0) {
-            // Left side - Exit button (X in circle with liquid glass)
+        ZStack {
+            // Center - Exit button (X in circle with liquid glass)
             Button {
                 stopAndSaveSession()
             } label: {
@@ -1031,10 +1037,11 @@ struct AmbientModeView: View {
                     .clipShape(Circle())
             }
             
-            Spacer()
-            
             // Right side - Switch books pill with liquid glass
-            if currentBookContext != nil {
+            HStack {
+                Spacer()
+                
+                if currentBookContext != nil {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         showingBookStrip.toggle()
@@ -1047,6 +1054,7 @@ struct AmbientModeView: View {
                         .padding(.vertical, 12)
                         .glassEffect()
                         .clipShape(Capsule())
+                }
                 }
             }
         }
