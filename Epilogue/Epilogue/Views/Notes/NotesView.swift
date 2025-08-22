@@ -18,7 +18,14 @@ struct NotesView: View {
     // View style toggle
     enum NotesViewStyle: String {
         case grid = "grid"
-        case list = "list"
+        case stack = "list"
+        
+        var icon: String {
+            switch self {
+            case .grid: return "square.grid.2x2"
+            case .stack: return "square.stack.3d.up"
+            }
+        }
     }
     @AppStorage("notesViewStyle") private var viewStyle: NotesViewStyle = .grid
     
@@ -209,102 +216,105 @@ struct NotesView: View {
             .environmentObject(libraryViewModel)
     }
     
-    var mainGridView: some View {
-        ZStack {
-            // Match the app's dark background
-            Color.black
-                .ignoresSafeArea()
+    // MARK: - Filter Pills Header
+    @ViewBuilder
+    private var filterPillsHeader: some View {
+        HStack(spacing: 8) {
+            FilterPill(
+                title: "All",
+                count: notesViewModel.notes.count,
+                isActive: selectedFilter == nil,
+                action: { selectedFilter = nil }
+            )
             
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 16) {
-                    // Filter pills and view toggle at the top
-                    HStack(spacing: 8) {
-                        // Filter pills
-                        FilterPill(
-                            title: "All",
-                            count: notesViewModel.notes.count,
-                            isActive: selectedFilter == nil,
-                            action: { selectedFilter = nil }
-                        )
-                        
-                        FilterPill(
-                            title: "Quote",
-                            count: notesViewModel.notes.filter { $0.type == .quote }.count,
-                            icon: "quote.opening",
-                            isActive: selectedFilter == .quote,
-                            action: { selectedFilter = selectedFilter == .quote ? nil : .quote }
-                        )
-                        
-                        FilterPill(
-                            title: "Note",
-                            count: notesViewModel.notes.filter { $0.type == .note }.count,
-                            icon: "note.text",
-                            isActive: selectedFilter == .note,
-                            action: { selectedFilter = selectedFilter == .note ? nil : .note }
-                        )
-                        
-                        Spacer()
-                        
-                        // View style toggle
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                viewStyle = viewStyle == .grid ? .stack : .grid
-                                HapticManager.shared.lightTap()
-                            }
-                        }) {
-                            Image(systemName: viewStyle.icon)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .frame(width: 36, height: 36)
-                                .glassEffect(
-                                    .regular.tint(Color.white.opacity(0.05)),
-                                    in: RoundedRectangle(cornerRadius: 12)
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                                }
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Notes grid or empty state
-                    if filteredNotes.isEmpty {
-                        EmptyNotesView(
-                            searchText: searchText,
-                            selectedFilter: selectedFilter,
-                            searchScope: searchScope
-                        )
-                        .frame(minHeight: 400)
-                        .padding(.top, 60)
-                    } else if viewStyle == .grid {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                            ForEach(filteredNotes) { note in
-                                noteCardView(for: note)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-                .padding(.top, 8)
-                .padding(.bottom, 80)
+            FilterPill(
+                title: "Quote",
+                count: notesViewModel.notes.filter { $0.type == .quote }.count,
+                icon: "quote.opening",
+                isActive: selectedFilter == .quote,
+                action: { selectedFilter = selectedFilter == .quote ? nil : .quote }
+            )
+            
+            FilterPill(
+                title: "Note",
+                count: notesViewModel.notes.filter { $0.type == .note }.count,
+                icon: "note.text",
+                isActive: selectedFilter == .note,
+                action: { selectedFilter = selectedFilter == .note ? nil : .note }
+            )
+            
+            Spacer()
+            
+            viewStyleToggleButton
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - View Style Toggle Button
+    @ViewBuilder
+    private var viewStyleToggleButton: some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                viewStyle = viewStyle == .grid ? .stack : .grid
+                HapticManager.shared.lightTap()
             }
-            .onChange(of: scrollToNoteId) { _, noteId in
-                if let noteId = noteId {
-                    withAnimation(SmoothAnimationType.smooth.animation) {
-                        proxy.scrollTo(noteId, anchor: .center)
-                    }
-                    // Clear the scroll request after animation completes
-                    Task {
-                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                        scrollToNoteId = nil
-                    }
+        }) {
+            Image(systemName: viewStyle.icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: 36, height: 36)
+                .glassEffect(
+                    .regular.tint(Color.white.opacity(0.05)),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                }
+        }
+    }
+    
+    // MARK: - Notes Grid Content
+    @ViewBuilder
+    private var notesGridContent: some View {
+        if filteredNotes.isEmpty {
+            EmptyNotesView(
+                searchText: searchText,
+                selectedFilter: selectedFilter,
+                searchScope: searchScope
+            )
+            .frame(minHeight: 400)
+            .padding(.top, 60)
+        } else if viewStyle == .grid {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                ForEach(filteredNotes) { note in
+                    noteCardView(for: note)
                 }
             }
-        } // End ScrollViewReader
-        
-        // Context menu overlay
+            .padding(.horizontal)
+        }
+    }
+    
+    // MARK: - Add Note Toolbar Button
+    @ViewBuilder
+    private var addNoteToolbarButton: some View {
+        GlassEffectContainer(spacing: 0) {
+            Button(action: { showingAddNote = true }) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .frame(width: 44, height: 44)
+            }
+            .glassEffect(
+                .regular,
+                in: Circle()
+            )
+        }
+    }
+    
+    // MARK: - Context Menu Overlay
+    @ViewBuilder
+    private var contextMenuOverlay: some View {
         if let contextMenuNote = contextMenuNote {
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
@@ -323,6 +333,36 @@ struct NotesView: View {
             .environmentObject(notesViewModel)
             .zIndex(1000)
         }
+    }
+    
+    // MARK: - Main Grid View (Simplified)
+    var mainGridView: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        filterPillsHeader
+                        notesGridContent
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 80)
+                }
+                .onChange(of: scrollToNoteId) { _, noteId in
+                    if let noteId = noteId {
+                        withAnimation(SmoothAnimationType.smooth.animation) {
+                            proxy.scrollTo(noteId, anchor: .center)
+                        }
+                        Task {
+                            try? await Task.sleep(nanoseconds: 500_000_000)
+                            scrollToNoteId = nil
+                        }
+                    }
+                }
+            }
+            
+            contextMenuOverlay
         }
         .navigationTitle("Notes")
         .navigationBarTitleDisplayMode(.large)
@@ -334,10 +374,9 @@ struct NotesView: View {
             }
         }
         .onChange(of: searchText) { _, newValue in
-            // Debounce search
             searchDebounceTask?.cancel()
             searchDebounceTask = Task {
-                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                try? await Task.sleep(nanoseconds: 300_000_000)
                 if !Task.isCancelled {
                     parseSearchTokens(from: newValue)
                 }
@@ -345,25 +384,14 @@ struct NotesView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                GlassEffectContainer(spacing: 0) {
-                    Button(action: { showingAddNote = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                            .frame(width: 44, height: 44)
-                    }
-                    .glassEffect(
-                        .regular,
-                        in: Circle()
-                    )
-                }
+                addNoteToolbarButton
             }
         }
         .sheet(isPresented: $showingAddNote) {
             LiquidCommandPalette(
                 isPresented: $showingAddNote,
                 animationNamespace: commandPaletteNamespace,
-                bookContext: nil  // No specific book context in general notes view
+                bookContext: nil
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)
