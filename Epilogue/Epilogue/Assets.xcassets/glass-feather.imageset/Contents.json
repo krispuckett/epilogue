@@ -1,8 +1,19 @@
 {
   "images" : [
     {
-      "filename" : "feather.pdf",
-      "idiom" : "universal"
+      "filename" : "glass-feather.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "glass-feather@2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "glass-feather@3x.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
   "info" : {
