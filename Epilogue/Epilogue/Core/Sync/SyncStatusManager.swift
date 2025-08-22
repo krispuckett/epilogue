@@ -94,7 +94,7 @@ final class SyncStatusManager: ObservableObject {
     
     private func setupNetworkMonitoring() {
         networkMonitor.pathUpdateHandler = { [weak self] path in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 let wasOnline = self?.isOnline ?? true
                 self?.isOnline = path.status == .satisfied
                 
