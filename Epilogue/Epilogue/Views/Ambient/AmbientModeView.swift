@@ -918,7 +918,6 @@ struct AmbientModeView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: geometry.size.height)
                 }  // End GeometryReader
                 
                 Spacer()
@@ -943,7 +942,6 @@ struct AmbientModeView: View {
         }  // Close VStack
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode) // Smooth Dynamic Island-style spring
     }  // Close ZStack
-    }
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
     // Keeping for reference but no longer used
