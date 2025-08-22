@@ -119,9 +119,11 @@ struct SimplifiedTranscriptionBubble: View {
     @State private var displayedText: String = ""
     @State private var bubbleHeight: CGFloat = 56
     @State private var bubbleWidth: CGFloat = 200
+    @State private var maxWidth: CGFloat = 310
     
     var body: some View {
-        HStack {
+        GeometryReader { geometry in
+            HStack {
             Spacer(minLength: 0)
             
             Text(displayedText.isEmpty ? text : displayedText)
@@ -153,14 +155,16 @@ struct SimplifiedTranscriptionBubble: View {
             // Update bubble size to fit content
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 bubbleHeight = max(56, size.height)
-                bubbleWidth = min(maxWidth, max(200, size.width))
+                bubbleWidth = min(self.maxWidth, max(200, size.width))
             }
         }
         .onAppear {
+            maxWidth = geometry.size.width - 80
             displayedText = text
         }
         .onChange(of: text) { _, newText in
             displayedText = newText
+        }
         }
     }
 }

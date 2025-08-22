@@ -16,6 +16,10 @@ struct NotesView: View {
     @State private var contextMenuSourceRect: CGRect = .zero
     
     // View style toggle
+    enum NotesViewStyle: String {
+        case grid = "grid"
+        case list = "list"
+    }
     @AppStorage("notesViewStyle") private var viewStyle: NotesViewStyle = .grid
     
     // Search states
@@ -435,6 +439,13 @@ struct NotesView: View {
             return formatted
         }
     }
+}
+
+// MARK: - Filter Type Definition
+enum FilterType: String, CaseIterable {
+    case all = "All"
+    case notes = "Notes"
+    case quotes = "Quotes"
 }
 
 // MARK: - Note Type to Filter Type Extension

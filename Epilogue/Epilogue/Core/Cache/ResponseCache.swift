@@ -39,8 +39,10 @@ actor ResponseCache {
     private let cacheQueue = DispatchQueue(label: "com.epilogue.responseCache", attributes: .concurrent)
     
     private init() {
-        loadCache()
-        cleanExpiredEntries()
+        Task {
+            await loadCache()
+            await cleanExpiredEntries()
+        }
     }
     
     // MARK: - Public Methods

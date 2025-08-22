@@ -89,7 +89,7 @@ class OptimizedAIResponseService: ObservableObject {
         let startTime = Date()
         
         // Check cache first for instant response
-        if let cachedResponse = responseCache.getResponse(for: question, bookTitle: bookContext?.title) {
+        if let cachedResponse = await responseCache.getResponse(for: question, bookTitle: bookContext?.title) {
             logger.info("📦 Instant cached response for: \(question)")
             
             let aiResponse = AIResponse(
@@ -178,7 +178,7 @@ class OptimizedAIResponseService: ObservableObject {
             addToHistory(aiResponse)
             
             // Cache the response with enhanced metadata
-            responseCache.cacheResponse(
+            await responseCache.cacheResponse(
                 accumulatedText, 
                 for: question, 
                 bookTitle: bookContext?.title,
@@ -243,7 +243,7 @@ class OptimizedAIResponseService: ObservableObject {
         let startTime = Date()
         
         // Check cache first
-        if let cachedResponse = responseCache.getResponse(for: question, bookTitle: bookContext?.title) {
+        if let cachedResponse = await responseCache.getResponse(for: question, bookTitle: bookContext?.title) {
             let aiResponse = AIResponse(
                 question: question,
                 answer: cachedResponse,
@@ -280,7 +280,7 @@ class OptimizedAIResponseService: ObservableObject {
             )
             
             addToHistory(aiResponse)
-            responseCache.cacheResponse(
+            await responseCache.cacheResponse(
                 response, 
                 for: question, 
                 bookTitle: bookContext?.title,
@@ -417,7 +417,7 @@ class OptimizedAIResponseService: ObservableObject {
         Task {
             for question in commonQuestions {
                 // Only preload if not already cached
-                if responseCache.getResponse(for: question, bookTitle: book.title) == nil {
+                if await responseCache.getResponse(for: question, bookTitle: book.title) == nil {
                     await processQuestion(question, bookContext: book, model: .sonar)
                 }
             }
@@ -428,6 +428,8 @@ class OptimizedAIResponseService: ObservableObject {
         recentResponses.removeAll()
         responseTimes.removeAll()
         activeStreams.removeAll()
-        responseCache.clearCache()
+        Task {
+            await responseCache.clearCache()
+        }
     }
 }

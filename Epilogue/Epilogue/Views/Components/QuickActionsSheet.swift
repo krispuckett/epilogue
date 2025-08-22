@@ -1,5 +1,23 @@
 import SwiftUI
 
+// MARK: - Standardized Search Field
+struct StandardizedSearchField: View {
+    @Binding var text: String
+    let placeholder: String
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField(placeholder, text: $text)
+                .textFieldStyle(.plain)
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+    }
+}
+
 struct QuickActionsSheet: View {
     @Binding var isPresented: Bool
     let onActionSelected: (String) -> Void

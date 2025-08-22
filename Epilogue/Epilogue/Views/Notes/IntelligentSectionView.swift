@@ -1,5 +1,10 @@
 import SwiftUI
 
+// MARK: - Swipe Direction
+enum SwipeDirection {
+    case leading, trailing
+}
+
 // MARK: - Intelligent Section View
 struct IntelligentSectionView: View {
     let section: SmartSection

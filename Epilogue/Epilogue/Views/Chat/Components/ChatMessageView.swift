@@ -16,10 +16,11 @@ struct ChatMessageView: View {
     @State private var showTypingIndicator = false
     @State private var glowAnimation = 0.0
     @State private var rotationAngle = 0.0
-    @Environment(\.screenSize) private var screenSize
+    @State private var screenSize: CGSize = CGSize(width: 390, height: 844)
     
     var body: some View {
-        VStack(spacing: 0) {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
             // Context switch messages
             if message.isContextSwitch {
                 contextSwitchView
@@ -53,6 +54,7 @@ struct ChatMessageView: View {
         .scaleEffect(isAnimatingIn ? 1 : 0.95)
         .opacity(isAnimatingIn ? 1 : 0)
         .onAppear {
+            screenSize = geometry.size
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 isAnimatingIn = true
             }
@@ -64,6 +66,7 @@ struct ChatMessageView: View {
                     showTypingIndicator = false
                 }
             }
+        }
         }
     }
     
