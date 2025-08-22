@@ -167,10 +167,14 @@ class AICompanionService: ObservableObject {
             let apiKey = KeychainManager.shared.getPerplexityAPIKey() ?? 
                          Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
             
-            let configured = apiKey != nil && !apiKey!.isEmpty && 
-                            apiKey != "your_actual_api_key_here" &&
-                            !apiKey!.contains("$(") &&
+            let configured: Bool
+            if let apiKey = apiKey, !apiKey.isEmpty {
+                configured = apiKey != "your_actual_api_key_here" &&
+                            !apiKey.contains("$(") &&
                             apiKey != "PLACEHOLDER_API_KEY"
+            } else {
+                configured = false
+            }
             
             print("🔑 AI Service configured: \(configured), has key: \(apiKey != nil)")
             
