@@ -488,8 +488,8 @@ struct AmbientModeView: View {
     // MARK: - Voice Gradient Overlay (Matching UnifiedChatView)
     @ViewBuilder
     private var voiceGradientOverlay: some View {
-        VStack {
-            // Book cover - show when book is detected, fade after 10 seconds
+        ZStack {
+            // Book cover - centered in the view
             if showBookCover, let book = currentBookContext, let coverURL = book.coverImageURL {
                 SharedBookCoverView(
                     coverURL: coverURL,
@@ -506,30 +506,26 @@ struct AmbientModeView: View {
                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                     removal: .scale(scale: 1.1).combined(with: .opacity)
                 ))
-                .padding(.top, 140)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2 - 100)
             }
             
-            Spacer()
-            
-            // Voice responsive bottom gradient - exactly like UnifiedChatView
-            VoiceResponsiveBottomGradient(
-                colorPalette: colorPalette,
-                audioLevel: audioLevel,
-                isRecording: isRecording,
-                bookContext: currentBookContext
-            )
-            .allowsHitTesting(false)
-            .ignoresSafeArea(.all)
-            .transition(.asymmetric(
-                insertion: .opacity.combined(with: .move(edge: .bottom)),
-                removal: .opacity.combined(with: .move(edge: .bottom))
-            ))
-        }
-        
-        // Minimal recording UI
-        VStack {
-            Spacer()
-            // All UI elements moved to bottomInputArea for proper positioning
+            // Voice responsive bottom gradient - positioned at bottom
+            VStack {
+                Spacer()
+                VoiceResponsiveBottomGradient(
+                    colorPalette: colorPalette,
+                    audioLevel: audioLevel,
+                    isRecording: isRecording,
+                    bookContext: currentBookContext
+                )
+                .allowsHitTesting(false)
+                .ignoresSafeArea(.all)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .bottom)),
+                    removal: .opacity.combined(with: .move(edge: .bottom))
+                ))
+            }
         }
     }
     
