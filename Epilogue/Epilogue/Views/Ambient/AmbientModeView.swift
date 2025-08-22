@@ -2246,10 +2246,10 @@ struct AmbientModeView: View {
         }
         
         do {
-            let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-            guard let image = UIImage(data: imageData) else { 
-                print("❌ Failed to create image from data")
-                return 
+            // Use SharedBookCoverManager for cached image loading
+            guard let image = await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) else {
+                print("❌ Failed to load image from SharedBookCoverManager")
+                return
             }
             
             let extractor = OKLABColorExtractor()
