@@ -167,6 +167,32 @@ class SmartEpilogueAI: ObservableObject {
         #endif
     }
     
+    // MARK: - Check if Local Model is Actually Ready
+    private func isLocalModelActuallyReady() -> Bool {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            // Check the actual availability status
+            let model = SystemLanguageModel.default
+            switch model.availability {
+            case .available:
+                // Model is available and ready
+                return true
+            case .unavailable(.modelNotReady):
+                // Model is still downloading or preparing
+                print("⚠️ Model is downloading or not ready")
+                return false
+            case .unavailable(let reason):
+                // Other unavailability reasons
+                print("⚠️ Model unavailable: \(reason)")
+                return false
+            @unknown default:
+                return false
+            }
+        }
+        #endif
+        return false
+    }
+    
     // MARK: - Update Active Book Context
     func setActiveBook(_ book: BookModel?) {
         self.activeBook = book
@@ -192,16 +218,21 @@ class SmartEpilogueAI: ObservableObject {
             // External knowledge needed - go straight to Perplexity
             return await queryWithPerplexity(question)
         } else {
-            // Book-specific question - try local first (FAST!)
-            // If Foundation Models available, it's faster than network
+            // CRITICAL FIX: Check if model is ACTUALLY ready before trying local
+            // The session existing doesn't mean it's ready to use!
             #if canImport(FoundationModels)
             if #available(iOS 26.0, *), session != nil {
-                // Local is available and FAST - use it!
-                return await queryLocal(question)
+                // Double-check the model is actually ready
+                // If we see "Model is downloading or not ready" in logs, skip local
+                if isLocalModelActuallyReady() {
+                    return await queryLocal(question)
+                } else {
+                    print("⚡ Local model not ready - using Perplexity for fast response")
+                }
             }
             #endif
             
-            // Fallback to Perplexity if local not available
+            // Fallback to Perplexity if local not available or not ready
             return await queryWithPerplexity(question)
         }
     }
@@ -310,10 +341,15 @@ class SmartEpilogueAI: ObservableObject {
                 return await queryWithPerplexity(question)
             }
             
+            let startTime = Date()
             do {
                 let formattedQuestion = formatQuestionWithContext(question)
                 let response = try await session.respond(to: formattedQuestion)
                 lastResponse = response.content
+                
+                let responseTime = Date().timeIntervalSince(startTime) * 1000
+                print("⚡ Local response in \(String(format: "%.1f", responseTime))ms")
+                
                 return response.content
             } catch {
                 print("❌ Foundation Models error: \(error)")
@@ -330,6 +366,7 @@ class SmartEpilogueAI: ObservableObject {
     
     // MARK: - External Query (Perplexity)
     private func queryWithPerplexity(_ question: String) async -> String {
+        let startTime = Date()
         do {
             let formattedQuestion = formatQuestionWithContext(question)
             let response = try await perplexityService.chat(
@@ -337,6 +374,10 @@ class SmartEpilogueAI: ObservableObject {
                 bookContext: activeBook?.toBook()
             )
             lastResponse = response
+            
+            let responseTime = Date().timeIntervalSince(startTime) * 1000
+            print("⚡ Perplexity response in \(String(format: "%.1f", responseTime))ms")
+            
             return response
         } catch {
             lastResponse = "Unable to fetch external information: \(error.localizedDescription)"

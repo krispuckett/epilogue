@@ -12,29 +12,54 @@ private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeVie
 struct ScrollingBookMessages: View {
     @State private var currentMessageIndex = 0
     @State private var opacity: Double = 1.0
+    @State private var usedIndices: Set<Int> = []
     
     let messages = [
-        "Reading all known books",
-        "Consulting the archives",
-        "Searching ancient texts",
-        "Analyzing the narrative",
-        "Cross-referencing chapters",
-        "Decoding the mythology",
-        "Examining character arcs",
-        "Reviewing plot threads",
-        "Studying the lore",
-        "Parsing the chronicles",
-        "Scanning epic tales",
-        "Interpreting the saga",
-        "Unraveling the story"
+        // Literary and bookish phrases
+        "Reading between the lines...",
+        "Consulting the archives...",
+        "Searching ancient texts...",
+        "Analyzing the narrative...",
+        "Cross-referencing chapters...",
+        "Studying the lore...",
+        "Unraveling the story...",
+        "Decoding the metaphors...",
+        "Following the plot threads...",
+        "Examining character arcs...",
+        "Parsing the prose...",
+        "Exploring the themes...",
+        "Mapping the world...",
+        "Tracing the timeline...",
+        "Uncovering hidden meanings...",
+        "Connecting the dots...",
+        "Diving into the subtext...",
+        "Illuminating the passage...",
+        "Consulting my notes...",
+        "Checking the appendices...",
+        "Reviewing the canon...",
+        "Scanning the margins...",
+        "Flipping through pages...",
+        "Pondering the symbolism...",
+        "Seeking wisdom...",
+        "Gathering insights...",
+        "Weaving understanding...",
+        "Building connections...",
+        "Finding the answer...",
+        "Contemplating deeply..."
     ]
     
     var body: some View {
         Text(messages[currentMessageIndex])
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(.white.opacity(0.6))
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.white.opacity(0.7))
             .opacity(opacity)
+            .animation(.easeInOut(duration: 0.4), value: opacity)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false) // Keep text on single line
             .onAppear {
+                // Start with a random message
+                currentMessageIndex = Int.random(in: 0..<messages.count)
+                usedIndices.insert(currentMessageIndex)
                 startCycling()
             }
     }
@@ -46,12 +71,34 @@ struct ScrollingBookMessages: View {
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                currentMessageIndex = (currentMessageIndex + 1) % messages.count
+                // Get next random message, avoiding recently used ones
+                let nextIndex = getNextRandomIndex()
+                currentMessageIndex = nextIndex
+                usedIndices.insert(nextIndex)
+                
+                // Reset used indices if we've used more than half
+                if usedIndices.count > messages.count / 2 {
+                    let currentIndex = currentMessageIndex
+                    usedIndices.removeAll()
+                    usedIndices.insert(currentIndex)
+                }
+                
                 withAnimation(.easeIn(duration: 0.3)) {
                     opacity = 1.0
                 }
             }
         }
+    }
+    
+    private func getNextRandomIndex() -> Int {
+        var availableIndices = Array(0..<messages.count).filter { !usedIndices.contains($0) }
+        
+        // If all have been used, reset and exclude current
+        if availableIndices.isEmpty {
+            availableIndices = Array(0..<messages.count).filter { $0 != currentMessageIndex }
+        }
+        
+        return availableIndices.randomElement() ?? 0
     }
 }
 
@@ -99,8 +146,7 @@ struct AmbientModeView: View {
     @State private var isEditingTranscription = false
     @State private var editableTranscription = ""
     @FocusState private var isTranscriptionFocused: Bool
-    @State private var isWaitingForAIResponse = false
-    @State private var shouldCollapseThinking = false
+    // Removed: isWaitingForAIResponse and shouldCollapseThinking - now using inline thinking messages
     @State private var pendingQuestion: String?
     @State private var lastProcessedCount = 0
     @State private var debounceTimer: Timer?
@@ -344,6 +390,9 @@ struct AmbientModeView: View {
             // Clean transcription - only show new content
             let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             
+            // Check for page mentions (e.g., "page 42", "on page 42", "I'm on page 42")
+            detectPageMention(in: cleanedText)
+            
             // Update live transcription only if there's text
             if !cleanedText.isEmpty {
                 liveTranscription = cleanedText
@@ -474,10 +523,10 @@ struct AmbientModeView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // Increased top spacing for better message positioning
+                    // Top spacing for message positioning
                     Rectangle()
                         .fill(Color.clear)
-                        .frame(height: 200) // More space for messages to appear lower
+                        .frame(height: 80) // Slightly higher positioning
                         .id("top")
                     
                     let hasRealContent = messages.contains { msg in
@@ -515,9 +564,10 @@ struct AmbientModeView: View {
                                         AmbientMessageThreadView(
                                             message: message,
                                             index: index,
+                                            totalMessages: messages.filter { !$0.isUser }.count,
                                             isExpanded: expandedMessageIds.contains(message.id),
                                             onToggle: {
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                withAnimation(.easeInOut(duration: 0.2)) {
                                                     if expandedMessageIds.contains(message.id) {
                                                         expandedMessageIds.remove(message.id)
                                                     } else {
@@ -549,9 +599,20 @@ struct AmbientModeView: View {
             .onChange(of: messages.count) { _, _ in
                 // Scroll to new message with delay to ensure layout is complete
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(.easeInOut(duration: 0.5)) {
                         if let lastMessage = messages.last {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            // Center the new message in view
+                            proxy.scrollTo(lastMessage.id, anchor: .center)
+                        }
+                    }
+                }
+            }
+            .onChange(of: expandedMessageIds) { _, _ in
+                // When a message is expanded, ensure it's visible
+                if let expandedId = expandedMessageIds.first {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(expandedId, anchor: .center)
                         }
                     }
                 }
@@ -623,24 +684,18 @@ struct AmbientModeView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
                 }
                 
-                // Simple AI thinking indicator
-                if isWaitingForAIResponse {
-                    HStack(spacing: 8) {
-                        LiquidGlassThinkingIndicator(color: adaptiveUIColor)
-                            .scaleEffect(0.8)
-                        
-                        ScrollingBookMessages()
-                            .frame(width: 150)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect()
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .padding(.bottom, 12)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.9).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
+                // Show scrolling text while waiting for response (above stop button)
+                if pendingQuestion != nil {
+                    ScrollingBookMessages()
+                        .padding(.horizontal, 24) // Consistent inner padding
+                        .padding(.vertical, 12)
+                        .glassEffect()
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .padding(.bottom, 16)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
                 }
                 
                 // Simple live transcription display
@@ -997,50 +1052,11 @@ struct AmbientModeView: View {
                 if !processedContentHashes.contains(responseKey) {
                     processedContentHashes.insert(responseKey)
                     
-                    // Hide thinking indicator and show response with collapse animation
-                    shouldCollapseThinking = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        isWaitingForAIResponse = false
-                        shouldCollapseThinking = false
-                    }
-                    pendingQuestion = nil
+                    // The response should already be added via getAIResponseForAmbientQuestion
+                    // which updates the thinking message. We just need to track that we've seen it.
+                    print("✅ Response update detected for: \(item.text.prefix(30))...")
                     
-                    // Format and display the response
-                    let formattedResponse = "**\(item.text)**\n\n\(response)"
-                    let aiMessage = UnifiedChatMessage(
-                        content: formattedResponse,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext,
-                        messageType: .text
-                    )
-                    
-                    // Check if this is the first response BEFORE adding it
-                    let isFirstResponse = messages.filter { !$0.isUser }.count == 0
-                    
-                    messages.append(aiMessage)
-                    
-                    // Apply the same auto-expansion logic as in processAndSaveDetectedContent
-                    if isFirstResponse {
-                        // First question - just expand it
-                        expandedMessageIds.insert(aiMessage.id)
-                    } else {
-                        // Keep first question expanded and expand new one
-                        let firstAIResponseId = messages.first(where: { !$0.isUser })?.id
-                        
-                        // Clear all expanded except first
-                        expandedMessageIds.removeAll()
-                        
-                        // Always keep first question expanded
-                        if let firstId = firstAIResponseId {
-                            expandedMessageIds.insert(firstId)
-                        }
-                        
-                        // And expand the new one
-                        expandedMessageIds.insert(aiMessage.id)
-                    }
-                    
-                    print("✅ Added AI response via update check: \(item.text.prefix(30))...")
+                    // Don't add a new message here - the thinking message was already updated
                 }
             }
         }
@@ -1171,10 +1187,6 @@ struct AmbientModeView: View {
                     }
                     
                     if !responseExists {
-                        // Hide thinking indicator immediately when we have a response
-                        isWaitingForAIResponse = false
-                        shouldCollapseThinking = false
-                        
                         // Format the response with the question for context
                         let formattedResponse = "**\(item.text)**\n\n\(item.response!)"
                         let aiMessage = UnifiedChatMessage(
@@ -1189,25 +1201,9 @@ struct AmbientModeView: View {
                         
                         messages.append(aiMessage)
                         
-                        // Auto-expand questions strategy:
-                        // If this is the first AI response, keep it expanded
-                        // Otherwise, keep first expanded and expand new one
-                        if isFirstResponse {
-                            // First question - just expand it
-                            expandedMessageIds.insert(aiMessage.id)
-                        } else {
-                            // Subsequent questions - keep first one expanded and open new one
-                            let firstAIResponseId = messages.first(where: { !$0.isUser })?.id
-                            
-                            // Clear all expanded except first
+                        // Auto-collapse all previous messages and expand only the new one
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             expandedMessageIds.removeAll()
-                            
-                            // Always keep first question expanded
-                            if let firstId = firstAIResponseId {
-                                expandedMessageIds.insert(firstId)
-                            }
-                            
-                            // And expand the new one
                             expandedMessageIds.insert(aiMessage.id)
                         }
                         print("✅ Added AI response for question: \(item.text.prefix(30))...")
@@ -1215,11 +1211,37 @@ struct AmbientModeView: View {
                         print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
                     }
                 } else {
-                    // Question detected but no response yet - show thinking indicator
-                    pendingQuestion = item.text
-                    shouldCollapseThinking = false  // Reset collapse state
-                    isWaitingForAIResponse = true
-                    print("💭 Showing thinking indicator for question: \(item.text.prefix(30))...")
+                    // Question detected but no response yet - add thinking message
+                    // Check if we already have a thinking message for this question
+                    let alreadyHasThinking = messages.contains { msg in
+                        !msg.isUser && msg.content.contains(item.text) && msg.content.contains("[Thinking]")
+                    }
+                    
+                    if !alreadyHasThinking {
+                        let thinkingMessage = UnifiedChatMessage(
+                            content: "**\(item.text)**\n\n[Thinking]",
+                            isUser: false,
+                            timestamp: Date(),
+                            messageType: .text
+                        )
+                        messages.append(thinkingMessage)
+                        
+                        // Collapse all previous messages and only expand the new one
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            expandedMessageIds.removeAll()
+                            expandedMessageIds.insert(thinkingMessage.id)
+                        }
+                        
+                        pendingQuestion = item.text
+                        print("💭 Added thinking message for question: \(item.text.prefix(30))...")
+                        
+                        // Trigger AI response
+                        Task {
+                            await getAIResponseForAmbientQuestion(item.text)
+                        }
+                    } else {
+                        print("⚠️ Thinking message already exists for: \(item.text.prefix(30))...")
+                    }
                 }
             }
             
@@ -1577,12 +1599,11 @@ struct AmbientModeView: View {
     private func startRecording() {
         isRecording = true
         
-        // Immediately collapse any pending questions
-        if isWaitingForAIResponse {
-            shouldCollapseThinking = true
-            isWaitingForAIResponse = false
-            pendingQuestion = nil
+        // INSTANTLY collapse ALL expanded messages when speaking starts
+        withAnimation(.easeOut(duration: 0.15)) {
+            expandedMessageIds.removeAll()
         }
+        pendingQuestion = nil
         
         processor.startSession()
         voiceManager.startAmbientListeningMode()
@@ -1676,6 +1697,9 @@ struct AmbientModeView: View {
         let messageText = keyboardText.trimmingCharacters(in: .whitespacesAndNewlines)
         keyboardText = "" // Clear immediately
         
+        // Check for page mentions in typed text too
+        detectPageMention(in: messageText)
+        
         // Smart content type detection
         let contentType = determineContentType(messageText)
         
@@ -1697,12 +1721,22 @@ struct AmbientModeView: View {
             // Save question to SwiftData immediately
             saveQuestionToSwiftData(content)
             
-            // For questions, show thinking and get AI response
-            shouldCollapseThinking = false  // Reset collapse state
-            isWaitingForAIResponse = true
-            pendingQuestion = messageText
+            // For questions, add a thinking message immediately
+            let thinkingMessage = UnifiedChatMessage(
+                content: "**\(messageText)**\n\n[Thinking]",
+                isUser: false,
+                timestamp: Date(),
+                messageType: .text
+            )
+            messages.append(thinkingMessage)
             
-            // Get AI response - it will handle updating with the response
+            // Collapse all previous and expand only the new question
+            withAnimation(.easeInOut(duration: 0.3)) {
+                expandedMessageIds.removeAll()
+                expandedMessageIds.insert(thinkingMessage.id)
+            }
+            
+            // Get AI response - it will update the thinking message
             Task {
                 await getAIResponseForAmbientQuestion(messageText)
             }
@@ -1860,16 +1894,24 @@ struct AmbientModeView: View {
         
         guard aiService.isConfigured() else {
             await MainActor.run {
-                // Clear thinking indicator immediately
-                isWaitingForAIResponse = false
-                shouldCollapseThinking = false
-                let configMessage = UnifiedChatMessage(
-                    content: "Please configure your AI service.",
-                    isUser: false,
-                    timestamp: Date(),
-                    bookContext: currentBookContext
-                )
-                messages.append(configMessage)
+                // Update thinking message to show error
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                    let updatedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\nPlease configure your AI service.",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        bookContext: currentBookContext
+                    )
+                    messages[thinkingIndex] = updatedMessage
+                } else {
+                    let configMessage = UnifiedChatMessage(
+                        content: "Please configure your AI service.",
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(configMessage)
+                }
             }
             return
         }
@@ -1882,18 +1924,34 @@ struct AmbientModeView: View {
             )
             
             await MainActor.run {
-                // Clear thinking indicator immediately
-                isWaitingForAIResponse = false
-                shouldCollapseThinking = false
+                // Update thinking message if it exists, otherwise append new message
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                    let updatedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\n\(response)",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        bookContext: currentBookContext
+                    )
+                    messages[thinkingIndex] = updatedMessage
+                    
+                    // AUTO-EXPAND the first question's answer!
+                    let nonUserMessages = messages.filter { !$0.isUser }
+                    if nonUserMessages.count == 1 {
+                        // This is the first question/answer - auto-expand it
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            expandedMessageIds.insert(updatedMessage.id)
+                        }
+                    }
+                } else {
+                    let aiMessage = UnifiedChatMessage(
+                        content: response,
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(aiMessage)
+                }
                 pendingQuestion = nil
-                
-                let aiMessage = UnifiedChatMessage(
-                    content: response,
-                    isUser: false,
-                    timestamp: Date(),
-                    bookContext: currentBookContext
-                )
-                messages.append(aiMessage)
                 
                 // Update the processed content with the response
                 if let pendingQ = pendingQuestion,
@@ -1907,21 +1965,40 @@ struct AmbientModeView: View {
                         bookTitle: currentBookContext?.title,
                         bookAuthor: currentBookContext?.author
                     )
+                    
+                    // CRITICAL: Update the saved question in SwiftData with the answer
+                    if let session = currentSession {
+                        // Find the question in the current session's questions
+                        if let question = session.capturedQuestions.first(where: { $0.content == pendingQ }) {
+                            question.answer = response
+                            question.isAnswered = true
+                            try? modelContext.save()
+                            print("✅ Updated SwiftData question with answer for summary view")
+                        }
+                    }
                 }
                 pendingQuestion = nil
             }
         } catch {
             await MainActor.run {
-                // Clear thinking indicator immediately  
-                isWaitingForAIResponse = false
-                shouldCollapseThinking = false
-                let errorMessage = UnifiedChatMessage(
-                    content: "Sorry, I couldn't process your message.",
-                    isUser: false,
-                    timestamp: Date(),
-                    bookContext: currentBookContext
-                )
-                messages.append(errorMessage)
+                // Update thinking message to show error
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                    let updatedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\nSorry, I couldn't process your message.",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        bookContext: currentBookContext
+                    )
+                    messages[thinkingIndex] = updatedMessage
+                } else {
+                    let errorMessage = UnifiedChatMessage(
+                        content: "Sorry, I couldn't process your message.",
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(errorMessage)
+                }
                 pendingQuestion = nil
             }
         }
@@ -1932,9 +2009,16 @@ struct AmbientModeView: View {
         
         guard aiService.isConfigured() else {
             await MainActor.run {
-                // Clear thinking indicator immediately
-                isWaitingForAIResponse = false
-                shouldCollapseThinking = false
+                // Update thinking message to show error
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                    let updatedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\nPlease configure your AI service in Settings.",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        messageType: .text
+                    )
+                    messages[thinkingIndex] = updatedMessage
+                }
                 pendingQuestion = nil
             }
             return
@@ -1948,10 +2032,25 @@ struct AmbientModeView: View {
             )
             
             await MainActor.run {
-                // Clear thinking indicator immediately
-                isWaitingForAIResponse = false
-                shouldCollapseThinking = false
-                pendingQuestion = nil
+                // Update the thinking message with the actual response
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                    let updatedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\n\(response)",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        messageType: .text
+                    )
+                    messages[thinkingIndex] = updatedMessage
+                    
+                    // AUTO-EXPAND the first question's answer!
+                    let nonUserMessages = messages.filter { !$0.isUser }
+                    if nonUserMessages.count == 1 {
+                        // This is the first question/answer - auto-expand it
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            expandedMessageIds.insert(updatedMessage.id)
+                        }
+                    }
+                }
                 
                 // Update the processed content with the response
                 if let index = processor.detectedContent.firstIndex(where: { $0.text == text && $0.type == .question && $0.response == nil }) {
@@ -1966,12 +2065,33 @@ struct AmbientModeView: View {
                     )
                     print("✅ Updated ambient question with AI response: \(text.prefix(30))...")
                 }
+                
+                // CRITICAL: Update the saved question in SwiftData with the answer
+                if let session = currentSession {
+                    // Find the question in the current session's questions
+                    if let question = session.capturedQuestions.first(where: { $0.content == text }) {
+                        question.answer = response
+                        question.isAnswered = true
+                        try? modelContext.save()
+                        print("✅ Updated SwiftData question with answer for summary view")
+                        print("   Session has \(session.capturedQuestions.count) questions")
+                    }
+                }
+                
+                pendingQuestion = nil
             }
         } catch {
             await MainActor.run {
-                // Clear thinking indicator immediately
-                isWaitingForAIResponse = false
-                shouldCollapseThinking = false
+                // Update thinking message to show error
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                    let updatedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\nSorry, I couldn't process your message.",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        messageType: .text
+                    )
+                    messages[thinkingIndex] = updatedMessage
+                }
                 pendingQuestion = nil
                 print("❌ Failed to get AI response for ambient question: \(error)")
             }
@@ -2020,9 +2140,9 @@ struct AmbientModeView: View {
             }
         }
         
-        // Start timer to hide book cover after 10 seconds
+        // Start timer to hide book cover after 4 seconds
         bookCoverTimer?.invalidate()
-        bookCoverTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
+        bookCoverTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
             withAnimation(.easeOut(duration: 0.8)) {
                 showBookCover = false
             }
@@ -2036,6 +2156,55 @@ struct AmbientModeView: View {
         }
         
         HapticManager.shared.lightTap()
+    }
+    
+    // MARK: - Page Detection
+    private func detectPageMention(in text: String) {
+        let lowercased = text.lowercased()
+        
+        // Regex patterns for page mentions
+        let patterns = [
+            "page (\\d+)",
+            "on page (\\d+)",
+            "i'm on page (\\d+)",
+            "i am on page (\\d+)",
+            "reading page (\\d+)",
+            "at page (\\d+)",
+            "page number (\\d+)"
+        ]
+        
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                let matches = regex.matches(in: lowercased, options: [], range: NSRange(location: 0, length: lowercased.count))
+                
+                if let match = matches.first,
+                   match.numberOfRanges > 1,
+                   let range = Range(match.range(at: 1), in: lowercased) {
+                    let pageNumberString = String(lowercased[range])
+                    if let pageNumber = Int(pageNumberString) {
+                        // Update the session with the current page
+                        if let session = currentSession {
+                            session.currentPage = pageNumber
+                            try? modelContext.save()
+                            print("📖 Updated current page to: \(pageNumber)")
+                            
+                            // Show subtle feedback
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                savedItemType = "Page \(pageNumber)"
+                                showSaveAnimation = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                withAnimation {
+                                    showSaveAnimation = false
+                                    savedItemType = nil
+                                }
+                            }
+                        }
+                        break // Only take the first page mention
+                    }
+                }
+            }
+        }
     }
     
     private func extractColorsForBook(_ book: Book) async {
@@ -2136,6 +2305,21 @@ struct AmbientModeView: View {
                 print("✅ Session saved with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
             } catch {
                 print("❌ Failed to save session: \(error)")
+            }
+            
+            // Debug: Log what we're saving
+            print("📊 Session Summary Debug:")
+            print("   Questions: \(session.capturedQuestions.count)")
+            for (i, q) in session.capturedQuestions.enumerated() {
+                print("     \(i+1). \(q.content.prefix(50))... Answer: \(q.isAnswered ? "Yes" : "No")")
+            }
+            print("   Quotes: \(session.capturedQuotes.count)")
+            for (i, quote) in session.capturedQuotes.enumerated() {
+                print("     \(i+1). \(quote.text.prefix(50))...")
+            }
+            print("   Notes: \(session.capturedNotes.count)")
+            for (i, note) in session.capturedNotes.enumerated() {
+                print("     \(i+1). \(note.content.prefix(50))...")
             }
             
             // Show summary if there's meaningful content
@@ -2400,6 +2584,7 @@ struct AmbientQuoteView: View {
 struct AmbientMessageThreadView: View {
     let message: UnifiedChatMessage
     let index: Int
+    let totalMessages: Int
     let isExpanded: Bool
     let onToggle: () -> Void
     
@@ -2407,6 +2592,9 @@ struct AmbientMessageThreadView: View {
     @State private var messageBlur: Double = 12
     @State private var messageScale: CGFloat = 0.96
     @State private var showThinkingParticles = false
+    @State private var answerOpacity: Double = 0
+    @State private var answerBlur: Double = 8
+    @State private var hasShownAnswer = false
     
     // Check if this is the first AI response in the session
     private var isFirstAIResponse: Bool {
@@ -2460,14 +2648,14 @@ struct AmbientMessageThreadView: View {
                 if message.isUser {
                     Text(message.content)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.white.opacity(0.9)) // Always full opacity once shown
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     // Extract question from AI response if formatted
                     let content = extractContent(from: message.content)
                     Text(content.question)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.white.opacity(0.9)) // Always full opacity once shown
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
@@ -2480,7 +2668,7 @@ struct AmbientMessageThreadView: View {
             .padding(.vertical, 16)
             .contentShape(Rectangle())
             .opacity(messageOpacity)
-            .blur(radius: messageBlur)
+            .blur(radius: messageBlur) // No extra blur when collapsed
             .scaleEffect(messageScale)
             .onTapGesture {
                 if !message.isUser {
@@ -2518,6 +2706,8 @@ struct AmbientMessageThreadView: View {
             // Answer (expandable for AI responses) with blur transition
             if !message.isUser && isExpanded {
                 let content = extractContent(from: message.content)
+                
+                // Show answer when ready with staggered fade-in
                 if !content.answer.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Rectangle()
@@ -2534,8 +2724,32 @@ struct AmbientMessageThreadView: View {
                             .padding(.vertical, 12)
                             .padding(.bottom, 4)
                     }
-                    .transition(.etherealAppear
-                    )
+                    .opacity(isExpanded ? answerOpacity : 0)
+                    .blur(radius: isExpanded ? answerBlur : 8)
+                    .onAppear {
+                        // Only animate the very first time
+                        if !hasShownAnswer {
+                            hasShownAnswer = true
+                            withAnimation(
+                                .timingCurve(0.215, 0.61, 0.355, 1, duration: 0.8)
+                                .delay(0.6) // Wait for question to fade in first
+                            ) {
+                                answerOpacity = 1.0
+                                answerBlur = 0
+                            }
+                        } else {
+                            // Already shown - no animation
+                            answerOpacity = 1.0
+                            answerBlur = 0
+                        }
+                    }
+                    .onChange(of: isExpanded) { _, newValue in
+                        // Handle collapse/expand without animation after first show
+                        if hasShownAnswer {
+                            answerOpacity = newValue ? 1.0 : 0
+                            answerBlur = newValue ? 0 : 8
+                        }
+                    }
                 }
             }
         }

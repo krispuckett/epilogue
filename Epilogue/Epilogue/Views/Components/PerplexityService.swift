@@ -11,8 +11,8 @@ class PerplexityService: ObservableObject {
     init() {
         // Configure URLSession for optimal performance
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15  // Faster timeout
-        config.timeoutIntervalForResource = 15
+        config.timeoutIntervalForRequest = 30  // Increased timeout for reliability
+        config.timeoutIntervalForResource = 30
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil  // Disable caching for real-time responses
         self.session = URLSession(configuration: config)

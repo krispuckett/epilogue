@@ -122,7 +122,6 @@ struct ChatSessionsViewRefined: View {
         }
         .onAppear {
             print("🔍 ChatSessionsViewRefined appeared with \(sessions.count) sessions")
-            loadColorPalettes()
             
             // Migrate orphaned sessions on first appearance
             if !hasMigratedSessions {
@@ -133,15 +132,15 @@ struct ChatSessionsViewRefined: View {
                     )
                     hasMigratedSessions = true
                     
-                    // Reload color palettes after migration
-                    loadColorPalettes()
+                    // Load color palettes after migration completes
+                    await MainActor.run {
+                        loadColorPalettes()
+                    }
                 }
+            } else {
+                // Only load palettes if we've already migrated
+                loadColorPalettes()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Refresh when app comes to foreground
-            print("🔄 App entered foreground, refreshing sessions...")
-            try? modelContext.save()
         }
     }
     
@@ -455,22 +454,64 @@ struct ChatSessionsViewRefined: View {
     
     
     private func loadColorPalettes() {
-        print("🎨 Loading color palettes for \(sessions.count) sessions")
-        for (index, session) in sessions.enumerated() {
-            print("   Session \(index + 1): Book = \(session.bookModel?.title ?? "No book"), Questions = \(session.capturedQuestions.count)")
-            guard let bookModel = session.bookModel,
-                  let coverURL = bookModel.coverImageURL,
-                  let url = URL(string: coverURL) else { continue }
+        print("🎨 Loading color palettes for unique books")
+        
+        // Get unique book IDs to avoid duplicate processing
+        var uniqueBookIds = Set<String>()
+        for session in sessions {
+            if let bookId = session.bookModel?.id {
+                uniqueBookIds.insert(bookId)
+            }
+        }
+        
+        print("   Found \(uniqueBookIds.count) unique books from \(sessions.count) sessions")
+        
+        // Only process books we haven't already processed
+        for bookId in uniqueBookIds {
+            // Skip if we already have this palette
+            if colorPalettes[bookId] != nil {
+                continue
+            }
             
-            Task {
-                if let (data, _) = try? await URLSession.shared.data(from: url),
-                   let uiImage = UIImage(data: data) {
-                    let extractor = OKLABColorExtractor()
-                    if let palette = try? await extractor.extractPalette(from: uiImage) {
-                        await MainActor.run {
-                            colorPalettes[bookModel.id] = palette
+            guard let session = sessions.first(where: { $0.bookModel?.id == bookId }),
+                  let bookModel = session.bookModel,
+                  let coverURL = bookModel.coverImageURL else { continue }
+            
+            // Convert HTTP to HTTPS
+            let secureURL = coverURL.hasPrefix("http://") 
+                ? coverURL.replacingOccurrences(of: "http://", with: "https://") 
+                : coverURL
+            
+            guard let url = URL(string: secureURL) else { continue }
+            
+            // Use a single task with proper memory management
+            Task { @MainActor in
+                // Check again if we already have this palette (race condition prevention)
+                if colorPalettes[bookId] != nil { return }
+                
+                do {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    
+                    // Use autoreleasepool to ensure image memory is freed
+                    await withCheckedContinuation { continuation in
+                        autoreleasepool {
+                            if let uiImage = UIImage(data: data) {
+                                let extractor = OKLABColorExtractor()
+                                Task {
+                                    if let palette = try? await extractor.extractPalette(from: uiImage) {
+                                        await MainActor.run {
+                                            colorPalettes[bookId] = palette
+                                        }
+                                    }
+                                    continuation.resume()
+                                }
+                            } else {
+                                continuation.resume()
+                            }
                         }
                     }
+                } catch {
+                    print("Failed to load palette for \(bookModel.title): \(error)")
                 }
             }
         }

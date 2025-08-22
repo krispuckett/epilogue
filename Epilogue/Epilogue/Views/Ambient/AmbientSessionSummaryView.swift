@@ -16,6 +16,9 @@ struct AmbientSessionSummaryView: View {
     @State private var isRecording = false
     @State private var contentOffset: CGFloat = 0
     @State private var isKeyInsightExpanded = false
+    @State private var editingPage = false
+    @State private var pageText = ""
+    @FocusState private var isPageFocused: Bool
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -205,8 +208,54 @@ struct AmbientSessionSummaryView: View {
     
     // MARK: - Metrics Section (Monospaced)
     private var metricsSection: some View {
-        HStack(spacing: 32) {
+        HStack(spacing: 24) {
             metricItem(value: formatDuration(session.duration), label: "DURATION")
+            
+            // Page tracking - tappable to edit
+            if editingPage {
+                VStack(spacing: 4) {
+                    TextField("Page", text: $pageText)
+                        .font(.system(size: 24, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.center)
+                        .frame(width: 60)
+                        .focused($isPageFocused)
+                        .keyboardType(.numberPad)
+                        .onSubmit {
+                            savePageNumber()
+                        }
+                    
+                    Text("PAGE")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .tracking(1.5)
+                }
+            } else {
+                Button {
+                    pageText = session.currentPage != nil ? "\(session.currentPage!)" : ""
+                    editingPage = true
+                    isPageFocused = true
+                } label: {
+                    VStack(spacing: 4) {
+                        HStack(spacing: 2) {
+                            Text(session.currentPage != nil ? "\(session.currentPage!)" : "—")
+                                .font(.system(size: 24, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.95))
+                            
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.3))
+                        }
+                        
+                        Text("PAGE")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .tracking(1.5)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            
             if session.capturedQuestions.count > 0 {
                 metricItem(value: "\(session.capturedQuestions.count)", label: "QUESTIONS")
             }
@@ -218,6 +267,11 @@ struct AmbientSessionSummaryView: View {
             }
         }
         .padding(.horizontal, 20)
+        .onTapGesture {
+            if editingPage {
+                savePageNumber()
+            }
+        }
     }
     
     private func metricItem(value: String, label: String) -> some View {
@@ -433,6 +487,21 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
+    private func savePageNumber() {
+        editingPage = false
+        isPageFocused = false
+        
+        if let pageNumber = Int(pageText), pageNumber > 0 {
+            session.currentPage = pageNumber
+            try? modelContext.save()
+            print("📖 Updated session page to: \(pageNumber)")
+        } else if pageText.isEmpty {
+            // Clear page if empty
+            session.currentPage = nil
+            try? modelContext.save()
+        }
+    }
+    
     private func sendFollowUp() {
         guard !continuationText.isEmpty else { return }
         
@@ -465,6 +534,31 @@ struct AmbientSessionSummaryView: View {
                         bookContext: session.book
                     )
                     additionalMessages.append(aiMessage)
+                    
+                    // CRITICAL: Save follow-up question to the session
+                    let capturedQuestion = CapturedQuestion(
+                        content: questionText,
+                        book: session.bookModel,
+                        pageNumber: session.currentPage,
+                        timestamp: Date(),
+                        source: .ambient
+                    )
+                    capturedQuestion.answer = response
+                    capturedQuestion.isAnswered = true
+                    capturedQuestion.ambientSession = session
+                    
+                    // Add to session and save
+                    session.capturedQuestions.append(capturedQuestion)
+                    modelContext.insert(capturedQuestion)
+                    
+                    do {
+                        try modelContext.save()
+                        print("✅ Follow-up question saved to session: \(questionText.prefix(50))...")
+                        print("   Session now has \(session.capturedQuestions.count) questions")
+                    } catch {
+                        print("❌ Failed to save follow-up question: \(error)")
+                    }
+                    
                     isProcessingFollowUp = false
                 }
             } catch {

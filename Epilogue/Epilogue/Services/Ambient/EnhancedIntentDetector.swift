@@ -241,7 +241,11 @@ public class EnhancedIntentDetector {
                         lowercased.starts(with: "can you explain") ||
                         lowercased.starts(with: "i'm curious about") ||
                         lowercased.starts(with: "i want to know") ||
-                        lowercased.starts(with: "explain")
+                        lowercased.starts(with: "explain") ||
+                        // Questions about quotes/themes/characters
+                        (lowercased.contains("quote") && text.contains("?")) ||
+                        (lowercased.contains("what") && lowercased.contains("quote")) ||
+                        (lowercased.contains("which") && lowercased.contains("quote"))
         
         guard isQuestion else {
             return nil
@@ -260,6 +264,7 @@ public class EnhancedIntentDetector {
     
     private func calculateQuestionConfidence(_ text: String, _ type: EnhancedIntent.QuestionType) -> Float {
         var confidence: Float = 0.5
+        let lowercased = text.lowercased()
         
         // Question mark adds confidence
         if text.contains("?") { confidence += 0.3 }
@@ -269,13 +274,39 @@ public class EnhancedIntentDetector {
             confidence += 0.2
         }
         
-        return min(confidence, 0.95)
+        // Questions about quotes/passages get maximum confidence
+        if (lowercased.contains("quote") || lowercased.contains("passage") || lowercased.contains("line")) &&
+           (text.contains("?") || lowercased.starts(with: "what")) {
+            confidence = 0.95
+        }
+        
+        return min(confidence, 0.99)
     }
     
     // MARK: - Quote Detection
     private func detectQuote(from text: String, entities: [EnhancedEntity]) -> (speaker: String?, confidence: Float)? {
         let hasQuotationMarks = text.contains("\"") || text.contains("\u{201C}") || text.contains("\u{201D}")
         let lowercased = text.lowercased()
+        
+        // CRITICAL: Check if this is a QUESTION about quotes first!
+        let questionAboutQuotes = [
+            "what is the most famous quote",
+            "what's the most famous quote",
+            "what quote",
+            "which quote",
+            "any quotes about",
+            "are there quotes",
+            "can you find a quote",
+            "remember any quotes",
+            "favorite quote from",
+            "best quote from"
+        ]
+        
+        // If it's a question ABOUT quotes, it's NOT a quote itself
+        if questionAboutQuotes.contains(where: { lowercased.contains($0) }) || 
+           (lowercased.contains("quote") && text.contains("?")) {
+            return nil  // This is a question, not a quote
+        }
         
         // Check if user is introducing a quote
         let quoteIntroPatterns = [
