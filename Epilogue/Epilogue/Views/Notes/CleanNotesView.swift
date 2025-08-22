@@ -372,7 +372,7 @@ struct CleanNotesView: View {
             Text("Are you sure you want to delete this \(itemType)? This action cannot be undone.")
         }
         .sheet(isPresented: $showingSessionSummary) {
-            NavigationView {
+            NavigationStack {
                 if selectedSessionNote != nil || selectedSessionQuote != nil {
                     SessionSummaryPlaceholderView(
                         note: selectedSessionNote,

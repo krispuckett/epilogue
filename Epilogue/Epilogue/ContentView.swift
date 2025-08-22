@@ -62,7 +62,7 @@ struct ContentView: View {
             .preferredColorScheme(.dark)
             .withErrorHandling()
             .sheet(isPresented: $showPrivacySettings) {
-                NavigationView {
+                NavigationStack {
                     PrivacySettingsView()
                         .toolbar {
                             ToolbarItem(placement: .navigationBarTrailing) {

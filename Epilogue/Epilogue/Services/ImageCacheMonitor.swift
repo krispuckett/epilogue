@@ -153,7 +153,7 @@ struct ImageCacheDebugView: View {
             }
         }
         .sheet(isPresented: $showingReport) {
-            NavigationView {
+            NavigationStack {
                 ScrollView {
                     Text(monitor.getDetailedReport())
                         .font(.system(.body, design: .monospaced))

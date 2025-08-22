@@ -7,7 +7,7 @@ struct PerformanceTestView: View {
     @State private var isRunning = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     // FPS Monitor

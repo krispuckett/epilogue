@@ -15,7 +15,7 @@ struct ColorExtractionDebugView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     // Original Image Section

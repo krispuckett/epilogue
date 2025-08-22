@@ -14,7 +14,7 @@ struct EnhancedBookScannerView: View {
     @State private var hasRequestedPermission = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Dark background for camera
                 Color.black

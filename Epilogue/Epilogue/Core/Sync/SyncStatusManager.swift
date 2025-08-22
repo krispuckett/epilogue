@@ -212,7 +212,7 @@ struct DetailedSyncStatusSheet: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
                 // Current Status
                 VStack(alignment: .leading, spacing: 8) {

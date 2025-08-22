@@ -7,7 +7,7 @@ struct CommandPaletteView: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List(libraryViewModel.books) { book in
                 Button {
                     selectedBook = book

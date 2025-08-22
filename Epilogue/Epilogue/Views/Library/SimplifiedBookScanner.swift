@@ -7,7 +7,7 @@ struct SimplifiedBookScanner: View {
     @State private var showBookSearch = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Dark background
                 Color.black

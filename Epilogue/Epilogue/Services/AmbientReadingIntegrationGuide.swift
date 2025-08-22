@@ -312,7 +312,7 @@ struct AmbientIntegrationTestView: View {
     @State private var testResults: [String] = []
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 20) {
                 // System Status
                 statusSection
