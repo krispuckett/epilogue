@@ -13,7 +13,6 @@ struct ScrollingBookMessages: View {
     @State private var currentMessageIndex = 0
     @State private var opacity: Double = 1.0
     @State private var usedIndices: Set<Int> = []
-    @State private var cyclingTimer: Timer?
     
     let messages = [
         // Literary and bookish phrases
@@ -63,15 +62,10 @@ struct ScrollingBookMessages: View {
                 usedIndices.insert(currentMessageIndex)
                 startCycling()
             }
-            .onDisappear {
-                cyclingTimer?.invalidate()
-                cyclingTimer = nil
-            }
     }
     
     private func startCycling() {
-        cyclingTimer?.invalidate()
-        cyclingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             withAnimation(.easeOut(duration: 0.3)) {
                 opacity = 0
             }
@@ -167,7 +161,6 @@ struct AmbientModeView: View {
     @State private var submitBlurWave: Double = 0
     @State private var lastCharacterCount: Int = 0
     @State private var breathingTimer: Timer?
-    @State private var cyclingTimer: Timer?
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
     
@@ -282,21 +275,16 @@ struct AmbientModeView: View {
             .allowsHitTesting(false)
             .blur(radius: 0.5)  // Subtle blur to soften the gradient edge
         }
-        // Bottom gradient overlay
+        // Bottom gradient and input controls
         .overlay(alignment: .bottom) {
-            // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
-            voiceGradientOverlay
-                .allowsHitTesting(false) // Ensure gradient doesn't block touches
-        }
-        // Use safeAreaInset for AmbientModeView to avoid layout issues
-        .safeAreaInset(edge: .bottom) {
-            bottomInputArea
-                .background {
-                    // Glass background for input area
-                    Rectangle()
-                        .fill(.regularMaterial)
-                        .ignoresSafeArea(edges: .bottom)
-                }
+            ZStack(alignment: .bottom) {
+                // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
+                voiceGradientOverlay
+                    .allowsHitTesting(false) // Ensure gradient doesn't block touches
+                
+                // Input controls overlay on top of gradient
+                bottomInputArea
+            }
         }
         // Top navigation bar with BookView-style header
         .safeAreaInset(edge: .top) {
@@ -356,19 +344,9 @@ struct AmbientModeView: View {
             handleBookDetection(book)
         }
         .onDisappear {
-            // Clean up all timers to prevent memory leaks
             bookCoverTimer?.invalidate()
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
-            debounceTimer?.invalidate()
-            cyclingTimer?.invalidate()
-            
-            // Set to nil to ensure deallocation
-            bookCoverTimer = nil
-            transcriptionFadeTimer = nil
-            breathingTimer = nil
-            debounceTimer = nil
-            cyclingTimer = nil
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $capturedImage)
@@ -494,8 +472,8 @@ struct AmbientModeView: View {
     // MARK: - Voice Gradient Overlay (Matching UnifiedChatView)
     @ViewBuilder
     private var voiceGradientOverlay: some View {
-        ZStack {
-            // Book cover - centered in the view
+        VStack {
+            // Book cover - show when book is detected, fade after 10 seconds
             if showBookCover, let book = currentBookContext, let coverURL = book.coverImageURL {
                 SharedBookCoverView(
                     coverURL: coverURL,
@@ -512,26 +490,30 @@ struct AmbientModeView: View {
                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                     removal: .scale(scale: 1.1).combined(with: .opacity)
                 ))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2 - 100)
+                .padding(.top, 140)
             }
             
-            // Voice responsive bottom gradient - positioned at bottom
-            VStack {
-                Spacer()
-                VoiceResponsiveBottomGradient(
-                    colorPalette: colorPalette,
-                    audioLevel: audioLevel,
-                    isRecording: isRecording,
-                    bookContext: currentBookContext
-                )
-                .allowsHitTesting(false)
-                .ignoresSafeArea(.all)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .move(edge: .bottom)),
-                    removal: .opacity.combined(with: .move(edge: .bottom))
-                ))
-            }
+            Spacer()
+            
+            // Voice responsive bottom gradient - exactly like UnifiedChatView
+            VoiceResponsiveBottomGradient(
+                colorPalette: colorPalette,
+                audioLevel: audioLevel,
+                isRecording: isRecording,
+                bookContext: currentBookContext
+            )
+            .allowsHitTesting(false)
+            .ignoresSafeArea(.all)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .move(edge: .bottom)),
+                removal: .opacity.combined(with: .move(edge: .bottom))
+            ))
+        }
+        
+        // Minimal recording UI
+        VStack {
+            Spacer()
+            // All UI elements moved to bottomInputArea for proper positioning
         }
     }
     
@@ -721,10 +703,10 @@ struct AmbientModeView: View {
                     .padding(.bottom, 16)
             
             // Unified morphing container - like morph-surface example
-            HStack(spacing: 0) {
-                Spacer()
-                
-                GeometryReader { geometry in
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    Spacer()
+                    
                     // Single morphing container that expands/contracts
                     ZStack {
                         // Morphing background with ambient blur
@@ -924,9 +906,7 @@ struct AmbientModeView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
-                }  // End GeometryReader
-                
-                Spacer()
+                .frame(height: geometry.size.height)
             }
             .frame(height: 100)
             .padding(.horizontal, 16)
@@ -945,9 +925,10 @@ struct AmbientModeView: View {
                 }
                 HapticManager.shared.mediumTap()
             }
-        }  // Close VStack
+            }  // Close VStack
+        }  // Close ZStack
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode) // Smooth Dynamic Island-style spring
-    }  // Close ZStack
+    }
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
     // Keeping for reference but no longer used
@@ -1024,8 +1005,8 @@ struct AmbientModeView: View {
     
     // MARK: - BookView-Style Header
     private var bookStyleHeader: some View {
-        ZStack {
-            // Center - Exit button (X in circle with liquid glass)
+        HStack(spacing: 0) {
+            // Left side - Exit button (X in circle with liquid glass)
             Button {
                 stopAndSaveSession()
             } label: {
@@ -1037,11 +1018,10 @@ struct AmbientModeView: View {
                     .clipShape(Circle())
             }
             
+            Spacer()
+            
             // Right side - Switch books pill with liquid glass
-            HStack {
-                Spacer()
-                
-                if currentBookContext != nil {
+            if currentBookContext != nil {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         showingBookStrip.toggle()
@@ -1054,7 +1034,6 @@ struct AmbientModeView: View {
                         .padding(.vertical, 12)
                         .glassEffect()
                         .clipShape(Capsule())
-                }
                 }
             }
         }
@@ -2255,10 +2234,10 @@ struct AmbientModeView: View {
         }
         
         do {
-            // Use SharedBookCoverManager for cached image loading
-            guard let image = await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) else {
-                print("❌ Failed to load image from SharedBookCoverManager")
-                return
+            let (imageData, _) = try await URLSession.shared.data(from: coverURL)
+            guard let image = UIImage(data: imageData) else { 
+                print("❌ Failed to create image from data")
+                return 
             }
             
             let extractor = OKLABColorExtractor()
