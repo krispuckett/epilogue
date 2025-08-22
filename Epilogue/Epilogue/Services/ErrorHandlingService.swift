@@ -267,22 +267,17 @@ extension View {
 
 // MARK: - Async Error Handling
 
-extension Task where Failure == Error {
-    /// Execute with automatic error handling
-    @discardableResult
-    static func handleErrors(
-        context: String,
-        priority: _Concurrency.TaskPriority? = nil,
-        operation: @escaping () async throws -> Success
-    ) -> Task<Success?, Never> {
-        Task(priority: priority) {
-            do {
-                return try await operation()
-            } catch {
-                await ErrorHandlingService.shared.handle(error, context: context)
-                return nil
-            }
-        }
+// MARK: - Convenience function for error handling
+func withErrorHandling<T>(
+    context: String,
+    priority: TaskPriority? = nil,
+    operation: @escaping () async throws -> T
+) async -> T? {
+    do {
+        return try await operation()
+    } catch {
+        await ErrorHandlingService.shared.handle(error, context: context)
+        return nil
     }
 }
 
