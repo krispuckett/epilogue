@@ -715,10 +715,10 @@ struct AmbientModeView: View {
                     .padding(.bottom, 16)
             
             // Unified morphing container - like morph-surface example
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    Spacer()
-                    
+            HStack(spacing: 0) {
+                Spacer()
+                
+                GeometryReader { geometry in
                     // Single morphing container that expands/contracts
                     ZStack {
                         // Morphing background with ambient blur
@@ -919,6 +919,9 @@ struct AmbientModeView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: geometry.size.height)
+                }  // End GeometryReader
+                
+                Spacer()
             }
             .frame(height: 100)
             .padding(.horizontal, 16)
