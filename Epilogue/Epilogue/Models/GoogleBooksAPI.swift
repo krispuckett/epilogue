@@ -551,7 +551,7 @@ class GoogleBooksService: ObservableObject {
         }
         
         // Boost books with descriptions (usually means it's a real book)
-        if book.description != nil && !book.description!.isEmpty {
+        if let description = book.description, !description.isEmpty {
             score += 20
         }
         
