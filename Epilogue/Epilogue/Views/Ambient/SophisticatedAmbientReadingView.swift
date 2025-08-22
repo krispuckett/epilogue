@@ -447,12 +447,11 @@ struct SophisticatedAmbientReadingView: View {
     }
     
     private func extractColorsForBook(_ book: Book) async {
-        guard let coverURLString = book.coverImageURL,
-              let coverURL = URL(string: coverURLString) else { return }
+        guard let coverURLString = book.coverImageURL else { return }
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: coverURL)
-            if let image = UIImage(data: data) {
+            // Use SharedBookCoverManager for cached loading
+            if let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURLString) {
                 let extractor = OKLABColorExtractor()
                 let palette = try await extractor.extractPalette(from: image)
                 
