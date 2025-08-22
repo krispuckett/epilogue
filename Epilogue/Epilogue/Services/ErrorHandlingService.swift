@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 import os.log
 
 // MARK: - Error Types
@@ -270,7 +271,7 @@ extension Task where Failure == Error {
     /// Execute with automatic error handling
     static func handleErrors(
         context: String,
-        priority: TaskPriority? = nil,
+        priority: _Concurrency.TaskPriority? = nil,
         operation: @escaping () async throws -> Success
     ) {
         Task(priority: priority) {

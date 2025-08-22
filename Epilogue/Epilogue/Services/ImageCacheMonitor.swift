@@ -1,5 +1,6 @@
 import Foundation
-import UIKit
+import SwiftUI
+import Combine
 import os.log
 
 /// Monitors and reports on image cache usage
