@@ -11,6 +11,7 @@ struct EpilogueApp: App {
                 ContentView()
                     .preferredColorScheme(.dark)
                     .modelContainer(container)
+                    .runSwiftDataMigrations()
                     .onAppear {
                         // Clear command history on app launch to prevent artifacts
                         Task { @MainActor in
