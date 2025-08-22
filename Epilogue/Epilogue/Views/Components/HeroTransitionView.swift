@@ -8,43 +8,45 @@ struct HeroTransitionView: View {
     @State private var animationProgress: CGFloat = 0
     
     var body: some View {
-        ZStack {
-            if isPresented {
-                // Expanding circle from waveform icon
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                .orange.opacity(0.8),
-                                .orange.opacity(0.4),
-                                .clear
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 400
+        GeometryReader { geometry in
+            ZStack {
+                if isPresented {
+                    // Expanding circle from waveform icon
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    .orange.opacity(0.8),
+                                    .orange.opacity(0.4),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 400
+                            )
                         )
-                    )
-                    .frame(
-                        width: 20 + (UIScreen.main.bounds.width * 2) * animationProgress,
-                        height: 20 + (UIScreen.main.bounds.height * 2) * animationProgress
-                    )
-                    .position(
-                        x: sourceFrame.midX,
-                        y: sourceFrame.midY
-                    )
-                    .animation(
-                        .easeInOut(duration: 0.8),
-                        value: animationProgress
-                    )
-                    .onAppear {
-                        animationProgress = 1.0
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            onComplete()
+                        .frame(
+                            width: 20 + (geometry.size.width * 2) * animationProgress,
+                            height: 20 + (geometry.size.height * 2) * animationProgress
+                        )
+                        .position(
+                            x: sourceFrame.midX,
+                            y: sourceFrame.midY
+                        )
+                        .animation(
+                            .easeInOut(duration: 0.8),
+                            value: animationProgress
+                        )
+                        .onAppear {
+                            animationProgress = 1.0
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                onComplete()
+                            }
                         }
-                    }
+                }
             }
+            .allowsHitTesting(false)
         }
-        .allowsHitTesting(false)
     }
 }
 

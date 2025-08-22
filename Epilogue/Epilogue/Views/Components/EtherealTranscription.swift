@@ -26,11 +26,11 @@ struct EtherealTranscription: View {
     private let maxCharacters = 80
     private let containerHeight: CGFloat = 80
     
-    private var containerBackground: some View {
+    private func containerBackground(maxWidth: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
             .fill(.clear)
             .frame(height: containerHeight)
-            .frame(maxWidth: UIScreen.main.bounds.width - 60)
+            .frame(maxWidth: maxWidth - 60)
             .glassEffect() // Using existing glass effect
     }
     
@@ -89,54 +89,56 @@ struct EtherealTranscription: View {
     }
     
     var body: some View {
-        ZStack {
-            // Container background
-            containerBackground
-                .overlay(glowOverlay)
-                .modifier(shadowModifier)
-            
-            // Text content
-            VStack(spacing: 4) {
-                if !previousLine.isEmpty {
-                    previousLineView
-                        .transition(.asymmetric(
-                            insertion: .opacity,
-                            removal: .opacity.combined(with: .move(edge: .leading))
-                        ))
-                }
+        GeometryReader { geometry in
+            ZStack {
+                // Container background
+                containerBackground(maxWidth: geometry.size.width)
+                    .overlay(glowOverlay)
+                    .modifier(shadowModifier)
                 
-                if !displayText.isEmpty {
-                    currentTextView
-                        .animation(.easeOut(duration: 0.3), value: textBlur)
-                        .animation(.easeOut(duration: 0.3), value: textOffset)
-                        .animation(.easeOut(duration: 0.3), value: wordRevealProgress)
+                // Text content
+                VStack(spacing: 4) {
+                    if !previousLine.isEmpty {
+                        previousLineView
+                            .transition(.asymmetric(
+                                insertion: .opacity,
+                                removal: .opacity.combined(with: .move(edge: .leading))
+                            ))
+                    }
+                    
+                    if !displayText.isEmpty {
+                        currentTextView
+                            .animation(.easeOut(duration: 0.3), value: textBlur)
+                            .animation(.easeOut(duration: 0.3), value: textOffset)
+                            .animation(.easeOut(duration: 0.3), value: wordRevealProgress)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .frame(height: containerHeight)
+                .frame(maxWidth: geometry.size.width - 60)
+            }
+            .drawingGroup() // GPU acceleration for smooth 120fps
+            .onChange(of: currentText) { oldValue, newValue in
+                updateText(from: oldValue, to: newValue)
+            }
+            .onChange(of: isActive) { _, active in
+                if active {
+                    startPulseAnimation()
+                } else {
+                    stopPulseAnimation()
                 }
             }
-            .padding(.horizontal, 20)
-            .frame(height: containerHeight)
-            .frame(maxWidth: UIScreen.main.bounds.width - 60)
-        }
-        .drawingGroup() // GPU acceleration for smooth 120fps
-        .onChange(of: currentText) { oldValue, newValue in
-            updateText(from: oldValue, to: newValue)
-        }
-        .onChange(of: isActive) { _, active in
-            if active {
-                startPulseAnimation()
-            } else {
+            .onAppear {
+                if isActive {
+                    startPulseAnimation()
+                }
+                if !currentText.isEmpty {
+                    updateText(from: "", to: currentText)
+                }
+            }
+            .onDisappear {
                 stopPulseAnimation()
             }
-        }
-        .onAppear {
-            if isActive {
-                startPulseAnimation()
-            }
-            if !currentText.isEmpty {
-                updateText(from: "", to: currentText)
-            }
-        }
-        .onDisappear {
-            stopPulseAnimation()
         }
     }
     

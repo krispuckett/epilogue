@@ -74,49 +74,51 @@ struct ThinkingMessageView: View {
     }
     
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // Thinking indicator
-            LiquidGlassThinkingIndicator(color: primaryColor)
-            
-            // Optional context text
-            Text("Thinking...")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
-                .italic()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.7, alignment: .leading)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 18))
-        .overlay {
-            // Animated glow border
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            primaryColor.opacity(glowOpacity),
-                            primaryColor.opacity(glowOpacity * 0.3),
-                            primaryColor.opacity(glowOpacity * 0.1),
-                            primaryColor.opacity(glowOpacity * 0.3),
-                            primaryColor.opacity(glowOpacity)
-                        ]),
-                        center: .center,
-                        startAngle: .degrees(rotationAngle),
-                        endAngle: .degrees(rotationAngle + 360)
-                    ),
-                    lineWidth: 1
-                )
-                .blur(radius: 2)
-        }
-        .onAppear {
-            // Pulse glow
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                glowOpacity = 0.6
+        GeometryReader { geometry in
+            HStack(alignment: .center, spacing: 12) {
+                // Thinking indicator
+                LiquidGlassThinkingIndicator(color: primaryColor)
+                
+                // Optional context text
+                Text("Thinking...")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .italic()
             }
-            
-            // Rotate gradient
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                rotationAngle = 360
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .frame(maxWidth: geometry.size.width * 0.7, alignment: .leading)
+            .glassEffect(in: RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                // Animated glow border
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                primaryColor.opacity(glowOpacity),
+                                primaryColor.opacity(glowOpacity * 0.3),
+                                primaryColor.opacity(glowOpacity * 0.1),
+                                primaryColor.opacity(glowOpacity * 0.3),
+                                primaryColor.opacity(glowOpacity)
+                            ]),
+                            center: .center,
+                            startAngle: .degrees(rotationAngle),
+                            endAngle: .degrees(rotationAngle + 360)
+                        ),
+                        lineWidth: 1
+                    )
+                    .blur(radius: 2)
+            }
+            .onAppear {
+                // Pulse glow
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    glowOpacity = 0.6
+                }
+                
+                // Rotate gradient
+                withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                    rotationAngle = 360
+                }
             }
         }
     }

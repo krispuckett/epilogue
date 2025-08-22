@@ -29,39 +29,41 @@ struct FramerTranscriptionView: View {
     private let twoLineHeight: CGFloat = 80
     
     var body: some View {
-        // Glass container that expands smoothly
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(lines) { line in
-                HStack(spacing: 4) {
-                    ForEach(line.words) { word in
-                        WordView(
-                            word: word,
-                            isLineExiting: line.isExiting
-                        )
+        GeometryReader { geometry in
+            // Glass container that expands smoothly
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(lines) { line in
+                    HStack(spacing: 4) {
+                        ForEach(line.words) { word in
+                            WordView(
+                                word: word,
+                                isLineExiting: line.isExiting
+                            )
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .frame(maxWidth: UIScreen.main.bounds.width - 80)
-        .frame(minHeight: containerHeight)
-        .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: lines.count)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: containerHeight)
-        .onChange(of: transcribedText) { oldValue, newValue in
-            if newValue != lastProcessedText {
-                processNewText(newValue)
-                lastProcessedText = newValue
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            .frame(maxWidth: geometry.size.width - 80)
+            .frame(minHeight: containerHeight)
+            .glassEffect()
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: lines.count)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: containerHeight)
+            .onChange(of: transcribedText) { oldValue, newValue in
+                if newValue != lastProcessedText {
+                    processNewText(newValue)
+                    lastProcessedText = newValue
+                }
             }
-        }
-        .onAppear {
-            if !transcribedText.isEmpty {
-                processNewText(transcribedText)
-                lastProcessedText = transcribedText
+            .onAppear {
+                if !transcribedText.isEmpty {
+                    processNewText(transcribedText)
+                    lastProcessedText = transcribedText
+                }
             }
         }
     }

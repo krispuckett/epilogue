@@ -17,43 +17,45 @@ struct BulletproofTranscription: View {
     private let maxCharsPerLine = 40
     
     var body: some View {
-        // Single VStack, no HStacks, no ForEach on words
-        VStack(alignment: .center, spacing: 6) {
-            if !line1.isEmpty {
-                Text(line1) // SINGLE Text view for entire line
-                    .font(.system(size: 19, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(1)
-                    .opacity(line1Opacity)
-                    .blur(radius: line1Blur)
-                    .offset(y: line1Offset)
+        GeometryReader { geometry in
+            // Single VStack, no HStacks, no ForEach on words
+            VStack(alignment: .center, spacing: 6) {
+                if !line1.isEmpty {
+                    Text(line1) // SINGLE Text view for entire line
+                        .font(.system(size: 19, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .opacity(line1Opacity)
+                        .blur(radius: line1Blur)
+                        .offset(y: line1Offset)
+                }
+                
+                if !line2.isEmpty {
+                    Text(line2) // SINGLE Text view for entire line
+                        .font(.system(size: 19, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .opacity(line2Opacity)
+                        .blur(radius: line2Blur)
+                        .offset(y: line2Offset)
+                }
             }
-            
-            if !line2.isEmpty {
-                Text(line2) // SINGLE Text view for entire line
-                    .font(.system(size: 19, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(1)
-                    .opacity(line2Opacity)
-                    .blur(radius: line2Blur)
-                    .offset(y: line2Offset)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            .frame(maxWidth: geometry.size.width - 80)
+            .frame(minHeight: containerHeight)
+            .glassEffect()
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: containerHeight)
+            .onChange(of: currentText) { _, newText in
+                updateLines(with: newText)
             }
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .frame(maxWidth: UIScreen.main.bounds.width - 80)
-        .frame(minHeight: containerHeight)
-        .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: containerHeight)
-        .onChange(of: currentText) { _, newText in
-            updateLines(with: newText)
-        }
-        .onAppear {
-            if !currentText.isEmpty {
-                updateLines(with: currentText)
+            .onAppear {
+                if !currentText.isEmpty {
+                    updateLines(with: currentText)
+                }
             }
         }
     }
@@ -160,34 +162,36 @@ struct UltraSimpleLineTranscription: View {
     @State private var textOpacity: Double = 1
     
     var body: some View {
-        Text(displayText)
-            .font(.system(size: 19, weight: .medium, design: .rounded))
-            .foregroundStyle(.white)
-            .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .lineSpacing(4)
-            .opacity(textOpacity)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
-            .frame(maxWidth: UIScreen.main.bounds.width - 80)
-            .glassEffect()
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .onChange(of: currentText) { _, newText in
-                // Simple fade transition
-                withAnimation(.easeOut(duration: 0.2)) {
-                    textOpacity = 0
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    displayText = String(newText.suffix(80))
-                    withAnimation(.easeIn(duration: 0.3)) {
-                        textOpacity = 1
+        GeometryReader { geometry in
+            Text(displayText)
+                .font(.system(size: 19, weight: .medium, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .lineSpacing(4)
+                .opacity(textOpacity)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .frame(maxWidth: geometry.size.width - 80)
+                .glassEffect()
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .onChange(of: currentText) { _, newText in
+                    // Simple fade transition
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        textOpacity = 0
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        displayText = String(newText.suffix(80))
+                        withAnimation(.easeIn(duration: 0.3)) {
+                            textOpacity = 1
+                        }
                     }
                 }
-            }
-            .onAppear {
-                displayText = String(currentText.suffix(80))
-            }
+                .onAppear {
+                    displayText = String(currentText.suffix(80))
+                }
+        }
     }
 }
 

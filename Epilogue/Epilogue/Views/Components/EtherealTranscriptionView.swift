@@ -22,52 +22,54 @@ struct EtherealTranscriptionView: View {
     private let lineTransitionDuration: Double = 0.8
     
     var body: some View {
-        VStack(alignment: .center, spacing: 8) {
-            ForEach(displayedLines) { line in
-                EtherealTranscriptionLineView(
-                    line: line,
-                    revealProgress: characterReveals[line.id] ?? 0,
-                    blurAmount: lineBlurs[line.id] ?? 0,
-                    opacity: lineOpacities[line.id] ?? 0,
-                    yOffset: lineOffsets[line.id] ?? 0,
-                    glowIntensity: glowIntensity
-                )
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .offset(y: 20)),
-                    removal: .opacity.combined(with: .offset(y: -20)).combined(with: .scale(scale: 0.95))
-                ))
+        GeometryReader { geometry in
+            VStack(alignment: .center, spacing: 8) {
+                ForEach(displayedLines) { line in
+                    EtherealTranscriptionLineView(
+                        line: line,
+                        revealProgress: characterReveals[line.id] ?? 0,
+                        blurAmount: lineBlurs[line.id] ?? 0,
+                        opacity: lineOpacities[line.id] ?? 0,
+                        yOffset: lineOffsets[line.id] ?? 0,
+                        glowIntensity: glowIntensity
+                    )
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: 20)),
+                        removal: .opacity.combined(with: .offset(y: -20)).combined(with: .scale(scale: 0.95))
+                    ))
+                }
             }
-        }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 20)
-        .frame(maxWidth: UIScreen.main.bounds.width - 60)
-        .glassEffect() // YOUR LIQUID GLASS - NOTHING ELSE
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .scaleEffect(containerScale)
-        .blur(radius: containerBlur)
-        .shadow(
-            color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(glowIntensity * 0.3),
-            radius: 20 * glowIntensity,
-            x: 0,
-            y: 0
-        )
-        .onChange(of: currentText) { _, newText in
-            updateTranscription(with: newText)
-        }
-        .onChange(of: isDissolving) { _, dissolving in
-            if dissolving {
-                performEtherealDissolve()
+            .padding(.horizontal, 28)
+            .padding(.vertical, 20)
+            .frame(maxWidth: geometry.size.width - 60)
+            .glassEffect() // YOUR LIQUID GLASS - NOTHING ELSE
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .scaleEffect(containerScale)
+            .blur(radius: containerBlur)
+            .shadow(
+                color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(glowIntensity * 0.3),
+                radius: 20 * glowIntensity,
+                x: 0,
+                y: 0
+            )
+            .onChange(of: currentText) { _, newText in
+                updateTranscription(with: newText)
             }
-        }
-        .onAppear {
-            // Entrance animation
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
-                containerScale = 1.0
-                containerBlur = 0
+            .onChange(of: isDissolving) { _, dissolving in
+                if dissolving {
+                    performEtherealDissolve()
+                }
             }
-            
-            if !currentText.isEmpty {
-                updateTranscription(with: currentText)
+            .onAppear {
+                // Entrance animation
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+                    containerScale = 1.0
+                    containerBlur = 0
+                }
+                
+                if !currentText.isEmpty {
+                    updateTranscription(with: currentText)
+                }
             }
         }
     }
@@ -325,55 +327,57 @@ struct SimplifiedLiquidGlassTranscription: View {
     @State private var containerScale: CGFloat = 0.95
     
     var body: some View {
-        ZStack {
-            // Invisible full text for sizing
-            Text(displayText)
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundStyle(.clear)
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .lineSpacing(6)
-            
-            // Revealed text with per-character animation
-            Text(displayText)
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .lineSpacing(6)
-                .mask(
-                    GeometryReader { geometry in
-                        Rectangle()
-                            .frame(width: geometry.size.width * revealProgress)
-                    }
-                )
-                .blur(radius: (1 - revealProgress) * 10)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .frame(maxWidth: UIScreen.main.bounds.width - 80)
-        .glassEffect() // ONLY YOUR LIQUID GLASS
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .scaleEffect(containerScale)
-        .onChange(of: currentText) { _, newText in
-            // Reset for new text
-            revealProgress = 0
-            displayText = String(newText.suffix(120))
-            
-            // Animate reveal
-            withAnimation(.easeOut(duration: 0.8)) {
-                revealProgress = 1
-                containerScale = 1.02
+        GeometryReader { geometry in
+            ZStack {
+                // Invisible full text for sizing
+                Text(displayText)
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .foregroundStyle(.clear)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .lineSpacing(6)
+                
+                // Revealed text with per-character animation
+                Text(displayText)
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .lineSpacing(6)
+                    .mask(
+                        GeometryReader { geometry in
+                            Rectangle()
+                                .frame(width: geometry.size.width * revealProgress)
+                        }
+                    )
+                    .blur(radius: (1 - revealProgress) * 10)
             }
-            withAnimation(.easeInOut(duration: 0.4).delay(0.8)) {
-                containerScale = 1.0
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            .frame(maxWidth: geometry.size.width - 80)
+            .glassEffect() // ONLY YOUR LIQUID GLASS
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .scaleEffect(containerScale)
+            .onChange(of: currentText) { _, newText in
+                // Reset for new text
+                revealProgress = 0
+                displayText = String(newText.suffix(120))
+                
+                // Animate reveal
+                withAnimation(.easeOut(duration: 0.8)) {
+                    revealProgress = 1
+                    containerScale = 1.02
+                }
+                withAnimation(.easeInOut(duration: 0.4).delay(0.8)) {
+                    containerScale = 1.0
+                }
             }
-        }
-        .onAppear {
-            displayText = String(currentText.suffix(120))
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                containerScale = 1.0
-                revealProgress = 1
+            .onAppear {
+                displayText = String(currentText.suffix(120))
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    containerScale = 1.0
+                    revealProgress = 1
+                }
             }
         }
     }

@@ -7,27 +7,29 @@ struct AmbientBackground: View {
     @Binding var orbPositions: [CGPoint]
     
     var body: some View {
-        ZStack {
-            // Base gradient
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.031, green: 0.027, blue: 0.027), // #080707
-                    Color(red: 0.11, green: 0.105, blue: 0.102)   // #1C1B1A
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            // Floating orbs
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(orbGradient(for: index))
-                    .frame(width: 200, height: 200)
-                    .blur(radius: 60)
-                    .opacity(0.4)
-                    .position(orbPosition(for: index))
-                    .animation(.easeInOut(duration: 20).repeatForever(autoreverses: true), value: animationPhase)
+        GeometryReader { geometry in
+            ZStack {
+                // Base gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.031, green: 0.027, blue: 0.027), // #080707
+                        Color(red: 0.11, green: 0.105, blue: 0.102)   // #1C1B1A
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                // Floating orbs
+                ForEach(0..<3) { index in
+                    Circle()
+                        .fill(orbGradient(for: index))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 60)
+                        .opacity(0.4)
+                        .position(orbPosition(for: index, in: geometry.size))
+                        .animation(.easeInOut(duration: 20).repeatForever(autoreverses: true), value: animationPhase)
+                }
             }
         }
     }
@@ -53,9 +55,9 @@ struct AmbientBackground: View {
         return gradients[index % gradients.count]
     }
     
-    private func orbPosition(for index: Int) -> CGPoint {
-        let screenWidth = UIScreen.main.bounds.width
-        let screenHeight = UIScreen.main.bounds.height
+    private func orbPosition(for index: Int, in size: CGSize) -> CGPoint {
+        let screenWidth = size.width
+        let screenHeight = size.height
         
         // Figure-8 pattern with different phases
         let phase = animationPhase + (Double(index) * 2 * .pi / 3)

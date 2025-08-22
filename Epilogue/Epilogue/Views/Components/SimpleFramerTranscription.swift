@@ -32,57 +32,59 @@ struct SimpleFramerTranscription: View {
     private let lineSpacing: CGFloat = 6
     
     var body: some View {
-        ZStack {
-            // Container that expands smoothly
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.clear)
-                .frame(maxWidth: UIScreen.main.bounds.width - 80)
-                .frame(height: max(minHeight, containerHeight))
-                .glassEffect()
-                .shadow(color: .white.opacity(0.1), radius: 20)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: containerHeight)
-            
-            // Content with height measurement
-            VStack(alignment: .leading, spacing: lineSpacing) {
-                // Exiting line (if any)
-                if let exitingLine = exitingLine {
-                    SimpleFramerLineView(line: exitingLine)
-                        .transition(.identity)
-                }
+        GeometryReader { geometry in
+            ZStack {
+                // Container that expands smoothly
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.clear)
+                    .frame(maxWidth: geometry.size.width - 80)
+                    .frame(height: max(minHeight, containerHeight))
+                    .glassEffect()
+                    .shadow(color: .white.opacity(0.1), radius: 20)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: containerHeight)
                 
-                // Current lines
-                ForEach(displayLines) { line in
-                    SimpleFramerLineView(line: line)
+                // Content with height measurement
+                VStack(alignment: .leading, spacing: lineSpacing) {
+                    // Exiting line (if any)
+                    if let exitingLine = exitingLine {
+                        SimpleFramerLineView(line: exitingLine)
+                            .transition(.identity)
+                    }
+                    
+                    // Current lines
+                    ForEach(displayLines) { line in
+                        SimpleFramerLineView(line: line)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: geometry.size.width - 80, alignment: .leading)
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear
+                            .preference(key: TranscriptionHeightKey.self, value: geometry.size.height)
+                    }
+                )
+                .onPreferenceChange(TranscriptionHeightKey.self) { height in
+                    // Calculate container height based on content
+                    let targetHeight = height + 32 // padding
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        containerHeight = min(maxHeight, max(minHeight, targetHeight))
+                    }
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: UIScreen.main.bounds.width - 80, alignment: .leading)
-            .background(
-                GeometryReader { geometry in
-                    Color.clear
-                        .preference(key: TranscriptionHeightKey.self, value: geometry.size.height)
-                }
-            )
-            .onPreferenceChange(TranscriptionHeightKey.self) { height in
-                // Calculate container height based on content
-                let targetHeight = height + 32 // padding
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    containerHeight = min(maxHeight, max(minHeight, targetHeight))
+            .onChange(of: text) { oldValue, newValue in
+                if newValue != lastProcessedText {
+                    processNewText(newValue)
+                    lastProcessedText = newValue
                 }
             }
-        }
-        .onChange(of: text) { oldValue, newValue in
-            if newValue != lastProcessedText {
-                processNewText(newValue)
-                lastProcessedText = newValue
-            }
-        }
-        .onAppear {
-            if !text.isEmpty {
-                processNewText(text)
-                lastProcessedText = text
+            .onAppear {
+                if !text.isEmpty {
+                    processNewText(text)
+                    lastProcessedText = text
+                }
             }
         }
     }
