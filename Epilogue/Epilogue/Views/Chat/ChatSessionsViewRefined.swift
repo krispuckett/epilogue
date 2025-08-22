@@ -672,10 +672,17 @@ struct IntelligentSessionCard: View {
         // Priority 1: Look for the most impactful question
         if !questions.isEmpty {
             // Find questions with answers for better context
-            if let answeredQuestion = questions.first(where: { $0.answer != nil && !$0.answer!.isEmpty }) {
+            if let answeredQuestion = questions.first(where: { question in
+                if let answer = question.answer, !answer.isEmpty {
+                    return true
+                }
+                return false
+            }) {
                 return "\(answeredQuestion.content)"
             }
-            return "\(questions.first!.content)"
+            if let firstQuestion = questions.first {
+                return "\(firstQuestion.content)"
+            }
         }
         
         // Priority 2: Look for meaningful quotes
