@@ -155,13 +155,16 @@ struct AmbientModeView: View {
     // New keyboard input states
     @State private var inputMode: AmbientInputMode = .listening
     @State private var keyboardText = ""
-    @State private var placeholderBlur: Double = 0
     @State private var containerBlur: Double = 0
     @State private var submitBlurWave: Double = 0
     @State private var lastCharacterCount: Int = 0
     @State private var breathingTimer: Timer?
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    
+    // Inline editing states
+    @State private var editingMessageId: UUID? = nil
+    @State private var editingMessageType: UnifiedChatMessage.MessageType? = nil
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -557,8 +560,23 @@ struct AmbientModeView: View {
                                 ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                                     // Display quotes with special formatting
                                     if case .quote(let capturedQuote) = message.messageType {
-                                        AmbientQuoteView(quote: capturedQuote, index: index)
-                                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                        AmbientQuoteView(
+                                            quote: capturedQuote, 
+                                            index: index,
+                                            onEdit: { quoteText in
+                                                // Prepopulate input with quote text for editing
+                                                keyboardText = quoteText
+                                                editingMessageId = message.id
+                                                editingMessageType = .quote(capturedQuote)
+                                                
+                                                // Switch to text input mode
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                    inputMode = .textInput
+                                                    isKeyboardFocused = true
+                                                }
+                                            }
+                                        )
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                                     } else {
                                         AmbientMessageThreadView(
                                             message: message,
@@ -573,7 +591,19 @@ struct AmbientModeView: View {
                                                         expandedMessageIds.insert(message.id)
                                                     }
                                                 }
-                                            }
+                                            },
+                                            onEdit: message.isUser ? { questionText in
+                                                // Prepopulate input with question text for editing
+                                                keyboardText = questionText
+                                                editingMessageId = message.id
+                                                editingMessageType = message.messageType
+                                                
+                                                // Switch to text input mode
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                    inputMode = .textInput
+                                                    isKeyboardFocused = true
+                                                }
+                                            } : nil
                                         )
                                     }
                                 }
@@ -796,15 +826,11 @@ struct AmbientModeView: View {
                                     
                                     // Enhanced text field with ambient blur
                                     ZStack(alignment: .leading) {
-                                        // Breathing placeholder
+                                        // Placeholder - NO BLUR
                                         if keyboardText.isEmpty {
-                                            Text("Ask, capture, or type...")
+                                            Text(editingMessageId != nil ? "Edit your message..." : "Ask, capture, or type...")
                                                 .foregroundColor(.white.opacity(0.35))
                                                 .font(.system(size: 16))
-                                                .blur(radius: placeholderBlur)
-                                                .onAppear {
-                                                    startPlaceholderBreathing()
-                                                }
                                         }
                                         
                                         TextField("", text: $keyboardText, axis: .vertical)
@@ -1128,6 +1154,11 @@ struct AmbientModeView: View {
                     )
                     messages.append(quoteMessage)
                     
+                    // Gracefully collapse previous messages when new quote arrives
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        expandedMessageIds.removeAll()
+                    }
+                    
                     print("🎯 SAVE ANIMATION: Setting showSaveAnimation = true for Quote")
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         showSaveAnimation = true
@@ -1145,19 +1176,38 @@ struct AmbientModeView: View {
                 }
             case .note, .thought:
                 // Save note to SwiftData with session relationship
-                saveNoteToSwiftData(item)
-                savedItemsCount += 1
-                savedItemType = item.type == .note ? "Note" : "Thought"
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showSaveAnimation = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showSaveAnimation = false
-                        savedItemType = nil
+                if let capturedNote = saveNoteToSwiftData(item) {
+                    savedItemsCount += 1
+                    savedItemType = item.type == .note ? "Note" : "Thought"
+                    
+                    // Add formatted note/thought to messages for display
+                    let noteMessage = UnifiedChatMessage(
+                        content: capturedNote.content,
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .note(capturedNote)  // Use note type with the CapturedNote object
+                    )
+                    messages.append(noteMessage)
+                    
+                    // Gracefully collapse previous messages when new note/thought arrives
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        expandedMessageIds.removeAll()
                     }
+                    
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        showSaveAnimation = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            showSaveAnimation = false
+                            savedItemType = nil
+                        }
+                    }
+                    logger.info("💾 \(item.type == .note ? "Note" : "Thought") detected and saved: \(item.text.prefix(50))...")
+                } else {
+                    logger.warning("⚠️ Failed to save note/thought: \(item.text.prefix(50))...")
                 }
-                logger.info("💾 \(item.type == .note ? "Note" : "Thought") detected and saved: \(item.text.prefix(50))...")
             case .question:
                 // Save question to SwiftData with session relationship
                 saveQuestionToSwiftData(item)
@@ -1358,7 +1408,7 @@ struct AmbientModeView: View {
         }
     }
     
-    private func saveNoteToSwiftData(_ content: AmbientProcessedContent) {
+    private func saveNoteToSwiftData(_ content: AmbientProcessedContent) -> CapturedNote? {
         // Use the raw text as-is for consistency
         let noteText = content.text
         let fetchRequest = FetchDescriptor<CapturedNote>(
@@ -1369,7 +1419,7 @@ struct AmbientModeView: View {
         
         if let existingNotes = try? modelContext.fetch(fetchRequest), !existingNotes.isEmpty {
             print("⚠️ Note already exists, skipping save: \(noteText.prefix(30))...")
-            return
+            return existingNotes.first
         }
         
         var bookModel: BookModel? = nil
@@ -1408,8 +1458,10 @@ struct AmbientModeView: View {
             try modelContext.save()
             print("✅ Note saved to SwiftData with session: \(content.text.prefix(50))...")
             HapticManager.shared.success()
+            return capturedNote
         } catch {
             print("❌ Failed to save note: \(error)")
+            return nil
         }
     }
     
@@ -1588,10 +1640,8 @@ struct AmbientModeView: View {
     private func startRecording() {
         isRecording = true
         
-        // INSTANTLY collapse ALL expanded messages when speaking starts
-        withAnimation(.easeOut(duration: 0.15)) {
-            expandedMessageIds.removeAll()
-        }
+        // Don't collapse messages when recording starts
+        // Let new messages handle collapsing the previous ones
         pendingQuestion = nil
         
         processor.startSession()
@@ -1663,12 +1713,6 @@ struct AmbientModeView: View {
         }
     }
     
-    private func startPlaceholderBreathing() {
-        // Gentle breathing effect on placeholder text
-        withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-            placeholderBlur = 2
-        }
-    }
     
     private func triggerSubmitBlurWave() {
         // Create outward blur wave effect on submit
@@ -1686,6 +1730,79 @@ struct AmbientModeView: View {
         let messageText = keyboardText.trimmingCharacters(in: .whitespacesAndNewlines)
         keyboardText = "" // Clear immediately
         
+        // Check if we're editing an existing message
+        if let editingId = editingMessageId {
+            // Find and update the message
+            if let index = messages.firstIndex(where: { $0.id == editingId }) {
+                let updatedMessage = messages[index]
+                
+                // Update the message content
+                messages[index] = UnifiedChatMessage(
+                    content: messageText,
+                    isUser: updatedMessage.isUser,
+                    timestamp: updatedMessage.timestamp,
+                    messageType: updatedMessage.messageType
+                )
+                
+                // Update in processor's detected content
+                if let processorIndex = processor.detectedContent.firstIndex(where: { 
+                    $0.text == updatedMessage.content 
+                }) {
+                    // Create a new content object with updated text (since text is immutable)
+                    let oldContent = processor.detectedContent[processorIndex]
+                    let newContent = AmbientProcessedContent(
+                        text: messageText,
+                        type: oldContent.type,
+                        timestamp: oldContent.timestamp,
+                        confidence: oldContent.confidence,
+                        response: oldContent.response,
+                        bookTitle: oldContent.bookTitle,
+                        bookAuthor: oldContent.bookAuthor
+                    )
+                    processor.detectedContent[processorIndex] = newContent
+                }
+                
+                // If it's a question (user text message), regenerate the response
+                if updatedMessage.isUser, case .text = updatedMessage.messageType {
+                    // Remove old response
+                    if let responseIndex = messages.firstIndex(where: { 
+                        !$0.isUser && $0.timestamp > updatedMessage.timestamp
+                    }) {
+                        messages.remove(at: responseIndex)
+                    }
+                    
+                    // Add thinking message and get new response
+                    let thinkingMessage = UnifiedChatMessage(
+                        content: "[Thinking]",
+                        isUser: false,
+                        timestamp: Date()
+                    )
+                    messages.append(thinkingMessage)
+                    pendingQuestion = messageText
+                    
+                    Task {
+                        await getAIResponse(for: messageText)
+                    }
+                }
+                
+                // Update in SwiftData if it's a quote
+                if case .quote(let capturedQuote) = updatedMessage.messageType {
+                    // Find and update the quote in the session
+                    if let session = currentSession,
+                       let quoteIndex = session.capturedQuotes.firstIndex(where: { $0.id == capturedQuote.id }) {
+                        session.capturedQuotes[quoteIndex].text = messageText
+                        try? modelContext.save()
+                    }
+                }
+            }
+            
+            // Clear editing state
+            editingMessageId = nil
+            editingMessageType = nil
+            return
+        }
+        
+        // Normal message processing (not editing)
         // Check for page mentions in typed text too
         detectPageMention(in: messageText)
         
@@ -2499,6 +2616,7 @@ struct AmbientModeView: View {
 struct AmbientQuoteView: View {
     let quote: CapturedQuote
     let index: Int
+    let onEdit: (String) -> Void
     
     @State private var quoteOpacity: Double = 0.3
     @State private var quoteBlur: Double = 12
@@ -2527,13 +2645,18 @@ struct AmbientQuoteView: View {
                     Spacer()
                 }
                 
-                // Quote text with elegant typography
+                // Quote text with elegant typography - TAPPABLE FOR EDITING
                 Text(quote.text)
                     .font(.custom("Georgia", size: 16))
                     .italic()
                     .foregroundStyle(.white.opacity(0.9))
                     .lineSpacing(5)
                     .fixedSize(horizontal: false, vertical: true)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        HapticManager.shared.lightTap()
+                        onEdit(quote.text)
+                    }
                 
                 // Author attribution if available
                 if let author = quote.author {
@@ -2576,6 +2699,7 @@ struct AmbientMessageThreadView: View {
     let totalMessages: Int
     let isExpanded: Bool
     let onToggle: () -> Void
+    let onEdit: ((String) -> Void)?
     
     @State private var messageOpacity: Double = 0.3
     @State private var messageBlur: Double = 12
@@ -2660,7 +2784,14 @@ struct AmbientMessageThreadView: View {
             .blur(radius: messageBlur) // No extra blur when collapsed
             .scaleEffect(messageScale)
             .onTapGesture {
-                if !message.isUser {
+                if message.isUser {
+                    // Edit user questions
+                    if let onEdit = onEdit {
+                        HapticManager.shared.lightTap()
+                        onEdit(message.content)
+                    }
+                } else {
+                    // Toggle expansion for AI responses
                     onToggle()
                 }
             }

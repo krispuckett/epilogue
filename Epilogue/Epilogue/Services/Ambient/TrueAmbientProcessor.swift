@@ -626,10 +626,13 @@ public class TrueAmbientProcessor: ObservableObject {
                 }
             }
             
-            // Remove common prefixes
+            // Remove common prefixes and reaction phrases
             let prefixesToRemove = [
                 "i love this quote.",
                 "i love this quote",
+                "i love this",
+                "this is great",
+                "amazing quote",
                 "quote...",
                 "quote:",
                 "quote ",
@@ -685,9 +688,12 @@ public class TrueAmbientProcessor: ObservableObject {
                 bookTitle: AmbientBookDetector.shared.detectedBook?.title,
                 bookAuthor: AmbientBookDetector.shared.detectedBook?.author
             )
-            // Use smart deduplication
+            
+            // Always add to detectedContent so it shows in UI
+            detectedContent.append(content)
+            
+            // Use smart deduplication only for saving to SwiftData
             if !deduplicator.isDuplicate(content.text) {
-                detectedContent.append(content)
                 // Save immediately to SwiftData if context available
                 if intent == .note {
                     await saveNote(content)
@@ -696,7 +702,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 }
                 logger.info("✅ \(intent == .note ? "Note" : "Thought") saved to SwiftData: \(text.prefix(50))...")
             } else {
-                logger.info("📝 \(intent == .note ? "Note" : "Thought") already captured: \(text.prefix(50))...")
+                logger.info("📝 \(intent == .note ? "Note" : "Thought") already captured (but showing in UI): \(text.prefix(50))...")
             }
             
         default:
