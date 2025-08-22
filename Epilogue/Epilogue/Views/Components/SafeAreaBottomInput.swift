@@ -2,16 +2,15 @@ import SwiftUI
 
 /// iOS 26 compliant bottom input area using safeAreaBar
 /// This ensures proper positioning above tab bars and safe areas
-struct SafeAreaBottomInput<Content: View>: ViewModifier {
-    let edge: Edge
+struct SafeAreaBottomInput<InputContent: View>: ViewModifier {
     let alignment: HorizontalAlignment
     let spacing: CGFloat
-    @ViewBuilder let content: () -> Content
+    @ViewBuilder let inputContent: () -> InputContent
     
-    func body(content inputContent: Content) -> some View {
-        inputContent
-            .safeAreaInset(edge: edge, alignment: alignment, spacing: spacing) {
-                content()
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .bottom, alignment: alignment, spacing: spacing) {
+                inputContent()
                     .background(.regularMaterial)
             }
     }
