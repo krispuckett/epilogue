@@ -65,7 +65,8 @@ struct ScrollingBookMessages: View {
     }
     
     private func startCycling() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        cyclingTimer?.invalidate()
+        cyclingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             withAnimation(.easeOut(duration: 0.3)) {
                 opacity = 0
             }
@@ -161,6 +162,7 @@ struct AmbientModeView: View {
     @State private var submitBlurWave: Double = 0
     @State private var lastCharacterCount: Int = 0
     @State private var breathingTimer: Timer?
+    @State private var cyclingTimer: Timer?
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
     
@@ -344,9 +346,19 @@ struct AmbientModeView: View {
             handleBookDetection(book)
         }
         .onDisappear {
+            // Clean up all timers to prevent memory leaks
             bookCoverTimer?.invalidate()
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
+            debounceTimer?.invalidate()
+            cyclingTimer?.invalidate()
+            
+            // Set to nil to ensure deallocation
+            bookCoverTimer = nil
+            transcriptionFadeTimer = nil
+            breathingTimer = nil
+            debounceTimer = nil
+            cyclingTimer = nil
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $capturedImage)
