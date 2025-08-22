@@ -74,12 +74,15 @@ struct EditBookSheet: View {
             
             // Add compact timeline if currently reading
             if currentBook.readingStatus == .currentlyReading, let pageCount = currentBook.pageCount, pageCount > 0 {
-                AmbientReadingProgressView(
-                    book: currentBook,
-                    width: UIScreen.main.bounds.width - 32,
-                    showDetailed: false,
-                    colorPalette: nil // EditBookSheet doesn't have color palette context
-                )
+                GeometryReader { geometry in
+                    AmbientReadingProgressView(
+                        book: currentBook,
+                        width: geometry.size.width - 32,
+                        showDetailed: false,
+                        colorPalette: nil // EditBookSheet doesn't have color palette context
+                    )
+                }
+                .frame(height: 60) // Set explicit height for GeometryReader
                 .padding(.top, -8) // Reduce spacing since CurrentBookRow has bottom padding
             }
         }

@@ -104,7 +104,6 @@ final class AmbientSession {
     
     private func groupConversations() -> [ConversationThread] {
         var threads: [ConversationThread] = []
-        var currentThread: ConversationThread?
         
         // Group questions with their responses
         for (index, question) in capturedQuestions.enumerated() {
