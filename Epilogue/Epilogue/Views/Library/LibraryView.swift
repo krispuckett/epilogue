@@ -727,6 +727,7 @@ struct LibraryBookListItem: View {
                                 endPoint: .bottom
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
                     } else {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
@@ -936,15 +937,18 @@ struct LibraryBookListItem: View {
         }
     }
     
-    private func statusColor(for status: ReadingStatus) -> Color {
-        switch status {
-        case .wantToRead:
-            return .blue
-        case .currentlyReading:
-            return .green
-        case .read:
-            return .purple
-        }
+}
+
+// MARK: - Helper Functions
+
+private func statusColor(for status: ReadingStatus) -> Color {
+    switch status {
+    case .wantToRead:
+        return .blue
+    case .currentlyReading:
+        return .green
+    case .read:
+        return .purple
     }
 }
 
