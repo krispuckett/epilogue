@@ -60,6 +60,7 @@ struct ContentView: View {
             .interruptibleAnimation(.snappy, value: showCommandInput)
             .interruptibleAnimation(.smooth, value: selectedTab)
             .preferredColorScheme(.dark)
+            .withErrorHandling()
             .sheet(isPresented: $showPrivacySettings) {
                 NavigationView {
                     PrivacySettingsView()
