@@ -13,6 +13,7 @@ struct ScrollingBookMessages: View {
     @State private var currentMessageIndex = 0
     @State private var opacity: Double = 1.0
     @State private var usedIndices: Set<Int> = []
+    @State private var cyclingTimer: Timer?
     
     let messages = [
         // Literary and bookish phrases
@@ -61,6 +62,10 @@ struct ScrollingBookMessages: View {
                 currentMessageIndex = Int.random(in: 0..<messages.count)
                 usedIndices.insert(currentMessageIndex)
                 startCycling()
+            }
+            .onDisappear {
+                cyclingTimer?.invalidate()
+                cyclingTimer = nil
             }
     }
     
