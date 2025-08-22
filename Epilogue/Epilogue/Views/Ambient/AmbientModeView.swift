@@ -289,9 +289,10 @@ struct AmbientModeView: View {
                 .allowsHitTesting(false) // Ensure gradient doesn't block touches
         }
         // iOS 26 safeAreaBar for bottom input with proper blur inheritance
-        .safeAreaBar(edge: .bottom) {
-            bottomInputArea
-        }
+        .safeAreaBar(
+            edge: .bottom,
+            content: { bottomInputArea }
+        )
         // Top navigation bar with BookView-style header
         .safeAreaInset(edge: .top) {
             bookStyleHeader

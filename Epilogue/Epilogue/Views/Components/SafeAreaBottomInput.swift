@@ -1,5 +1,21 @@
 import SwiftUI
 
+/// iOS 26 SafeAreaBar modifier that provides proper blur inheritance
+struct SafeAreaBarModifier<BarContent: View>: ViewModifier {
+    let edge: VerticalEdge
+    let alignment: HorizontalAlignment
+    let spacing: CGFloat
+    let content: () -> BarContent
+    
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: edge, alignment: alignment, spacing: spacing) {
+                // NO .background modifier - this is critical for iOS 26 blur inheritance
+                self.content()
+            }
+    }
+}
+
 /// iOS 26 compliant bottom input area using safeAreaBar
 /// This ensures proper positioning above tab bars and safe areas
 struct SafeAreaBottomInput<InputContent: View>: ViewModifier {
@@ -23,13 +39,15 @@ extension View {
         edge: VerticalEdge = .bottom,
         alignment: HorizontalAlignment = .center,
         spacing: CGFloat = 0,
-        @ViewBuilder content: @escaping () -> Content
+        content: @escaping () -> Content
     ) -> some View {
-        // Use safeAreaInset with proper material background for iOS 26 blur inheritance
-        self.safeAreaInset(edge: edge, alignment: alignment, spacing: spacing) {
-            content()
-                .background(.bar) // iOS 26 bar material for proper blur
-        }
+        // iOS 26 safeAreaBar - NO background modifier to maintain blur inheritance
+        self.modifier(SafeAreaBarModifier(
+            edge: edge,
+            alignment: alignment,
+            spacing: spacing,
+            content: content
+        ))
     }
     
     /// Fallback for older iOS versions
@@ -43,20 +61,6 @@ extension View {
         }
     }
     
-    /// Apply iOS 26 safeAreaBar with glass effect for bottom input areas
-    func safeAreaBottomBar<Content: View>(
-        @ViewBuilder content: @escaping () -> Content
-    ) -> some View {
-        self.safeAreaInset(edge: .bottom, spacing: 0) {
-            content()
-                .background {
-                    // iOS 26 glass effect for bottom bars
-                    Rectangle()
-                        .fill(.regularMaterial)
-                        .ignoresSafeArea(edges: .bottom)
-                }
-        }
-    }
 }
 
 /// Example implementation for UniversalInputBar wrapper
