@@ -548,7 +548,7 @@ struct BookSessionGroupWithSelection: View {
                             : coverURL
                         
                         if let url = URL(string: secureURL) {
-                            AsyncImage(url: url) { image in
+                            CachedAsyncImage(url: url) { image in
                                 image
                                     .resizable()
                                     .scaledToFill()

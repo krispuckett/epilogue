@@ -702,45 +702,31 @@ struct LibraryBookListItem: View {
                     // Cover with proper aspect ratio
                     if let coverURL = book.coverImageURL,
                        let url = URL(string: coverURL.replacingOccurrences(of: "http://", with: "https://")) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.gray.opacity(0.2))
-                                    .overlay {
-                                        ProgressView()
-                                            .tint(.white.opacity(0.5))
-                                    }
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 60, height: 90)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                                    .overlay {
-                                        // Subtle gradient for depth
-                                        LinearGradient(
-                                            colors: [
-                                                Color.clear,
-                                                Color.black.opacity(0.1)
-                                            ],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                                    }
-                            case .failure(_):
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                                    .overlay {
-                                        Image(systemName: "book.closed.fill")
-                                            .font(.system(size: 24))
-                                            .foregroundStyle(.white.opacity(0.3))
-                                    }
-                            @unknown default:
-                                EmptyView()
-                            }
+                        CachedAsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.gray.opacity(0.2))
+                                .overlay {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.5))
+                                }
                         }
+                        .frame(width: 60, height: 90)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay {
+                            // Subtle gradient for depth
+                            LinearGradient(
+                                colors: [
+                                    Color.clear,
+                                    Color.black.opacity(0.1)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                     } else {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
