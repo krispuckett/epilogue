@@ -1493,10 +1493,9 @@ struct BookDetailView: View {
         }
         
         do {
-            // Download the image
-            let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-            guard let uiImage = UIImage(data: imageData) else {
-                print("❌ Could not create UIImage from data")
+            // Use SharedBookCoverManager for cached loading
+            guard let uiImage = await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) else {
+                print("❌ Could not load image from SharedBookCoverManager")
                 isExtractingColors = false
                 return
             }
@@ -1573,9 +1572,8 @@ struct BookDetailView: View {
             }
             
             do {
-                let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-                guard UIImage(data: imageData) != nil else {
-                    print("❌ Could not create UIImage for diagnostic")
+                guard await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) != nil else {
+                    print("❌ Could not load image for diagnostic from SharedBookCoverManager")
                     return
                 }
                 
