@@ -8,7 +8,8 @@ struct EtherealBreathingTranscription: View {
     @State private var glowOpacity: Double = 0.3
     
     var body: some View {
-        Text(displayText)
+        GeometryReader { geometry in
+            Text(displayText)
             .font(.system(size: 19, weight: .medium, design: .rounded))
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
@@ -16,7 +17,7 @@ struct EtherealBreathingTranscription: View {
             .truncationMode(.head)
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
-            .frame(maxWidth: UIScreen.main.bounds.width - 80)
+            .frame(maxWidth: geometry.size.width - 80)
             .scaleEffect(breathScale)
             .glassEffect()
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -48,6 +49,7 @@ struct EtherealBreathingTranscription: View {
         withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
             breathScale = 1.01
             glowOpacity = 0.4
+        }
         }
     }
 }

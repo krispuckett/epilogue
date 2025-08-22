@@ -22,11 +22,12 @@ struct LiveTranscriptionBubble: View {
     private let cornerRadius: CGFloat = 24
     private let horizontalPadding: CGFloat = 24
     private let verticalPadding: CGFloat = 16
-    private let maxWidth: CGFloat = UIScreen.main.bounds.width - 80
+    @State private var maxWidth: CGFloat = 310  // Default: 390 - 80
     private let minHeight: CGFloat = 60
     private let fontSize: CGFloat = 17
     
     var body: some View {
+        GeometryReader { geometry in
         ZStack {
             // Text content (measure it first for sizing)
             Text(displayedText)
@@ -67,6 +68,10 @@ struct LiveTranscriptionBubble: View {
         }
         .onDisappear {
             animationTimer?.invalidate()
+        }
+        .onAppear {
+            maxWidth = geometry.size.width - 80
+        }
         }
     }
     
@@ -148,7 +153,7 @@ struct SimplifiedTranscriptionBubble: View {
             // Update bubble size to fit content
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 bubbleHeight = max(56, size.height)
-                bubbleWidth = min(UIScreen.main.bounds.width - 80, max(200, size.width))
+                bubbleWidth = min(maxWidth, max(200, size.width))
             }
         }
         .onAppear {
