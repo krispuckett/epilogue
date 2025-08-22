@@ -31,7 +31,7 @@ struct CachedResponse: Codable {
 }
 
 // MARK: - Response Cache Manager
-final class ResponseCache {
+actor ResponseCache {
     static let shared = ResponseCache()
     
     private let cacheKey = "com.epilogue.responseCache"

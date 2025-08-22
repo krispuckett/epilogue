@@ -97,7 +97,7 @@ struct AmbientBookView: View {
         isLoading = true
         
         // Try to load from cache first
-        if let cachedPalette = ColorPaletteCache.shared.palette(for: book.id) {
+        if let cachedPalette = await ColorPaletteCache.shared.palette(for: book.id) {
             self.palette = cachedPalette
             self.coverImage = await loadCoverImage()
             isLoading = false
@@ -117,7 +117,7 @@ struct AmbientBookView: View {
         let extractedPalette = await colorEngine.extractAmbientPalette(from: image)
         
         // Cache the palette
-        ColorPaletteCache.shared.cache(extractedPalette, for: book.id)
+        await ColorPaletteCache.shared.cache(extractedPalette, for: book.id)
         
         // Animate palette change
         withAnimation(.easeInOut(duration: 0.5)) {
@@ -319,7 +319,7 @@ struct VignetteLayer: View {
 
 // MARK: - Color Palette Cache
 
-class ColorPaletteCache {
+actor ColorPaletteCache {
     static let shared = ColorPaletteCache()
     private var cache: [String: AmbientPalette] = [:]
     private let cacheLimit = 20
