@@ -4,6 +4,7 @@ import SwiftUI
 
 // MARK: - Notes Sync Manager
 /// Manages synchronization between NotesView and ChatView for consistent data
+@MainActor
 final class NotesSyncManager: ObservableObject {
     static let shared = NotesSyncManager()
     
@@ -101,26 +102,20 @@ final class NotesSyncManager: ObservableObject {
     // MARK: - Private Methods
     
     private func handleNoteDeleted(_ noteId: UUID) {
-        DispatchQueue.main.async { [weak self] in
-            self?.deletedNoteIds.insert(noteId)
-            self?.updatedNotes.removeValue(forKey: noteId)
-        }
+        deletedNoteIds.insert(noteId)
+        updatedNotes.removeValue(forKey: noteId)
     }
     
     private func handleNoteUpdated(_ note: Note) {
-        DispatchQueue.main.async { [weak self] in
-            self?.updatedNotes[note.id] = note
-            // If note was previously marked as deleted, remove from deleted set
-            self?.deletedNoteIds.remove(note.id)
-        }
+        updatedNotes[note.id] = note
+        // If note was previously marked as deleted, remove from deleted set
+        deletedNoteIds.remove(note.id)
     }
     
     private func handleBatchDeletion(_ noteIds: [UUID]) {
-        DispatchQueue.main.async { [weak self] in
-            noteIds.forEach { id in
-                self?.deletedNoteIds.insert(id)
-                self?.updatedNotes.removeValue(forKey: id)
-            }
+        noteIds.forEach { id in
+            deletedNoteIds.insert(id)
+            updatedNotes.removeValue(forKey: id)
         }
     }
 }
