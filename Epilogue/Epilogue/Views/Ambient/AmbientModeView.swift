@@ -282,16 +282,15 @@ struct AmbientModeView: View {
             .allowsHitTesting(false)
             .blur(radius: 0.5)  // Subtle blur to soften the gradient edge
         }
-        // Bottom gradient and input controls
+        // Bottom gradient overlay
         .overlay(alignment: .bottom) {
-            ZStack(alignment: .bottom) {
-                // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
-                voiceGradientOverlay
-                    .allowsHitTesting(false) // Ensure gradient doesn't block touches
-                
-                // Input controls overlay on top of gradient
-                bottomInputArea
-            }
+            // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
+            voiceGradientOverlay
+                .allowsHitTesting(false) // Ensure gradient doesn't block touches
+        }
+        // iOS 26 safeAreaBar for bottom input with proper blur inheritance
+        .safeAreaBar(edge: .bottom) {
+            bottomInputArea
         }
         // Top navigation bar with BookView-style header
         .safeAreaInset(edge: .top) {

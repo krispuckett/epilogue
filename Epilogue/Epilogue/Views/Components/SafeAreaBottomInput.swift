@@ -18,6 +18,21 @@ struct SafeAreaBottomInput<InputContent: View>: ViewModifier {
 
 extension View {
     /// Apply iOS 26 safeAreaBar pattern for bottom input areas
+    /// This provides the proper blur inheritance for iOS 26
+    func safeAreaBar<Content: View>(
+        edge: VerticalEdge = .bottom,
+        alignment: HorizontalAlignment = .center,
+        spacing: CGFloat = 0,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        // Use safeAreaInset with proper material background for iOS 26 blur inheritance
+        self.safeAreaInset(edge: edge, alignment: alignment, spacing: spacing) {
+            content()
+                .background(.bar) // iOS 26 bar material for proper blur
+        }
+    }
+    
+    /// Fallback for older iOS versions
     func safeAreaBottomInput<Content: View>(
         alignment: HorizontalAlignment = .center,
         spacing: CGFloat = 0,

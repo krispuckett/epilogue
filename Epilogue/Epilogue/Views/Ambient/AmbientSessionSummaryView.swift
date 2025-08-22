@@ -81,7 +81,7 @@ struct AmbientSessionSummaryView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .bottom) {
+            .safeAreaBar(edge: .bottom) {
                 minimalInputBar
             }
             .onAppear {
