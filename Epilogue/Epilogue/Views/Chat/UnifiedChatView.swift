@@ -2258,10 +2258,10 @@ struct UnifiedChatView: View {
         print("Starting color extraction from: \(secureURLString)")
         
         do {
-            let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-            guard let uiImage = UIImage(data: imageData) else { 
-                print("Failed to create UIImage from data")
-                return 
+            // Use SharedBookCoverManager for cached loading
+            guard let uiImage = await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) else {
+                print("Failed to load image from SharedBookCoverManager")
+                return
             }
             
             self.coverImage = uiImage
