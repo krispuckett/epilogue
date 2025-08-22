@@ -940,9 +940,9 @@ struct AmbientModeView: View {
                 }
                 HapticManager.shared.mediumTap()
             }
-            }  // Close VStack
-        }  // Close ZStack
+        }  // Close VStack
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode) // Smooth Dynamic Island-style spring
+    }  // Close ZStack
     }
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
