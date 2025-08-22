@@ -8,7 +8,7 @@ extension CapturedNote {
         Note(
             type: .note,
             content: self.content,
-            bookId: self.book?.localId.flatMap { UUID(uuidString: $0) },
+            bookId: self.book?.localId != nil ? UUID(uuidString: self.book?.localId ?? "") : nil,
             bookTitle: self.book?.title,
             author: self.book?.author,
             pageNumber: self.pageNumber,
@@ -23,7 +23,7 @@ extension CapturedQuote {
         Note(
             type: .quote,
             content: self.text,
-            bookId: self.book?.localId.flatMap { UUID(uuidString: $0) },
+            bookId: self.book?.localId != nil ? UUID(uuidString: self.book?.localId ?? "") : nil,
             bookTitle: self.book?.title,
             author: self.author ?? self.book?.author,
             pageNumber: self.pageNumber,
@@ -38,7 +38,7 @@ extension CapturedQuestion {
         Note(
             type: .note,  // Questions are stored as notes
             content: self.content,
-            bookId: self.book?.localId.flatMap { UUID(uuidString: $0) },
+            bookId: self.book?.localId != nil ? UUID(uuidString: self.book?.localId ?? "") : nil,
             bookTitle: self.book?.title,
             author: self.book?.author,
             pageNumber: self.pageNumber,
