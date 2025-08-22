@@ -201,8 +201,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         wordTimestamps.removeAll { $0.time < cutoffTime }
         
         // Calculate WPM
-        if wordTimestamps.count > 5 {
-            let timeSpan = now.timeIntervalSince(wordTimestamps.first!.time)
+        if wordTimestamps.count > 5, let firstTimestamp = wordTimestamps.first {
+            let timeSpan = now.timeIntervalSince(firstTimestamp.time)
             if timeSpan > 0 {
                 let wpm = Double(wordTimestamps.count) * 60.0 / timeSpan
                 
