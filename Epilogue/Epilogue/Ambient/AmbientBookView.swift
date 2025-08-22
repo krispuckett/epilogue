@@ -79,13 +79,13 @@ struct AmbientBookView: View {
                 phase = 1.0
             }
         }
-        .onChange(of: book.id) { _ in
+        .onChange(of: book.id) { _, _ in
             // Reload colors if book changes
             Task {
                 await loadAndExtractColors()
             }
         }
-        .onChange(of: palette) { newPalette in
+        .onChange(of: palette) { _, newPalette in
             if let palette = newPalette {
                 onPaletteExtracted(palette)
                 print("🎨 Palette extracted with luminance: \(palette.luminance)")

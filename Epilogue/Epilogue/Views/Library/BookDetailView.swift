@@ -333,7 +333,7 @@ struct BookDetailView: View {
                 hasAppeared = true
             }
         }
-        .onChange(of: coverImage) { _ in
+        .onChange(of: coverImage) { _, _ in
             // Don't reset color palette when cover changes
             // The color extraction will handle updates automatically
         }

@@ -64,7 +64,7 @@ struct StreamingAmbientChatView: View {
                     }
                     .padding()
                 }
-                .onChange(of: messages.count) { _ in
+                .onChange(of: messages.count) { _, _ in
                     // Auto-scroll to latest message
                     if let lastMessage = messages.last {
                         withAnimation(.easeOut(duration: 0.3)) {
@@ -72,7 +72,7 @@ struct StreamingAmbientChatView: View {
                         }
                     }
                 }
-                .onChange(of: activeStreamingMessages.count) { _ in
+                .onChange(of: activeStreamingMessages.count) { _, _ in
                     // Auto-scroll when streaming starts
                     if let streamingMessage = activeStreamingMessages.values.first {
                         withAnimation(.easeOut(duration: 0.3)) {

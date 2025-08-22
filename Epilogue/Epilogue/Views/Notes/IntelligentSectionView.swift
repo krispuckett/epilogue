@@ -49,7 +49,7 @@ struct IntelligentSectionView: View {
                 startBreathing()
             }
         }
-        .onChange(of: isExpanded) { expanded in
+        .onChange(of: isExpanded) { _, expanded in
             if expanded {
                 stopBreathing()
             } else {

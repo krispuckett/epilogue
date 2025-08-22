@@ -172,7 +172,7 @@ struct StackedNotesView: View {
                 await processNotes()
             }
         }
-        .onChange(of: filteredNotes) { _ in
+        .onChange(of: filteredNotes) { _, _ in
             Task {
                 await processNotes()
             }
@@ -227,7 +227,7 @@ struct StackedNotesView: View {
                                         sectionLayouts[section.id] = geometry.frame(in: .global)
                                         updateVisibleSections(geometry.frame(in: .global))
                                     }
-                                    .onChange(of: geometry.frame(in: .global)) { newFrame in
+                                    .onChange(of: geometry.frame(in: .global)) { _, newFrame in
                                         sectionLayouts[section.id] = newFrame
                                         updateVisibleSections(newFrame)
                                     }
@@ -240,7 +240,7 @@ struct StackedNotesView: View {
                 .padding(.vertical, 20)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: scrollToNoteId) { noteId in
+            .onChange(of: scrollToNoteId) { _, noteId in
                 if let noteId = noteId,
                    let sectionId = sections.first(where: { $0.notes.contains { $0.id == noteId } })?.id {
                     withAnimation {
@@ -500,7 +500,7 @@ struct NotificationStackSection: View {
                 startBreathingAnimation()
             }
         }
-        .onChange(of: isExpanded) { expanded in
+        .onChange(of: isExpanded) { _, expanded in
             if expanded {
                 startBreathingAnimation()
             } else {
