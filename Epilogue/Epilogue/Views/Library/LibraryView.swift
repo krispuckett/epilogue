@@ -1523,7 +1523,12 @@ class LibraryViewModel: ObservableObject {
         // Check for series matches (e.g., "fellowship of the ring" matches "lord of the rings")
         let seriesScore = calculateSeriesMatch(searchTitle, bookTitle)
         if seriesScore > 0.8 {
-            let authorBonus = (searchAuthor == nil || bookAuthor.contains(searchAuthor!) || searchAuthor!.contains(bookAuthor)) ? 0.1 : 0.0
+            let authorBonus: Double
+            if let searchAuthor = searchAuthor {
+                authorBonus = (bookAuthor.contains(searchAuthor) || searchAuthor.contains(bookAuthor)) ? 0.1 : 0.0
+            } else {
+                authorBonus = 0.1  // No author specified means we don't penalize
+            }
             return seriesScore + authorBonus
         }
         
