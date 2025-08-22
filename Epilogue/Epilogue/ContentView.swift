@@ -1,6 +1,48 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Voice Note Button Overlay (Minimal)
+struct VoiceNoteButtonOverlay: View {
+    @Binding var showVoiceRecording: Bool
+    
+    var body: some View {
+        EmptyView() // Minimal implementation since original was deleted
+    }
+}
+
+// MARK: - Glass Toast Modifier (Minimal)
+struct GlassToastModifier: ViewModifier {
+    @Binding var isShowing: Bool
+    let message: String
+    
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .top) {
+                if isShowing {
+                    Text(message)
+                        .padding()
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(10)
+                        .padding(.top, 50)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                withAnimation {
+                                    isShowing = false
+                                }
+                            }
+                        }
+                }
+            }
+    }
+}
+
+extension View {
+    func glassToast(isShowing: Binding<Bool>, message: String) -> some View {
+        modifier(GlassToastModifier(isShowing: isShowing, message: message))
+    }
+}
+
 struct ContentView: View {
     @StateObject private var navigationCoordinator = NavigationCoordinator.shared
     @StateObject private var ambientCoordinator = EpilogueAmbientCoordinator.shared

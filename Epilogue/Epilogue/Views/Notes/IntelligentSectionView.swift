@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Swipe Direction
 enum SwipeDirection {
-    case leading, trailing
+    case left, right
 }
 
 // MARK: - Intelligent Section View
