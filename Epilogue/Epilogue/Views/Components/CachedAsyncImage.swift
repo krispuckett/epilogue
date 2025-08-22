@@ -60,29 +60,12 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 }
 
-/// Convenience initializer for phase-based content
-extension CachedAsyncImage where Content == _ConditionalContent<Image, Placeholder> {
+/// Simple convenience initializer with default placeholder
+extension CachedAsyncImage {
     init(
         url: URL?,
-        scale: CGFloat = 1,
-        @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
-    ) where Placeholder == ProgressView {
-        self.init(
-            url: url,
-            scale: scale,
-            content: { image in
-                content(.success(image))
-            },
-            placeholder: {
-                content(.empty)
-            }
-        )
-    }
-}
-
-/// Simple convenience initializer with default placeholder
-extension CachedAsyncImage where Placeholder == ProgressView, Content == Image {
-    init(url: URL?, scale: CGFloat = 1) {
+        scale: CGFloat = 1
+    ) where Content == Image, Placeholder == ProgressView<EmptyView, EmptyView> {
         self.init(
             url: url,
             scale: scale,
