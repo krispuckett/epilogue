@@ -142,6 +142,7 @@ public class TrueAmbientProcessor: ObservableObject {
     private var recentQuestions: [(text: String, timestamp: Date)] = []  // Recent questions with timestamps
     private let questionDedupeWindow: TimeInterval = 3.0  // 3 second window for exact duplicates
     private var evolvingQuestion: (base: String, timestamp: Date)? = nil  // Track evolving questions like "Who is gone" → "Who is Gollum"
+    private var questionsBeingFetched: Set<String> = []  // Questions with API calls in progress
     
     private init() {
         setupNotificationObservers()
@@ -377,9 +378,34 @@ public class TrueAmbientProcessor: ObservableObject {
             // Track this as potential base for evolution
             evolvingQuestion = (base: normalizedText, timestamp: now)
             
-            // Step 2: Check if we're actively processing this exact question
-            if activeQuestions.contains(normalizedText) {
-                logger.warning("🔒 Question already being processed, ignoring duplicate: \(correctedText.prefix(30))...")
+            // Step 2: Check if we're actively processing this or a very similar question
+            let isAlreadyActive = activeQuestions.contains { activeQuestion in
+                // Exact match
+                if activeQuestion == normalizedText {
+                    return true
+                }
+                
+                // Check for transcription variations (like "gone" vs "Gondor")
+                let activeWords = activeQuestion.split(separator: " ")
+                let newWords = normalizedText.split(separator: " ")
+                
+                if abs(activeWords.count - newWords.count) <= 1 && activeWords.count >= 3 {
+                    let minCount = min(activeWords.count, newWords.count) - 1
+                    if minCount > 0 {
+                        let activePrefix = activeWords.prefix(minCount).joined(separator: " ")
+                        let newPrefix = newWords.prefix(minCount).joined(separator: " ")
+                        
+                        if activePrefix == newPrefix {
+                            return true  // This is likely the same question being re-transcribed
+                        }
+                    }
+                }
+                
+                return false
+            }
+            
+            if isAlreadyActive {
+                logger.warning("🔒 Question or similar variant already being processed, ignoring: \(correctedText.prefix(30))...")
                 return
             }
             
@@ -454,27 +480,55 @@ public class TrueAmbientProcessor: ObservableObject {
                     guard content.type == .question && content.response == nil else { return false }
                     let normalizedExisting = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                     
-                    // DISABLED EVOLUTION DETECTION - Each question is separate
-                    // Too many false positives with evolving questions
-                    // Better to have separate questions than corrupted ones
-                    
-                    // Only match EXACT duplicates to prevent double-processing
-                    // Do NOT try to detect "evolving" questions - it causes corruption
-                    
                     // Exact same question (duplicate detection)
                     if normalizedExisting == normalizedNew {
                         return true
                     }
                     
-                    // DO NOT match different questions that happen to start similarly
-                    // "Who is Gandalf" and "Who is Elrond" are DIFFERENT questions
-                    // "What is the ring" and "What is the ring of power" IS an evolution
+                    // Check for transcription evolution - where most of the question is the same
+                    // but the last word is changing (like "gone" -> "Gondor")
+                    let existingWords = normalizedExisting.split(separator: " ")
+                    let newWords = normalizedNew.split(separator: " ")
+                    
+                    // If they have the same number of words or differ by 1
+                    if abs(existingWords.count - newWords.count) <= 1 && existingWords.count >= 3 {
+                        // Check if all but the last word are the same
+                        let minCount = min(existingWords.count, newWords.count) - 1
+                        if minCount > 0 {
+                            let existingPrefix = existingWords.prefix(minCount).joined(separator: " ")
+                            let newPrefix = newWords.prefix(minCount).joined(separator: " ")
+                            
+                            // If the prefixes match, this is likely a transcription correction
+                            if existingPrefix == newPrefix {
+                                // Additional check: the questions should be very similar in length
+                                let lengthDiff = abs(normalizedExisting.count - normalizedNew.count)
+                                if lengthDiff < 10 {  // Allow up to 10 character difference
+                                    logger.info("🔄 Detected question evolution: '\(normalizedExisting)' → '\(normalizedNew)'")
+                                    return true
+                                }
+                            }
+                        }
+                    }
+                    
                     return false
                 }
             }
             
             if let existingIndex = existingIndex {
                 // Update existing question to the latest version
+                let oldText = await MainActor.run {
+                    self.detectedContent[existingIndex].text
+                }
+                
+                // Remove old text from active questions
+                let oldNormalized = oldText.lowercased()
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                activeQuestions.remove(oldNormalized)
+                
+                // Add new text to active questions
+                activeQuestions.insert(normalizedNew)
+                
                 await MainActor.run {
                     logger.info("📝 Updating evolving question from '\(self.detectedContent[existingIndex].text)' to '\(text)'")
                     self.detectedContent[existingIndex] = AmbientProcessedContent(
@@ -835,6 +889,7 @@ public class TrueAmbientProcessor: ObservableObject {
         activeQuestions.removeAll()  // Clear active questions tracking
         recentQuestions.removeAll()  // Clear recent questions
         evolvingQuestion = nil       // Clear evolving question tracker
+        questionsBeingFetched.removeAll()  // Clear API fetch tracking
         currentTranscript = ""
         currentBook = AmbientBookDetector.shared.detectedBook
         sessionStartTime = Date()
@@ -1648,6 +1703,51 @@ extension TrueAmbientProcessor {
         // Just need to get the response and update it
         
         logger.info("🚀 Processing question for response: \(question.prefix(30))...")
+        
+        // Check if we're already fetching a response for this or similar question
+        let normalizedQuestion = question.lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        
+        // Check for exact match or similar question being fetched
+        let isAlreadyFetching = questionsBeingFetched.contains { fetchingQuestion in
+            if fetchingQuestion == normalizedQuestion {
+                return true
+            }
+            
+            // Check for similar questions
+            let fetchingWords = fetchingQuestion.split(separator: " ")
+            let newWords = normalizedQuestion.split(separator: " ")
+            
+            if abs(fetchingWords.count - newWords.count) <= 1 && fetchingWords.count >= 3 {
+                let minCount = min(fetchingWords.count, newWords.count) - 1
+                if minCount > 0 {
+                    let fetchingPrefix = fetchingWords.prefix(minCount).joined(separator: " ")
+                    let newPrefix = newWords.prefix(minCount).joined(separator: " ")
+                    
+                    if fetchingPrefix == newPrefix {
+                        return true  // Similar question already being fetched
+                    }
+                }
+            }
+            
+            return false
+        }
+        
+        if isAlreadyFetching {
+            logger.warning("🔒 Already fetching response for this or similar question, skipping: \(question.prefix(30))...")
+            return
+        }
+        
+        // Mark as being fetched
+        questionsBeingFetched.insert(normalizedQuestion)
+        
+        // Make sure to remove from fetching set when done
+        defer {
+            Task { @MainActor in
+                self.questionsBeingFetched.remove(normalizedQuestion)
+            }
+        }
         
         // Default to true if not set (enable by default)
         let realTimeEnabled = UserDefaults.standard.object(forKey: "realTimeQuestions") as? Bool ?? true

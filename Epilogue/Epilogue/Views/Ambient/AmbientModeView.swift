@@ -157,7 +157,6 @@ struct AmbientModeView: View {
     @State private var keyboardText = ""
     @State private var placeholderBlur: Double = 0
     @State private var containerBlur: Double = 0
-    @State private var textFieldBlur: Double = 0
     @State private var submitBlurWave: Double = 0
     @State private var lastCharacterCount: Int = 0
     @State private var breathingTimer: Timer?
@@ -815,17 +814,7 @@ struct AmbientModeView: View {
                                             .focused($isKeyboardFocused)
                                             .lineLimit(1...3)
                                             .textFieldStyle(.plain)
-                                            .blur(radius: textFieldBlur)
                                             .onChange(of: keyboardText) { oldValue, newValue in
-                                                // Character blur-in effect
-                                                if newValue.count > oldValue.count {
-                                                    withAnimation(.easeOut(duration: 0.2)) {
-                                                        textFieldBlur = 3
-                                                    }
-                                                    withAnimation(.easeOut(duration: 0.2).delay(0.05)) {
-                                                        textFieldBlur = 0
-                                                    }
-                                                }
                                                 lastCharacterCount = newValue.count
                                             }
                                             .onSubmit {

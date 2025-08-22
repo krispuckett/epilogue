@@ -411,22 +411,35 @@ class SmartEpilogueAI: ObservableObject {
             }
         }
         
-        // For EVERYTHING ELSE, assume it's about the book
-        // This is the key insight - when reading a book, 99% of questions are about that book
+        // Use enhanced context for smarter responses
+        let enhancedContext = AmbientContextManager.shared.buildEnhancedContext(
+            for: question,
+            book: book.toBook()
+        )
         
-        // Add clear book context to help the AI understand
-        if questionLower.starts(with: "who is") || 
-           questionLower.starts(with: "what is") ||
-           questionLower.starts(with: "what happens") ||
-           questionLower.starts(with: "how does") ||
-           questionLower.starts(with: "why does") ||
-           questionLower.starts(with: "when does") ||
-           questionLower.starts(with: "where does") {
-            return "In the book '\(book.title)' by \(book.author), \(question)"
+        // Check for potential transcription errors
+        var finalQuestion = question
+        if let correction = AmbientContextManager.shared.suggestCorrection(
+            for: question, 
+            confidence: 0.6
+        ) {
+            print("📝 Correcting transcription: '\(question)' → '\(correction)'")
+            finalQuestion = correction
         }
         
-        // For other questions, still make context clear
-        return "Regarding '\(book.title)': \(question)"
+        // Build intelligent prompt with rich context
+        return """
+        \(enhancedContext)
+        
+        Book: '\(book.title)' by \(book.author)
+        Question: \(finalQuestion)
+        
+        Respond as a knowledgeable friend who:
+        - Provides specific, relevant answers about THIS book
+        - Avoids spoilers based on reading progress
+        - Anticipates natural follow-up questions
+        - Uses a warm, conversational tone
+        """
     }
     
     // MARK: - Stream Response

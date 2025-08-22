@@ -121,7 +121,7 @@ struct AmbientSessionSummaryView: View {
             
             // Subtle darkening overlay for readability
             Color.black.opacity(0.2)
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom safe area
                 .allowsHitTesting(false)
         }
     }
@@ -337,9 +337,9 @@ struct AmbientSessionSummaryView: View {
                         .fill(Color.white.opacity(0.1))
                         .frame(height: 0.5)
                     
-                    Text(answer)
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.8))
+                    Text(try! AttributedString(markdown: answer))
+                        .font(.custom("Georgia", size: 15))
+                        .foregroundStyle(.white.opacity(0.85))
                         .lineSpacing(6)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 24)
@@ -734,10 +734,10 @@ struct MinimalThreadView: View {
                         .fill(Color.white.opacity(0.08))
                         .frame(height: 0.5)
                     
-                    Text(answer)
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineSpacing(5)
+                    Text(try! AttributedString(markdown: answer))
+                        .font(.custom("Georgia", size: 15))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineSpacing(6)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.leading, 40)
                         .padding(.vertical, 12)
@@ -795,8 +795,8 @@ struct MinimalMessageView: View {
                 Spacer(minLength: 60)
             }
             
-            Text(message.content)
-                .font(.system(size: 15, weight: .regular))
+            Text(try! AttributedString(markdown: message.content))
+                .font(message.isUser ? .system(size: 15, weight: .regular) : .custom("Georgia", size: 15))
                 .foregroundStyle(message.isUser ? .white.opacity(0.95) : .white.opacity(0.8))
                 .padding(16)
                 .glassEffect()

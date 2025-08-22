@@ -6,7 +6,7 @@ import SwiftUI
 /// Manages synchronization between NotesView and ChatView for consistent data
 @MainActor
 final class NotesSyncManager: ObservableObject {
-    static let shared = NotesSyncManager()
+    nonisolated static let shared = NotesSyncManager()
     
     // MARK: - Published Properties
     @Published var deletedNoteIds: Set<UUID> = []
