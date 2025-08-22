@@ -211,27 +211,29 @@ struct AmbientModeView: View {
     
     // MARK: - Simple Live Transcription View
     private var liveTranscriptionView: some View {
-        VStack {
-            if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
-                HStack {
-                    Spacer()
-                    
-                    // Simple text that just appears
-                    Text(liveTranscription)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                        .frame(maxWidth: UIScreen.main.bounds.width - 100)
-                        .glassEffect()
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    
-                    Spacer()
+        GeometryReader { geometry in
+            VStack {
+                if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
+                    HStack {
+                        Spacer()
+                        
+                        // Simple text that just appears
+                        Text(liveTranscription)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: geometry.size.width - 100)
+                            .glassEffect()
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .animation(.easeInOut(duration: 0.3), value: liveTranscription)
                 }
-                .padding(.horizontal, 20)
-                .animation(.easeInOut(duration: 0.3), value: liveTranscription)
             }
         }
     }

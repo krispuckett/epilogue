@@ -11,13 +11,14 @@ struct CleanBlurTranscription: View {
     private let maxCharacters = 80
     
     var body: some View {
-        // Simple text with blur - NO container, NO glass
-        Text(visibleText)
+        GeometryReader { geometry in
+            // Simple text with blur - NO container, NO glass
+            Text(visibleText)
             .font(.system(size: 19, weight: .medium, design: .rounded))
             .foregroundColor(.white.opacity(0.95))
             .multilineTextAlignment(.center)
             .lineLimit(2)
-            .frame(maxWidth: UIScreen.main.bounds.width - 80)
+            .frame(maxWidth: geometry.size.width - 80)
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
             .modifier(CharacterBlurModifier(
@@ -36,6 +37,7 @@ struct CleanBlurTranscription: View {
             .onDisappear {
                 animationTimer?.invalidate()
             }
+        }
     }
     
     private func updateText(_ newText: String) {
@@ -119,7 +121,7 @@ struct UltraSimpleTranscription: View {
             .foregroundStyle(.white)
             .multilineTextAlignment(.center)
             .lineLimit(3) // Allow up to 3 lines
-            .frame(maxWidth: UIScreen.main.bounds.width - 100)
+            .frame(maxWidth: geometry.size.width - 100)
             .padding(.horizontal, 24)
             .padding(.vertical, 14)
             .glassEffect() // Apply glass effect

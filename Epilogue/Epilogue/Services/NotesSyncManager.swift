@@ -6,7 +6,7 @@ import SwiftUI
 /// Manages synchronization between NotesView and ChatView for consistent data
 @MainActor
 final class NotesSyncManager: ObservableObject {
-    nonisolated static let shared = NotesSyncManager()
+    static let shared = NotesSyncManager()
     
     // MARK: - Published Properties
     @Published var deletedNoteIds: Set<UUID> = []
@@ -21,8 +21,10 @@ final class NotesSyncManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let syncQueue = DispatchQueue(label: "com.epilogue.notesSync", qos: .userInitiated)
     
-    private init() {
-        setupNotificationObservers()
+    nonisolated private init() {
+        Task { @MainActor in
+            self.setupNotificationObservers()
+        }
     }
     
     // MARK: - Setup

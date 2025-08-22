@@ -23,31 +23,33 @@ struct AmbientBookView: View {
     }
     
     var body: some View {
-        ZStack {
-            if let palette = palette, let image = coverImage {
-                // Layer 1: Diffused cover essence
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .scaleEffect(1.15) // Extra scale for parallax headroom
-                    .blur(radius: 120)
-                    .opacity(palette.luminance > 0.7 ? 0.2 : 0.4)  // Lower values
-                    .offset(y: scrollOffset * 0.15)
-                    .ignoresSafeArea()
-                
-                // Layer 2: Gradient orbs with golden ratio positioning
-                ZStack {
-                    ForEach(Array(palette.colors.enumerated()), id: \.offset) { index, color in
-                        GradientOrb(
-                            color: color,
-                            index: index,
-                            phase: phase,
-                            scrollOffset: scrollOffset,
-                            isMainColor: index == 0
-                        )
+        GeometryReader { geometry in
+            ZStack {
+                if let palette = palette, let image = coverImage {
+                    // Layer 1: Diffused cover essence
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .scaleEffect(1.15) // Extra scale for parallax headroom
+                        .blur(radius: 120)
+                        .opacity(palette.luminance > 0.7 ? 0.2 : 0.4)  // Lower values
+                        .offset(y: scrollOffset * 0.15)
+                        .ignoresSafeArea()
+                    
+                    // Layer 2: Gradient orbs with golden ratio positioning
+                    ZStack {
+                        ForEach(Array(palette.colors.enumerated()), id: \.offset) { index, color in
+                            GradientOrb(
+                                color: color,
+                                index: index,
+                                phase: phase,
+                                scrollOffset: scrollOffset,
+                                isMainColor: index == 0,
+                                screenSize: geometry.size
+                            )
+                        }
                     }
-                }
-                .drawingGroup() // Performance optimization
+                    .drawingGroup() // Performance optimization
                 
                 // Layer 3: Glass effect for iOS 17+
                 if #available(iOS 17.0, *) {
@@ -66,6 +68,7 @@ struct AmbientBookView: View {
                     )
                     .ignoresSafeArea()
             }
+        }
         }
         .task {
             await loadAndExtractColors()
@@ -196,6 +199,7 @@ struct GradientOrb: View {
     let phase: Double
     let scrollOffset: CGFloat
     let isMainColor: Bool
+    let screenSize: CGSize
     
     private var position: CGPoint {
         goldenRatioPosition(index: index)
@@ -230,8 +234,8 @@ struct GradientOrb: View {
         )
         .offset(y: scrollOffset * (0.25 + Double(index) * 0.05))
         .position(
-            x: position.x * UIScreen.main.bounds.width,
-            y: position.y * UIScreen.main.bounds.height
+            x: position.x * screenSize.width,
+            y: position.y * screenSize.height
         )
     }
     

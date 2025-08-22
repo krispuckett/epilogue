@@ -16,6 +16,7 @@ struct ChatMessageView: View {
     @State private var showTypingIndicator = false
     @State private var glowAnimation = 0.0
     @State private var rotationAngle = 0.0
+    @Environment(\.screenSize) private var screenSize
     
     var body: some View {
         VStack(spacing: 0) {
@@ -89,7 +90,7 @@ struct ChatMessageView: View {
                         object: note
                     )
                 }
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
+                .frame(maxWidth: screenSize.width * 0.85)
             case .noteWithContext(let note, let context):
                 NoteWithContextBubble(note: note, context: context) {
                     // Navigation will be handled by parent view
@@ -98,7 +99,7 @@ struct ChatMessageView: View {
                         object: note
                     )
                 }
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
+                .frame(maxWidth: screenSize.width * 0.85)
             case .quote(let quote):
                 MiniQuoteCard(quote: quote) {
                     // Navigation will be handled by parent view
@@ -107,7 +108,7 @@ struct ChatMessageView: View {
                         object: quote
                     )
                 }
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.85)
+                .frame(maxWidth: screenSize.width * 0.85)
             default:
                 aiMessageContent
             }
@@ -122,7 +123,7 @@ struct ChatMessageView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.7, alignment: .trailing)
+            .frame(maxWidth: screenSize.width * 0.7, alignment: .trailing)
             .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
             .glassEffect(in: .rect(cornerRadius: 18))
             .overlay(alignment: .topTrailing) {
@@ -159,7 +160,7 @@ struct ChatMessageView: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .leading)
+        .frame(maxWidth: screenSize.width * 0.85, alignment: .leading)
         .padding(.horizontal, 12) // Increased padding for better readability
         .padding(.vertical, 4) // Add vertical padding for better spacing
     }

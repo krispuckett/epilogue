@@ -248,8 +248,8 @@ class BatteryOptimizer {
     func enablePowerSaving() {
         powerSavingEnabled = true
         
-        // Reduce screen brightness
-        UIScreen.main.brightness = 0.5
+        // Note: Screen brightness control requires user permission in iOS 26
+        // Removed automatic brightness adjustment for compliance
         
         // Disable animations
         UIView.setAnimationsEnabled(false)
@@ -265,8 +265,7 @@ class BatteryOptimizer {
     func disablePowerSaving() {
         powerSavingEnabled = false
         
-        // Restore screen brightness
-        UIScreen.main.brightness = 0.8
+        // Note: Brightness control removed for iOS 26 compliance
         
         // Enable animations
         UIView.setAnimationsEnabled(true)

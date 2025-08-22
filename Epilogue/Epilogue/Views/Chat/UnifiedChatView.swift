@@ -2767,10 +2767,10 @@ struct VoiceResponsiveBottomGradient: View {
         ]
     }
     
-    private var gradientHeight: CGFloat {
+    private func gradientHeight(for screenHeight: CGFloat) -> CGFloat {
         let baseHeight: CGFloat = 240 // Slightly lower base
         let audioBoost = CGFloat(audioLevel) * 160 // Still extreme but controlled
-        let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.40 // Cap at 40% of screen
+        let maxHeight: CGFloat = screenHeight * 0.40 // Cap at 40% of screen
         return min(baseHeight + audioBoost, maxHeight)
     }
     
@@ -2790,7 +2790,7 @@ struct VoiceResponsiveBottomGradient: View {
                     startPoint: .bottom,
                     endPoint: .top
                 )
-                .frame(height: gradientHeight)
+                .frame(height: gradientHeight(for: geometry.size.height))
                 .blur(radius: 20)
                 .opacity(isRecording ? 1.0 : 0.0)
                 .scaleEffect(y: 1.0 + Double(audioLevel) * 0.5, anchor: .bottom) // Voice-reactive scale

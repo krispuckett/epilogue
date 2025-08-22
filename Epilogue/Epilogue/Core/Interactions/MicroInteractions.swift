@@ -200,6 +200,7 @@ struct ParallaxEffect: ViewModifier {
 // MARK: - Sparkle Effect
 struct SparkleView: View {
     @State private var sparkles: [Sparkle] = []
+    @State private var viewSize: CGSize = .zero
     let timer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
     
     struct Sparkle: Identifiable {
@@ -230,17 +231,25 @@ struct SparkleView: View {
                         )
                     )
             }
+            .onAppear {
+                viewSize = geometry.size
+            }
+            .onChange(of: geometry.size) { _, newSize in
+                viewSize = newSize
+            }
         }
         .onReceive(timer) { _ in
-            addSparkle()
+            if viewSize != .zero {
+                addSparkle()
+            }
         }
     }
     
     private func addSparkle() {
         let sparkle = Sparkle(
             position: CGPoint(
-                x: CGFloat.random(in: 0...UIScreen.main.bounds.width),
-                y: CGFloat.random(in: 0...UIScreen.main.bounds.height)
+                x: CGFloat.random(in: 0...viewSize.width),
+                y: CGFloat.random(in: 0...viewSize.height)
             ),
             size: CGFloat.random(in: 8...16),
             rotation: Double.random(in: 0...360)
