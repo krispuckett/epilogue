@@ -680,10 +680,9 @@ struct UnifiedChatView: View {
             keyboardDismissBackground
             gradientBackground
             mainScrollContent
-                .safeAreaBar(
-                    edge: .bottom,
-                    content: { bottomInputArea }
-                )
+                .safeAreaBar(edge: .bottom) {
+                    bottomInputArea
+                }
         }
     }
     

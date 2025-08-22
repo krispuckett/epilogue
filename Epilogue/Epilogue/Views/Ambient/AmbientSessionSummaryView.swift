@@ -81,10 +81,9 @@ struct AmbientSessionSummaryView: View {
                     }
                 }
             }
-            .safeAreaBar(
-                edge: .bottom,
-                content: { minimalInputBar }
-            )
+            .safeAreaBar(edge: .bottom) {
+                minimalInputBar
+            }
             .onAppear {
                 // Auto-expand all questions on first load
                 if !hasInitializedExpanded {
