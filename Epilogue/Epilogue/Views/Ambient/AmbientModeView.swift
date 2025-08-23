@@ -160,6 +160,10 @@ struct AmbientModeView: View {
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
     
+    // Smooth gradient transitions
+    @State private var gradientOpacity: Double = 0
+    @State private var lastBookId: UUID? = nil
+    
     // Inline editing states
     @State private var editingMessageId: UUID? = nil
     @State private var editingMessageType: UnifiedChatMessage.MessageType? = nil
@@ -327,6 +331,11 @@ struct AmbientModeView: View {
             if let firstAIResponse = messages.first(where: { !$0.isUser }) {
                 expandedMessageIds.insert(firstAIResponse.id)
             }
+            
+            // Smooth gradient fade in on load
+            withAnimation(.easeInOut(duration: 1.5).delay(0.3)) {
+                gradientOpacity = 1.0
+            }
         }
         .onChange(of: inputMode) { _, newMode in
             // Handle focus changes when switching modes
@@ -350,7 +359,24 @@ struct AmbientModeView: View {
             }
         }
         .onReceive(bookDetector.$detectedBook) { book in
-            handleBookDetection(book)
+            // Smooth gradient transition when book changes
+            if book?.localId != lastBookId {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    gradientOpacity = 0.3 // Fade to low opacity
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    handleBookDetection(book)
+                    lastBookId = book?.localId
+                    
+                    // Fade back in with new colors
+                    withAnimation(.easeIn(duration: 0.8)) {
+                        gradientOpacity = 1.0
+                    }
+                }
+            } else {
+                handleBookDetection(book)
+            }
         }
         .onDisappear {
             bookCoverTimer?.invalidate()
@@ -448,30 +474,38 @@ struct AmbientModeView: View {
         }
     }
     
-    // MARK: - Gradient Background (Matching UnifiedChatView)
+    // MARK: - Gradient Background (Smooth Loading)
     @ViewBuilder
     private var gradientBackground: some View {
-        if let book = currentBookContext {
-            // Use book-specific gradient with extracted colors
-            let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-            BookAtmosphericGradientView(
-                colorPalette: palette, 
-                intensity: gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85),
-                audioLevel: isRecording ? audioLevel : 0
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            .animation(.easeInOut(duration: 0.8), value: currentBookContext?.localId)
-            .id(book.localId)
-        } else {
-            // Default warm ambient gradient
-            AmbientChatGradientView()
-                .opacity(isRecording ? 0.8 + Double(audioLevel) * 0.4 : 1.0)
+        ZStack {
+            // Always show a base black layer for smooth transitions
+            Color.black
+                .ignoresSafeArea()
+            
+            if let book = currentBookContext {
+                // Use book-specific gradient with extracted colors
+                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                BookAtmosphericGradientView(
+                    colorPalette: palette, 
+                    intensity: gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85),
+                    audioLevel: isRecording ? audioLevel : 0
+                )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.5), value: isRecording)
+                .opacity(gradientOpacity)
+                .blur(radius: gradientOpacity < 0.5 ? 10 * (1 - gradientOpacity * 2) : 0)
+                .scaleEffect(gradientOpacity < 1 ? 0.95 + gradientOpacity * 0.05 : 1.0)
+                .animation(.easeInOut(duration: 1.2), value: gradientOpacity)
+                .id(book.localId)
+            } else {
+                // Default warm ambient gradient with smooth fade
+                AmbientChatGradientView()
+                    .opacity(gradientOpacity * (isRecording ? 0.8 + Double(audioLevel) * 0.4 : 1.0))
+                    .blur(radius: gradientOpacity < 0.5 ? 10 * (1 - gradientOpacity * 2) : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.8), value: gradientOpacity)
+            }
         }
     }
     
@@ -875,29 +909,6 @@ struct AmbientModeView: View {
                                     .opacity(inputMode == .textInput ? 1 : 0)
                                     .scaleEffect(inputMode == .textInput ? 1 : 0.8)
                                     .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.2), value: inputMode)
-                                    
-                                    // Send button - amber tinted glass
-                                    if !keyboardText.isEmpty {
-                                        Button {
-                                            triggerSubmitBlurWave()
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                sendTextMessage()
-                                            }
-                                        } label: {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
-                                                    .frame(width: 32, height: 32)
-                                                    .glassEffect()
-                                                
-                                                Image(systemName: "arrow.up")
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                                            }
-                                        }
-                                        .buttonStyle(.plain)
-                                        .transition(.scale(scale: 0.5).combined(with: .opacity))
-                                    }
                                 }
                                 .padding(.horizontal, 16)
                                 .frame(maxWidth: .infinity)
@@ -907,16 +918,12 @@ struct AmbientModeView: View {
                     }
                     .animation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0), value: inputMode)
                     
-                    // Waveform orb - appears only in text mode
-                    if inputMode == .textInput {
+                    // Submit button - appears in text mode when there's text
+                    if inputMode == .textInput && !keyboardText.isEmpty {
                         Button {
-                            isKeyboardFocused = false
-                            withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
-                                keyboardText = ""
-                                inputMode = .listening
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                startRecording()
+                            triggerSubmitBlurWave()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                sendTextMessage()
                             }
                         } label: {
                             Circle()
@@ -924,16 +931,16 @@ struct AmbientModeView: View {
                                 .frame(width: 48, height: 48)
                                 .glassEffect()
                                 .overlay(
-                                    Image(systemName: "waveform")
-                                        .font(.system(size: 20, weight: .medium, design: .rounded))
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 20, weight: .semibold))
                                         .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
                                 )
                         }
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0).combined(with: .opacity).combined(with: .move(edge: .leading)),
+                            insertion: .scale(scale: 0).combined(with: .opacity),
                             removal: .scale(scale: 0).combined(with: .opacity)
                         ))
-                        .animation(.spring(response: 0.45, dampingFraction: 0.75).delay(0.1), value: inputMode)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: !keyboardText.isEmpty)
                         .padding(.leading, 12)
                     }
                     
@@ -2573,7 +2580,9 @@ struct AmbientModeView: View {
     
     private func startNewSessionForBook(_ book: Book) {
         // Create a fresh session for the new book
-        let newSession = ReadingSession(date: Date(), bookModel: BookModel(from: book))
+        let newSession = AmbientSession()
+        newSession.startTime = Date()
+        newSession.bookModel = BookModel(from: book)
         modelContext.insert(newSession)
         currentSession = newSession
         
@@ -2645,7 +2654,9 @@ struct AmbientModeView: View {
                             showingBookStrip = false
                             
                             // Create a new session without a book
-                            let newSession = ReadingSession(date: Date(), bookModel: nil)
+                            let newSession = AmbientSession()
+                            newSession.startTime = Date()
+                            newSession.bookModel = nil
                             modelContext.insert(newSession)
                             currentSession = newSession
                             
