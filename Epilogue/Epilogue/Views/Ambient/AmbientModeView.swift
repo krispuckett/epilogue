@@ -138,7 +138,6 @@ struct AmbientModeView: View {
     @State private var showQuoteHighlighter = false
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
-    @State private var showLiveTranscription = true
     @State private var isTranscriptionDissolving = false
     @State private var currentSession: AmbientSession?
     @State private var showingSessionSummary = false
@@ -150,7 +149,6 @@ struct AmbientModeView: View {
     @State private var pendingQuestion: String?
     @State private var lastProcessedCount = 0
     @State private var debounceTimer: Timer?
-    @AppStorage("showLiveTranscriptionBubble") private var showTranscriptionBubble = true
     
     // New keyboard input states
     @State private var inputMode: AmbientInputMode = .listening
@@ -170,6 +168,11 @@ struct AmbientModeView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
+    
+    // Settings
+    @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
+    @AppStorage("enableAnimations") private var enableAnimations = true
+    @AppStorage("showLiveTranscriptionBubble") private var showLiveTranscriptionBubble = true
     
     enum DetectionState {
         case idle
@@ -214,7 +217,7 @@ struct AmbientModeView: View {
         GeometryReader { geometry in
             VStack {
                 Spacer() // Push content to bottom
-                if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
+                if isRecording && !liveTranscription.isEmpty && showLiveTranscriptionBubble {
                     HStack {
                         Spacer()
                         
@@ -373,7 +376,6 @@ struct AmbientModeView: View {
             // Clear transcription when recording stops
             if !newValue {
                 liveTranscription = ""
-                showLiveTranscription = false
                 transcriptionFadeTimer?.invalidate()
                 transcriptionFadeTimer = nil
                 // Also clear the voice manager's text
@@ -384,9 +386,8 @@ struct AmbientModeView: View {
             // CRITICAL: Only update if actually recording
             guard isRecording else {
                 // Clear everything when not recording
-                if !liveTranscription.isEmpty || showLiveTranscription {
+                if !liveTranscription.isEmpty {
                     liveTranscription = ""
-                    showLiveTranscription = false
                     transcriptionFadeTimer?.invalidate()
                     transcriptionFadeTimer = nil
                 }
@@ -402,14 +403,13 @@ struct AmbientModeView: View {
             // Update live transcription only if there's text
             if !cleanedText.isEmpty {
                 liveTranscription = cleanedText
-                showLiveTranscription = true
+                // Transcription visibility controlled by showLiveTranscriptionBubble setting
                 
                 // Debug log
                 print("📝 Live transcription received: \(cleanedText)")
             } else {
                 // Empty text means clear everything
                 liveTranscription = ""
-                showLiveTranscription = false
                 transcriptionFadeTimer?.invalidate()
                 transcriptionFadeTimer = nil
             }
@@ -422,7 +422,7 @@ struct AmbientModeView: View {
                 // Set a simple timer to fade after 3 seconds
                 transcriptionFadeTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
                     withAnimation(.easeOut(duration: 0.5)) {
-                        showLiveTranscription = false
+                        // Fade handled by animation, visibility controlled by setting
                     }
                     // Clear text after fade
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -456,7 +456,7 @@ struct AmbientModeView: View {
             let palette = colorPalette ?? generatePlaceholderPalette(for: book)
             BookAtmosphericGradientView(
                 colorPalette: palette, 
-                intensity: isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85,
+                intensity: gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85),
                 audioLevel: isRecording ? audioLevel : 0
             )
             .ignoresSafeArea()
@@ -532,7 +532,7 @@ struct AmbientModeView: View {
                     // Top spacing for message positioning
                     Rectangle()
                         .fill(Color.clear)
-                        .frame(height: 80) // Slightly higher positioning
+                        .frame(height: 64) // ← Reduced by 16px
                         .id("top")
                     
                     let hasRealContent = messages.contains { msg in
@@ -543,7 +543,7 @@ struct AmbientModeView: View {
                         if currentBookContext == nil && !isRecording {
                             // Simplified welcome
                             minimalWelcomeView
-                                .padding(.top, 50)
+                                .padding(.top, 34) // ← Reduced from 50 to 34
                         }
                     }
                     
@@ -730,7 +730,7 @@ struct AmbientModeView: View {
                 }
                 
                 // Live transcription bubble
-                if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
+                if isRecording && !liveTranscription.isEmpty && showLiveTranscriptionBubble {
                     HStack {
                         Spacer()
                         
@@ -764,7 +764,7 @@ struct AmbientModeView: View {
                         )
                         .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
                         .frame(
-                            width: inputMode == .textInput ? geometry.size.width - 80 : 64,
+                            width: inputMode == .textInput ? geometry.size.width - 80 : 64,  // Back to fuller width
                             height: inputMode == .textInput ? 48 : 64  // Match waveform orb height
                         )
                         .blur(radius: containerBlur) // Ambient container blur
@@ -944,8 +944,8 @@ struct AmbientModeView: View {
             }
             .frame(height: 100)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, inputMode == .textInput ? 6 : 24)
+        .padding(.horizontal, 16)  // Back to original padding
+        .padding(.bottom, inputMode == .textInput ? 18 : 36)  // Back to previous values
         
         // Long press for quick keyboard
         .onLongPressGesture(minimumDuration: 0.5) {
@@ -1672,7 +1672,7 @@ struct AmbientModeView: View {
     private func stopRecording() {
         isRecording = false
         liveTranscription = "" // Clear immediately
-        showLiveTranscription = false
+        // Visibility controlled by showLiveTranscriptionBubble setting
         transcriptionFadeTimer?.invalidate()
         transcriptionFadeTimer = nil
         voiceManager.stopListening()
@@ -1916,8 +1916,31 @@ struct AmbientModeView: View {
            lowercased.starts(with: "could ") ||
            lowercased.starts(with: "would ") ||
            lowercased.starts(with: "should ") ||
-           lowercased.starts(with: "tell me about") ||
-           lowercased.starts(with: "explain") {
+           lowercased.starts(with: "will ") ||
+           lowercased.starts(with: "do ") ||
+           lowercased.starts(with: "does ") ||
+           lowercased.starts(with: "did ") ||
+           lowercased.starts(with: "has ") ||
+           lowercased.starts(with: "have ") ||
+           lowercased.starts(with: "had ") ||
+           lowercased.starts(with: "tell me") ||
+           lowercased.starts(with: "explain") ||
+           lowercased.starts(with: "describe") ||
+           lowercased.starts(with: "analyze") ||
+           lowercased.starts(with: "compare") ||
+           lowercased.starts(with: "contrast") ||
+           lowercased.starts(with: "summarize") ||
+           lowercased.starts(with: "define") ||
+           lowercased.starts(with: "discuss") ||
+           lowercased.starts(with: "elaborate") ||
+           lowercased.starts(with: "clarify") ||
+           lowercased.contains("tell me about") ||
+           lowercased.contains("what about") ||
+           lowercased.contains("how about") ||
+           lowercased.contains("thoughts on") ||
+           lowercased.contains("opinion on") ||
+           lowercased.contains("do you think") ||
+           lowercased.contains("what do you think") {
             return .question
         }
         
@@ -2243,24 +2266,37 @@ struct AmbientModeView: View {
         
         // Clear the transcription immediately to prevent double appearance
         liveTranscription = ""
-        showLiveTranscription = false
+        // Visibility controlled by showLiveTranscriptionBubble setting
         
         // Cancel any pending fade timer
         transcriptionFadeTimer?.invalidate()
         transcriptionFadeTimer = nil
         
-        withAnimation(.easeInOut(duration: 0.5)) {
-            currentBookContext = book
-            showBookCover = true
+        // Save current session before switching books (if there was a previous book)
+        if currentBookContext != nil {
+            saveCurrentSessionBeforeBookSwitch()
             
-            // Update the current session with the detected book
-            if let session = currentSession {
-                session.bookModel = BookModel(from: book)
-                do {
-                    try modelContext.save()
-                    print("📚 Updated session with detected book: \(book.title)")
-                } catch {
-                    print("❌ Failed to update session with detected book: \(error)")
+            // Start a new session for the detected book
+            withAnimation(.easeInOut(duration: 0.5)) {
+                currentBookContext = book
+                showBookCover = true
+                startNewSessionForBook(book)
+            }
+        } else {
+            // First book detection - just update the existing session
+            withAnimation(.easeInOut(duration: 0.5)) {
+                currentBookContext = book
+                showBookCover = true
+                
+                // Update the current session with the detected book
+                if let session = currentSession {
+                    session.bookModel = BookModel(from: book)
+                    do {
+                        try modelContext.save()
+                        print("📚 Updated session with first detected book: \(book.title)")
+                    } catch {
+                        print("❌ Failed to update session with detected book: \(error)")
+                    }
                 }
             }
         }
@@ -2390,7 +2426,7 @@ struct AmbientModeView: View {
         // INSTANT UI updates
         isRecording = false
         liveTranscription = ""
-        showLiveTranscription = false
+        // Visibility controlled by showLiveTranscriptionBubble setting
         transcriptionFadeTimer?.invalidate()
         transcriptionFadeTimer = nil
         voiceManager.stopListening()
@@ -2408,7 +2444,7 @@ struct AmbientModeView: View {
         // Stop recording immediately
         isRecording = false
         liveTranscription = ""
-        showLiveTranscription = false
+        // Visibility controlled by showLiveTranscriptionBubble setting
         transcriptionFadeTimer?.invalidate()
         transcriptionFadeTimer = nil
         
@@ -2520,6 +2556,41 @@ struct AmbientModeView: View {
         return try? modelContext.fetch(fetchRequest).first
     }
     
+    private func saveCurrentSessionBeforeBookSwitch() {
+        guard let session = currentSession else { return }
+        
+        // Save the session with its current book
+        session.endTime = Date()
+        
+        // Ensure all content is saved to the current book
+        do {
+            try modelContext.save()
+            print("✅ Saved session for \(currentBookContext?.title ?? "unknown book") with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
+        } catch {
+            print("❌ Failed to save session before book switch: \(error)")
+        }
+    }
+    
+    private func startNewSessionForBook(_ book: Book) {
+        // Create a fresh session for the new book
+        let newSession = ReadingSession(date: Date(), bookModel: BookModel(from: book))
+        modelContext.insert(newSession)
+        currentSession = newSession
+        
+        // Clear the detected content from previous book
+        processor.detectedContent.removeAll()
+        
+        // Reset counts
+        savedItemsCount = 0
+        
+        do {
+            try modelContext.save()
+            print("📚 Started new session for book: \(book.title)")
+        } catch {
+            print("❌ Failed to create new session: \(error)")
+        }
+    }
+    
     private func generatePlaceholderPalette(for book: Book) -> ColorPalette {
         ColorPalette(
             primary: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8),
@@ -2566,9 +2637,28 @@ struct AmbientModeView: View {
                 ], spacing: 16) {
                     // "All books" button
                     Button {
+                        // Save current session content before clearing book
+                        saveCurrentSessionBeforeBookSwitch()
+                        
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             currentBookContext = nil
                             showingBookStrip = false
+                            
+                            // Create a new session without a book
+                            let newSession = ReadingSession(date: Date(), bookModel: nil)
+                            modelContext.insert(newSession)
+                            currentSession = newSession
+                            
+                            // Clear the detected content
+                            processor.detectedContent.removeAll()
+                            savedItemsCount = 0
+                            
+                            do {
+                                try modelContext.save()
+                                print("📚 Started new session without book context")
+                            } catch {
+                                print("❌ Failed to create new session: \(error)")
+                            }
                         }
                         HapticManager.shared.lightTap()
                     } label: {
@@ -2585,21 +2675,16 @@ struct AmbientModeView: View {
                     // Book covers
                     ForEach(libraryViewModel.books) { book in
                         Button {
+                            // Save current session content before switching books
+                            saveCurrentSessionBeforeBookSwitch()
+                            
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 currentBookContext = book
                                 showingBookStrip = false
                                 lastDetectedBookId = book.localId
                                 
-                                // Update the current session with the selected book
-                                if let session = currentSession {
-                                    session.bookModel = BookModel(from: book)
-                                    do {
-                                        try modelContext.save()
-                                        print("📚 Updated session with book: \(book.title)")
-                                    } catch {
-                                        print("❌ Failed to update session with book: \(error)")
-                                    }
-                                }
+                                // Create a new session for the new book
+                                startNewSessionForBook(book)
                             }
                             Task {
                                 await extractColorsForBook(book)
@@ -2779,14 +2864,14 @@ struct AmbientMessageThreadView: View {
                 
                 if message.isUser {
                     Text(message.content)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))  // ← Increased from 16
                         .foregroundStyle(.white.opacity(0.9)) // Always full opacity once shown
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     // Extract question from AI response if formatted
                     let content = extractContent(from: message.content)
                     Text(content.question)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))  // ← Increased from 16
                         .foregroundStyle(.white.opacity(0.9)) // Always full opacity once shown
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -2853,12 +2938,12 @@ struct AmbientMessageThreadView: View {
                             .fill(Color.white.opacity(0.08))
                             .frame(height: 0.5)
                         
-                        Text(try! AttributedString(markdown: content.answer))
-                            .font(.custom("Georgia", size: 15))
+                        Text(formatResponseText(content.answer))
+                            .font(.custom("Georgia", size: 17))  // ← Increased from 15
                             .foregroundStyle(.white.opacity(0.85))
-                            .lineSpacing(6)
+                            .lineSpacing(8)  // ← Increased from 6
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 40)
+                            .padding(.leading, 0)  // ← Changed to align under number
                             .padding(.trailing, 20)
                             .padding(.vertical, 12)
                             .padding(.bottom, 4)
@@ -2906,6 +2991,53 @@ struct AmbientMessageThreadView: View {
         }
         // Otherwise return the full text as the question
         return (text, "")
+    }
+    
+    private func formatResponseText(_ text: String) -> AttributedString {
+        // Split text into sentences and group into paragraphs
+        let sentences = text.components(separatedBy: ". ")
+        var paragraphs: [String] = []
+        var currentParagraph = ""
+        
+        for (index, sentence) in sentences.enumerated() {
+            let cleanSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleanSentence.isEmpty {
+                currentParagraph += cleanSentence
+                if !cleanSentence.hasSuffix(".") {
+                    currentParagraph += "."
+                }
+                
+                // Create paragraph break every 2-3 sentences or at natural breaks
+                if (index + 1) % 3 == 0 || 
+                   cleanSentence.contains("However") || 
+                   cleanSentence.contains("Additionally") ||
+                   cleanSentence.contains("Furthermore") ||
+                   cleanSentence.contains("In conclusion") ||
+                   cleanSentence.contains("First") ||
+                   cleanSentence.contains("Second") ||
+                   cleanSentence.contains("Finally") {
+                    paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
+                    currentParagraph = ""
+                } else if index < sentences.count - 1 {
+                    currentParagraph += " "
+                }
+            }
+        }
+        
+        // Add any remaining text as final paragraph
+        if !currentParagraph.trimmingCharacters(in: .whitespaces).isEmpty {
+            paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
+        }
+        
+        // Join paragraphs with double newlines for spacing
+        let formattedText = paragraphs.joined(separator: "\n\n")
+        
+        // Convert to AttributedString with markdown support
+        do {
+            return try AttributedString(markdown: formattedText)
+        } catch {
+            return AttributedString(formattedText)
+        }
     }
 }
 

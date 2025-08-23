@@ -181,12 +181,29 @@ class AmbientBookDetector: ObservableObject {
         let lowercased = text.lowercased()
         print("📚 Checking against \(libraryBooks.count) known books")
         
+        // Debug: Print first few book titles to verify library contents
+        if libraryBooks.count > 0 {
+            print("📚 Books in library: \(libraryBooks.prefix(6).map { $0.title }.joined(separator: ", "))")
+        }
+        
         for book in libraryBooks {
             // Check title match
             let titleLower = book.title.lowercased()
             if lowercased.contains(titleLower) {
                 print("📚 Found exact match: \(book.title)")
                 setDetectedBook(book, confidence: 0.9)
+                return
+            }
+            
+            // Check for title without articles (a, an, the)
+            let titleWithoutArticles = titleLower
+                .replacingOccurrences(of: "^(a |an |the )", with: "", options: .regularExpression)
+            let textWithoutArticles = lowercased
+                .replacingOccurrences(of: "^(a |an |the )", with: "", options: .regularExpression)
+            
+            if textWithoutArticles.contains(titleWithoutArticles) || titleWithoutArticles.contains(textWithoutArticles) {
+                print("📚 Found match without articles: \(book.title)")
+                setDetectedBook(book, confidence: 0.85)
                 return
             }
             

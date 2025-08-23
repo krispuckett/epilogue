@@ -23,6 +23,10 @@ struct UnifiedChatView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
+    
+    // Settings
+    @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
+    @AppStorage("enableAnimations") private var enableAnimations = true
     @ObservedObject private var syncManager = NotesSyncManager.shared
     
     // Ambient session tracking
@@ -430,7 +434,7 @@ struct UnifiedChatView: View {
             let palette = colorPalette ?? generatePlaceholderPalette(for: book)
             BookAtmosphericGradientView(
                 colorPalette: palette, 
-                intensity: 0.9 + Double(audioLevel) * 0.3 // Audio-reactive intensity
+                intensity: gradientIntensity * (0.9 + Double(audioLevel) * 0.3) // Audio-reactive intensity with user setting
             )
             .ignoresSafeArea()
             .allowsHitTesting(false)
@@ -447,7 +451,7 @@ struct UnifiedChatView: View {
         } else if let book = currentBookContext {
             // Use the same BookAtmosphericGradientView with extracted colors
             let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-            BookAtmosphericGradientView(colorPalette: palette, intensity: 0.85)
+            BookAtmosphericGradientView(colorPalette: palette, intensity: gradientIntensity * 0.85)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
                 .transition(.opacity)
@@ -2769,8 +2773,14 @@ struct VoiceResponsiveBottomGradient: View {
     
     private func gradientHeight(for screenHeight: CGFloat) -> CGFloat {
         let baseHeight: CGFloat = 240 // Slightly lower base
-        let audioBoost = CGFloat(audioLevel) * 160 // Still extreme but controlled
-        let maxHeight: CGFloat = screenHeight * 0.40 // Cap at 40% of screen
+        
+        // Apply logarithmic curve to make it more sensitive to lower volumes
+        // This amplifies quiet sounds more than loud ones
+        let normalizedAudio = min(audioLevel, 1.0) // Ensure it's capped at 1.0
+        let amplifiedLevel = log10(1 + normalizedAudio * 9) // Log curve: more boost at low levels
+        
+        let audioBoost = CGFloat(amplifiedLevel) * 200 // Increased multiplier for visibility
+        let maxHeight: CGFloat = screenHeight * 0.35 // Cap at 35% of screen (reduced from 40%)
         return min(baseHeight + audioBoost, maxHeight)
     }
     
@@ -2793,7 +2803,7 @@ struct VoiceResponsiveBottomGradient: View {
                 .frame(height: gradientHeight(for: geometry.size.height))
                 .blur(radius: 20)
                 .opacity(isRecording ? 1.0 : 0.0)
-                .scaleEffect(y: 1.0 + Double(audioLevel) * 0.5, anchor: .bottom) // Voice-reactive scale
+                .scaleEffect(y: 1.0 + Double(min(log10(1 + audioLevel * 9), 1.0)) * 0.6, anchor: .bottom) // More sensitive scale with log curve
                 .animation(.easeInOut(duration: 0.1), value: audioLevel)
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isRecording)
                 

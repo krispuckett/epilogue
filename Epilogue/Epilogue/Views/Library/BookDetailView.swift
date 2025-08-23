@@ -115,6 +115,10 @@ struct BookDetailView: View {
     @State private var hasHighResColors = false
     // Remove DisplayColorScheme - we don't need it
     
+    // Settings
+    @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
+    @AppStorage("enableAnimations") private var enableAnimations = true
+    
     // Fixed colors for Claude voice mode style (always white text on dark background)
     private var textColor: Color {
         .white
@@ -223,11 +227,14 @@ struct BookDetailView: View {
     var body: some View {
         ZStack {
             // Use the Apple Music-style atmospheric gradient with dynamic opacity
-            BookAtmosphericGradientView(colorPalette: colorPalette ?? generatePlaceholderPalette())
+            BookAtmosphericGradientView(
+                colorPalette: colorPalette ?? generatePlaceholderPalette(),
+                intensity: gradientIntensity
+            )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
                 .opacity(gradientOpacity) // Fades on scroll
-                .animation(.easeOut(duration: 0.2), value: gradientOpacity)
+                .animation(enableAnimations ? .easeOut(duration: 0.2) : nil, value: gradientOpacity)
                 .id(book.id) // Force view recreation when book changes
             
             // Content - always visible but colors update

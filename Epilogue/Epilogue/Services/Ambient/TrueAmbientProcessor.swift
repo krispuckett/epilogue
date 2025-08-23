@@ -717,15 +717,30 @@ public class TrueAmbientProcessor: ObservableObject {
     
     private func initializeWhisper() async {
         do {
+            // Get voice quality setting and map to WhisperKit model
+            let voiceQuality = UserDefaults.standard.string(forKey: "voiceQuality") ?? "high"
+            let modelName: String
+            
+            switch voiceQuality {
+            case "low":
+                modelName = "tiny.en"  // Fastest, lowest accuracy
+            case "medium":
+                modelName = "base.en"  // Balanced
+            case "high":
+                modelName = "small.en" // Best accuracy, slower
+            default:
+                modelName = "base.en"  // Default to balanced
+            }
+            
             // Initialize WhisperKit with enhanced configuration for low volume
             let config = WhisperKitConfig(
-                model: "base.en",  // English-only model for better accuracy
+                model: modelName,
                 modelRepo: "argmaxinc/whisperkit-coreml"
             )
             
             whisperModel = try await WhisperKit(config)
             isInitialized = true
-            logger.info("✅ WhisperKit initialized with low-volume optimization")
+            logger.info("✅ WhisperKit initialized with \(modelName) model (quality: \(voiceQuality))")
         } catch {
             logger.error("❌ Failed to initialize WhisperKit: \(error)")
         }
