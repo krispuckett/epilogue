@@ -43,6 +43,45 @@ extension View {
     }
 }
 
+// MARK: - Custom Tab Bar Overlay
+struct CustomTabBarOverlay: View {
+    @Binding var selectedTab: Int
+    
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // Library tab background
+                TabBackgroundView(isSelected: selectedTab == 0)
+                    .frame(width: geometry.size.width / 3)
+                
+                // Notes tab background
+                TabBackgroundView(isSelected: selectedTab == 1)
+                    .frame(width: geometry.size.width / 3)
+                
+                // Chat tab background
+                TabBackgroundView(isSelected: selectedTab == 2)
+                    .frame(width: geometry.size.width / 3)
+            }
+            .allowsHitTesting(false) // Don't interfere with tab bar touches
+        }
+        .frame(height: 49) // Standard tab bar height
+    }
+}
+
+struct TabBackgroundView: View {
+    let isSelected: Bool
+    
+    var body: some View {
+        if isSelected {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject private var navigationCoordinator = NavigationCoordinator.shared
     @StateObject private var ambientCoordinator = EpilogueAmbientCoordinator.shared
@@ -90,8 +129,28 @@ struct ContentView: View {
         appearance.backgroundColor = UIColor.black.withAlphaComponent(0.8)
         appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
         
+        // Configure amber tint for selected items
+        let amberColor = UIColor(red: 1.0, green: 0.55, blue: 0.26, alpha: 1.0)
+        
+        // Selected item appearance with amber background
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            .foregroundColor: UIColor.white
+        ]
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.white
+        
+        // Add amber background for selected tab - using background image approach
+        let amberBackground = UIColor(red: 1.0, green: 0.55, blue: 0.26, alpha: 0.15)
+        appearance.selectionIndicatorTintColor = amberColor.withAlphaComponent(0.2)
+        
+        // Normal (unselected) appearance
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            .foregroundColor: UIColor.gray
+        ]
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.gray
+        
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBar.appearance().tintColor = amberColor
     }
     
     var body: some View {
@@ -290,6 +349,13 @@ struct ContentView: View {
             .environmentObject(notesViewModel)
             .environmentObject(navigationCoordinator)
             .sensoryFeedback(.selection, trigger: selectedTab)
+            
+            // Custom tab bar overlay for amber selected background
+            VStack {
+                Spacer()
+                CustomTabBarOverlay(selectedTab: $selectedTab)
+                    .padding(.bottom, 20) // Position above the tab bar
+            }
             .toolbar {
                 // Privacy settings button (only on Library tab)
                 if selectedTab == 0 {
