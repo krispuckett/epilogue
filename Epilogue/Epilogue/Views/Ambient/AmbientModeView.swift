@@ -213,6 +213,7 @@ struct AmbientModeView: View {
     private var liveTranscriptionView: some View {
         GeometryReader { geometry in
             VStack {
+                Spacer() // Push content to bottom
                 if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
                     HStack {
                         Spacer()
@@ -288,6 +289,7 @@ struct AmbientModeView: View {
                 
                 // Input controls overlay on top of gradient
                 bottomInputArea
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
         // Top navigation bar with BookView-style header
@@ -688,8 +690,21 @@ struct AmbientModeView: View {
                     }
             }
             
-            VStack(spacing: 0) {
-                Spacer()
+            VStack(spacing: 16) { // ← Fixed spacing and order
+                Spacer() // Push everything to bottom
+                
+                // FIXED: Scrolling text positioned correctly above the buttons
+                if pendingQuestion != nil {
+                    ScrollingBookMessages()
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .glassEffect()
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                }
                 
                 // Save indicator - positioned above everything else
                 if showSaveAnimation, let itemType = savedItemType {
@@ -711,30 +726,32 @@ struct AmbientModeView: View {
                         insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .bottom)),
                         removal: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .top))
                     ))
-                    .padding(.bottom, 12)
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
                 }
                 
-                // Show scrolling text while waiting for response (above stop button)
-                if pendingQuestion != nil {
-                    ScrollingBookMessages()
-                        .padding(.horizontal, 24) // Consistent inner padding
-                        .padding(.vertical, 12)
-                        .glassEffect()
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .padding(.bottom, 16)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.9).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
+                // Live transcription bubble
+                if isRecording && !liveTranscription.isEmpty && showLiveTranscription && showTranscriptionBubble {
+                    HStack {
+                        Spacer()
+                        
+                        Text(liveTranscription)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: 300) // Limit width
+                            .glassEffect()
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        
+                        Spacer()
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: liveTranscription)
                 }
                 
-                // Simple live transcription display
-                liveTranscriptionView
-                    .padding(.bottom, 16)
-            
-            // Unified morphing container - like morph-surface example
-            GeometryReader { geometry in
+                // FIXED: Main input controls at the very bottom
+                GeometryReader { geometry in
                 HStack(spacing: 0) {
                     Spacer()
                     
@@ -926,26 +943,26 @@ struct AmbientModeView: View {
                 .frame(height: geometry.size.height)
             }
             .frame(height: 100)
-            .padding(.horizontal, 16)
-            .padding(.bottom, inputMode == .textInput ? 6 : 24)  // Only 6px padding when keyboard is shown
-            
-            // Long press for quick keyboard
-            .onLongPressGesture(minimumDuration: 0.5) {
-                if isRecording {
-                    stopRecording()
-                }
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
-                    inputMode = .textInput
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        isKeyboardFocused = true
-                    }
-                }
-                HapticManager.shared.mediumTap()
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, inputMode == .textInput ? 6 : 24)
+        
+        // Long press for quick keyboard
+        .onLongPressGesture(minimumDuration: 0.5) {
+            if isRecording {
+                stopRecording()
             }
-            }  // Close VStack
-        }  // Close ZStack
-        .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode) // Smooth Dynamic Island-style spring
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
+                inputMode = .textInput
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isKeyboardFocused = true
+                }
+            }
+            HapticManager.shared.mediumTap()
+        }
     }
+    .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
+}
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
     // Keeping for reference but no longer used
