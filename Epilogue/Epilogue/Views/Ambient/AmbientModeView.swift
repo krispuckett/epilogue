@@ -248,8 +248,10 @@ struct AmbientModeView: View {
     
     var body: some View {
         ZStack {
-            // Base gradient background - always visible
+            // Base gradient background - pinned to edges from start
             gradientBackground
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .edgesIgnoringSafeArea(.all)
             
             // Main scroll content
             mainScrollContent
@@ -477,36 +479,36 @@ struct AmbientModeView: View {
     // MARK: - Gradient Background (Smooth Loading)
     @ViewBuilder
     private var gradientBackground: some View {
-        ZStack {
-            // Always show a base black layer for smooth transitions
-            Color.black
-                .ignoresSafeArea()
-            
-            if let book = currentBookContext {
-                // Use book-specific gradient with extracted colors
-                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-                BookAtmosphericGradientView(
-                    colorPalette: palette, 
-                    intensity: gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85),
-                    audioLevel: isRecording ? audioLevel : 0
-                )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .opacity(gradientOpacity)
-                .blur(radius: gradientOpacity < 0.5 ? 10 * (1 - gradientOpacity * 2) : 0)
-                .scaleEffect(gradientOpacity < 1 ? 0.95 + gradientOpacity * 0.05 : 1.0)
-                .animation(.easeInOut(duration: 1.2), value: gradientOpacity)
-                .id(book.localId)
-            } else {
-                // Default warm ambient gradient with smooth fade
-                AmbientChatGradientView()
-                    .opacity(gradientOpacity * (isRecording ? 0.8 + Double(audioLevel) * 0.4 : 1.0))
-                    .blur(radius: gradientOpacity < 0.5 ? 10 * (1 - gradientOpacity * 2) : 0)
-                    .ignoresSafeArea()
+        // Always show a base black layer for smooth transitions
+        Color.black
+            .ignoresSafeArea(.all)
+            .overlay {
+                if let book = currentBookContext {
+                    // Use book-specific gradient with extracted colors
+                    let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                    BookAtmosphericGradientView(
+                        colorPalette: palette, 
+                        intensity: gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85),
+                        audioLevel: isRecording ? audioLevel : 0
+                    )
+                    .ignoresSafeArea(.all)
                     .allowsHitTesting(false)
-                    .animation(.easeInOut(duration: 0.8), value: gradientOpacity)
+                    .opacity(gradientOpacity)
+                    // Only animate opacity, not position or scale
+                    .animation(.easeInOut(duration: 1.0), value: gradientOpacity)
+                    .transition(.opacity) // Simple opacity transition
+                    .id(book.localId)
+                } else {
+                    // Default warm ambient gradient with smooth fade
+                    AmbientChatGradientView()
+                        .ignoresSafeArea(.all)
+                        .allowsHitTesting(false)
+                        .opacity(gradientOpacity * (isRecording ? 0.8 + Double(audioLevel) * 0.4 : 1.0))
+                        // Only animate opacity
+                        .animation(.easeInOut(duration: 0.8), value: gradientOpacity)
+                        .transition(.opacity)
+                }
             }
-        }
     }
     
     // MARK: - Voice Gradient Overlay (Matching UnifiedChatView)
@@ -798,7 +800,7 @@ struct AmbientModeView: View {
                         )
                         .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
                         .frame(
-                            width: inputMode == .textInput ? geometry.size.width - 80 : 64,  // Back to fuller width
+                            width: inputMode == .textInput ? min(geometry.size.width - 80, 320) : 64,  // Wider to fit camera, still leaves space for button
                             height: inputMode == .textInput ? 48 : 64  // Match waveform orb height
                         )
                         .blur(radius: containerBlur) // Ambient container blur
@@ -906,24 +908,38 @@ struct AmbientModeView: View {
                                                 }
                                             }
                                     }
+                                    .frame(maxWidth: .infinity)  // Fill available space
                                     .opacity(inputMode == .textInput ? 1 : 0)
                                     .scaleEffect(inputMode == .textInput ? 1 : 0.8)
                                     .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.2), value: inputMode)
                                 }
-                                .padding(.horizontal, 16)
-                                .frame(maxWidth: .infinity)
+                                .padding(.leading, 12)  // Proper padding for camera icon
+                                .padding(.trailing, 12)
                                 .frame(height: 48)  // Match container height
                             }
                         }
                     }
                     .animation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0), value: inputMode)
                     
-                    // Submit button - appears in text mode when there's text
-                    if inputMode == .textInput && !keyboardText.isEmpty {
+                    // Morphing button - waveform when empty, submit when has text
+                    if inputMode == .textInput {
                         Button {
-                            triggerSubmitBlurWave()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                sendTextMessage()
+                            if !keyboardText.isEmpty {
+                                // Submit the message
+                                triggerSubmitBlurWave()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    sendTextMessage()
+                                }
+                            } else {
+                                // Return to voice mode
+                                isKeyboardFocused = false
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
+                                    keyboardText = ""
+                                    inputMode = .listening
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                    startRecording()
+                                }
                             }
                         } label: {
                             Circle()
@@ -931,16 +947,17 @@ struct AmbientModeView: View {
                                 .frame(width: 48, height: 48)
                                 .glassEffect()
                                 .overlay(
-                                    Image(systemName: "arrow.up")
-                                        .font(.system(size: 20, weight: .semibold))
+                                    Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
+                                        .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
                                         .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                        .contentTransition(.symbolEffect(.replace))
                                 )
                         }
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0).combined(with: .opacity),
+                            insertion: .scale(scale: 0).combined(with: .opacity).combined(with: .move(edge: .leading)),
                             removal: .scale(scale: 0).combined(with: .opacity)
                         ))
-                        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: !keyboardText.isEmpty)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.75).delay(0.1), value: inputMode)
                         .padding(.leading, 12)
                     }
                     
