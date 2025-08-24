@@ -48,6 +48,7 @@ struct SharedBookCoverView: View {
     @State private var fullImage: UIImage?
     @State private var isLoadingStarted = false
     @State private var isLoading = true
+    @State private var loadFailed = false
     
     // Simple in-memory cache to avoid state recreation
     private static let quickImageCache: NSCache<NSString, UIImage> = {
@@ -132,8 +133,8 @@ struct SharedBookCoverView: View {
                     thumbnail = await SharedBookCoverManager.shared.loadThumbnail(from: urlString)
                 }
                 
-                if let thumbnail = thumbnail {
-                    await MainActor.run {
+                await MainActor.run {
+                    if let thumbnail = thumbnail {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             self.thumbnailImage = thumbnail
                             self.isLoading = false
@@ -141,6 +142,11 @@ struct SharedBookCoverView: View {
                         self.onImageLoaded?(thumbnail)
                         // Store in quick cache
                         Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
+                    } else {
+                        // Image failed to load
+                        self.loadFailed = true
+                        self.isLoading = false
+                        print("❌ Failed to load image from: \(urlString)")
                     }
                 }
             }

@@ -194,23 +194,25 @@ struct QuoteCard: View {
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .animation(.easeInOut(duration: 0.3), value: showDate)
-        .onLongPressGesture(minimumDuration: 0.3) {
-            // Show date on long press
-            HapticManager.shared.lightTap()
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showDate = true
-            }
-            // Hide date after 3 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showDate = false
-                }
-            }
-        }
         .onTapGesture(count: 2) {
             HapticManager.shared.mediumTap()
             // Navigate to ambient session
             navigateToAmbientSession()
+        }
+        .onTapGesture(count: 1) {
+            // Single tap toggles date visibility
+            HapticManager.shared.lightTap()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showDate.toggle()
+            }
+            // Auto-hide after 3 seconds when showing
+            if showDate == false {  // Will be true after toggle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showDate = false
+                    }
+                }
+            }
         }
     }
     

@@ -7,6 +7,8 @@ struct NotesView: View {
     
     @State private var selectedFilter: NoteType? = nil
     @State private var showingAddNote = false
+    @State private var addNoteCommandText = ""
+    @State private var editNoteCommandText = ""
     @State private var noteToEdit: Note? = nil
     @State private var editingNote: Note? = nil
     @State private var openOptionsNoteId: UUID? = nil
@@ -388,25 +390,20 @@ struct NotesView: View {
             }
         }
         .sheet(isPresented: $showingAddNote) {
-            LiquidCommandPalette(
+            IntelligentCommandPalette(
                 isPresented: $showingAddNote,
-                animationNamespace: commandPaletteNamespace,
-                bookContext: nil
+                commandText: $addNoteCommandText
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)
         }
         .sheet(item: $noteToEdit) { note in
-            LiquidCommandPalette(
+            IntelligentCommandPalette(
                 isPresented: .constant(true),
-                animationNamespace: commandPaletteNamespace,
-                initialContent: formatNoteForEditing(note),
-                editingNote: note,
-                onUpdate: { updatedNote in
-                    notesViewModel.updateNote(updatedNote)
-                    noteToEdit = nil
-                },
-                bookContext: nil  // No specific book context when editing existing notes
+                commandText: Binding(
+                    get: { formatNoteForEditing(note) ?? "" },
+                    set: { editNoteCommandText = $0 }
+                )
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)

@@ -188,8 +188,8 @@ class NaturalLanguageDateParser {
             return calendar.date(byAdding: .weekOfYear, value: 1, to: now)
         }
         
-        // In X days/hours/weeks
-        let inPattern = #"in (\d+) (hour|day|week)s?"#
+        // In X minutes/hours/days/weeks
+        let inPattern = #"in (\d+) (minute|hour|day|week)s?"#
         if let regex = try? NSRegularExpression(pattern: inPattern, options: .caseInsensitive),
            let match = regex.firstMatch(in: lowercased, range: NSRange(lowercased.startIndex..., in: lowercased)) {
             
@@ -200,6 +200,8 @@ class NaturalLanguageDateParser {
                 let unit = String(lowercased[unitRange])
                 
                 switch unit {
+                case "minute":
+                    return calendar.date(byAdding: .minute, value: number, to: now)
                 case "hour":
                     return calendar.date(byAdding: .hour, value: number, to: now)
                 case "day":

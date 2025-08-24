@@ -191,10 +191,31 @@ struct CommandParser {
         // THIRD: Check for reminders
         if lowercased.contains("remind") || lowercased.contains("reminder") {
             if let date = NaturalLanguageDateParser.parse(from: input) {
-                let reminderText = input
+                // Extract the reminder text (what comes after "remind me to" or before the time)
+                var reminderText = input
                     .replacingOccurrences(of: "remind me to ", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "remind me ", with: "", options: .caseInsensitive)
                     .replacingOccurrences(of: "reminder: ", with: "", options: .caseInsensitive)
+                
+                // Clean up time references from the text
+                reminderText = reminderText
+                    .replacingOccurrences(of: #"in \d+ minutes?"#, with: "", options: [.regularExpression, .caseInsensitive])
+                    .replacingOccurrences(of: #"in \d+ hours?"#, with: "", options: [.regularExpression, .caseInsensitive])
+                    .replacingOccurrences(of: #"in \d+ days?"#, with: "", options: [.regularExpression, .caseInsensitive])
+                    .replacingOccurrences(of: "tomorrow", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "tonight", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespaces)
+                
+                if reminderText.isEmpty {
+                    reminderText = "Time to read!"
+                }
+                
                 return .createReminder(text: reminderText, date: date)
+            } else {
+                // Date parsing failed but it's clearly a reminder intent
+                print("Warning: Reminder detected but date parsing failed for: \(input)")
+                // Don't fall through to other intents
+                return .unknown
             }
         }
         

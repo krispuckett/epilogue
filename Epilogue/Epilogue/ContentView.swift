@@ -66,20 +66,16 @@ struct ContentView: View {
     @State private var toastMessage = ""
     @State private var showBookSearch = false
     @State private var bookSearchQuery = ""
+    @State private var batchBookTitles: [String] = []
+    @State private var currentBatchIndex = 0
+    @State private var showBatchBookSearch = false
     
     // Command processing
     @Environment(\.modelContext) private var modelContext
     @Query private var capturedNotes: [CapturedNote]
     @Query private var capturedQuotes: [CapturedQuote]
     
-    // Command processing manager
-    private var commandProcessor: CommandProcessingManager {
-        CommandProcessingManager(
-            modelContext: modelContext,
-            libraryViewModel: libraryViewModel,
-            notesViewModel: notesViewModel
-        )
-    }
+    // Command processing manager - will be set up properly in body
     
     init() {
         print("🏠 DEBUG: ContentView init")
@@ -145,6 +141,27 @@ struct ContentView: View {
                     }
                 )
             }
+            .sheet(isPresented: $showBatchBookSearch) {
+                BatchBookSearchSheet(
+                    bookTitles: $batchBookTitles,
+                    onBookSelected: { book in
+                        libraryViewModel.addBook(book)
+                        HapticManager.shared.bookOpen()
+                        
+                        let remaining = batchBookTitles.count - 1
+                        if remaining > 0 {
+                            toastMessage = "Added \"\(book.title)\". \(remaining) more to add..."
+                        } else {
+                            toastMessage = "Added \"\(book.title)\" - batch complete!"
+                        }
+                        showGlassToast = true
+                    },
+                    onComplete: {
+                        batchBookTitles.removeAll()
+                        showBatchBookSearch = false
+                    }
+                )
+            }
             .overlay {
                 BookScannerLoadingOverlay()
             }
@@ -205,6 +222,24 @@ struct ContentView: View {
                 if let query = notification.object as? String {
                     bookSearchQuery = query
                     showBookSearch = true
+                    // Dismiss command input if it's open
+                    showCommandInput = false
+                    commandText = ""
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBatchBookSearch"))) { notification in
+                if let titles = notification.object as? [String], !titles.isEmpty {
+                    // Start batch processing
+                    batchBookTitles = titles
+                    currentBatchIndex = 0
+                    
+                    // Show toast for batch operation
+                    toastMessage = "Adding \(titles.count) books to library..."
+                    showGlassToast = true
+                    
+                    // Show the batch search sheet
+                    showBatchBookSearch = true
+                    
                     // Dismiss command input if it's open
                     showCommandInput = false
                     commandText = ""
@@ -456,8 +491,13 @@ struct ContentView: View {
             return
         }
         
-        // Delegate to command processor
-        commandProcessor.processInlineCommand(trimmedText)
+        // Create and use command processor
+        let processor = CommandProcessingManager(
+            modelContext: modelContext,
+            libraryViewModel: libraryViewModel,
+            notesViewModel: notesViewModel
+        )
+        processor.processInlineCommand(trimmedText)
         
         // Provide haptic feedback and dismiss
         HapticManager.shared.success()
@@ -467,6 +507,22 @@ struct ContentView: View {
     private func dismissCommandInput() {
         isInputFocused = false
         commandText = ""
+    }
+    
+    private func processNextBatchBook() {
+        guard !batchBookTitles.isEmpty else {
+            // Batch complete
+            currentBatchIndex = 0
+            return
+        }
+        
+        let nextTitle = batchBookTitles.removeFirst()
+        
+        // Add a small delay between searches to prevent UI issues
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            bookSearchQuery = nextTitle
+            showBookSearch = true
+        }
         withAnimation(SmoothAnimationType.smooth.animation) {
             showCommandInput = false
         }

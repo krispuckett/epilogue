@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct EpilogueApp: App {
@@ -17,6 +18,9 @@ struct EpilogueApp: App {
                         Task { @MainActor in
                             CommandHistoryManager.shared.clearHistory()
                         }
+                        
+                        // Request notification permissions
+                        requestNotificationPermissions()
                     }
             } else {
                 // Minimal launch screen while loading
@@ -33,6 +37,21 @@ struct EpilogueApp: App {
                 }
             }
         }
+    }
+    
+    private func requestNotificationPermissions() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            if granted {
+                print("✅ Notification permissions granted")
+            } else if let error = error {
+                print("❌ Notification permission error: \(error)")
+            } else {
+                print("⚠️ Notification permissions denied")
+            }
+        }
+        
+        // Set the delegate to handle notification taps
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
     }
     
     @MainActor

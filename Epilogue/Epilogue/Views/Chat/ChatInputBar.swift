@@ -6,6 +6,7 @@ struct ChatInputBar: View {
     let onStartAmbient: () -> Void
     @FocusState private var isFocused: Bool
     @State private var showCommandPalette = false
+    @State private var commandPaletteText = ""
     @State private var showNavigationMenu = false
     @State private var selectedBook: Book?
     @State private var isAmbientActive = false
@@ -108,10 +109,9 @@ struct ChatInputBar: View {
             Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $showCommandPalette) {
-            LiquidCommandPalette(
+            IntelligentCommandPalette(
                 isPresented: $showCommandPalette,
-                animationNamespace: commandPaletteNamespace,
-                bookContext: selectedBook  // Pass selected book if available
+                commandText: $commandPaletteText
             )
             .environmentObject(notesViewModel)
             .environmentObject(libraryViewModel)

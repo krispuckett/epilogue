@@ -12,6 +12,10 @@ class CommandProcessingManager: ObservableObject {
     private let libraryViewModel: LibraryViewModel
     private let notesViewModel: NotesViewModel
     
+    // MARK: - Batch Book Queue
+    @Published var pendingBookSearches: [String] = []
+    @Published var isProcessingBatchBooks = false
+    
     init(modelContext: ModelContext, libraryViewModel: LibraryViewModel, notesViewModel: NotesViewModel) {
         self.modelContext = modelContext
         self.libraryViewModel = libraryViewModel
@@ -103,13 +107,8 @@ class CommandProcessingManager: ObservableObject {
                 setReadingGoal(book: book, pagesPerDay: pagesPerDay)
                 
             case .batchAddBooks(let titles):
-                // Add multiple books
-                for title in titles {
-                    NotificationCenter.default.post(
-                        name: Notification.Name("ShowBookSearch"),
-                        object: title
-                    )
-                }
+                // Queue multiple books for sequential processing
+                processBatchBookAdditions(titles)
                 
             case .unknown:
                 print("Unknown command: \(commandText)")
@@ -376,5 +375,43 @@ class CommandProcessingManager: ObservableObject {
             name: Notification.Name("ReadingGoalSet"),
             object: ["book": book, "pagesPerDay": pagesPerDay]
         )
+    }
+    
+    // MARK: - Batch Book Processing
+    
+    private func processBatchBookAdditions(_ titles: [String]) {
+        // Store the list of books to add
+        pendingBookSearches = titles
+        isProcessingBatchBooks = true
+        
+        // Post notification with the entire batch
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowBatchBookSearch"),
+            object: titles
+        )
+        
+        print("📚 Queued \(titles.count) books for batch addition: \(titles.joined(separator: ", "))")
+    }
+    
+    func processNextBookInQueue() {
+        guard !pendingBookSearches.isEmpty else {
+            isProcessingBatchBooks = false
+            return
+        }
+        
+        let nextBook = pendingBookSearches.removeFirst()
+        
+        // Show search for this book
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowBookSearch"),
+            object: nextBook
+        )
+        
+        print("📖 Processing book search: \(nextBook). Remaining: \(pendingBookSearches.count)")
+    }
+    
+    func clearBookQueue() {
+        pendingBookSearches.removeAll()
+        isProcessingBatchBooks = false
     }
 }
