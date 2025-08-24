@@ -94,6 +94,8 @@ struct QuoteCard: View {
     @Binding var showingOptions: Bool
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.sizeCategory) var sizeCategory
+    @State private var showDate = false
+    @State private var dragOffset: CGFloat = 0
     
     var firstLetter: String {
         String(note.content.prefix(1))
@@ -171,6 +173,18 @@ struct QuoteCard: View {
                     }
                 }
             }
+            
+            // Date overlay that fades in on swipe
+            if showDate {
+                HStack {
+                    Spacer()
+                    Text(note.formattedDate)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
+                        .padding(.top, 16)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
         }
         .padding(32) // Generous padding
         .background(
@@ -179,11 +193,43 @@ struct QuoteCard: View {
         )
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
+        .offset(x: dragOffset)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(.easeInOut(duration: 0.3), value: showDate)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    dragOffset = value.translation.width
+                    // Show date when swiping
+                    if abs(value.translation.width) > 20 && !showDate {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showDate = true
+                        }
+                    }
+                }
+                .onEnded { value in
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        dragOffset = 0
+                    }
+                    // Hide date after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showDate = false
+                        }
+                    }
+                }
+        )
         .onTapGesture(count: 2) {
             HapticManager.shared.mediumTap()
-            showingOptions = true
+            // Navigate to ambient session
+            navigateToAmbientSession()
         }
+    }
+    
+    private func navigateToAmbientSession() {
+        // Find the ambient session this quote belongs to
+        // For now, just open ambient mode - can be enhanced to find specific session
+        SimplifiedAmbientCoordinator.shared.openAmbientReading()
     }
 }
 

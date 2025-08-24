@@ -12,13 +12,21 @@ enum CommandIntent {
     case existingNote(note: Note)
     case unknown
     
+    // New intelligent commands with @mentions and multi-step
+    case createNoteWithBook(text: String, book: Book) // Note with @book mention
+    case createQuoteWithBook(text: String, book: Book) // Quote with @book mention
+    case multiStepCommand([ChainedCommand]) // Complex multi-step operations
+    case createReminder(text: String, date: Date) // Reminders with natural language
+    case setReadingGoal(book: Book, pagesPerDay: Int) // Reading goals
+    case batchAddBooks([String]) // Add multiple books at once
+    
     var icon: String {
         switch self {
-        case .addBook:
+        case .addBook, .batchAddBooks:
             return "plus.circle"
-        case .createQuote:
+        case .createQuote, .createQuoteWithBook:
             return "quote.opening"
-        case .createNote:
+        case .createNote, .createNoteWithBook:
             return "note.text"
         case .searchLibrary, .existingBook:
             return "magnifyingglass"
@@ -26,6 +34,12 @@ enum CommandIntent {
             return "doc.text.magnifyingglass"
         case .searchAll:
             return "magnifyingglass.circle"
+        case .multiStepCommand:
+            return "arrow.triangle.branch"
+        case .createReminder:
+            return "bell.badge"
+        case .setReadingGoal:
+            return "target"
         case .unknown:
             return "questionmark.circle"
         }
@@ -33,12 +47,18 @@ enum CommandIntent {
     
     var color: Color {
         switch self {
-        case .addBook:
+        case .addBook, .batchAddBooks:
             return Color(red: 0.6, green: 0.4, blue: 0.8) // Purple for new books
-        case .createQuote, .createNote:
+        case .createQuote, .createNote, .createQuoteWithBook, .createNoteWithBook:
             return Color(red: 1.0, green: 0.55, blue: 0.26) // Orange for notes
         case .searchLibrary, .existingBook, .searchNotes, .existingNote, .searchAll:
             return Color(red: 0.4, green: 0.6, blue: 0.9) // Blue for search
+        case .multiStepCommand:
+            return Color(red: 0.9, green: 0.3, blue: 0.5) // Pink for complex
+        case .createReminder:
+            return Color(red: 0.5, green: 0.8, blue: 0.4) // Green for reminders
+        case .setReadingGoal:
+            return Color(red: 0.95, green: 0.75, blue: 0.2) // Gold for goals
         case .unknown:
             return .gray
         }
@@ -48,9 +68,9 @@ enum CommandIntent {
         switch self {
         case .addBook:
             return "Add Book"
-        case .createQuote:
+        case .createQuote, .createQuoteWithBook:
             return "Save Quote"
-        case .createNote:
+        case .createNote, .createNoteWithBook:
             return "Save Note"
         case .searchLibrary:
             return "Search Books"
@@ -62,6 +82,14 @@ enum CommandIntent {
             return "Open Book"
         case .existingNote:
             return "View Note"
+        case .batchAddBooks:
+            return "Add Multiple Books"
+        case .multiStepCommand:
+            return "Execute Commands"
+        case .createReminder:
+            return "Set Reminder"
+        case .setReadingGoal:
+            return "Set Goal"
         case .unknown:
             return "Enter"
         }
@@ -127,6 +155,50 @@ struct CommandParser {
         print("CommandParser: Parsing input: '\(input)' (lowercased: '\(lowercased)')")
         print("CommandParser: Available books count: \(books.count)")
         print("CommandParser: Available notes count: \(notes.count)")
+        
+        // FIRST: Check for @book mentions
+        if input.contains("@") {
+            let (cleanText, mentionedBook) = BookMentionParser.extractBookContext(from: input, books: books)
+            
+            if let book = mentionedBook {
+                // Determine intent type with book context
+                if lowercased.contains("note") || lowercased.contains("thought") {
+                    return .createNoteWithBook(text: cleanText, book: book)
+                } else if lowercased.contains("quote") || cleanText.contains("\"") {
+                    return .createQuoteWithBook(text: cleanText, book: book)
+                }
+                // Default to note with book
+                return .createNoteWithBook(text: cleanText, book: book)
+            }
+        }
+        
+        // SECOND: Check for multi-step commands
+        if lowercased.contains(" and ") || lowercased.contains(" & ") {
+            let chainedCommands = MultiStepCommandParser.parse(input, books: books)
+            if !chainedCommands.isEmpty {
+                return .multiStepCommand(chainedCommands)
+            }
+        }
+        
+        // THIRD: Check for reminders
+        if lowercased.contains("remind") || lowercased.contains("reminder") {
+            if let date = NaturalLanguageDateParser.parse(from: input) {
+                let reminderText = input
+                    .replacingOccurrences(of: "remind me to ", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "reminder: ", with: "", options: .caseInsensitive)
+                return .createReminder(text: reminderText, date: date)
+            }
+        }
+        
+        // FOURTH: Check for reading goals
+        if lowercased.contains("goal") || lowercased.contains("pages per day") || lowercased.contains("pages daily") {
+            let goalCommands = MultiStepCommandParser.parse(input, books: books)
+            for command in goalCommands {
+                if case .setReadingGoal(let book, let pages) = command {
+                    return .setReadingGoal(book: book, pagesPerDay: pages)
+                }
+            }
+        }
         
         // Debug: Print first few book titles
         if books.count > 0 {
