@@ -274,6 +274,9 @@ class NaturalLanguageDateParser {
 }
 
 // MARK: - Command Executor
+// Note: The executor is implemented in CommandProcessingManager.swift
+// This is kept here for reference of the command structure
+/*
 @MainActor
 class MultiStepCommandExecutor {
     private let modelContext: ModelContext
@@ -330,3 +333,4 @@ class MultiStepCommandExecutor {
         }
     }
 }
+*/

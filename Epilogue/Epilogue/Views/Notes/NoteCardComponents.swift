@@ -95,7 +95,6 @@ struct QuoteCard: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.sizeCategory) var sizeCategory
     @State private var showDate = false
-    @State private var dragOffset: CGFloat = 0
     
     var firstLetter: String {
         String(note.content.prefix(1))
@@ -193,32 +192,21 @@ struct QuoteCard: View {
         )
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .offset(x: dragOffset)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .animation(.easeInOut(duration: 0.3), value: showDate)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    dragOffset = value.translation.width
-                    // Show date when swiping
-                    if abs(value.translation.width) > 20 && !showDate {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showDate = true
-                        }
-                    }
+        .onLongPressGesture(minimumDuration: 0.3) {
+            // Show date on long press
+            HapticManager.shared.lightTap()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showDate = true
+            }
+            // Hide date after 3 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showDate = false
                 }
-                .onEnded { value in
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        dragOffset = 0
-                    }
-                    // Hide date after a delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showDate = false
-                        }
-                    }
-                }
-        )
+            }
+        }
         .onTapGesture(count: 2) {
             HapticManager.shared.mediumTap()
             // Navigate to ambient session

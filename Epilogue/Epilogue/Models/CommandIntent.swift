@@ -99,9 +99,9 @@ enum CommandIntent {
         switch self {
         case .addBook:
             return "Add Book"
-        case .createQuote:
+        case .createQuote, .createQuoteWithBook:
             return "New Quote"
-        case .createNote:
+        case .createNote, .createNoteWithBook:
             return "New Note"
         case .searchLibrary:
             return "Search Library"
@@ -113,6 +113,14 @@ enum CommandIntent {
             return "Found in Library"
         case .existingNote:
             return "Found Note"
+        case .batchAddBooks:
+            return "Add Multiple Books"
+        case .multiStepCommand:
+            return "Multi-Step Command"
+        case .createReminder:
+            return "Set Reminder"
+        case .setReadingGoal:
+            return "Reading Goal"
         case .unknown:
             return "Command"
         }
@@ -918,6 +926,14 @@ struct CommandSuggestion: Identifiable {
     let text: String
     let icon: String
     let intent: CommandIntent
+    let description: String?
+    
+    init(text: String, icon: String, intent: CommandIntent, description: String? = nil) {
+        self.text = text
+        self.icon = icon
+        self.intent = intent
+        self.description = description
+    }
     
     static func suggestions(for input: String) -> [CommandSuggestion] {
         guard !input.isEmpty else { return [] }

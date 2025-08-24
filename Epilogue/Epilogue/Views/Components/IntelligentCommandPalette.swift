@@ -256,6 +256,7 @@ struct IntelligentCommandPalette: View {
             suggestions.append(CommandSuggestion(
                 text: "Update reading progress",
                 icon: "book.pages",
+                intent: .searchAll(query: "progress"),
                 description: "Record tonight's reading"
             ))
         }
@@ -265,6 +266,7 @@ struct IntelligentCommandPalette: View {
             suggestions.append(CommandSuggestion(
                 text: "Add note @\(recentBook.title)",
                 icon: "note.text",
+                intent: .createNoteWithBook(text: "", book: recentBook),
                 description: "Quick thought about your current read"
             ))
         }
@@ -273,12 +275,15 @@ struct IntelligentCommandPalette: View {
         suggestions.append(CommandSuggestion(
             text: "Add Dune and Foundation to library",
             icon: "plus.circle",
+            intent: .batchAddBooks(["Dune", "Foundation"]),
             description: "Add multiple books at once"
         ))
         
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
         suggestions.append(CommandSuggestion(
             text: "Remind me to read tomorrow at 8pm",
             icon: "bell.badge",
+            intent: .createReminder(text: "Time to read", date: tomorrow),
             description: "Set a reading reminder"
         ))
         
@@ -480,16 +485,4 @@ struct ExamplesSection: View {
     }
 }
 
-// MARK: - Command Suggestion Model
-struct CommandSuggestion: Identifiable {
-    let id = UUID()
-    let text: String
-    let icon: String
-    let description: String?
-    
-    init(text: String, icon: String, description: String? = nil) {
-        self.text = text
-        self.icon = icon
-        self.description = description
-    }
-}
+// Note: CommandSuggestion is now defined in CommandIntent.swift

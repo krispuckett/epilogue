@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 // MARK: - Main Component
 struct LiquidCommandPalette: View {
@@ -350,6 +351,12 @@ struct LiquidCommandPalette: View {
             createNote(from: noteText)
         case .createQuote(let quoteText):
             createQuote(from: quoteText)
+        case .createNoteWithBook(let text, let book):
+            // Create note with book context
+            createNoteWithBookContext(text: text, book: book)
+        case .createQuoteWithBook(let text, let book):
+            // Create quote with book context
+            createQuoteWithBookContext(text: text, book: book)
         case .addBook(let query):
             // Open BookSearchSheet with the query (the smart way!)
             bookSearchQuery = query
@@ -358,6 +365,26 @@ struct LiquidCommandPalette: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 dismissPalette()
             }
+        case .batchAddBooks(let titles):
+            // Handle batch book additions
+            for title in titles {
+                bookSearchQuery = title
+                showBookSearch = true
+                // Process one at a time for now
+                break
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                dismissPalette()
+            }
+        case .multiStepCommand(let commands):
+            // Process multi-step commands
+            handleMultiStepCommands(commands)
+        case .createReminder(let text, let date):
+            // Create reminder
+            createReminder(text: text, date: date)
+        case .setReadingGoal(let book, let pagesPerDay):
+            // Set reading goal
+            setReadingGoal(book: book, pagesPerDay: pagesPerDay)
         case .searchLibrary(let query), .searchNotes(let query), .searchAll(let query):
             // Navigate to search with query
             performSearch(query: query, intent: intent)
@@ -718,6 +745,110 @@ struct LiquidCommandPalette: View {
         }
         
         await googleBooksService.searchBooks(query: cleanQuery)
+    }
+    
+    // MARK: - New Command Handlers
+    
+    private func createNoteWithBookContext(text: String, book: Book) {
+        // Create note with book context
+        let noteContent = "\(text)\n\n📚 \(book.title)"
+        createNote(from: noteContent)
+        
+        // Post notification with book context
+        NotificationCenter.default.post(
+            name: Notification.Name("NoteCreatedWithBook"),
+            object: ["note": text, "book": book]
+        )
+    }
+    
+    private func createQuoteWithBookContext(text: String, book: Book) {
+        // Create quote with book context
+        let quoteContent = "\"\(text)\" - \(book.title) by \(book.author)"
+        createQuote(from: quoteContent)
+        
+        // Post notification with book context
+        NotificationCenter.default.post(
+            name: Notification.Name("QuoteCreatedWithBook"),
+            object: ["quote": text, "book": book]
+        )
+    }
+    
+    private func handleMultiStepCommands(_ commands: [ChainedCommand]) {
+        // Process each command in sequence
+        Task {
+            for command in commands {
+                switch command {
+                case .addBooks(let titles):
+                    for title in titles {
+                        await MainActor.run {
+                            bookSearchQuery = title
+                            showBookSearch = true
+                        }
+                    }
+                case .setReadingGoal(let book, let pagesPerDay):
+                    await MainActor.run {
+                        setReadingGoal(book: book, pagesPerDay: pagesPerDay)
+                    }
+                case .createReminder(let text, let date):
+                    await MainActor.run {
+                        createReminder(text: text, date: date)
+                    }
+                default:
+                    break
+                }
+            }
+            
+            await MainActor.run {
+                dismissPalette()
+            }
+        }
+    }
+    
+    private func createReminder(text: String, date: Date) {
+        // Create reminder using UserNotifications
+        let content = UNMutableNotificationContent()
+        content.title = "Reading Reminder"
+        content.body = text
+        content.sound = .default
+        
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date),
+            repeats: false
+        )
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Failed to schedule reminder: \(error)")
+            } else {
+                print("✅ Reminder scheduled for \(date)")
+                HapticManager.shared.success()
+            }
+        }
+        
+        dismissPalette()
+    }
+    
+    private func setReadingGoal(book: Book, pagesPerDay: Int) {
+        // Store reading goal
+        let goalKey = "readingGoal_\(book.localId)"
+        UserDefaults.standard.set(pagesPerDay, forKey: goalKey)
+        
+        print("✅ Reading goal set: \(pagesPerDay) pages/day for \(book.title)")
+        
+        // Post notification to update UI
+        NotificationCenter.default.post(
+            name: Notification.Name("ReadingGoalSet"),
+            object: ["book": book, "pagesPerDay": pagesPerDay]
+        )
+        
+        HapticManager.shared.success()
+        dismissPalette()
     }
 }
 

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import UserNotifications
 
 /// Handles command processing for the main ContentView
 @MainActor
@@ -78,6 +79,37 @@ class CommandProcessingManager: ObservableObject {
                     name: Notification.Name("SearchNotes"),
                     object: query
                 )
+                
+            case .createNoteWithBook(let text, let book):
+                // Create note with book context
+                createNoteWithBook(content: text, book: book)
+                
+            case .createQuoteWithBook(let text, let book):
+                // Create quote with book context
+                createQuoteWithBook(content: text, book: book)
+                
+            case .multiStepCommand(let commands):
+                // Execute multi-step commands
+                Task {
+                    await executeMultiStepCommands(commands)
+                }
+                
+            case .createReminder(let text, let date):
+                // Create a reminder
+                createReminder(text: text, date: date)
+                
+            case .setReadingGoal(let book, let pagesPerDay):
+                // Set reading goal for book
+                setReadingGoal(book: book, pagesPerDay: pagesPerDay)
+                
+            case .batchAddBooks(let titles):
+                // Add multiple books
+                for title in titles {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("ShowBookSearch"),
+                        object: title
+                    )
+                }
                 
             case .unknown:
                 print("Unknown command: \(commandText)")
@@ -187,5 +219,162 @@ class CommandProcessingManager: ObservableObject {
         if let book = libraryViewModel.books.first(where: { $0.title.lowercased().contains(bookTitle.lowercased()) }) {
             libraryViewModel.updateBookProgress(book, currentPage: page)
         }
+    }
+    
+    // MARK: - New Command Implementations
+    
+    private func createNoteWithBook(content: String, book: Book) {
+        // Create BookModel if needed
+        var bookModel: BookModel? = nil
+        
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate { model in
+                model.localId == book.localId.uuidString
+            }
+        )
+        
+        if let existingBook = try? modelContext.fetch(fetchRequest).first {
+            bookModel = existingBook
+        } else {
+            bookModel = BookModel(from: book)
+            modelContext.insert(bookModel!)
+        }
+        
+        // Create note with book context
+        let capturedNote = CapturedNote(
+            content: content,
+            book: bookModel,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedNote)
+        
+        do {
+            try modelContext.save()
+            print("✅ Note saved with book context: \(book.title)")
+        } catch {
+            print("Failed to save note: \(error)")
+        }
+    }
+    
+    private func createQuoteWithBook(content: String, book: Book) {
+        // Create BookModel if needed
+        var bookModel: BookModel? = nil
+        
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate { model in
+                model.localId == book.localId.uuidString
+            }
+        )
+        
+        if let existingBook = try? modelContext.fetch(fetchRequest).first {
+            bookModel = existingBook
+        } else {
+            bookModel = BookModel(from: book)
+            modelContext.insert(bookModel!)
+        }
+        
+        // Create quote with book context
+        let capturedQuote = CapturedQuote(
+            text: content,
+            book: bookModel,
+            author: book.author,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedQuote)
+        
+        do {
+            try modelContext.save()
+            print("✅ Quote saved with book context: \(book.title)")
+        } catch {
+            print("Failed to save quote: \(error)")
+        }
+    }
+    
+    private func executeMultiStepCommands(_ commands: [ChainedCommand]) async {
+        for command in commands {
+            switch command {
+            case .addBooks(let titles):
+                for title in titles {
+                    print("Adding book: \(title)")
+                    // Post notification to show book search
+                    await MainActor.run {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("ShowBookSearch"),
+                            object: title
+                        )
+                    }
+                }
+                
+            case .markAsStatus(let titles, let status):
+                print("Marking \(titles) as \(status)")
+                // TODO: Implement status update
+                
+            case .setReadingGoal(let book, let pagesPerDay):
+                await MainActor.run {
+                    setReadingGoal(book: book, pagesPerDay: pagesPerDay)
+                }
+                
+            case .createReminder(let text, let date):
+                await MainActor.run {
+                    createReminder(text: text, date: date)
+                }
+                
+            case .batchNote(let note, let books):
+                for book in books {
+                    await MainActor.run {
+                        createNoteWithBook(content: note, book: book)
+                    }
+                }
+                
+            case .compound(let subCommands):
+                await executeMultiStepCommands(subCommands)
+            }
+        }
+    }
+    
+    private func createReminder(text: String, date: Date) {
+        // Create a reminder using UserNotifications
+        let content = UNMutableNotificationContent()
+        content.title = "Reading Reminder"
+        content.body = text
+        content.sound = .default
+        
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date),
+            repeats: false
+        )
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Failed to schedule reminder: \(error)")
+            } else {
+                print("✅ Reminder scheduled for \(date)")
+            }
+        }
+    }
+    
+    private func setReadingGoal(book: Book, pagesPerDay: Int) {
+        // Store reading goal in UserDefaults or SwiftData
+        let goalKey = "readingGoal_\(book.localId)"
+        UserDefaults.standard.set(pagesPerDay, forKey: goalKey)
+        
+        print("✅ Reading goal set: \(pagesPerDay) pages/day for \(book.title)")
+        
+        // Post notification to update UI
+        NotificationCenter.default.post(
+            name: Notification.Name("ReadingGoalSet"),
+            object: ["book": book, "pagesPerDay": pagesPerDay]
+        )
     }
 }
