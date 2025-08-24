@@ -1254,6 +1254,7 @@ class LibraryViewModel: ObservableObject {
     @Published var books: [Book] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var currentDetailBook: Book? = nil  // Track which book is being viewed in detail
     
     private let googleBooksService = GoogleBooksService()
     private let userDefaults = UserDefaults.standard

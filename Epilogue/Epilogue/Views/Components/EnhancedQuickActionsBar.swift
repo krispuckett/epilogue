@@ -157,17 +157,25 @@ struct EnhancedQuickActionsBar: View {
         HapticManager.shared.lightTap()
         startGlowAnimation()
         
-        // Open simplified ambient mode
-        print("🎯 DEBUG: About to call SimplifiedAmbientCoordinator.shared.openAmbientMode()")
-        SimplifiedAmbientCoordinator.shared.openAmbientReading()
-        print("🎯 DEBUG: Called SimplifiedAmbientCoordinator.shared.openAmbientMode()")
+        // Check if we're viewing a specific book
+        if let currentBook = libraryViewModel.currentDetailBook {
+            print("📚 Opening ambient mode with book: \(currentBook.title)")
+            SimplifiedAmbientCoordinator.shared.openAmbientReading(with: currentBook)
+        } else {
+            print("🎯 DEBUG: Opening generic ambient mode")
+            SimplifiedAmbientCoordinator.shared.openAmbientReading()
+        }
     }
     
     private func handleDoubleTap() {
         HapticManager.shared.success()
         
-        // Double tap also opens simplified ambient mode
-        SimplifiedAmbientCoordinator.shared.openAmbientReading()
+        // Double tap also checks for current book context
+        if let currentBook = libraryViewModel.currentDetailBook {
+            SimplifiedAmbientCoordinator.shared.openAmbientReading(with: currentBook)
+        } else {
+            SimplifiedAmbientCoordinator.shared.openAmbientReading()
+        }
     }
     
     private func handleSwipeGesture(_ translation: CGSize) {
@@ -325,8 +333,8 @@ struct EnhancedQuickActionsBar: View {
         HapticManager.shared.success()
         dismissRadialMenu()
         
-        // Open simplified ambient mode (book will be detected from speech)
-        SimplifiedAmbientCoordinator.shared.openAmbientReading()
+        // Open ambient mode with the selected book
+        SimplifiedAmbientCoordinator.shared.openAmbientReading(with: book)
     }
     
     private func dismissRadialMenu() {
