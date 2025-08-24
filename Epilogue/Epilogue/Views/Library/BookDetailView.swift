@@ -290,6 +290,16 @@ struct BookDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 16) {
+                    // Ambient Reading button
+                    Button {
+                        SimplifiedAmbientCoordinator.shared.openAmbientReading(with: book)
+                        HapticManager.shared.voiceModeStart()
+                    } label: {
+                        Image(systemName: "mic.circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    }
+                    
                     Button("Edit Book") {
                         editedTitle = book.title
                         showingBookSearch = true

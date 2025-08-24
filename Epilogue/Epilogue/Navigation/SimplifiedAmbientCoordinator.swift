@@ -9,6 +9,7 @@ public class EpilogueAmbientCoordinator: ObservableObject {
     
     @Published var isActive = false
     @Published var preSelectedBook: Book?
+    @Published var initialBook: Book?  // Book to start with when launched from BookDetailView
     
     private init() {}
     
@@ -78,10 +79,16 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Open ambient reading - always starts with voice
-    func openAmbientReading() {
+    /// Open ambient reading - optionally with a pre-selected book
+    func openAmbientReading(with book: Book? = nil) {
         logger.info("🎙️ Opening ambient reading via SimplifiedAmbientCoordinator")
         print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientReading() called")
+        
+        // Set initial book context if provided
+        if let book = book {
+            currentBook = book
+            logger.info("📚 Starting ambient mode with book: \(book.title)")
+        }
         
         // Haptic feedback
         HapticManager.shared.voiceModeStart()
@@ -90,7 +97,8 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         // This will present the NEW AmbientModeView
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             EpilogueAmbientCoordinator.shared.isActive = true
-            print("🎙️ DEBUG: isPresented set to true")
+            EpilogueAmbientCoordinator.shared.initialBook = book
+            print("🎙️ DEBUG: isPresented set to true, initial book: \(book?.title ?? "none")")
         }
     }
     

@@ -106,29 +106,9 @@ struct UniversalInputBar: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 
-                // Send button only (waveform moved outside)
-                HStack {
-                    if !messageText.isEmpty {
-                        Button(action: onSend) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.001))
-                                    .frame(width: 32, height: 32)
-                                    .glassEffect()
-                                
-                                Image(systemName: "arrow.up")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity),
-                            removal: .scale.combined(with: .opacity)
-                        ))
-                    }
-                }
-                .padding(.trailing, 12)
+                // Removed - send button is now integrated with waveform button
+                Spacer()
+                    .frame(width: 12)
             }
             .frame(minHeight: 44)
             .glassEffect(in: RoundedRectangle(cornerRadius: 22))
@@ -138,24 +118,27 @@ struct UniversalInputBar: View {
                     .allowsHitTesting(false)
             }
             
-            // Separate waveform orb - amber glass design
+            // Morphing button - waveform when empty, submit when has text
             Button {
-                onMicrophoneTap()
+                if !messageText.isEmpty {
+                    // Submit the message
+                    onSend()
+                } else {
+                    // Trigger microphone/voice input
+                    onMicrophoneTap()
+                }
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.001))
+                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
                         .frame(width: 44, height: 44)
                         .glassEffect()
                     
-                    Image(systemName: "waveform")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(
-                            isRecording ? 
-                            Color(red: 1.0, green: 0.55, blue: 0.26) : 
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
-                        )
-                        .scaleEffect(isRecording ? 1.1 : 1.0)
+                    Image(systemName: messageText.isEmpty ? "waveform" : "arrow.up")
+                        .font(.system(size: 18, weight: messageText.isEmpty ? .medium : .semibold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .contentTransition(.symbolEffect(.replace))
+                        .scaleEffect(isRecording && messageText.isEmpty ? 1.1 : 1.0)
                         .animation(.easeInOut(duration: 0.2), value: isRecording)
                 }
             }

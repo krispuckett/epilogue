@@ -326,6 +326,21 @@ struct AmbientModeView: View {
             }
         }
         .onAppear {
+            // Check if we have an initial book from the coordinator
+            if let initialBook = EpilogueAmbientCoordinator.shared.initialBook {
+                currentBookContext = initialBook
+                lastDetectedBookId = initialBook.localId
+                print("📚 Starting ambient mode with book: \(initialBook.title)")
+                
+                // Extract colors for the book
+                Task {
+                    await extractColorsForBook(initialBook)
+                }
+                
+                // Clear the initial book from coordinator after using it
+                EpilogueAmbientCoordinator.shared.initialBook = nil
+            }
+            
             startAmbientExperience()
             setupKeyboardObservers()
             
