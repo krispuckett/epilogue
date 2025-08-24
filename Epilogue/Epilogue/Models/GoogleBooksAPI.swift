@@ -39,37 +39,69 @@ struct GoogleBookItem: Codable, Identifiable {
     }
     
     private func enhanceGoogleBooksImageURL(_ urlString: String) -> String {
-        // FIXED: Remove zoom parameter entirely to get full cover
-        // zoom=3 was causing cropped images showing only part of the cover
-        
         var enhanced = urlString
         
         // IMPORTANT: Convert HTTP to HTTPS for App Transport Security
         enhanced = enhanced.replacingOccurrences(of: "http://", with: "https://")
         
-        // Remove ALL zoom parameters if present
+        // Try to extract book ID and use the most reliable URL format
+        // Google Books has several URL formats, but content API is most reliable
+        if let bookIdRange = enhanced.range(of: "id=([A-Za-z0-9_-]+)", options: .regularExpression) {
+            let bookIdWithPrefix = String(enhanced[bookIdRange])
+            let bookId = bookIdWithPrefix.replacingOccurrences(of: "id=", with: "")
+            
+            // Use the content API which is most reliable
+            enhanced = "https://books.google.com/books/content?id=\(bookId)&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+            print("📚 Using reliable content API for book ID: \(bookId)")
+            return enhanced
+        }
+        
+        // Alternative: If URL contains books/edition or books/publisher (less reliable formats)
+        if enhanced.contains("/books/edition/") || enhanced.contains("/books/publisher/") {
+            // Try to extract the ID from these URLs
+            let components = enhanced.components(separatedBy: "/")
+            for (index, component) in components.enumerated() {
+                if component == "edition" || component == "publisher" {
+                    if index + 1 < components.count {
+                        let potentialId = components[index + 1].components(separatedBy: "?").first ?? ""
+                        if !potentialId.isEmpty {
+                            enhanced = "https://books.google.com/books/content?id=\(potentialId)&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+                            print("📚 Converted to content API from edition/publisher URL: \(potentialId)")
+                            return enhanced
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: Clean up existing URL
+        // Remove all zoom parameters
         if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
             let range = NSRange(location: 0, length: enhanced.utf16.count)
             enhanced = regex.stringByReplacingMatches(in: enhanced, options: [], range: range, withTemplate: "")
         }
         
-        // Remove zoom parameter at start of query string too
-        enhanced = enhanced.replacingOccurrences(of: "?zoom=1&", with: "?")
-        enhanced = enhanced.replacingOccurrences(of: "?zoom=2&", with: "?")
-        enhanced = enhanced.replacingOccurrences(of: "?zoom=3&", with: "?")
-        enhanced = enhanced.replacingOccurrences(of: "?zoom=4&", with: "?")
-        enhanced = enhanced.replacingOccurrences(of: "?zoom=5&", with: "?")
-        
-        // Add width parameter only (NO ZOOM!)
+        // Add reliable parameters
         if enhanced.contains("?") {
-            enhanced += "&w=1080&source=gbs_api"
+            if !enhanced.contains("img=") {
+                enhanced += "&img=1"
+            }
+            if !enhanced.contains("zoom=") {
+                enhanced += "&zoom=1"  // zoom=1 is most reliable
+            }
+            if !enhanced.contains("source=") {
+                enhanced += "&source=gbs_api"
+            }
+            if !enhanced.contains("printsec=") {
+                enhanced += "&printsec=frontcover"
+            }
         } else {
-            enhanced += "?w=1080&source=gbs_api"
+            enhanced += "?img=1&zoom=1&printsec=frontcover&source=gbs_api"
         }
         
-        // Also remove edge curl parameter if present (makes covers look cleaner)
+        // Remove edge curl which can cause loading issues
         enhanced = enhanced.replacingOccurrences(of: "&edge=curl", with: "")
-        enhanced = enhanced.replacingOccurrences(of: "?edge=curl", with: "?")
+        enhanced = enhanced.replacingOccurrences(of: "?edge=curl&", with: "?")
         
         return enhanced
     }
@@ -409,6 +441,34 @@ class GoogleBooksService: ObservableObject {
         let titleLower = book.title.lowercased()
         let authorLower = book.author.lowercased()
         let queryLower = query.lowercased()
+        
+        // Special boost for well-known classics when searching for them
+        let classicBooks: [(title: String, author: String)] = [
+            ("meditations", "marcus aurelius"),
+            ("1984", "george orwell"),
+            ("dune", "frank herbert"),
+            ("foundation", "isaac asimov"),
+            ("the lord of the rings", "tolkien"),
+            ("the hobbit", "tolkien"),
+            ("pride and prejudice", "jane austen"),
+            ("the great gatsby", "fitzgerald"),
+            ("to kill a mockingbird", "harper lee"),
+            ("the odyssey", "homer"),
+            ("the iliad", "homer"),
+            ("war and peace", "tolstoy"),
+            ("crime and punishment", "dostoevsky")
+        ]
+        
+        // Check if query matches a classic and this book is that classic
+        for classic in classicBooks {
+            if queryLower.contains(classic.title) || classic.title.contains(queryLower) {
+                // Query is looking for this classic
+                if titleLower.contains(classic.title) && authorLower.contains(classic.author) {
+                    score += 800  // Massive boost for the actual classic
+                    print("📚 Classic match: '\(book.title)' by \(book.author) (+800)")
+                }
+            }
+        }
         
         // Remove common noise words from comparison
         let cleanTitle = titleLower

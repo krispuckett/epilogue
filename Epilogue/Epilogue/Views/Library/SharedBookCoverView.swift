@@ -143,10 +143,15 @@ struct SharedBookCoverView: View {
                         // Store in quick cache
                         Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
                     } else {
-                        // Image failed to load
-                        self.loadFailed = true
+                        // Image failed to load - don't mark as failed yet
+                        // Just set loading to false, will show placeholder
                         self.isLoading = false
                         print("❌ Failed to load image from: \(urlString)")
+                        
+                        // Note: We could try fallback sources here but that would require
+                        // passing the full Book object, not just the URL
+                        // For now, the placeholder will show
+                        self.loadFailed = true
                     }
                 }
             }
@@ -178,8 +183,18 @@ struct SharedBookCoverView: View {
                     .frame(width: width, height: height)
                     .clipped()
                     .transition(.opacity)
-            } else if coverURL != nil && isLoading {
-                // Loading state - show gradient placeholder instead of spinner
+            } else if loadFailed || (coverURL == nil) {
+                // Failed to load or no URL - just show gradient background
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.25, green: 0.25, blue: 0.3),
+                        Color(red: 0.2, green: 0.2, blue: 0.25)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else if isLoading {
+                // Loading state - show shimmer effect
                 LinearGradient(
                     colors: [
                         Color(red: 0.3, green: 0.3, blue: 0.35),
@@ -188,11 +203,11 @@ struct SharedBookCoverView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-            } else {
-                // No cover URL
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: min(width, height) * 0.25))
-                    .foregroundStyle(.white.opacity(0.2))
+                .overlay {
+                    ProgressView()
+                        .tint(.white.opacity(0.3))
+                        .scaleEffect(0.8)
+                }
             }
         }
         .frame(width: width, height: height)

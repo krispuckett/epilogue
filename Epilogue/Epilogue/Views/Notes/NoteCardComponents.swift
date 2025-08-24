@@ -95,6 +95,8 @@ struct QuoteCard: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.sizeCategory) var sizeCategory
     @State private var showDate = false
+    @State private var tapCount = 0
+    @State private var lastTapTime = Date()
     
     var firstLetter: String {
         String(note.content.prefix(1))
@@ -194,19 +196,29 @@ struct QuoteCard: View {
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .animation(.easeInOut(duration: 0.3), value: showDate)
-        .onTapGesture(count: 2) {
-            HapticManager.shared.mediumTap()
-            // Navigate to ambient session
-            navigateToAmbientSession()
+        .onTapGesture {
+            handleTap()
         }
-        .onTapGesture(count: 1) {
-            // Single tap toggles date visibility
+    }
+    
+    private func handleTap() {
+        let now = Date()
+        let timeSinceLastTap = now.timeIntervalSince(lastTapTime)
+        
+        if timeSinceLastTap < 0.3 {
+            // Double tap detected
+            HapticManager.shared.mediumTap()
+            navigateToAmbientSession()
+            tapCount = 0
+        } else {
+            // Single tap - show date
             HapticManager.shared.lightTap()
             withAnimation(.easeInOut(duration: 0.3)) {
                 showDate.toggle()
             }
+            
             // Auto-hide after 3 seconds when showing
-            if showDate == false {  // Will be true after toggle
+            if showDate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showDate = false
@@ -214,6 +226,8 @@ struct QuoteCard: View {
                 }
             }
         }
+        
+        lastTapTime = now
     }
     
     private func navigateToAmbientSession() {
