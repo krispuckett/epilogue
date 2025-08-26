@@ -481,7 +481,7 @@ struct CleanNotesView: View {
         let capturedNote = capturedNotes.first { $0.id == note.id }
         let isSelected = selectedItems.contains(note.id)
         
-        return noteCardContent(note: note, capturedNote: capturedNote)
+        return NoteCardView(note: note, capturedNote: capturedNote)
             .overlay(alignment: .topLeading) {
                 // Selection checkbox when in selection mode
                 if isSelectionMode {
@@ -553,74 +553,6 @@ struct CleanNotesView: View {
                     }
                 }
             }
-    }
-    
-    private func noteCardContent(note: Note, capturedNote: CapturedNote? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Timestamp header - more refined typography
-            Text(formatDate(note.dateCreated).uppercased())
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .kerning(1.2)
-                .foregroundStyle(
-                    capturedNote?.source == .ambient 
-                        ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
-                        : .white.opacity(0.4)
-                )
-            
-            // Content with better typography
-            Text(note.content)
-                .font(.system(size: 16, weight: .regular, design: .default))
-                .foregroundStyle(.white.opacity(0.95))
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(6)
-            
-            // Book context with refined styling (no divider line)
-            if let bookTitle = note.bookTitle {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(bookTitle.uppercased())
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .kerning(0.8)
-                        .foregroundStyle(.white.opacity(0.7))
-                    
-                    if let author = note.author {
-                        Text(author.uppercased())
-                            .font(.system(size: 10, weight: .regular, design: .monospaced))
-                            .kerning(0.6)
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                }
-                .padding(.top, 12) // Add spacing instead of divider line
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.06)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
-        )
-        .onTapGesture(count: 2) {
-            // Double tap to show session summary for ambient notes
-            if let captured = capturedNote, captured.source == .ambient {
-                selectedSessionNote = captured
-                showingSessionSummary = true
-                HapticManager.shared.mediumTap()
-            }
-        }
     }
     
     private func quoteCard(quote: CapturedQuote) -> some View {
@@ -931,3 +863,89 @@ struct CleanNotesView: View {
 
 // Extension removed - already exists in SwiftDataNotesBridge.swift
 // EditContentSheet already exists in UnifiedChatView.swift
+
+// MARK: - Note Card View with Date Toggle
+private struct NoteCardView: View {
+    let note: Note
+    let capturedNote: CapturedNote?
+    @State private var showDate = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Timestamp header - shown on tap
+            if showDate {
+                Text(formatDate(note.dateCreated).uppercased())
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .kerning(1.2)
+                    .foregroundStyle(
+                        capturedNote?.source == .ambient 
+                            ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
+                            : .white.opacity(0.4)
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+            }
+            
+            // Content with better typography
+            Text(note.content)
+                .font(.system(size: 16, weight: .regular, design: .default))
+                .foregroundStyle(.white.opacity(0.95))
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(6)
+            
+            // Book context with refined styling (no divider line)
+            if let bookTitle = note.bookTitle {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bookTitle.uppercased())
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .kerning(0.8)
+                        .foregroundStyle(.white.opacity(0.7))
+                    
+                    if let author = note.author {
+                        Text(author.uppercased())
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .kerning(0.6)
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                .padding(.top, 12) // Add spacing instead of divider line
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showDate)
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showDate.toggle()
+            }
+            HapticManager.shared.lightTap()
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
+        return formatter.string(from: date)
+    }
+}

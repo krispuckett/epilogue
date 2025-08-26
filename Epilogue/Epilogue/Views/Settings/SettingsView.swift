@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("enableAnalytics") private var enableAnalytics = false
     @AppStorage("enableDataSync") private var enableDataSync = false
     @AppStorage("processOnDevice") private var processOnDevice = true
+    @AppStorage("gandalfMode") private var gandalfMode = false
     
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -107,10 +108,20 @@ struct SettingsView: View {
                             showingAPIKeySheet = true
                         } label: {
                             HStack {
-                                Label("API Key", systemImage: "key.fill")
+                                Label("API Configuration", systemImage: "key.fill")
                                 Spacer()
-                                Text(hasStoredAPIKey ? "••••••••" : "Not Set")
-                                    .foregroundStyle(.secondary)
+                                if KeychainManager.shared.hasPerplexityAPIKey {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(.green)
+                                        Text("Configured")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                } else {
+                                    Text("Required")
+                                        .foregroundStyle(.orange)
+                                }
                             }
                         }
                         
@@ -145,6 +156,36 @@ struct SettingsView: View {
                     Text("AI & Intelligence")
                 } footer: {
                     Text("On-device processing keeps your data private but may be slower")
+                }
+                
+                // MARK: - Developer Options (Gandalf Mode)
+                Section {
+                    Toggle(isOn: $gandalfMode) {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading) {
+                                Text("Gandalf Mode")
+                                    .foregroundColor(.purple)
+                                Text("Unlimited testing (no quota limits)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .onChange(of: gandalfMode) { _, enabled in
+                        PerplexityService.shared.enableGandalf(enabled)
+                    }
+                    
+                    if gandalfMode {
+                        Label("Testing mode active - quotas disabled", systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                } header: {
+                    Text("Developer Options")
+                } footer: {
+                    Text("Gandalf mode disables all API quotas for testing. Use responsibly!")
                 }
                 
                 // MARK: - Reading Preferences
@@ -322,7 +363,7 @@ struct SettingsView: View {
                 Text("Your data has been exported successfully.")
             }
             .sheet(isPresented: $showingAPIKeySheet) {
-                APIKeyEntrySheet(apiKey: $apiKey, hasStoredAPIKey: $hasStoredAPIKey)
+                APIConfigurationView()
             }
             .sheet(isPresented: $showingSyncStatus) {
                 DetailedSyncStatusSheet(isPresented: $showingSyncStatus)

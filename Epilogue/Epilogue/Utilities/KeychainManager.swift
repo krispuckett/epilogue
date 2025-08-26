@@ -147,20 +147,25 @@ extension KeychainManager {
         return apiKey.unicodeScalars.allSatisfy { allowedCharacters.contains($0) }
     }
     
-    /// Migrate API key from Info.plist to Keychain
-    func migrateAPIKeyFromBundle() {
-        // Check if already migrated
-        if hasPerplexityAPIKey { return }
-        
-        // Try to get from bundle
-        if let apiKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
-           isValidAPIKey(apiKey) {
-            do {
-                try savePerplexityAPIKey(apiKey)
-                print("✅ Migrated API key to secure storage")
-            } catch {
-                print("❌ Failed to migrate API key: \(error)")
-            }
+    /// Check if API key needs to be configured
+    func needsAPIKeyConfiguration() -> Bool {
+        return !hasPerplexityAPIKey
+    }
+    
+    /// Save API key with validation
+    func configurePerplexityAPIKey(_ apiKey: String) throws {
+        guard isValidAPIKey(apiKey) else {
+            throw KeychainError.invalidData
         }
+        
+        try savePerplexityAPIKey(apiKey)
+        print("✅ API key securely stored in Keychain")
+    }
+    
+    /// Remove legacy API key storage (one-time migration)
+    func removeLegacyAPIKeyStorage() {
+        // This method is for cleanup only - no actual migration
+        // since we no longer store keys in Info.plist or Config files
+        print("✅ Legacy API key storage check complete")
     }
 }

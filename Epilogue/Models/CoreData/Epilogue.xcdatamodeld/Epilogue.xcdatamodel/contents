@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22225" systemVersion="23G93" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    
+    <entity name="CachedQuery" representedClassName="CachedQuery" syncable="YES">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="query" attributeType="String"/>
+        <attribute name="queryHash" attributeType="String"/>
+        <attribute name="response" attributeType="String"/>
+        <attribute name="bookId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="bookTitle" optional="YES" attributeType="String"/>
+        <attribute name="contextUsed" optional="YES" attributeType="String"/>
+        <attribute name="tokensUsed" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="responseTime" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastAccessedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="accessCount" attributeType="Integer 32" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="queryType" attributeType="String"/>
+        <attribute name="embedding" optional="YES" attributeType="Binary"/>
+        <attribute name="confidence" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <relationship name="similarQueries" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="SimilarQuery" inverseName="sourceQuery" inverseEntity="SimilarQuery"/>
+    </entity>
+    
+    <entity name="SimilarQuery" representedClassName="SimilarQuery" syncable="YES">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="similarity" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="sourceQuery" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CachedQuery" inverseName="similarQueries" inverseEntity="CachedQuery"/>
+        <relationship name="targetQuery" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CachedQuery"/>
+    </entity>
+    
+    <entity name="QueryAnalytics" representedClassName="QueryAnalytics" syncable="YES">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="totalQueries" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="cacheHits" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="apiCalls" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalTokensUsed" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalCost" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="averageResponseTime" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="cacheHitRate" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="queriesByType" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer"/>
+    </entity>
+    
+    <entity name="UserQuota" representedClassName="UserQuota" syncable="YES">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="freeQueriesUsed" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="freeQueriesLimit" attributeType="Integer 32" defaultValueString="20" usesScalarValueType="YES"/>
+        <attribute name="isPro" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="proExpirationDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="totalQueriesAllTime" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastResetDate" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="queryHistory" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="QueryHistoryItem" inverseName="quota" inverseEntity="QueryHistoryItem"/>
+    </entity>
+    
+    <entity name="QueryHistoryItem" representedClassName="QueryHistoryItem" syncable="YES">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="query" attributeType="String"/>
+        <attribute name="timestamp" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="wasFromCache" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="tokensUsed" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="quota" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserQuota" inverseName="queryHistory" inverseEntity="UserQuota"/>
+    </entity>
+    
+</model>

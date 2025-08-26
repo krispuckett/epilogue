@@ -709,10 +709,6 @@ struct LibraryBookListItem: View {
                         } placeholder: {
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(Color.gray.opacity(0.2))
-                                .overlay {
-                                    ProgressView()
-                                        .tint(.white.opacity(0.5))
-                                }
                         }
                         .frame(width: 60, height: 90)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -731,11 +727,6 @@ struct LibraryBookListItem: View {
                     } else {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                            .overlay {
-                                Image(systemName: "book.closed.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(.white.opacity(0.3))
-                            }
                     }
                 }
                 .frame(width: 60, height: 90)

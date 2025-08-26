@@ -159,6 +159,13 @@ class CommandProcessingManager: ObservableObject {
         do {
             try modelContext.save()
             print("✅ Quote saved via command")
+            
+            // Post success notification
+            let bookInfo = bookTitle ?? "your collection"
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToastMessage"),
+                object: ["message": "Quote saved to \(bookInfo)"]
+            )
         } catch {
             print("Failed to save quote: \(error)")
         }
@@ -173,6 +180,12 @@ class CommandProcessingManager: ObservableObject {
         do {
             try modelContext.save()
             print("✅ Note saved via command")
+            
+            // Post success notification
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToastMessage"),
+                object: ["message": "Note saved successfully"]
+            )
         } catch {
             print("Error saving note: \(error)")
         }
@@ -252,6 +265,12 @@ class CommandProcessingManager: ObservableObject {
         do {
             try modelContext.save()
             print("✅ Note saved with book context: \(book.title)")
+            
+            // Post success notification
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToastMessage"),
+                object: ["message": "Note saved to \(book.title)"]
+            )
         } catch {
             print("Failed to save note: \(error)")
         }
@@ -289,6 +308,12 @@ class CommandProcessingManager: ObservableObject {
         do {
             try modelContext.save()
             print("✅ Quote saved with book context: \(book.title)")
+            
+            // Post success notification
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToastMessage"),
+                object: ["message": "Quote saved from \(book.title)"]
+            )
         } catch {
             print("Failed to save quote: \(error)")
         }
@@ -359,6 +384,15 @@ class CommandProcessingManager: ObservableObject {
                 print("Failed to schedule reminder: \(error)")
             } else {
                 print("✅ Reminder scheduled for \(date)")
+                
+                // Post success notification
+                let formatter = DateFormatter()
+                formatter.dateStyle = .short
+                formatter.timeStyle = .short
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowToastMessage"),
+                    object: ["message": "Reminder set for \(formatter.string(from: date))"]
+                )
             }
         }
     }
@@ -374,6 +408,12 @@ class CommandProcessingManager: ObservableObject {
         NotificationCenter.default.post(
             name: Notification.Name("ReadingGoalSet"),
             object: ["book": book, "pagesPerDay": pagesPerDay]
+        )
+        
+        // Post success toast
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowToastMessage"),
+            object: ["message": "Reading goal: \(pagesPerDay) pages/day for \(book.title)"]
         )
     }
     
@@ -391,6 +431,12 @@ class CommandProcessingManager: ObservableObject {
         )
         
         print("📚 Queued \(titles.count) books for batch addition: \(titles.joined(separator: ", "))")
+        
+        // Post success notification
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowToastMessage"),
+            object: ["message": "Adding \(titles.count) books to library..."]
+        )
     }
     
     func processNextBookInQueue() {

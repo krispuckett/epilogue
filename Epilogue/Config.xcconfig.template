@@ -1,9 +1,21 @@
 // Config.xcconfig.template
-// Copy this file to Config.xcconfig and add your actual API key
-// NEVER commit Config.xcconfig to version control!
+// Template for local configuration - Copy to Config.xcconfig
+// NEVER commit Config.xcconfig with actual values to version control!
+//
+// Setup Instructions:
+// 1. Copy this file to Config.xcconfig
+// 2. DO NOT add any API keys here
+// 3. API keys should be managed through the app's Settings
+// 4. The app uses iOS Keychain for secure storage
 
-// Your Perplexity API Key (get from https://www.perplexity.ai/settings/api)
-PERPLEXITY_API_KEY = pplx-YOUR-ACTUAL-KEY-HERE
+// Build Configuration
+// Leave this empty - API keys are managed securely at runtime
+PERPLEXITY_API_KEY = 
 
-// Example:
-// PERPLEXITY_API_KEY = pplx-1234567890abcdef...
+// Development flags (safe to configure)
+DEBUG_MODE = YES
+ENABLE_LOGGING = YES
+
+// NOTE: The app will prompt you to enter your API key on first launch
+// API keys are stored securely in the iOS Keychain
+// You can manage your API key in Settings > API Configuration

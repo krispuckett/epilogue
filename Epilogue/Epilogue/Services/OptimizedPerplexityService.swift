@@ -60,18 +60,15 @@ class OptimizedPerplexityService: ObservableObject {
     }
     
     private func setupAPIKey() {
-        // Try KeychainManager first, then Info.plist
+        // SECURE: Only use KeychainManager - no Info.plist fallback
         if let keychainKey = KeychainManager.shared.getPerplexityAPIKey(),
-           !keychainKey.isEmpty {
+           !keychainKey.isEmpty,
+           KeychainManager.shared.isValidAPIKey(keychainKey) {
             self.apiKey = keychainKey
-            logger.info("✅ Using Perplexity API key from Keychain")
-        } else if let plistKey = Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String,
-                  !plistKey.isEmpty,
-                  !plistKey.contains("$(") {
-            self.apiKey = plistKey
-            logger.info("✅ Using Perplexity API key from Info.plist")
+            logger.info("✅ Using Perplexity API key from secure storage")
         } else {
-            logger.error("❌ No valid Perplexity API key found")
+            self.apiKey = ""
+            logger.warning("⚠️ No valid Perplexity API key configured. User needs to configure in Settings.")
         }
     }
     

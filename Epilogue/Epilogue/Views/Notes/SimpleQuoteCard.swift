@@ -5,6 +5,7 @@ struct SimpleQuoteCard: View {
     let note: Note
     @Environment(\.sizeCategory) var sizeCategory
     @State private var isPressed = false
+    @State private var showDate = false
     
     var firstLetter: String {
         String(note.content.prefix(1)).uppercased()
@@ -16,6 +17,19 @@ struct SimpleQuoteCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Date header (shown on tap)
+            if showDate {
+                Text(formatDate(note.dateCreated).uppercased())
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .kerning(1.2)
+                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
+                    .padding(.bottom, 16)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+            }
+            
             // Large transparent opening quote
             Text("\u{201C}")
                 .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 60 : 80))
@@ -94,8 +108,12 @@ struct SimpleQuoteCard: View {
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showDate)
         .onTapGesture {
-            // Handle tap
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showDate.toggle()
+            }
+            HapticManager.shared.lightTap()
         }
         .pressEvents(onPress: {
             withAnimation(.spring(response: 0.1)) {
@@ -106,5 +124,11 @@ struct SimpleQuoteCard: View {
                 isPressed = false
             }
         })
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
+        return formatter.string(from: date)
     }
 }

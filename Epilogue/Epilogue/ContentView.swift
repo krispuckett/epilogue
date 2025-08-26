@@ -20,9 +20,12 @@ struct GlassToastModifier: ViewModifier {
             .overlay(alignment: .top) {
                 if isShowing {
                     Text(message)
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(10)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .glassEffect()
+                        .clipShape(Capsule())
                         .padding(.top, 50)
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .onAppear {

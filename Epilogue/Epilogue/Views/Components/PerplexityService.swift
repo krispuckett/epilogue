@@ -3,10 +3,13 @@ import Combine
 
 // MARK: - Perplexity Service
 class PerplexityService: ObservableObject {
+    static let shared = PerplexityService()
+    
     private let apiKey: String
     private let baseURL = "https://api.perplexity.ai/chat/completions"
     private let session: URLSession
     private var responseCache = [String: String]()  // Simple cache
+    private var isGandalfEnabled = false
     
     init() {
         // Configure URLSession for optimal performance
@@ -17,24 +20,23 @@ class PerplexityService: ObservableObject {
         config.urlCache = nil  // Disable caching for real-time responses
         self.session = URLSession(configuration: config)
         
-        // First try KeychainManager, then Info.plist
-        let apiKey = KeychainManager.shared.getPerplexityAPIKey() ?? 
-                     Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
-        
-        if let apiKey = apiKey,
+        // SECURE: Only use KeychainManager - no Info.plist fallback
+        if let apiKey = KeychainManager.shared.getPerplexityAPIKey(),
            !apiKey.isEmpty,
-           apiKey != "your_actual_api_key_here",
-           !apiKey.contains("$(") {
+           KeychainManager.shared.isValidAPIKey(apiKey) {
             self.apiKey = apiKey
-            let source = KeychainManager.shared.hasPerplexityAPIKey ? "Settings (Keychain)" : "Info.plist"
-            print("✅ Perplexity Service initialized with API key from \(source)")
+            print("✅ Perplexity Service initialized with API key from secure storage")
         } else {
-            // Fallback: Use a placeholder key to prevent crashes
-            // IMPORTANT: Replace this with your actual API key
-            self.apiKey = "PLACEHOLDER_API_KEY"
-            print("⚠️ WARNING: Using placeholder API key. Chat functionality will not work!")
-            print("⚠️ To fix: Add PERPLEXITY_API_KEY to your Info.plist file")
+            // No API key configured - service will prompt for configuration
+            self.apiKey = ""
+            print("⚠️ No API key configured. User will be prompted to configure in Settings.")
         }
+    }
+    
+    // MARK: - Gandalf Mode
+    func enableGandalf(_ enabled: Bool) {
+        isGandalfEnabled = enabled
+        print("🧙‍♂️ Gandalf mode \(enabled ? "enabled" : "disabled") - quotas \(enabled ? "bypassed" : "enforced")")
     }
     
     // MARK: - Chat Methods
@@ -46,10 +48,10 @@ class PerplexityService: ObservableObject {
     // Fast streaming chat for real-time responses
     func streamChat(message: String, bookContext: Book? = nil, model: String? = nil) async throws -> AsyncThrowingStream<String, Error> {
         // Check if we have a valid API key
-        if apiKey == "PLACEHOLDER_API_KEY" {
-            print("Cannot make API request with placeholder key")
+        if apiKey.isEmpty || !KeychainManager.shared.hasPerplexityAPIKey {
+            print("Cannot make API request without configured API key")
             return AsyncThrowingStream { continuation in
-                continuation.yield("Chat is currently unavailable. Please configure your Perplexity API key in Info.plist.")
+                continuation.yield("Chat is currently unavailable. Please configure your Perplexity API key in Settings > AI & Intelligence.")
                 continuation.finish()
             }
         }

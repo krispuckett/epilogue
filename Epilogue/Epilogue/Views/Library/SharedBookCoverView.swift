@@ -194,7 +194,7 @@ struct SharedBookCoverView: View {
                     endPoint: .bottomTrailing
                 )
             } else if isLoading {
-                // Loading state - show shimmer effect
+                // Loading state - show shimmer effect without spinner
                 LinearGradient(
                     colors: [
                         Color(red: 0.3, green: 0.3, blue: 0.35),
@@ -203,11 +203,6 @@ struct SharedBookCoverView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .overlay {
-                    ProgressView()
-                        .tint(.white.opacity(0.3))
-                        .scaleEffect(0.8)
-                }
             }
         }
         .frame(width: width, height: height)
