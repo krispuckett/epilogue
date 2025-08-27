@@ -61,21 +61,14 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "book.closed.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-        
-            Text("Your library awaits")
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-            
-            Text("Tap + to add your first book")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.6))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
+        SimpleEmptyState(
+            icon: "books.vertical.fill",
+            title: "Your library awaits",
+            subtitle: "Start your reading journey by adding your first book",
+            action: {
+                showingBookSearch = true
+            }
+        )
     }
     
     @ViewBuilder
@@ -174,13 +167,6 @@ struct LibraryView: View {
                         .foregroundStyle(.white.opacity(0.8))
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.3)
-            )
         }
     }
     
@@ -282,7 +268,10 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                backgroundView
+                // Only show background when there are books
+                if !viewModel.books.isEmpty {
+                    backgroundView
+                }
                 navigationLink
                 mainContent
             }
@@ -1254,18 +1243,49 @@ class LibraryViewModel: ObservableObject {
     init() {
         loadBooks()
         updateBookCoverURLsToHigherQuality()
+        
+        // Listen for library refresh notification
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("RefreshLibrary"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            print("🔄 RefreshLibrary notification received")
+            self.loadBooks()
+        }
     }
     
     private func loadBooks() {
-        if let data = userDefaults.data(forKey: booksKey),
-           let decodedBooks = try? JSONDecoder().decode([Book].self, from: data) {
-            self.books = decodedBooks
+        print("📚 Loading books from UserDefaults")
+        if let data = userDefaults.data(forKey: booksKey) {
+            print("  📦 Found data in UserDefaults, size: \(data.count) bytes")
+            do {
+                let decodedBooks = try JSONDecoder().decode([Book].self, from: data)
+                self.books = decodedBooks
+                print("  ✅ Loaded \(decodedBooks.count) books from UserDefaults")
+                
+                // Log first few books for debugging
+                for (index, book) in decodedBooks.prefix(3).enumerated() {
+                    print("    Book \(index + 1): \(book.title) by \(book.author)")
+                }
+            } catch {
+                print("  ❌ Failed to decode books: \(error)")
+            }
+        } else {
+            print("  ⚠️ No books found in UserDefaults")
+            self.books = []
         }
     }
     
     private func saveBooks() {
-        if let encoded = try? JSONEncoder().encode(books) {
+        print("💾 Saving \(books.count) books to UserDefaults")
+        do {
+            let encoded = try JSONEncoder().encode(books)
             userDefaults.set(encoded, forKey: booksKey)
+            userDefaults.synchronize() // Force immediate save
+            print("  ✅ Successfully saved \(books.count) books")
+        } catch {
+            print("  ❌ Failed to save books: \(error)")
         }
     }
     
@@ -1275,6 +1295,12 @@ class LibraryViewModel: ObservableObject {
         for index in books.indices {
             if let url = books[index].coverImageURL {
                 var updatedURL = url
+                
+                // Convert HTTP to HTTPS
+                if updatedURL.starts(with: "http://") {
+                    updatedURL = updatedURL.replacingOccurrences(of: "http://", with: "https://")
+                    hasUpdates = true
+                }
                 
                 // REMOVE all zoom parameters to get full covers
                 if updatedURL.contains("zoom=") {
@@ -1295,30 +1321,73 @@ class LibraryViewModel: ObservableObject {
                     print("📚 Removed zoom parameter from '\(books[index].title)' for full cover")
                 }
                 
-                // Remove edge=curl if present
+                // Remove edge=curl if present  
                 if updatedURL.contains("&edge=curl") {
                     updatedURL = updatedURL.replacingOccurrences(of: "&edge=curl", with: "")
                     hasUpdates = true
                 }
+                
                 
                 books[index].coverImageURL = updatedURL
             }
         }
         
         if hasUpdates {
-            print("✅ Updated cover URLs for higher quality images")
+            print("✅ Updated \(books.filter { $0.coverImageURL != nil }.count) cover URLs for higher quality images")
             saveBooks()
         } else {
             print("ℹ️ All book cover URLs already optimized")
         }
     }
     
-    func addBook(_ book: Book) {
+    func addBook(_ book: Book, overwriteIfExists: Bool = false) {
+        print("📖 LibraryViewModel.addBook called for: \(book.title)")
+        print("  📊 Book data - Rating: \(book.userRating ?? 0), Status: \(book.readingStatus.rawValue)")
+        print("  📝 Notes: \(book.userNotes?.prefix(50) ?? "None")")
+        
+        // Check if book already exists
+        if let existingIndex = books.firstIndex(where: { $0.id == book.id }) {
+            if overwriteIfExists {
+                print("  🔄 Overwriting existing book: \(book.title)")
+                var updatedBook = book
+                updatedBook.isInLibrary = true
+                // Preserve the original dateAdded if the imported one is today
+                if book.dateAdded == Date() {
+                    updatedBook.dateAdded = books[existingIndex].dateAdded
+                }
+                books[existingIndex] = updatedBook
+                saveBooks()
+                loadBooks()
+                print("  ✅ Book updated with new data")
+                return
+            } else {
+                print("  ⚠️ Book already exists in library: \(book.title)")
+                return
+            }
+        }
+        
         var newBook = book
         newBook.isInLibrary = true
-        newBook.dateAdded = Date()
+        // Only set dateAdded if it's not already set (preserve imported date)
+        if newBook.dateAdded == Date() {
+            newBook.dateAdded = Date()
+        }
+        
+        print("  📝 Adding book to array. Current count: \(books.count)")
         books.append(newBook)
+        print("  📝 New count after adding: \(books.count)")
+        print("  ✅ Preserved data - Rating: \(newBook.userRating ?? 0), Status: \(newBook.readingStatus.rawValue)")
+        
         saveBooks()
+        
+        // Verify it was saved
+        loadBooks()
+        print("  ✅ Book saved. Library now has \(books.count) books")
+        
+        // Verify the saved book has the correct data
+        if let savedBook = books.first(where: { $0.id == book.id }) {
+            print("  🔍 Verified saved book - Rating: \(savedBook.userRating ?? 0), Status: \(savedBook.readingStatus.rawValue)")
+        }
     }
     
     func removeBook(_ book: Book) {
@@ -1361,6 +1430,13 @@ class LibraryViewModel: ObservableObject {
         if let index = books.firstIndex(where: { $0.id == book.id }) {
             books[index].coverImageURL = newCoverURL
             saveBooks()
+            
+            // Post notification so other views can update
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BookCoverUpdated"),
+                object: nil,
+                userInfo: ["bookId": book.id, "coverURL": newCoverURL as Any]
+            )
         }
     }
     
@@ -1378,7 +1454,7 @@ class LibraryViewModel: ObservableObject {
         }
     }
     
-    func replaceBook(originalBook: Book, with newBook: Book) {
+    func replaceBook(originalBook: Book, with newBook: Book, preserveCover: Bool = false) {
         if let index = books.firstIndex(where: { $0.id == originalBook.id }) {
             var updatedBook = newBook
             // Preserve user data from original book
@@ -1387,6 +1463,12 @@ class LibraryViewModel: ObservableObject {
             updatedBook.userRating = originalBook.userRating
             updatedBook.userNotes = originalBook.userNotes
             updatedBook.dateAdded = originalBook.dateAdded
+            
+            // Preserve the cover URL if requested or if it's been manually selected
+            if preserveCover || originalBook.coverImageURL != nil {
+                // Keep the original cover if it exists
+                updatedBook.coverImageURL = originalBook.coverImageURL
+            }
             
             books[index] = updatedBook
             saveBooks()
