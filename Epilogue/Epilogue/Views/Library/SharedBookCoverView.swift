@@ -98,29 +98,29 @@ struct SharedBookCoverView: View {
         isLoadingStarted = true
         
         if loadFullImage {
-            // Progressive loading for detail views
-            SharedBookCoverManager.shared.loadProgressiveImage(
-                from: urlString,
-                onThumbnailLoaded: { image in
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self.thumbnailImage = image
+            // For detail views, skip thumbnail and load full quality directly
+            Task {
+                print("🎯 BookDetailView: Loading FULL quality image directly")
+                if let fullImage = await SharedBookCoverManager.shared.loadFullImage(from: urlString) {
+                    print("🖼️ BookDetailView full image loaded: \(fullImage.size)")
+                    await MainActor.run {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.fullImage = fullImage
+                            self.isLoading = false
+                        }
+                        self.onImageLoaded?(fullImage)
+                        DisplayedImageStore.shared.store(image: fullImage, for: urlString)
+                        // Store in quick cache
+                        Self.quickImageCache.setObject(fullImage, forKey: "\(urlString)_full" as NSString)
+                    }
+                } else {
+                    print("❌ Failed to load full image")
+                    await MainActor.run {
                         self.isLoading = false
+                        self.loadFailed = true
                     }
-                    if self.fullImage == nil {
-                        self.onImageLoaded?(image)
-                    }
-                },
-                onFullImageLoaded: { image in
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self.fullImage = image
-                        self.isLoading = false
-                    }
-                    self.onImageLoaded?(image)
-                    DisplayedImageStore.shared.store(image: image, for: urlString)
-                    // Store in quick cache
-                    Self.quickImageCache.setObject(image, forKey: "\(urlString)_full" as NSString)
                 }
-            )
+            }
         } else {
             // Only load thumbnail for grid views
             Task {
@@ -179,6 +179,7 @@ struct SharedBookCoverView: View {
             if let image = fullImage ?? thumbnailImage {
                 Image(uiImage: image)
                     .resizable()
+                    .interpolation(.high) // Force high quality rendering
                     .aspectRatio(contentMode: .fill)
                     .frame(width: width, height: height)
                     .clipped()

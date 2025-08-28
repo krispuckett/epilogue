@@ -359,6 +359,8 @@ struct BookDetailView: View {
                 coverURL: book.coverImageURL,
                 width: 180,
                 height: 270,
+                loadFullImage: true,  // Explicitly request full quality
+                isLibraryView: false,
                 onImageLoaded: { uiImage in
                     // Store the actual displayed image
                     print("🖼️ BookDetailView: Received displayed image")

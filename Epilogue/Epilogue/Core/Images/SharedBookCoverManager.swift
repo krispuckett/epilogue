@@ -105,8 +105,11 @@ public class SharedBookCoverManager: ObservableObject {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
         let cleanedURL = cleanURL(coverURL)
-        let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 5)
+        // Use zoom=10 for maximum quality from Google Books
+        let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 10)
         let cacheKey = "\(cleanedURL)_full" as NSString
+        
+        print("📱 Loading full image from: \(highQualityURL.suffix(100))")
         
         // Check memory cache
         if let cached = Self.imageCache.object(forKey: cacheKey) {
@@ -136,14 +139,15 @@ public class SharedBookCoverManager: ObservableObject {
     /// Progressive loading - thumbnail first, then full image
     public func loadProgressiveImage(
         from coverURL: String?,
+        thumbnailSize: CGSize = CGSize(width: 120, height: 180),
         onThumbnailLoaded: @escaping (UIImage) -> Void,
         onFullImageLoaded: @escaping (UIImage) -> Void
     ) {
         guard let coverURL = coverURL else { return }
         
         Task {
-            // Load thumbnail first
-            if let thumbnail = await loadThumbnail(from: coverURL) {
+            // Load thumbnail first at requested size
+            if let thumbnail = await loadThumbnail(from: coverURL, targetSize: thumbnailSize) {
                 await MainActor.run {
                     onThumbnailLoaded(thumbnail)
                 }

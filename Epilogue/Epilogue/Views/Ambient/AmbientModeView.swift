@@ -801,6 +801,22 @@ struct AmbientModeView: View {
                     .animation(.easeInOut(duration: 0.3), value: liveTranscription)
                 }
                 
+                // Book context pill above controls when we have context
+                if currentBookContext != nil || inputMode == .textInput {
+                    HStack {
+                        Spacer()
+                        BookContextPill(
+                            book: currentBookContext,
+                            onTap: {
+                                showBookSelector = true
+                            }
+                        )
+                        .padding(.bottom, 12)
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                
                 // FIXED: Main input controls at the very bottom
                 GeometryReader { geometry in
                 HStack(spacing: 0) {
@@ -1311,12 +1327,12 @@ struct AmbientModeView: View {
                     // Question detected but no response yet - add thinking message
                     // Check if we already have a thinking message for this question
                     let alreadyHasThinking = messages.contains { msg in
-                        !msg.isUser && msg.content.contains(item.text) && msg.content.contains("[Thinking]")
+                        !msg.isUser && msg.content.contains(item.text) && !msg.content.contains("\n\n")
                     }
                     
                     if !alreadyHasThinking {
                         let thinkingMessage = UnifiedChatMessage(
-                            content: "**\(item.text)**\n\n[Thinking]",
+                            content: "**\(item.text)**",
                             isUser: false,
                             timestamp: Date(),
                             messageType: .text
@@ -1405,8 +1421,8 @@ struct AmbientModeView: View {
             
             // Still link to session if not already linked
             if let session = currentSession, let existingQuote = existingQuotes.first {
-                if existingQuote.ambientSession == nil || !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
-                    existingQuote.ambientSession = session
+                if existingQuote.session == nil || !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
+                    existingQuote.session = session
                     // Check if quote is already in session's captured quotes before adding
                     if !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
                         session.capturedQuotes.append(existingQuote)
@@ -1446,7 +1462,7 @@ struct AmbientModeView: View {
         
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
-            capturedQuote.ambientSession = session
+            capturedQuote.session = session
             // Check for duplicates before adding (defensive programming)
             if !session.capturedQuotes.contains(where: { $0.text == capturedQuote.text }) {
                 session.capturedQuotes.append(capturedQuote)
@@ -1506,7 +1522,7 @@ struct AmbientModeView: View {
         
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
-            capturedNote.ambientSession = session
+            capturedNote.session = session
             session.capturedNotes.append(capturedNote)
         }
         
@@ -1550,8 +1566,8 @@ struct AmbientModeView: View {
            let existingQuestion = existingQuestions.first {
             // Link to session if not already linked
             if let session = currentSession {
-                if existingQuestion.ambientSession == nil {
-                    existingQuestion.ambientSession = session
+                if existingQuestion.session == nil {
+                    existingQuestion.session = session
                     // Check if question is already in session before adding
                     if !session.capturedQuestions.contains(where: { $0.id == existingQuestion.id }) {
                         session.capturedQuestions.append(existingQuestion)
@@ -1607,7 +1623,7 @@ struct AmbientModeView: View {
         
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
-            capturedQuestion.ambientSession = session
+            capturedQuestion.session = session
             // Check for duplicates before adding (defensive programming)
             if !session.capturedQuestions.contains(where: { $0.content == capturedQuestion.content }) {
                 session.capturedQuestions.append(capturedQuestion)
@@ -1887,7 +1903,7 @@ struct AmbientModeView: View {
             
             // For questions, add a thinking message immediately
             let thinkingMessage = UnifiedChatMessage(
-                content: "**\(messageText)**\n\n[Thinking]",
+                content: "**\(messageText)**",
                 isUser: false,
                 timestamp: Date(),
                 messageType: .text
@@ -2082,7 +2098,7 @@ struct AmbientModeView: View {
         guard aiService.isConfigured() else {
             await MainActor.run {
                 // Update thinking message to show error
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
                         content: "**\(text)**\n\nPlease configure your AI service.",
                         isUser: false,
@@ -2112,7 +2128,7 @@ struct AmbientModeView: View {
             
             await MainActor.run {
                 // Update thinking message if it exists, otherwise append new message
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
                         content: "**\(text)**\n\n\(response)",
                         isUser: false,
@@ -2169,7 +2185,7 @@ struct AmbientModeView: View {
         } catch {
             await MainActor.run {
                 // Update thinking message to show error
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
                         content: "**\(text)**\n\nSorry, I couldn't process your message.",
                         isUser: false,
@@ -2197,7 +2213,7 @@ struct AmbientModeView: View {
         guard aiService.isConfigured() else {
             await MainActor.run {
                 // Update thinking message to show error
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
                         content: "**\(text)**\n\nPlease configure your AI service in Settings.",
                         isUser: false,
@@ -2220,7 +2236,7 @@ struct AmbientModeView: View {
             
             await MainActor.run {
                 // Update the thinking message with the actual response
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
                         content: "**\(text)**\n\n\(response)",
                         isUser: false,
@@ -2270,7 +2286,7 @@ struct AmbientModeView: View {
         } catch {
             await MainActor.run {
                 // Update thinking message to show error
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("[Thinking]") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
                         content: "**\(text)**\n\nSorry, I couldn't process your message.",
                         isUser: false,
@@ -2907,15 +2923,15 @@ struct AmbientMessageThreadView: View {
                 
                 if message.isUser {
                     Text(message.content)
-                        .font(.system(size: 18, weight: .medium))  // ← Increased from 16
-                        .foregroundStyle(.white.opacity(0.9)) // Always full opacity once shown
+                        .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
+                        .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     // Extract question from AI response if formatted
                     let content = extractContent(from: message.content)
                     Text(content.question)
-                        .font(.system(size: 18, weight: .medium))  // ← Increased from 16
-                        .foregroundStyle(.white.opacity(0.9)) // Always full opacity once shown
+                        .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
+                        .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
