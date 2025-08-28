@@ -161,10 +161,8 @@ struct APIConfigurationView: View {
         do {
             try KeychainManager.shared.configurePerplexityAPIKey(trimmedKey)
             
-            // Update Perplexity service
-            Task {
-                await SonarAPIClient.shared.setAPIKey(trimmedKey)
-            }
+            // API key saved to Keychain
+            // Services will read it from there when needed
             
             // Clear the input field for security
             apiKey = ""

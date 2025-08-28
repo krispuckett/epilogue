@@ -61,14 +61,37 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var emptyStateView: some View {
-        SimpleEmptyState(
-            icon: "books.vertical.fill",
-            title: "Your library awaits",
-            subtitle: "Start your reading journey by adding your first book",
-            action: {
-                showingBookSearch = true
+        VStack(spacing: 20) {
+            Image(systemName: "books.vertical.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(.secondary)
+            
+            VStack(spacing: 8) {
+                Text("Your library awaits")
+                    .font(.title2)
+                    .fontWeight(.medium)
+                
+                Text("Start your reading journey by adding your first book")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             }
-        )
+            
+            Button {
+                showingBookSearch = true
+            } label: {
+                Text("Add Book")
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.orange)
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 10)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     @ViewBuilder

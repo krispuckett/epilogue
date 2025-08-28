@@ -49,11 +49,8 @@ struct EpilogueApp: App {
     private func initializeAPIKey() {
         // Check if API key exists in Keychain
         if let apiKey = KeychainManager.shared.getPerplexityAPIKey() {
-            // Initialize the API client with the stored key
-            Task {
-                await SonarAPIClient.shared.setAPIKey(apiKey)
-                print("✅ API key loaded from secure storage")
-            }
+            // API key is available
+            print("✅ API key loaded from secure storage")
         } else if KeychainManager.shared.needsAPIKeyConfiguration() {
             // Show setup sheet on first launch or if key is missing
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
