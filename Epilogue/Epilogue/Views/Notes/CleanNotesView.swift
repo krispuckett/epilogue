@@ -570,7 +570,7 @@ struct CleanNotesView: View {
         
         let isSelected = selectedItems.contains(quote.id)
         
-        return SimpleQuoteCard(note: note)
+        return SimpleQuoteCard(note: note, capturedQuote: quote)
             .overlay(alignment: .topLeading) {
                 // Selection checkbox when in selection mode
                 if isSelectionMode {
@@ -870,33 +870,62 @@ private struct NoteCardView: View {
     let capturedNote: CapturedNote?
     @State private var showDate = false
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Timestamp header - shown on tap
-            if showDate {
-                Text(formatDate(note.dateCreated).uppercased())
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .kerning(1.2)
-                    .foregroundStyle(
-                        capturedNote?.source == .ambient 
-                            ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
-                            : .white.opacity(0.4)
+    private var dateHeader: some View {
+        HStack {
+            Text(formatDate(note.dateCreated).uppercased())
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .kerning(1.2)
+                .foregroundStyle(
+                    capturedNote?.source == .ambient 
+                        ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
+                        : .white.opacity(0.4)
+                )
+            
+            Spacer()
+            
+            // Session pill for ambient notes - shows with date on tap
+            if let session = capturedNote?.ambientSession, capturedNote?.source == .ambient {
+                NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                    HStack(spacing: 6) {
+                        Text("SESSION")
+                            .font(.system(size: 10, weight: .semibold, design: .default))
+                            .kerning(1.0)
+                        
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1))
                     )
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            
-            // Content with better typography
-            Text(note.content)
-                .font(.system(size: 16, weight: .regular, design: .default))
-                .foregroundStyle(.white.opacity(0.95))
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(6)
-            
-            // Book context with refined styling (no divider line)
+        }
+        .transition(.asymmetric(
+            insertion: .move(edge: .top).combined(with: .opacity),
+            removal: .move(edge: .top).combined(with: .opacity)
+        ))
+    }
+    
+    private var contentText: some View {
+        Text(note.content)
+            .font(.system(size: 16, weight: .regular, design: .default))
+            .foregroundStyle(.white.opacity(0.95))
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .lineSpacing(6)
+    }
+    
+    private var bookContext: some View {
+        Group {
             if let bookTitle = note.bookTitle {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(bookTitle.uppercased())
@@ -911,8 +940,21 @@ private struct NoteCardView: View {
                             .foregroundStyle(.white.opacity(0.5))
                     }
                 }
-                .padding(.top, 12) // Add spacing instead of divider line
+                .padding(.top, 12)
             }
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Show header when date is toggled on
+            if showDate {
+                dateHeader
+            }
+            
+            contentText
+            
+            bookContext
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -3,9 +3,16 @@ import SwiftUI
 // MARK: - Simple Quote Card for Award Winning Notes View
 struct SimpleQuoteCard: View {
     let note: Note
+    let capturedQuote: CapturedQuote?
     @Environment(\.sizeCategory) var sizeCategory
     @State private var isPressed = false
     @State private var showDate = false
+    
+    // Convenience initializer for backward compatibility
+    init(note: Note, capturedQuote: CapturedQuote? = nil) {
+        self.note = note
+        self.capturedQuote = capturedQuote
+    }
     
     var firstLetter: String {
         String(note.content.prefix(1)).uppercased()
@@ -19,15 +26,45 @@ struct SimpleQuoteCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // Date header (shown on tap)
             if showDate {
-                Text(formatDate(note.dateCreated).uppercased())
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .kerning(1.2)
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
-                    .padding(.bottom, 16)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .move(edge: .top).combined(with: .opacity)
-                    ))
+                HStack {
+                    Text(formatDate(note.dateCreated).uppercased())
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .kerning(1.2)
+                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
+                    
+                    Spacer()
+                    
+                    // Session pill for ambient quotes
+                    if let session = capturedQuote?.ambientSession, capturedQuote?.source == .ambient {
+                        NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                            HStack(spacing: 6) {
+                                Text("SESSION")
+                                    .font(.system(size: 10, weight: .semibold, design: .default))
+                                    .kerning(1.0)
+                                
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.bottom, 16)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
+                ))
             }
             
             // Large transparent opening quote
