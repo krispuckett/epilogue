@@ -22,6 +22,7 @@ struct LibraryCommandPalette: View {
         enum CommandAction {
             case scanBook
             case addBook
+            case importFromGoodreads
             case createNote
             case createQuote
             case searchNotes
@@ -41,6 +42,13 @@ struct LibraryCommandPalette: View {
             title: "Search Books",
             description: "Find and add books to library",
             action: .addBook,
+            isFeatured: true
+        ),
+        Command(
+            icon: "square.and.arrow.down",
+            title: "Import from Goodreads",
+            description: "Import your Goodreads library CSV",
+            action: .importFromGoodreads,
             isFeatured: true
         )
     ]
@@ -160,6 +168,11 @@ struct LibraryCommandPalette: View {
         case .addBook:
             // Immediately show Google Books search
             NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+            dismiss()
+            
+        case .importFromGoodreads:
+            // Trigger Goodreads import
+            NotificationCenter.default.post(name: Notification.Name("ShowGoodreadsImport"), object: nil)
             dismiss()
             
         case .createNote, .createQuote, .searchNotes:

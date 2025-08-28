@@ -23,6 +23,9 @@ struct LibraryView: View {
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
     @State private var showingBookSearch = false
     @State private var showingEnhancedScanner = false
+    @State private var showingGoodreadsImport = false
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var googleBooksService = GoogleBooksService()
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -237,6 +240,16 @@ struct LibraryView: View {
     }
     
     @ViewBuilder
+    private var goodreadsImportSheet: some View {
+        GoodreadsImportView(
+            modelContext: modelContext,
+            googleBooksService: googleBooksService,
+            libraryViewModel: viewModel
+        )
+        .environmentObject(googleBooksService)
+    }
+    
+    @ViewBuilder
     private var mainContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -317,6 +330,9 @@ struct LibraryView: View {
         .sheet(isPresented: $showingEnhancedScanner) {
             enhancedScannerSheet
         }
+        .sheet(isPresented: $showingGoodreadsImport) {
+            goodreadsImportSheet
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {
                 // Navigate directly to book detail
@@ -329,6 +345,9 @@ struct LibraryView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowEnhancedBookScanner"))) { _ in
             showingEnhancedScanner = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowGoodreadsImport"))) { _ in
+            showingGoodreadsImport = true
         }
         #if DEBUG
         .onAppear {
