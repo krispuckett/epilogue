@@ -1418,8 +1418,8 @@ struct BookDetailView: View {
     }
     
     private func extractColorsFromDisplayedImage(_ displayedImage: UIImage) async {
-        // Check cache first
-        let bookID = book.id
+        // Check cache first - use localId like AmbientMode does
+        let bookID = book.localId.uuidString
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
@@ -1440,23 +1440,22 @@ struct BookDetailView: View {
         }
         
         do {
-            // Use improved color extraction with validation
-            if let palette = await ImprovedColorExtraction.extractColors(from: displayedImage, bookTitle: book.title) {
-                await MainActor.run {
-                    self.colorPalette = palette
-                    
-                    print("🎨 Low-res extracted colors:")
-                    print("  Primary: \(palette.primary)")
-                    print("  Secondary: \(palette.secondary)")
-                    print("  Accent: \(palette.accent)")
-                    print("  Background: \(palette.background)")
-                }
+            // Use OKLABColorExtractor directly like AmbientMode does
+            let extractor = OKLABColorExtractor()
+            let palette = try await extractor.extractPalette(from: displayedImage)
+            
+            await MainActor.run {
+                self.colorPalette = palette
                 
-                // Cache the result
-                await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
-            } else {
-                print("❌ Color extraction returned nil")
+                print("🎨 Low-res extracted colors:")
+                print("  Primary: \(palette.primary)")
+                print("  Secondary: \(palette.secondary)")
+                print("  Accent: \(palette.accent)")
+                print("  Background: \(palette.background)")
             }
+            
+            // Cache the result with localId
+            await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
         } catch {
             print("❌ Error in color extraction: \(error)")
         }
@@ -1465,8 +1464,8 @@ struct BookDetailView: View {
     }
     
     private func extractColorsFromCover() async {
-        // Check cache first
-        let bookID = book.id
+        // Check cache first - use localId like AmbientMode does
+        let bookID = book.localId.uuidString
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
@@ -1506,9 +1505,10 @@ struct BookDetailView: View {
         }
         
         do {
-            // Use SharedBookCoverManager for cached loading
-            guard let uiImage = await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) else {
-                print("❌ Could not load image from SharedBookCoverManager")
+            // Load image directly from URL like AmbientMode does
+            let (imageData, _) = try await URLSession.shared.data(from: coverURL)
+            guard let uiImage = UIImage(data: imageData) else {
+                print("❌ Failed to create image from data")
                 isExtractingColors = false
                 return
             }
@@ -1516,20 +1516,21 @@ struct BookDetailView: View {
             // Store the cover image
             self.coverImage = uiImage
             
-            // Use improved color extraction with validation
-            if let palette = await ImprovedColorExtraction.extractColors(from: uiImage, bookTitle: book.title) {
-                await MainActor.run {
-                    self.colorPalette = palette
-                    print("🎨 High-res extracted colors (final):")
-                    print("  Primary: \(palette.primary)")
-                    print("  Secondary: \(palette.secondary)")
-                    print("  Accent: \(palette.accent)")
-                    print("  Background: \(palette.background)")
-                }
-                
-                // Cache the result outside of MainActor.run
-                await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
+            // Use OKLABColorExtractor directly like AmbientMode does
+            let extractor = OKLABColorExtractor()
+            let palette = try await extractor.extractPalette(from: uiImage)
+            
+            await MainActor.run {
+                self.colorPalette = palette
+                print("🎨 High-res extracted colors (final):")
+                print("  Primary: \(palette.primary)")
+                print("  Secondary: \(palette.secondary)")
+                print("  Accent: \(palette.accent)")
+                print("  Background: \(palette.background)")
             }
+            
+            // Cache the result outside of MainActor.run
+            await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
             
             // Debug print moved inside MainActor block above
             
@@ -1579,23 +1580,19 @@ struct BookDetailView: View {
                 .replacingOccurrences(of: "zoom=3", with: "")
                 .replacingOccurrences(of: "zoom=2", with: "")
                 .replacingOccurrences(of: "zoom=1", with: "")
-            guard let coverURL = URL(string: secureURLString) else {
+            guard URL(string: secureURLString) != nil else {
                 print("❌ Invalid cover URL for diagnostic")
                 return
             }
             
-            do {
-                guard await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) != nil else {
-                    print("❌ Could not load image for diagnostic from SharedBookCoverManager")
-                    return
-                }
-                
-                // ColorExtractionDiagnostic was removed - diagnostic functionality no longer available
-                // let diagnostic = ColorExtractionDiagnostic()
-                // await diagnostic.runDiagnostic(on: uiImage, bookTitle: book.title)
-            } catch {
-                print("❌ Failed to download image for diagnostic: \(error)")
+            guard await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) != nil else {
+                print("❌ Could not load image for diagnostic from SharedBookCoverManager")
+                return
             }
+            
+            // ColorExtractionDiagnostic was removed - diagnostic functionality no longer available
+            // let diagnostic = ColorExtractionDiagnostic()
+            // await diagnostic.runDiagnostic(on: uiImage, bookTitle: book.title)
         } else {
             print("❌ No cover image available for diagnostic")
         }
