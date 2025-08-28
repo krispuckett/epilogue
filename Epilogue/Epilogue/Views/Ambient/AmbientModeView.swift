@@ -130,6 +130,7 @@ struct AmbientModeView: View {
     @State private var showSaveAnimation = false
     @State private var savedItemType: String? = nil
     @State private var showBookCover = false
+    @State private var showBookSelector = false
     @State private var bookCoverTimer: Timer?
     @State private var expandedMessageIds = Set<UUID>()  // Track expanded messages individually
     @State private var showImagePicker = false
@@ -745,7 +746,8 @@ struct AmbientModeView: View {
                 Spacer() // Push everything to bottom
                 
                 // FIXED: Scrolling text positioned correctly above the buttons
-                if pendingQuestion != nil {
+                // Show when processing in any mode (including text input)
+                if processor.isProcessing || pendingQuestion != nil {
                     ScrollingBookMessages()
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
@@ -801,21 +803,7 @@ struct AmbientModeView: View {
                     .animation(.easeInOut(duration: 0.3), value: liveTranscription)
                 }
                 
-                // Book context pill above controls when we have context
-                if currentBookContext != nil || inputMode == .textInput {
-                    HStack {
-                        Spacer()
-                        BookContextPill(
-                            book: currentBookContext,
-                            onTap: {
-                                showBookSelector = true
-                            }
-                        )
-                        .padding(.bottom, 12)
-                        Spacer()
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
+                // Removed book context pill - book context is shown elsewhere
                 
                 // FIXED: Main input controls at the very bottom
                 GeometryReader { geometry in
@@ -835,17 +823,7 @@ struct AmbientModeView: View {
                             height: inputMode == .textInput ? 48 : 64  // Match waveform orb height
                         )
                         .blur(radius: containerBlur) // Ambient container blur
-                        .glassEffect() // Glass effect on the morphing container
-                        .overlay(
-                            // Glass tint overlay with submit wave effect
-                            RoundedRectangle(
-                                cornerRadius: inputMode == .textInput ? 22 : 32,
-                                style: .continuous
-                            )
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(inputMode == .textInput ? submitBlurWave * 0.3 : 0.2))
-                            .blur(radius: submitBlurWave)
-                            .scaleEffect(1 + submitBlurWave * 0.05)
-                        )
+                        .glassEffect() // Glass effect on the morphing container only
                         .onAppear {
                             // Start subtle idle breathing animation
                             startContainerBreathing()
@@ -931,11 +909,8 @@ struct AmbientModeView: View {
                                             }
                                             .onSubmit {
                                                 if !keyboardText.isEmpty {
-                                                    // Trigger blur wave before sending
-                                                    triggerSubmitBlurWave()
-                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                        sendTextMessage()
-                                                    }
+                                                    // Removed blur wave for cleaner submission
+                                                    sendTextMessage()
                                                 }
                                             }
                                     }
@@ -957,10 +932,8 @@ struct AmbientModeView: View {
                         Button {
                             if !keyboardText.isEmpty {
                                 // Submit the message
-                                triggerSubmitBlurWave()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    sendTextMessage()
-                                }
+                                // Removed blur wave for cleaner submission
+                                sendTextMessage()
                             } else {
                                 // Return to voice mode
                                 isKeyboardFocused = false
@@ -1109,22 +1082,7 @@ struct AmbientModeView: View {
             
             Spacer()
             
-            // Right side - Switch books pill with liquid glass
-            if currentBookContext != nil {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        showingBookStrip.toggle()
-                    }
-                } label: {
-                    Text("Switch Book")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .glassEffect()
-                        .clipShape(Capsule())
-                }
-            }
+            // Removed Switch Book button - book switching is handled via book strip
         }
     }
     
@@ -1421,8 +1379,8 @@ struct AmbientModeView: View {
             
             // Still link to session if not already linked
             if let session = currentSession, let existingQuote = existingQuotes.first {
-                if existingQuote.session == nil || !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
-                    existingQuote.session = session
+                if existingQuote.ambientSession == nil || !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
+                    existingQuote.ambientSession = session
                     // Check if quote is already in session's captured quotes before adding
                     if !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
                         session.capturedQuotes.append(existingQuote)
@@ -1462,7 +1420,7 @@ struct AmbientModeView: View {
         
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
-            capturedQuote.session = session
+            capturedQuote.ambientSession = session
             // Check for duplicates before adding (defensive programming)
             if !session.capturedQuotes.contains(where: { $0.text == capturedQuote.text }) {
                 session.capturedQuotes.append(capturedQuote)
@@ -1522,7 +1480,7 @@ struct AmbientModeView: View {
         
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
-            capturedNote.session = session
+            capturedNote.ambientSession = session
             session.capturedNotes.append(capturedNote)
         }
         
@@ -1566,8 +1524,8 @@ struct AmbientModeView: View {
            let existingQuestion = existingQuestions.first {
             // Link to session if not already linked
             if let session = currentSession {
-                if existingQuestion.session == nil {
-                    existingQuestion.session = session
+                if existingQuestion.ambientSession == nil {
+                    existingQuestion.ambientSession = session
                     // Check if question is already in session before adding
                     if !session.capturedQuestions.contains(where: { $0.id == existingQuestion.id }) {
                         session.capturedQuestions.append(existingQuestion)
@@ -1623,7 +1581,7 @@ struct AmbientModeView: View {
         
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
-            capturedQuestion.session = session
+            capturedQuestion.ambientSession = session
             // Check for duplicates before adding (defensive programming)
             if !session.capturedQuestions.contains(where: { $0.content == capturedQuestion.content }) {
                 session.capturedQuestions.append(capturedQuestion)
