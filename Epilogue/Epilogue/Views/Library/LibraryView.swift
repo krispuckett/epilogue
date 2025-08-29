@@ -26,6 +26,7 @@ struct LibraryView: View {
     @State private var showingGoodreadsImport = false
     @Environment(\.modelContext) private var modelContext
     @StateObject private var googleBooksService = GoogleBooksService()
+    @State private var isRefreshing = false
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -40,6 +41,20 @@ struct LibraryView: View {
     private func changeCover(for book: Book) {
         selectedBookForEdit = book
         showingCoverPicker = true
+    }
+    
+    // Refresh library data
+    private func refreshLibrary() async {
+        HapticManager.shared.lightTap()
+        
+        // Simulate network delay for smooth UX
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        await MainActor.run {
+            // Trigger refresh - loadBooks is private
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+            HapticManager.shared.lightTap()
+        }
     }
     
     private func preloadNeighboringCovers(for book: Book) {
@@ -117,31 +132,12 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var gridContent: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16)
-        ], spacing: 32) { // Increased spacing between rows
-            ForEach(viewModel.books) { book in
-                LibraryGridItem(
-                    book: book,
-                    index: 0, // Remove index-based animations
-                    viewModel: viewModel,
-                    highlightedBookId: highlightedBookId,
-                    onChangeCover: { book in changeCover(for: book) }
-                )
-                .id(book.localId) // Stable identity for recycling
-                .onAppear {
-                    visibleBookIDs.insert(book.localId)
-                    // Preload neighboring book covers
-                    preloadNeighboringCovers(for: book)
-                }
-                .onDisappear {
-                    visibleBookIDs.remove(book.localId)
-                }
-            }
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 100)
+        OptimizedLibraryGrid(
+            books: viewModel.books,
+            viewModel: viewModel,
+            highlightedBookId: highlightedBookId,
+            onChangeCover: { book in changeCover(for: book) }
+        )
     }
     
     @ViewBuilder
@@ -287,6 +283,9 @@ struct LibraryView: View {
                 }
             }
             .ignoresSafeArea(edges: .bottom)
+            .refreshable {
+                await refreshLibrary()
+            }
             .onChange(of: scrollToBookId) { _, bookId in
                 if let bookId = bookId {
                     withAnimation(.easeInOut(duration: 0.5)) {

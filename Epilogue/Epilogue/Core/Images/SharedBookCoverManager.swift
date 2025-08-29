@@ -26,6 +26,14 @@ public class SharedBookCoverManager: ObservableObject {
         registerForMemoryWarnings()
     }
     
+    deinit {
+        // Cancel all active tasks when manager is deallocated
+        activeTasks.values.forEach { $0.cancel() }
+        activeTasks.removeAll()
+        // Remove notification observer
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     // MARK: - Configuration
     
     private func configureCaches() {
@@ -69,6 +77,15 @@ public class SharedBookCoverManager: ObservableObject {
         print("⚠️ Memory warning received - clearing image caches")
         Self.imageCache.removeAllObjects()
         Self.thumbnailCache.removeAllObjects()
+        // Also clean up active tasks
+        cleanupCompletedTasks()
+    }
+    
+    private func cleanupCompletedTasks() {
+        let completedKeys = activeTasks.compactMap { key, task in
+            task.isCancelled ? key : nil
+        }
+        completedKeys.forEach { activeTasks.removeValue(forKey: $0) }
     }
     
     // MARK: - Public Methods
@@ -239,6 +256,11 @@ public class SharedBookCoverManager: ObservableObject {
         
         // Clean up
         activeTasks.removeValue(forKey: cacheKey)
+        
+        // Periodic cleanup every 10 tasks
+        if activeTasks.count % 10 == 0 {
+            cleanupCompletedTasks()
+        }
         
         return result
     }

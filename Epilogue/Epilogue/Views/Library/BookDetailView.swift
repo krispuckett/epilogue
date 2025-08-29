@@ -41,18 +41,6 @@ extension Color {
     static let warmWhite = Color(red: 0.98, green: 0.97, blue: 0.96) // #FAF8F5
     static let warmAmber = Color(red: 1.0, green: 0.549, blue: 0.259) // #FF8C42
     
-    func adjustBrightness(to targetBrightness: CGFloat) -> Color {
-        let uiColor = UIColor(self)
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        return Color(UIColor(hue: hue, saturation: saturation, brightness: targetBrightness, alpha: alpha))
-    }
-    
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
@@ -100,6 +88,14 @@ struct BookDetailView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var coverImage: UIImage? = nil
     @State private var hasAppeared = false
+    @State private var contentLoaded = false
+    @State private var delayedContentLoaded = false
+    
+    // Enhanced animation states
+    @State private var coverScale: CGFloat = 0.9
+    @State private var coverOpacity: Double = 0
+    @State private var titleOpacity: Double = 0
+    @State private var metadataOpacity: Double = 0
     
     // Dynamic gradient opacity based on scroll
     private var gradientOpacity: Double {
@@ -152,7 +148,11 @@ struct BookDetailView: View {
            (hueDegrees >= 80 && hueDegrees <= 150) {   // Greens
             // Ensure minimum brightness for visibility
             if brightness < 0.5 {
-                return bookAccent.adjustBrightness(to: 0.6)
+                // Adjust brightness manually
+                let uiColor = UIColor(bookAccent)
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+                return Color(UIColor(hue: h, saturation: s, brightness: 0.6, alpha: a))
             }
             return bookAccent
         }
@@ -233,7 +233,9 @@ struct BookDetailView: View {
             )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
-                .opacity(gradientOpacity) // Fades on scroll
+                .opacity(gradientOpacity * (hasAppeared ? 1 : 0)) // Fades on scroll and on appear
+                .blur(radius: hasAppeared ? 0 : 10)
+                .animation(enableAnimations ? .easeOut(duration: 0.8) : nil, value: hasAppeared)
                 .animation(enableAnimations ? .easeOut(duration: 0.2) : nil, value: gradientOpacity)
                 .id(book.id) // Force view recreation when book changes
             
@@ -256,31 +258,54 @@ struct BookDetailView: View {
                         centeredHeaderView
                             .padding(.top, 20)
                     
-                    // Summary section wrapped in padding container
-                    if let description = book.description {
-                        summarySection(description: description)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 32)
+                    // Progressive content loading for better performance
+                    if contentLoaded {
+                        // Summary section wrapped in padding container
+                        if let description = book.description {
+                            summarySection(description: description)
+                                .padding(.horizontal, 24)
+                                .padding(.top, 32)
+                                .transition(.asymmetric(
+                                    insertion: .opacity
+                                        .combined(with: .scale(scale: 0.95, anchor: .top))
+                                        .combined(with: .offset(y: 10)),
+                                    removal: .opacity
+                                ))
+                        }
+                        
+                        // Progress section
+                        if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
+                            progressSection
+                                .padding(.horizontal, 24)
+                                .padding(.top, 24)
+                                .transition(.asymmetric(
+                                    insertion: .opacity
+                                        .combined(with: .scale(scale: 0.98)),
+                                    removal: .opacity
+                                ))
+                        }
                     }
                     
-                    // Progress section
-                    if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
-                        progressSection
+                    // Delayed content for smooth initial load
+                    if delayedContentLoaded {
+                        // Contextual content based on reading status
+                        contextualContentSections
                             .padding(.horizontal, 24)
                             .padding(.top, 24)
+                            .padding(.bottom, 100) // Space for tab bar
+                            .transition(.asymmetric(
+                                insertion: .opacity
+                                    .combined(with: .scale(scale: 0.96, anchor: .bottom))
+                                    .combined(with: .offset(y: 20)),
+                                removal: .opacity
+                            ))
+                            .scrollTransition { content, phase in
+                                content
+                                    .opacity(phase.isIdentity ? 1 : 0.6)
+                                    .scaleEffect(phase.isIdentity ? 1 : 0.96)
+                                    .blur(radius: phase.isIdentity ? 0 : 1)
+                            }
                     }
-                    
-                    // Contextual content based on reading status
-                    contextualContentSections
-                        .padding(.horizontal, 24)
-                        .padding(.top, 24)
-                        .padding(.bottom, 100) // Space for tab bar
-                        .scrollTransition { content, phase in
-                            content
-                                .opacity(phase.isIdentity ? 1 : 0.8)
-                                .scaleEffect(phase.isIdentity ? 1 : 0.98)
-                                .blur(radius: phase.isIdentity ? 0 : 0.5)
-                        }
                     }
                 }
             }
@@ -333,17 +358,54 @@ struct BookDetailView: View {
         .onAppear {
             // findOrCreateThreadForBook() // DISABLED - ChatThread removed
             
-            // TEMPORARY: Clear cache to test new color extraction
+            // Check for cached colors first for instant display
             Task {
-                await BookColorPaletteCache.shared.clearCache()
-                print("🧹 CLEARED COLOR CACHE - FORCING FRESH EXTRACTION")
+                let bookID = book.localId.uuidString
+                if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+                    await MainActor.run {
+                        self.colorPalette = cachedPalette
+                    }
+                }
             }
-            
-            // Placeholder is now generated inline in the gradient view
             
             // Enable animations after a short delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 hasAppeared = true
+                
+                // Start cover animation if image is already loaded
+                if coverImage != nil {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        coverScale = 1.0
+                        coverOpacity = 1.0
+                    }
+                }
+            }
+            
+            // Title animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                    titleOpacity = 1.0
+                }
+            }
+            
+            // Metadata animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    metadataOpacity = 1.0
+                }
+            }
+            
+            // Progressive content loading for smoother performance
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+                    contentLoaded = true
+                }
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+                    delayedContentLoaded = true
+                }
             }
         }
         .onChange(of: coverImage) { _, _ in
@@ -354,7 +416,7 @@ struct BookDetailView: View {
     
     private var centeredHeaderView: some View {
         VStack(spacing: 16) {
-            // Book Cover with 3D effect
+            // Book Cover with 3D effect and smooth entrance
             SharedBookCoverView(
                 coverURL: book.coverImageURL,
                 width: 180,
@@ -363,22 +425,22 @@ struct BookDetailView: View {
                 isLibraryView: false,
                 onImageLoaded: { uiImage in
                     // Store the actual displayed image
-                    print("🖼️ BookDetailView: Received displayed image")
-                    print("📐 Image size: \(uiImage.size)")
                     self.coverImage = uiImage
                     
-                    // Extract colors progressively
-                    Task {
-                        // If we don't have low-res colors yet, extract from this image
-                        if !hasLowResColors {
-                            await extractColorsFromDisplayedImage(uiImage)
-                            hasLowResColors = true
-                        }
-                        
-                        // Always trigger high-res extraction for best quality
-                        if !hasHighResColors {
-                            await extractColorsFromCover()
-                            hasHighResColors = true
+                    // Trigger smooth cover animation
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        coverScale = 1.0
+                        coverOpacity = 1.0
+                    }
+                    
+                    // Only extract colors if we don't have them yet
+                    if colorPalette == nil && !isExtractingColors {
+                        Task.detached(priority: .userInitiated) {
+                            // Quick extraction from displayed image
+                            if !hasLowResColors {
+                                await extractColorsFromDisplayedImage(uiImage)
+                                hasLowResColors = true
+                            }
                         }
                     }
                 }
@@ -387,18 +449,21 @@ struct BookDetailView: View {
             #if DEBUG
             .colorExtractionDebug(book: book, coverImage: coverImage)
             #endif
-            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+            .scaleEffect(coverScale)
+            .opacity(coverOpacity)
+            .shadow(color: .black.opacity(coverOpacity * 0.3), radius: 20 * coverOpacity, y: 10 * coverOpacity)
             .task(id: book.localId) {
                 // Color extraction now happens when image loads in SharedBookCoverView
             }
             
-            // Title - dynamic color with adaptive shadow
+            // Title - dynamic color with adaptive shadow and fade-in
             Text(book.title)
                 .font(.system(size: 28, weight: .semibold, design: .serif))
                 .foregroundColor(textColor)
                 .shadow(color: shadowColor, radius: 1, x: 0, y: 1)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
+                .opacity(titleOpacity)
             
             // Author(s) - Handle multiple authors by splitting on comma
             VStack(spacing: 4) {
@@ -426,6 +491,7 @@ struct BookDetailView: View {
             }
             .multilineTextAlignment(.center)
             .padding(.top, -8)
+            .opacity(metadataOpacity)
             
             // Status and page info
             HStack(spacing: 16) {
@@ -467,6 +533,7 @@ struct BookDetailView: View {
                 }
             }
             .padding(.top, 8)
+            .opacity(metadataOpacity)
             
             // Progress bar removed per user request
             

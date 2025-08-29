@@ -76,7 +76,12 @@ class OptimizedPerplexityService: ObservableObject {
     
     func streamSonarResponse(_ query: String, bookContext: Book?) -> AsyncThrowingStream<PerplexityResponse, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            Task { [weak self] in
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
+                
                 do {
                     // Check cache first
                     let cacheKey = generateCacheKey(query: query, bookContext: bookContext)

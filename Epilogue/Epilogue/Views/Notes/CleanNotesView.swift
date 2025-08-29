@@ -26,6 +26,7 @@ struct CleanNotesView: View {
     @State private var collapsedSections: Set<String> = []
     @State private var isSelectionMode = false
     @State private var selectedItems: Set<UUID> = []
+    @State private var scrollOffset: CGFloat = 0
     @Namespace private var animation
     
     enum FilterType: String, CaseIterable {
@@ -387,62 +388,12 @@ struct CleanNotesView: View {
     // Removed filterPopoverButton - now integrated in toolbar
     
     private var contentSections: some View {
-        VStack(spacing: 24) {
+        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
             ForEach(Array(groupedItems.enumerated()), id: \.0) { index, group in
                 let section = group.0
                 let items = group.1
-                VStack(alignment: .leading, spacing: 16) {
-                    // Section Header (collapsible for By Book filter)
-                    Button {
-                        if selectedFilter == .byBook {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                if collapsedSections.contains(section) {
-                                    collapsedSections.remove(section)
-                                } else {
-                                    collapsedSections.insert(section)
-                                }
-                            }
-                            HapticManager.shared.lightTap()
-                        }
-                    } label: {
-                        HStack(alignment: .center, spacing: 12) {
-                            if selectedFilter == .byBook {
-                                Image(systemName: collapsedSections.contains(section) ? "chevron.right" : "chevron.down")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.6))
-                                    .frame(width: 20)
-                            }
-                            
-                            // Book title with refined typography
-                            Text(section.uppercased())
-                                .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                                .kerning(0.6)
-                                .foregroundStyle(.white.opacity(0.9))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                            
-                            // Count badge with monospaced font
-                            Text("\(items.count)")
-                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.12))
-                                )
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
-                                )
-                            
-                            Spacer()
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(selectedFilter != .byBook)
-                    .padding(.horizontal, 20)
-                    
+                
+                Section {
                     // Items in section with staggered animation (collapsible)
                     if !collapsedSections.contains(section) {
                         VStack(spacing: 16) {
@@ -463,7 +414,29 @@ struct CleanNotesView: View {
                                 ))
                             }
                         }
+                        .padding(.top, 8)
+                        .padding(.bottom, 24)
                     }
+                } header: {
+                    NoteStickyHeader(
+                        section: section,
+                        itemCount: items.count,
+                        isCollapsible: selectedFilter == .byBook,
+                        isCollapsed: collapsedSections.contains(section),
+                        scrollOffset: scrollOffset,
+                        onToggle: {
+                            if selectedFilter == .byBook {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    if collapsedSections.contains(section) {
+                                        collapsedSections.remove(section)
+                                    } else {
+                                        collapsedSections.insert(section)
+                                    }
+                                }
+                                HapticManager.shared.lightTap()
+                            }
+                        }
+                    )
                 }
             }
             
@@ -863,6 +836,94 @@ struct CleanNotesView: View {
 
 // Extension removed - already exists in SwiftDataNotesBridge.swift
 // EditContentSheet already exists in UnifiedChatView.swift
+
+// MARK: - Sticky Header with Amber Glass Effect
+private struct NoteStickyHeader: View {
+    let section: String
+    let itemCount: Int
+    let isCollapsible: Bool
+    let isCollapsed: Bool
+    let scrollOffset: CGFloat
+    let onToggle: () -> Void
+    
+    @State private var isPinned = false
+    
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(alignment: .center, spacing: 12) {
+                if isCollapsible {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: isPinned ? 15 : 14, weight: .medium))
+                        .foregroundStyle(isPinned ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.6))
+                        .frame(width: 20)
+                }
+                
+                // Section title - matches chat tab style
+                Text(section.uppercased())
+                    .font(.system(
+                        size: isPinned ? 15 : 13,
+                        weight: isPinned ? .bold : .semibold
+                    ))
+                    .foregroundStyle(isPinned ? .white : .white.opacity(0.5))
+                    .tracking(isPinned ? 1.4 : 1.2)
+                
+                Spacer()
+                
+                // Count with "items" text - orange like chat tab
+                HStack(spacing: 4) {
+                    Text("\(itemCount)")
+                        .font(.system(
+                            size: isPinned ? 15 : 13,
+                            weight: .semibold
+                        ))
+                    Text(itemCount == 1 ? "item" : "items")
+                        .font(.system(
+                            size: isPinned ? 15 : 13,
+                            weight: .medium
+                        ))
+                }
+                .foregroundStyle(isPinned ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isCollapsible)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background {
+            GeometryReader { geo in
+                let minY = geo.frame(in: .global).minY
+                // Header is pinned when it's at the top of the screen
+                let pinned = minY <= 150  // Adjust threshold as needed
+                
+                Color.clear
+                    .onAppear {
+                        isPinned = pinned
+                    }
+                    .onChange(of: minY) { _, newValue in
+                        withAnimation(.smooth(duration: 0.2)) {
+                            isPinned = newValue <= 150
+                        }
+                    }
+            }
+            .frame(height: 0)
+            
+            if isPinned {
+                // Amber tinted rectangular card with proper glass effect
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.08))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                    .padding(.horizontal, 16)
+            } else {
+                // Non-pinned background
+                Color(red: 0.11, green: 0.105, blue: 0.102)
+                    .opacity(0.98)
+            }
+        }
+        // Removed the bottom border overlay completely
+        .animation(.smooth(duration: 0.2), value: isPinned)
+    }
+}
 
 // MARK: - Note Card View with Date Toggle
 private struct NoteCardView: View {
