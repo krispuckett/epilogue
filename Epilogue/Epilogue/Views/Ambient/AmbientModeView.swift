@@ -51,7 +51,7 @@ struct ScrollingBookMessages: View {
     var body: some View {
         Text(messages[currentMessageIndex])
             .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
             .opacity(opacity)
             .animation(.easeInOut(duration: 0.4), value: opacity)
             .lineLimit(1)
@@ -213,7 +213,7 @@ struct AmbientModeView: View {
         if let palette = colorPalette {
             return palette.adaptiveUIColor
         } else {
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
     }
     
@@ -231,7 +231,7 @@ struct AmbientModeView: View {
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.vertical, 16)
                             .frame(maxWidth: geometry.size.width - 100)
                             .glassEffect()
@@ -240,8 +240,8 @@ struct AmbientModeView: View {
                         
                         Spacer()
                     }
-                    .padding(.horizontal, 20)
-                    .animation(.easeInOut(duration: 0.3), value: liveTranscription)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                    .animation(DesignSystem.Animation.easeStandard, value: liveTranscription)
                 }
             }
         }
@@ -264,11 +264,11 @@ struct AmbientModeView: View {
                 if isRecording {
                     stopRecording()
                 }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     inputMode = .textInput
                     isKeyboardFocused = true
                 }
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }
         }
         // Top gradient overlay for fake blur effect (like BookView)
@@ -305,7 +305,7 @@ struct AmbientModeView: View {
         // Top navigation bar with BookView-style header
         .safeAreaInset(edge: .top) {
             bookStyleHeader
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 8)
         }
         // Removed - moved above transcription bar
@@ -539,7 +539,7 @@ struct AmbientModeView: View {
                     height: 210
                 )
                 .aspectRatio(2/3, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
                 .scaleEffect(isRecording ? 1.0 : 0.9)
                 .opacity(isRecording ? 1.0 : 0.8)
@@ -606,9 +606,9 @@ struct AmbientModeView: View {
                             if messages.count > 1 {
                                 Text("CONVERSATION")
                                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                                     .tracking(1.2)
-                                    .padding(.horizontal, 20)
+                                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             }
                             
                             // Thread-style messages
@@ -626,7 +626,7 @@ struct AmbientModeView: View {
                                                 editingMessageType = .quote(capturedQuote)
                                                 
                                                 // Switch to text input mode
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                withAnimation(DesignSystem.Animation.springStandard) {
                                                     inputMode = .textInput
                                                     isKeyboardFocused = true
                                                 }
@@ -640,7 +640,7 @@ struct AmbientModeView: View {
                                             totalMessages: messages.filter { !$0.isUser }.count,
                                             isExpanded: expandedMessageIds.contains(message.id),
                                             onToggle: {
-                                                withAnimation(.easeInOut(duration: 0.2)) {
+                                                withAnimation(DesignSystem.Animation.easeQuick) {
                                                     if expandedMessageIds.contains(message.id) {
                                                         expandedMessageIds.remove(message.id)
                                                     } else {
@@ -655,7 +655,7 @@ struct AmbientModeView: View {
                                                 editingMessageType = message.messageType
                                                 
                                                 // Switch to text input mode
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                withAnimation(DesignSystem.Animation.springStandard) {
                                                     inputMode = .textInput
                                                     isKeyboardFocused = true
                                                 }
@@ -664,7 +664,7 @@ struct AmbientModeView: View {
                                     }
                                 }
                             }
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         }
                     }
                     
@@ -696,7 +696,7 @@ struct AmbientModeView: View {
                 // When a message is expanded, ensure it's visible
                 if let expandedId = expandedMessageIds.first {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             proxy.scrollTo(expandedId, anchor: .center)
                         }
                     }
@@ -715,7 +715,7 @@ struct AmbientModeView: View {
             
             Text("Just start talking about what you're reading")
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .multilineTextAlignment(.center)
         }
     }
@@ -738,7 +738,7 @@ struct AmbientModeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                             startRecording()
                         }
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     }
             }
             
@@ -749,10 +749,10 @@ struct AmbientModeView: View {
                 // Show when processing in any mode (including text input)
                 if processor.isProcessing || pendingQuestion != nil {
                     ScrollingBookMessages()
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                         .padding(.vertical, 12)
                         .glassEffect()
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.9).combined(with: .opacity),
                             removal: .scale(scale: 0.9).combined(with: .opacity)
@@ -771,7 +771,7 @@ struct AmbientModeView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 10)
                     .glassEffect()
                     .clipShape(Capsule())
@@ -779,7 +779,7 @@ struct AmbientModeView: View {
                         insertion: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .bottom)),
                         removal: .scale(scale: 0.8).combined(with: .opacity).combined(with: .move(edge: .top))
                     ))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveAnimation)
+                    .animation(DesignSystem.Animation.springStandard, value: showSaveAnimation)
                 }
                 
                 // Live transcription bubble
@@ -791,7 +791,7 @@ struct AmbientModeView: View {
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.vertical, 16)
                             .frame(maxWidth: 300) // Limit width
                             .glassEffect()
@@ -800,7 +800,7 @@ struct AmbientModeView: View {
                         
                         Spacer()
                     }
-                    .animation(.easeInOut(duration: 0.3), value: liveTranscription)
+                    .animation(DesignSystem.Animation.easeStandard, value: liveTranscription)
                 }
                 
                 // Removed book context pill - book context is shown elsewhere
@@ -860,7 +860,7 @@ struct AmbientModeView: View {
                                 } label: {
                                     Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
                                         .font(.system(size: 28, weight: .medium, design: .rounded))
-                                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                                         .frame(width: 64, height: 64)
                                         .contentTransition(.interpolate)
                                 }
@@ -893,14 +893,14 @@ struct AmbientModeView: View {
                                         // Placeholder - NO BLUR
                                         if keyboardText.isEmpty {
                                             Text(editingMessageId != nil ? "Edit your message..." : "Ask, capture, or type...")
-                                                .foregroundColor(.white.opacity(0.35))
+                                                .foregroundColor(DesignSystem.Colors.textQuaternary)
                                                 .font(.system(size: 16))
                                         }
                                         
                                         TextField("", text: $keyboardText, axis: .vertical)
                                             .font(.system(size: 16))
                                             .foregroundStyle(.white)
-                                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                            .tint(DesignSystem.Colors.primaryAccent)
                                             .focused($isKeyboardFocused)
                                             .lineLimit(1...3)
                                             .textFieldStyle(.plain)
@@ -947,13 +947,13 @@ struct AmbientModeView: View {
                             }
                         } label: {
                             Circle()
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
                                 .frame(width: 48, height: 48)
                                 .glassEffect()
                                 .overlay(
                                     Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
                                         .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
-                                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                                         .contentTransition(.symbolEffect(.replace))
                                 )
                         }
@@ -972,7 +972,7 @@ struct AmbientModeView: View {
             }
             .frame(height: 100)
         }
-        .padding(.horizontal, 16)  // Back to original padding
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)  // Back to original padding
         .padding(.bottom, inputMode == .textInput ? 18 : 36)  // Back to previous values
         
         // Long press for quick keyboard
@@ -986,7 +986,7 @@ struct AmbientModeView: View {
                     isKeyboardFocused = true
                 }
             }
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
         }
     }
     .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
@@ -1014,7 +1014,7 @@ struct AmbientModeView: View {
                 TextField("", text: $keyboardText, axis: .vertical)
                     .placeholder(when: keyboardText.isEmpty) {
                         Text("Ask, capture, or type...")
-                            .foregroundColor(.white.opacity(0.35))
+                            .foregroundColor(DesignSystem.Colors.textQuaternary)
                             .font(.system(size: 16))
                     }
                     .font(.system(size: 16))
@@ -1042,14 +1042,14 @@ struct AmbientModeView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .glassEffect()
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
             
             // Voice return button - proper liquid glass
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     returnToVoiceMode()
                 }
             } label: {
@@ -1062,7 +1062,7 @@ struct AmbientModeView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 20) // Match the voice button's horizontal positioning
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding) // Match the voice button's horizontal positioning
     }
     
     // MARK: - BookView-Style Header
@@ -1130,7 +1130,7 @@ struct AmbientModeView: View {
             processedContentHashes.insert(contentHash)
             
             // Update detection state
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 switch item.type {
                 case .question:
                     detectionState = .processingQuestion
@@ -1187,7 +1187,7 @@ struct AmbientModeView: View {
                     messages.append(quoteMessage)
                     
                     // Gracefully collapse previous messages when new quote arrives
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignSystem.Animation.easeStandard) {
                         expandedMessageIds.removeAll()
                     }
                     
@@ -1223,7 +1223,7 @@ struct AmbientModeView: View {
                     messages.append(noteMessage)
                     
                     // Gracefully collapse previous messages when new note/thought arrives
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignSystem.Animation.easeStandard) {
                         expandedMessageIds.removeAll()
                     }
                     
@@ -1273,7 +1273,7 @@ struct AmbientModeView: View {
                         messages.append(aiMessage)
                         
                         // Auto-collapse all previous messages and expand only the new one
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             expandedMessageIds.removeAll()
                             expandedMessageIds.insert(aiMessage.id)
                         }
@@ -1298,7 +1298,7 @@ struct AmbientModeView: View {
                         messages.append(thinkingMessage)
                         
                         // Collapse all previous messages and only expand the new one
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             expandedMessageIds.removeAll()
                             expandedMessageIds.insert(thinkingMessage.id)
                         }
@@ -1432,7 +1432,7 @@ struct AmbientModeView: View {
         do {
             try modelContext.save()
             print("✅ Quote saved to SwiftData with session: \(quoteText.prefix(50))...")
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
             return capturedQuote
         } catch {
             print("❌ Failed to save quote: \(error)")
@@ -1489,7 +1489,7 @@ struct AmbientModeView: View {
         do {
             try modelContext.save()
             print("✅ Note saved to SwiftData with session: \(content.text.prefix(50))...")
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
             return capturedNote
         } catch {
             print("❌ Failed to save note: \(error)")
@@ -1609,7 +1609,7 @@ struct AmbientModeView: View {
             queue: .main
         ) { notification in
             if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     keyboardHeight = keyboardFrame.height
                 }
             }
@@ -1620,7 +1620,7 @@ struct AmbientModeView: View {
             object: nil,
             queue: .main
         ) { _ in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 keyboardHeight = 0
             }
         }
@@ -1679,7 +1679,7 @@ struct AmbientModeView: View {
         processor.startSession()
         voiceManager.startAmbientListeningMode()
         bookDetector.startDetection()
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
     }
     
     private func stopRecording() {
@@ -1690,7 +1690,7 @@ struct AmbientModeView: View {
         transcriptionFadeTimer = nil
         voiceManager.stopListening()
         voiceManager.transcribedText = "" // Force clear the source
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Don't force scroll - let the content stay where it is
         // The onChange handler will scroll when new messages arrive
@@ -1705,15 +1705,15 @@ struct AmbientModeView: View {
         }
         
         // First transition to paused state
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             inputMode = .paused
         }
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func resumeVoiceInput() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             inputMode = .listening
         }
         startRecording()
@@ -1724,7 +1724,7 @@ struct AmbientModeView: View {
         isKeyboardFocused = false
         keyboardText = ""
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             inputMode = .listening
         }
         
@@ -1869,7 +1869,7 @@ struct AmbientModeView: View {
             messages.append(thinkingMessage)
             
             // Collapse all previous and expand only the new question
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(DesignSystem.Animation.easeStandard) {
                 expandedMessageIds.removeAll()
                 expandedMessageIds.insert(thinkingMessage.id)
             }
@@ -2099,7 +2099,7 @@ struct AmbientModeView: View {
                     let nonUserMessages = messages.filter { !$0.isUser }
                     if nonUserMessages.count == 1 {
                         // This is the first question/answer - auto-expand it
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             expandedMessageIds.insert(updatedMessage.id)
                         }
                     }
@@ -2207,7 +2207,7 @@ struct AmbientModeView: View {
                     let nonUserMessages = messages.filter { !$0.isUser }
                     if nonUserMessages.count == 1 {
                         // This is the first question/answer - auto-expand it
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             expandedMessageIds.insert(updatedMessage.id)
                         }
                     }
@@ -2329,7 +2329,7 @@ struct AmbientModeView: View {
             await extractColorsForBook(book)
         }
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     // MARK: - Page Detection
@@ -2363,7 +2363,7 @@ struct AmbientModeView: View {
                             print("📖 Updated current page to: \(pageNumber)")
                             
                             // Show subtle feedback
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignSystem.Animation.easeStandard) {
                                 savedItemType = "Page \(pageNumber)"
                                 showSaveAnimation = true
                             }
@@ -2608,7 +2608,7 @@ struct AmbientModeView: View {
     
     private func generatePlaceholderPalette(for book: Book) -> ColorPalette {
         ColorPalette(
-            primary: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8),
+            primary: DesignSystem.Colors.primaryAccent.opacity(0.8),
             secondary: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.6),
             accent: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.5),
             background: Color(white: 0.1),
@@ -2621,7 +2621,7 @@ struct AmbientModeView: View {
     
     private var defaultColorPalette: ColorPalette {
         ColorPalette(
-            primary: Color(red: 1.0, green: 0.55, blue: 0.26),
+            primary: DesignSystem.Colors.primaryAccent,
             secondary: Color(red: 0.8, green: 0.3, blue: 0.4),
             accent: Color(red: 0.6, green: 0.2, blue: 0.5),
             background: Color.black,
@@ -2640,7 +2640,7 @@ struct AmbientModeView: View {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         showingBookStrip = false
                     }
                 }
@@ -2655,7 +2655,7 @@ struct AmbientModeView: View {
                         // Save current session content before clearing book
                         saveCurrentSessionBeforeBookSwitch()
                         
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             currentBookContext = nil
                             showingBookStrip = false
                             
@@ -2677,9 +2677,9 @@ struct AmbientModeView: View {
                                 print("❌ Failed to create new session: \(error)")
                             }
                         }
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     } label: {
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                             .fill(Color.white.opacity(0.1))
                             .aspectRatio(2/3, contentMode: .fit)
                             .overlay {
@@ -2695,7 +2695,7 @@ struct AmbientModeView: View {
                             // Save current session content before switching books
                             saveCurrentSessionBeforeBookSwitch()
                             
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 currentBookContext = book
                                 showingBookStrip = false
                                 lastDetectedBookId = book.localId
@@ -2706,7 +2706,7 @@ struct AmbientModeView: View {
                             Task {
                                 await extractColorsForBook(book)
                             }
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         } label: {
                             SharedBookCoverView(
                                 coverURL: book.coverImageURL,
@@ -2714,17 +2714,17 @@ struct AmbientModeView: View {
                                 height: 135
                             )
                             .aspectRatio(2/3, contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                             .overlay {
                                 if currentBookContext?.id == book.id {
-                                    RoundedRectangle(cornerRadius: 8)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                         .stroke(Color.white, lineWidth: 2)
                                 }
                             }
                         }
                     }
                 }
-                .padding(20)
+                .padding(DesignSystem.Spacing.listItemPadding)
                 .padding(.top, 60)
             }
         }
@@ -2747,7 +2747,7 @@ struct AmbientQuoteView: View {
         HStack(alignment: .top, spacing: 16) {
             Text(String(format: "%02d", index + 1))
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .frame(width: 24)
                 .padding(.top, 2)
             
@@ -2775,7 +2775,7 @@ struct AmbientQuoteView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                         onEdit(quote.text)
                     }
                 
@@ -2855,7 +2855,7 @@ struct AmbientMessageThreadView: View {
                 HStack(spacing: 4) {
                     ForEach(0..<3, id: \.self) { index in
                         Circle()
-                            .fill(Color.white.opacity(0.3))
+                            .fill(DesignSystem.Colors.textQuaternary)
                             .frame(width: 4, height: 4)
                             .blur(radius: 1)
                             .scaleEffect(showThinkingParticles ? 1.2 : 0.8)
@@ -2876,7 +2876,7 @@ struct AmbientMessageThreadView: View {
             HStack(alignment: .center, spacing: 16) {
                 Text(String(format: "%02d", index + 1))
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .frame(width: 24)
                 
                 if message.isUser {
@@ -2887,6 +2887,8 @@ struct AmbientMessageThreadView: View {
                 } else {
                     // Extract question from AI response if formatted
                     let content = extractContent(from: message.content)
+                    
+                    // Show question text
                     Text(content.question)
                         .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
                         .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
@@ -2896,7 +2898,7 @@ struct AmbientMessageThreadView: View {
                 if !message.isUser {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
                 }
             }
             .padding(.vertical, 16)
@@ -2908,7 +2910,7 @@ struct AmbientMessageThreadView: View {
                 if message.isUser {
                     // Edit user questions
                     if let onEdit = onEdit {
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                         onEdit(message.content)
                     }
                 } else {
@@ -2948,11 +2950,45 @@ struct AmbientMessageThreadView: View {
             if !message.isUser && isExpanded {
                 let content = extractContent(from: message.content)
                 
-                // Show answer when ready with staggered fade-in
-                if !content.answer.isEmpty {
+                // If no answer yet, show scrolling text pill
+                if content.answer.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Rectangle()
-                            .fill(Color.white.opacity(0.08))
+                            .fill(Color.white.opacity(0.10))
+                            .frame(height: 0.5)
+                        
+                        // Scrolling text pill - centered like in session summary
+                        HStack {
+                            Spacer()
+                            
+                            HStack(spacing: 12) {
+                                ScrollingBookMessages()
+                                    .frame(maxWidth: 200)
+                            }
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                            .padding(.vertical, 12)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.05))
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                                    )
+                            )
+                            
+                            Spacer()
+                        }
+                        .padding(.vertical, 20)
+                        
+                        Rectangle()
+                            .fill(Color.white.opacity(0.10))
+                            .frame(height: 0.5)
+                    }
+                } else {
+                    // Show answer when ready with staggered fade-in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.10))
                             .frame(height: 0.5)
                         
                         Text(formatResponseText(content.answer))

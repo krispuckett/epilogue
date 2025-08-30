@@ -18,7 +18,7 @@ struct RefinedOnboardingView: View {
             subtitle: "Your reading companion",
             description: "A beautiful space to track your reading journey, capture thoughts, and discover insights from your books.",
             gradientColors: [
-                Color(red: 1.0, green: 0.55, blue: 0.26),  // Warm amber
+                DesignSystem.Colors.primaryAccent,  // Warm amber
                 Color(red: 1.0, green: 0.45, blue: 0.16)   // Deep orange
             ]
         ),
@@ -65,7 +65,7 @@ struct RefinedOnboardingView: View {
                     // Header with glass buttons
                     headerView
                         .padding(.top, geometry.safeAreaInsets.top + 20)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     
                     // Centered page content
                     TabView(selection: $currentPage) {
@@ -83,7 +83,7 @@ struct RefinedOnboardingView: View {
                     // Bottom controls with liquid glass
                     bottomControls
                         .padding(.bottom, geometry.safeAreaInsets.bottom + 30)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                 }
             }
             .ignoresSafeArea()
@@ -149,7 +149,7 @@ struct RefinedOnboardingView: View {
                         .animation(.spring(response: 0.3), value: currentPage)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .glassEffect(
                 .regular.tint(.white.opacity(0.05)),
@@ -166,7 +166,7 @@ struct RefinedOnboardingView: View {
                 Text("Skip")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.vertical, 10)
                     .glassEffect(
                         .regular.tint(.white.opacity(0.1)),
@@ -258,7 +258,7 @@ struct OnboardingPageContent: View {
                     // Subtitle - monospaced like metadata on note cards
                     Text(page.subtitle.uppercased())
                         .font(.system(size: 14, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .tracking(2)
                         .offset(y: textOffset)
                     

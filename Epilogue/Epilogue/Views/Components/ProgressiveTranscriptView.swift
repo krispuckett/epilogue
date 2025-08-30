@@ -12,7 +12,7 @@ struct ProgressiveTranscriptView: View {
     // Customization
     var fontSize: CGFloat = 16
     var lineSpacing: CGFloat = 4
-    var adaptiveColor: Color = Color(red: 1.0, green: 0.55, blue: 0.26)
+    var adaptiveColor: Color = DesignSystem.Colors.primaryAccent
     
     // Animation states
     @State private var displayedText: String = ""
@@ -48,7 +48,7 @@ struct ProgressiveTranscriptView: View {
                         lineSpacing: lineSpacing,
                         adaptiveColor: adaptiveColor
                     )
-                    .animation(.easeInOut(duration: 0.3), value: displayedText)
+                    .animation(DesignSystem.Animation.easeStandard, value: displayedText)
                     
                     // Processing indicators
                     if isProcessing {
@@ -95,7 +95,7 @@ struct ProgressiveTranscriptView: View {
                 .frame(height: 30)
                 .allowsHitTesting(false)
                 .opacity(userIsScrolling ? 1.0 : 0.0)
-                .animation(.easeInOut(duration: 0.3), value: userIsScrolling)
+                .animation(DesignSystem.Animation.easeStandard, value: userIsScrolling)
             }
             .overlay(alignment: .bottom) {
                 // Fade gradient at bottom for visual polish
@@ -164,7 +164,7 @@ struct ProgressiveTranscriptView: View {
             
             // Haptic feedback for certain characters
             if transcription[index] == "?" || transcription[index] == "!" {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }
         }
     }
@@ -199,13 +199,13 @@ struct ProgressiveTranscriptView: View {
             // Haptic feedback based on entity type
             switch entity.type {
             case .question:
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 startThinkingAnimation()
             case .quote:
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 pulseQuoteAnimation()
             case .insight, .reflection:
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             default:
                 break
             }
@@ -230,7 +230,7 @@ struct ProgressiveTranscriptView: View {
     private func startThinkingAnimation() {
         thinkingDots = ""
         Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(DesignSystem.Animation.easeStandard) {
                 if thinkingDots.count >= 3 {
                     thinkingDots = ""
                 } else {
@@ -246,7 +246,7 @@ struct ProgressiveTranscriptView: View {
     }
     
     private func pulseQuoteAnimation() {
-        withAnimation(.easeInOut(duration: 0.3).repeatCount(3, autoreverses: true)) {
+        withAnimation(DesignSystem.Animation.easeStandard.repeatCount(3, autoreverses: true)) {
             pulseQuote = true
         }
         
@@ -256,11 +256,11 @@ struct ProgressiveTranscriptView: View {
     }
     
     private func showSaveConfirmationBriefly() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             showSaveConfirmation = true
         }
         
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.easeOut(duration: 0.3)) {
@@ -285,7 +285,7 @@ struct ProgressiveTranscriptView: View {
     private func snapToBottomIfNeeded(proxy: ScrollViewProxy) {
         // Check if user is near bottom (within 100 points)
         // If so, snap to bottom
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             proxy.scrollTo(bottomAnchor, anchor: .bottom)
         }
     }
@@ -378,7 +378,7 @@ struct HighlightedTextView: View {
         case .quote:
             return .green
         case .insight, .reflection:
-            return Color(red: 1.0, green: 0.55, blue: 0.26) // Orange
+            return DesignSystem.Colors.primaryAccent // Orange
         case .note:
             return .purple
         case .unknown:
@@ -436,7 +436,7 @@ struct SaveConfirmationView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.green)
                 .scaleEffect(checkmarkScale)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: checkmarkScale)
+                .animation(DesignSystem.Animation.springStandard, value: checkmarkScale)
             
             Text("Saved")
                 .font(.system(size: 14, weight: .medium, design: .rounded))

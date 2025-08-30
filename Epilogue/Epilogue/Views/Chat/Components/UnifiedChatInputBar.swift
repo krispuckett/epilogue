@@ -28,7 +28,7 @@ struct UnifiedChatInputBar: View {
         if let palette = colorPalette {
             return palette.adaptiveUIColor
         } else {
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
     }
     
@@ -52,7 +52,7 @@ struct UnifiedChatInputBar: View {
                     ZStack(alignment: .leading) {
                         if messageText.isEmpty {
                             Text(placeholderText)
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
                                 .font(.system(size: 16))
                                 .lineLimit(1)
                         }
@@ -105,9 +105,9 @@ struct UnifiedChatInputBar: View {
                     .padding(.trailing, 12)
                 }
                 .frame(minHeight: 36)
-                .glassEffect(in: RoundedRectangle(cornerRadius: 18))
+                .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
@@ -122,7 +122,7 @@ struct UnifiedChatInputBar: View {
                         .allowsHitTesting(false) // Don't intercept button taps
                 }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
+        .animation(DesignSystem.Animation.springStandard, value: messageText.isEmpty)
     }
 }
 

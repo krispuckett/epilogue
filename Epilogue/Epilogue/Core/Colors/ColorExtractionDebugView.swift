@@ -86,7 +86,7 @@ struct ColorExtractionDebugView: View {
                         .foregroundColor(.secondary)
                 }
             } else {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.gray.opacity(0.3))
                     .frame(height: 200)
                     .overlay(
@@ -179,11 +179,11 @@ struct ColorExtractionDebugView: View {
     
     private func colorSwatch(color: Color, label: String, role: String) -> some View {
         HStack {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                 .fill(color)
                 .frame(width: 60, height: 60)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
                 )
             
@@ -246,7 +246,7 @@ struct ColorExtractionDebugView: View {
             .frame(height: 200)
             .cornerRadius(10)
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
             )
         }

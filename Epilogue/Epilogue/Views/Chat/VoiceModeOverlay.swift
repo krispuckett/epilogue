@@ -57,10 +57,10 @@ struct VoiceModeOverlay: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundStyle(.white.opacity(0.3), .white.opacity(0.1))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary, .white.opacity(0.1))
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .padding(.top, 60)
                 
                 Spacer()
@@ -120,7 +120,7 @@ struct VoiceModeOverlay: View {
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundStyle(Color(hexString: pattern.pattern.color))
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.vertical, 6)
                             .background(
                                 Capsule()
@@ -143,10 +143,10 @@ struct VoiceModeOverlay: View {
                             .padding(.horizontal, 40)
                             .padding(.vertical, 20)
                             .background(
-                                RoundedRectangle(cornerRadius: 20)
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                     .fill(Color.white.opacity(0.1))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 20)
+                                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                             .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
                                     )
                             )
@@ -214,7 +214,7 @@ struct VoiceModeOverlay: View {
                 // Detect patterns
                 let patterns = CognitivePatternRecognizer.shared.recognizePatterns(in: newValue)
                 if !patterns.isEmpty {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         detectedPatterns = patterns
                         showPatternIndicator = true
                     }
@@ -234,8 +234,8 @@ struct VoiceModeOverlay: View {
                 glowOpacity = min(glowOpacity, 0.8)
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isListening)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hasTranscript)
+        .animation(DesignSystem.Animation.springStandard, value: isListening)
+        .animation(DesignSystem.Animation.springStandard, value: hasTranscript)
         .onReceive(NotificationCenter.default.publisher(for: .autoStopTriggered)) { _ in
             stopListening()
         }
@@ -265,7 +265,7 @@ struct VoiceModeOverlay: View {
         autoStopManager.maxDuration = 60.0 // 1 minute for voice mode
         autoStopManager.startMonitoring()
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func stopListening() {
@@ -285,7 +285,7 @@ struct VoiceModeOverlay: View {
         
         voiceManager.stopListening()
         onSendTranscript(transcript)
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         // Close overlay after sending
         withAnimation {

@@ -82,7 +82,7 @@ struct IntelligentSectionView: View {
                     // Count Badge
                     Text("\(section.notes.count)")
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .glassEffect(
@@ -107,7 +107,7 @@ struct IntelligentSectionView: View {
                         .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 14)
         }
         .buttonStyle(PlainButtonStyle())
@@ -120,14 +120,14 @@ struct IntelligentSectionView: View {
             // Main visible card
             if let firstNote = section.notes.first {
                 NoteCardView(note: firstNote)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .onTapGesture {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             isExpanded = true
                         }
                     }
                     .onLongPressGesture {
-                        HapticManager.shared.mediumTap()
+                        DesignSystem.HapticFeedback.medium()
                         onLongPress(firstNote, CGRect(origin: .zero, size: .zero))
                     }
             }
@@ -142,7 +142,7 @@ struct IntelligentSectionView: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
             }
@@ -167,7 +167,7 @@ struct IntelligentSectionView: View {
     // Helper view for note card with gestures
     private func noteCardWithGestures(note: Note) -> some View {
         NoteCardView(note: note)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .transition(
                 .asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
@@ -178,7 +178,7 @@ struct IntelligentSectionView: View {
                 onNoteTap(note)
             }
             .onLongPressGesture {
-                HapticManager.shared.mediumTap()
+                DesignSystem.HapticFeedback.medium()
                 onLongPress(note, CGRect(origin: .zero, size: .zero))
             }
             .gesture(
@@ -206,7 +206,7 @@ struct IntelligentSectionView: View {
                 if let bookTitle = note.bookTitle {
                     Text(bookTitle.uppercased())
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         .tracking(0.5)
                 }
                 
@@ -214,7 +214,7 @@ struct IntelligentSectionView: View {
                 
                 Text(note.formattedDate)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
             
             // Content (using your monospaced font for notes!)
@@ -235,18 +235,18 @@ struct IntelligentSectionView: View {
                     
                     Image(systemName: "quote.bubble.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
                 }
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(
             .regular.tint(Color.white.opacity(0.05)),
-            in: RoundedRectangle(cornerRadius: 16)
+            in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
         )
     }
@@ -261,23 +261,23 @@ struct IntelligentSectionView: View {
                 
                 Text("Pattern Detected")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 
                 Spacer()
             }
             
             Text(generateDeepInsight())
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .lineLimit(2)
         }
         .padding(12)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .glassEffect(
             .regular.tint(section.color.opacity(0.05)),
-            in: RoundedRectangle(cornerRadius: 12)
+            in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
         )
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.top, 8)
     }
     
@@ -285,7 +285,7 @@ struct IntelligentSectionView: View {
     private func toggleExpansion() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             isExpanded.toggle()
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }
     }
     
@@ -357,7 +357,7 @@ struct IntelligentSectionView: View {
                             Note(type: .note, content: "What is the significance of the ring's inscription?", bookId: nil, bookTitle: "The Lord of the Rings", author: "J.R.R. Tolkien", pageNumber: nil, dateCreated: Date().addingTimeInterval(-3600), id: UUID()),
                             Note(type: .note, content: "How does power corrupt in Middle-earth?", bookId: nil, bookTitle: "The Lord of the Rings", author: "J.R.R. Tolkien", pageNumber: nil, dateCreated: Date().addingTimeInterval(-7200), id: UUID())
                         ],
-                        color: Color(red: 1.0, green: 0.55, blue: 0.26)
+                        color: DesignSystem.Colors.primaryAccent
                     ),
                     isExpanded: .constant(false),
                     onNoteTap: { _ in },

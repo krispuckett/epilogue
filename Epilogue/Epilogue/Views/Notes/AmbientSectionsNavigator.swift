@@ -17,7 +17,7 @@ struct AmbientSectionsNavigator: View {
                 Color.black.opacity(0.8)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             isShowing = false
                         }
                     }
@@ -46,7 +46,7 @@ struct AmbientSectionsNavigator: View {
                                     )
                                     .onTapGesture {
                                         selectedSection = section
-                                        HapticManager.shared.lightTap()
+                                        DesignSystem.HapticFeedback.light()
                                         
                                         // Animate selection then navigate
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -65,7 +65,7 @@ struct AmbientSectionsNavigator: View {
                         Spacer()
                     }
                     .frame(width: 280)
-                    .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                    .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                     .overlay(
                         // Right edge highlight
                         HStack {
@@ -182,11 +182,11 @@ struct SectionRow: View {
         .padding(.horizontal, 28)
         .overlay {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.white.opacity(0.02))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .animation(DesignSystem.Animation.springStandard, value: isSelected)
         .onHover { hovering in
             withAnimation(.spring(response: 0.2)) {
                 isHovered = hovering
@@ -222,7 +222,7 @@ struct EdgeSwipeGesture: ViewModifier {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                         isShowingNavigator = true
                                     }
-                                    HapticManager.shared.mediumTap()
+                                    DesignSystem.HapticFeedback.medium()
                                 }
                             }
                         }

@@ -171,7 +171,7 @@ struct BookSearchResultsView: View {
                     ForEach(books) { book in
                         BookSearchResultCard(book: book) {
                             libraryViewModel.addBook(book)
-                            HapticManager.shared.success()
+                            DesignSystem.HapticFeedback.success()
                             
                             // Show success and dismiss
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -205,14 +205,14 @@ struct BookSearchResultCard: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                 } placeholder: {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .fill(Color.gray.opacity(0.2))
                         .overlay {
                             ProgressView()
                         }
                 }
                 .frame(width: 60, height: 90)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             }
             
             // Book info
@@ -244,12 +244,12 @@ struct BookSearchResultCard: View {
             } label: {
                 Image(systemName: isAdded ? "checkmark.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundColor(isAdded ? .green : Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundColor(isAdded ? .green : DesignSystem.Colors.primaryAccent)
             }
             .disabled(isAdded)
         }
         .padding()
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
 }

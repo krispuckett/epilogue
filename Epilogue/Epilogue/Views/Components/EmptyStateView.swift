@@ -14,7 +14,7 @@ struct EmptyStateView: View {
             // Icon
             Image(systemName: icon)
                 .font(.system(size: 64))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                 .padding(.bottom, 8)
             
             // Title
@@ -38,7 +38,7 @@ struct EmptyStateView: View {
                     }
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 12)
                     .background(
                         RoundedRectangle(cornerRadius: 24)

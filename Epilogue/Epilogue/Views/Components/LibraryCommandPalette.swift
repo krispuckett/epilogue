@@ -83,17 +83,17 @@ struct LibraryCommandPalette: View {
                     // Add divider between items
                     if index < filteredCommands.count - 1 {
                         Rectangle()
-                            .fill(Color.white.opacity(0.08))
+                            .fill(Color.white.opacity(0.10))
                             .frame(height: 0.5)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     }
                 }
             }
             .padding(.vertical, 8)
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
         .offset(y: dragOffset)
@@ -108,7 +108,7 @@ struct LibraryCommandPalette: View {
                     if value.translation.height > 50 {
                         dismiss()
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             dragOffset = 0
                         }
                     }
@@ -124,13 +124,13 @@ struct LibraryCommandPalette: View {
             ZStack {
                 if command.isFeatured {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
                         .frame(width: 36, height: 36)
                 }
                 
                 Image(systemName: command.icon)
                     .font(.system(size: command.isFeatured ? 22 : 20))
-                    .foregroundStyle(command.isFeatured ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.8))
+                    .foregroundStyle(command.isFeatured ? DesignSystem.Colors.primaryAccent : .white.opacity(0.8))
                     .frame(width: 32, height: 32)
             }
             
@@ -149,7 +149,7 @@ struct LibraryCommandPalette: View {
             
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
@@ -157,7 +157,7 @@ struct LibraryCommandPalette: View {
     // MARK: - Actions
     
     private func handleCommandSelection(_ command: Command) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         switch command.action {
         case .scanBook:
@@ -182,7 +182,7 @@ struct LibraryCommandPalette: View {
     }
     
     private func dismiss() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             isPresented = false
         }
     }

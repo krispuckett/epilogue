@@ -65,15 +65,15 @@ struct SessionBookCard: View {
                 // Content summary
                 Text(contentSummary)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .frame(width: 200, height: 140)
             
             // Action buttons
             HStack(spacing: 0) {
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     onViewDetail()
                 } label: {
                     Text("View")
@@ -88,7 +88,7 @@ struct SessionBookCard: View {
                     .frame(height: 20)
                 
                 Button {
-                    HapticManager.shared.mediumTap()
+                    DesignSystem.HapticFeedback.medium()
                     onContinue()
                 } label: {
                     Text("Continue")
@@ -114,23 +114,23 @@ struct SessionBookCard: View {
                 )
             }
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .onTapGesture {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springQuick) {
                 isPressed = true
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             onViewDetail()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springQuick) {
                     isPressed = false
                 }
             }

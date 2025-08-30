@@ -45,7 +45,7 @@ struct LibraryView: View {
     
     // Refresh library data
     private func refreshLibrary() async {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Simulate network delay for smooth UX
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -53,7 +53,7 @@ struct LibraryView: View {
         await MainActor.run {
             // Trigger refresh - loadBooks is private
             NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }
     }
     
@@ -102,7 +102,7 @@ struct LibraryView: View {
                 Text("Add Book")
                     .fontWeight(.medium)
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 12)
                     .background(Color.orange)
                     .clipShape(Capsule())
@@ -115,7 +115,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var backgroundView: some View {
         // Simple background for performance
-        Color(red: 0.11, green: 0.105, blue: 0.102)
+        DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea(.all)
     }
     
@@ -154,41 +154,55 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            HStack(spacing: 12) {
-                // Grid button - simple
+            // All buttons in a single glass container
+            HStack(spacing: 4) {
+                // Grid button
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = .grid
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     }
                 } label: {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 16, weight: viewMode == .grid ? .semibold : .regular))
-                        .foregroundStyle(viewMode == .grid ? Color.orange : .white.opacity(0.7))
+                        .foregroundStyle(viewMode == .grid ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
+                        .frame(width: 34, height: 34)
                 }
                 
-                // List button - simple
+                Divider()
+                    .frame(height: 16)
+                    .overlay(Color.white.opacity(0.15))
+                
+                // List button
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = .list
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     }
                 } label: {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 16, weight: viewMode == .list ? .semibold : .regular))
-                        .foregroundStyle(viewMode == .list ? Color.orange : .white.opacity(0.7))
+                        .foregroundStyle(viewMode == .list ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
+                        .frame(width: 34, height: 34)
                 }
                 
-                // Settings button - simple
+                Divider()
+                    .frame(height: 16)
+                    .overlay(Color.white.opacity(0.15))
+                
+                // Settings button
                 Button {
                     showingSettings = true
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 } label: {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 34, height: 34)
                 }
             }
+            .padding(.horizontal, 4)
+            .glassEffect(in: .capsule)
         }
     }
     
@@ -316,7 +330,7 @@ struct LibraryView: View {
                 toolbarContent
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewMode)
+        .animation(DesignSystem.Animation.easeQuick, value: viewMode)
         .sheet(isPresented: $showingCoverPicker) {
             coverPickerSheet
         }
@@ -385,7 +399,7 @@ struct LibraryGridItem: View {
         .contextMenu {
                 // Same menu items as card
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     withAnimation {
                         viewModel.toggleReadingStatus(for: book)
                     }
@@ -399,7 +413,7 @@ struct LibraryGridItem: View {
                 Divider()
                 
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     // Share functionality
                     let text = "Check out \"\(book.title)\" by \(book.author)"
                     let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
@@ -415,7 +429,7 @@ struct LibraryGridItem: View {
                 Divider()
                 
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     onChangeCover(book)
                 } label: {
                     Label("Change Cover", systemImage: "photo")
@@ -424,7 +438,7 @@ struct LibraryGridItem: View {
                 Divider()
                 
                 Button(role: .destructive) {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     withAnimation {
                         viewModel.deleteBook(book)
                     }
@@ -435,8 +449,8 @@ struct LibraryGridItem: View {
     }
     
     private var highlightOverlay: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+            .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 3)
             .opacity(highlightedBookId == book.localId ? 1 : 0)
     }
 }
@@ -465,7 +479,7 @@ struct LibraryListItemWrapper: View {
             .contextMenu {
                 // Same menu items
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     withAnimation {
                         viewModel.toggleReadingStatus(for: book)
                     }
@@ -479,7 +493,7 @@ struct LibraryListItemWrapper: View {
                 Divider()
                 
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     let text = "Check out \"\(book.title)\" by \(book.author)"
                     let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
                     
@@ -494,7 +508,7 @@ struct LibraryListItemWrapper: View {
                 Divider()
                 
                 Button {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     onChangeCover(book)
                 } label: {
                     Label("Change Cover", systemImage: "photo")
@@ -503,7 +517,7 @@ struct LibraryListItemWrapper: View {
                 Divider()
                 
                 Button(role: .destructive) {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     withAnimation {
                         viewModel.deleteBook(book)
                     }
@@ -514,8 +528,8 @@ struct LibraryListItemWrapper: View {
     }
     
     private var highlightOverlay: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+            .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 3)
             .opacity(highlightedBookId == book.localId ? 1 : 0)
     }
 }
@@ -567,7 +581,7 @@ struct LibraryBookCard: View {
                 )
                 .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 6)
                 .scaleEffect(isPressed ? 0.98 : (isHovered ? 1.02 : 1.0))
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+                .animation(DesignSystem.Animation.springStandard, value: isPressed)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isHovered)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -594,7 +608,7 @@ struct LibraryBookCard: View {
         .contextMenu {
             // Mark as Read/Want to Read
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     viewModel.toggleReadingStatus(for: book)
                 }
@@ -609,7 +623,7 @@ struct LibraryBookCard: View {
             
             // Share
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 shareBook()
             } label: {
                 Label("Share", systemImage: "square.and.arrow.up")
@@ -619,7 +633,7 @@ struct LibraryBookCard: View {
             
             // Change Cover
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 onChangeCover?(book)
             } label: {
                 Label("Change Cover", systemImage: "photo")
@@ -629,7 +643,7 @@ struct LibraryBookCard: View {
             
             // Delete
             Button(role: .destructive) {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     viewModel.deleteBook(book)
                 }
@@ -638,7 +652,7 @@ struct LibraryBookCard: View {
             }
         }
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(DesignSystem.Animation.easeQuick) {
                 isHovered = hovering
             }
         }
@@ -661,54 +675,30 @@ struct ViewModeToggle: View {
         HStack(spacing: 0) {
             // Grid button
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     viewMode = .grid
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
             }) {
                 Image(systemName: "square.grid.2x2")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(viewMode == .grid ? Color(red: 0.98, green: 0.97, blue: 0.96) : Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                    .foregroundStyle(viewMode == .grid ? DesignSystem.Colors.primaryAccent : .white.opacity(0.6))
                     .frame(width: 40, height: 32)
                     .contentTransition(.symbolEffect(.replace))
-                    .background {
-                        if viewMode == .grid {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15)) // Warm amber/orange glow
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1)
-                                }
-                                .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 6)
-                                .matchedGeometryEffect(id: "viewModeSelection", in: namespace)
-                        }
-                    }
             }
             
             // List button
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     viewMode = .list
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
             }) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(viewMode == .list ? Color(red: 0.98, green: 0.97, blue: 0.96) : Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                    .foregroundStyle(viewMode == .list ? DesignSystem.Colors.primaryAccent : .white.opacity(0.6))
                     .frame(width: 40, height: 32)
                     .contentTransition(.symbolEffect(.replace))
-                    .background {
-                        if viewMode == .list {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15)) // Warm amber/orange glow
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1)
-                                }
-                                .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 6)
-                                .matchedGeometryEffect(id: "viewModeSelection", in: namespace)
-                        }
-                    }
             }
         }
         .padding(4)
@@ -737,11 +727,11 @@ struct LibraryBookListItem: View {
                                 .resizable()
                                 .scaledToFill()
                         } placeholder: {
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                 .fill(Color.gray.opacity(0.2))
                         }
                         .frame(width: 60, height: 90)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         .overlay {
                             // Subtle gradient for depth
                             LinearGradient(
@@ -752,10 +742,10 @@ struct LibraryBookListItem: View {
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         }
                     } else {
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                             .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
                     }
                 }
@@ -885,21 +875,21 @@ struct LibraryBookListItem: View {
         }
         .frame(height: 114) // Fixed height to contain cover + padding
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)) // #262524 with transparency
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.97 : 1.0)
         .offset(x: showActions ? -120 : 0)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPressed)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showActions)
         .onTapGesture {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             
             if showActions {
                 withAnimation {
@@ -910,7 +900,7 @@ struct LibraryBookListItem: View {
         .contextMenu {
             // Same menu items
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     viewModel.toggleReadingStatus(for: book)
                 }
@@ -924,7 +914,7 @@ struct LibraryBookListItem: View {
             Divider()
             
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 let text = "Check out \"\(book.title)\" by \(book.author)"
                 let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
                 
@@ -939,7 +929,7 @@ struct LibraryBookListItem: View {
             Divider()
             
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 onChangeCover?(book)
             } label: {
                 Label("Change Cover", systemImage: "photo")
@@ -948,7 +938,7 @@ struct LibraryBookListItem: View {
             Divider()
             
             Button(role: .destructive) {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     viewModel.deleteBook(book)
                 }
@@ -1126,7 +1116,7 @@ struct LibraryBookListRow: View {
         NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
             ZStack {
                 // Background with edge-to-edge gradient
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .fill(Color.black.opacity(0.2))
                 
                 // Blurred gradient overlay
@@ -1142,15 +1132,15 @@ struct LibraryBookListRow: View {
                         endPoint: .trailing
                     )
                     .blur(radius: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                     .opacity(isHovered ? 1 : 0.7)
-                    .animation(.easeInOut(duration: 0.3), value: isHovered)
+                    .animation(DesignSystem.Animation.easeStandard, value: isHovered)
                 }
                 
                 // Border
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(
-                        isHighlighted ? Color(red: 1.0, green: 0.55, blue: 0.26) : Color.white.opacity(0.1),
+                        isHighlighted ? DesignSystem.Colors.primaryAccent : Color.white.opacity(0.1),
                         lineWidth: isHighlighted ? 2 : 1
                     )
                 
@@ -1164,7 +1154,7 @@ struct LibraryBookListRow: View {
                         loadFullImage: false,
                         isLibraryView: true
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                     .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
                     .padding(.trailing, 12)
                     
@@ -1195,8 +1185,8 @@ struct LibraryBookListRow: View {
                                             .fill(
                                                 LinearGradient(
                                                     colors: [
-                                                        colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26),
-                                                        colorPalette?.secondary ?? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8)
+                                                        colorPalette?.primary ?? DesignSystem.Colors.primaryAccent,
+                                                        colorPalette?.secondary ?? DesignSystem.Colors.primaryAccent.opacity(0.8)
                                                     ],
                                                     startPoint: .leading,
                                                     endPoint: .trailing
@@ -1220,9 +1210,9 @@ struct LibraryBookListRow: View {
             }
             .frame(height: 104)
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .animation(DesignSystem.Animation.springStandard, value: isPressed)
             .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(DesignSystem.Animation.easeQuick) {
                     isHovered = hovering
                 }
             }
@@ -1235,7 +1225,7 @@ struct LibraryBookListRow: View {
         )
         .contextMenu {
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     viewModel.toggleReadingStatus(for: book)
                 }
@@ -1249,7 +1239,7 @@ struct LibraryBookListRow: View {
             Divider()
             
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 onChangeCover(book)
             } label: {
                 Label("Change Cover", systemImage: "photo")
@@ -1258,7 +1248,7 @@ struct LibraryBookListRow: View {
             Divider()
             
             Button(role: .destructive) {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     viewModel.deleteBook(book)
                 }

@@ -7,7 +7,7 @@ struct AIShimmerView: View {
     @State private var animationPhase: CGFloat = 0
     
     init(isActive: Bool, colors: [Color] = [
-        Color(red: 1.0, green: 0.55, blue: 0.26),
+        DesignSystem.Colors.primaryAccent,
         Color(red: 1.0, green: 0.7, blue: 0.4),
         Color(red: 1.0, green: 0.8, blue: 0.6)
     ]) {
@@ -29,9 +29,9 @@ struct AIShimmerView: View {
                     LinearGradient(
                         colors: [
                             .clear,
-                            .white.opacity(0.3),
+                            DesignSystem.Colors.textQuaternary,
                             .white.opacity(0.8),
-                            .white.opacity(0.3),
+                            DesignSystem.Colors.textQuaternary,
                             .clear
                         ],
                         startPoint: UnitPoint(x: animationPhase - 0.3, y: 0.5),
@@ -86,12 +86,12 @@ struct ThinkingAnimationView: View {
         HStack(spacing: 4) {
             Text("Thinking")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
             
             HStack(spacing: 2) {
                 ForEach(0..<3) { index in
                     Circle()
-                        .fill(.white.opacity(0.7))
+                        .fill(DesignSystem.Colors.textSecondary)
                         .frame(width: 3, height: 3)
                         .opacity(animationPhase == index ? 1.0 : 0.3)
                         .animation(
@@ -131,7 +131,7 @@ struct AIEnhancedInputField: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
         }
         .overlay {
@@ -148,14 +148,14 @@ struct AIEnhancedInputField: View {
 #Preview {
     VStack(spacing: 20) {
         // Regular shimmer
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
             .fill(.clear)
             .frame(height: 50)
             .overlay {
                 AIShimmerView(isActive: true)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(.white.opacity(0.2), lineWidth: 1)
             }
         
@@ -167,7 +167,7 @@ struct AIEnhancedInputField: View {
             placeholder: "Ask your books anything...",
             isProcessing: true,
             shimmerColors: [
-                Color(red: 1.0, green: 0.55, blue: 0.26),
+                DesignSystem.Colors.primaryAccent,
                 Color(red: 1.0, green: 0.7, blue: 0.4)
             ]
         ) {

@@ -53,8 +53,8 @@ struct EnhancedBookScannerView: View {
                     // Scanning guidance overlay
                     VStack(spacing: 20) {
                         // Visual scanning frame - Simple and clean
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 3)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                            .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 3)
                             .frame(width: 280, height: 380)
                             .overlay(
                                 // Corner markers
@@ -65,7 +65,7 @@ struct EnhancedBookScannerView: View {
                                         path.addLine(to: CGPoint(x: 0, y: 0))
                                         path.addLine(to: CGPoint(x: 30, y: 0))
                                     }
-                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 4)
+                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
                                     .frame(width: 30, height: 30)
                                     .position(x: 15, y: 15)
                                     
@@ -75,7 +75,7 @@ struct EnhancedBookScannerView: View {
                                         path.addLine(to: CGPoint(x: 30, y: 0))
                                         path.addLine(to: CGPoint(x: 30, y: 30))
                                     }
-                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 4)
+                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
                                     .frame(width: 30, height: 30)
                                     .position(x: 265, y: 15)
                                     
@@ -85,7 +85,7 @@ struct EnhancedBookScannerView: View {
                                         path.addLine(to: CGPoint(x: 0, y: 30))
                                         path.addLine(to: CGPoint(x: 30, y: 30))
                                     }
-                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 4)
+                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
                                     .frame(width: 30, height: 30)
                                     .position(x: 15, y: 365)
                                     
@@ -95,7 +95,7 @@ struct EnhancedBookScannerView: View {
                                         path.addLine(to: CGPoint(x: 30, y: 30))
                                         path.addLine(to: CGPoint(x: 0, y: 30))
                                     }
-                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 4)
+                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
                                     .frame(width: 30, height: 30)
                                     .position(x: 265, y: 365)
                                 }
@@ -105,7 +105,7 @@ struct EnhancedBookScannerView: View {
                         Text(detectionStatus)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             .padding(.vertical, 12)
                             .glassEffect()
                             .clipShape(Capsule())
@@ -125,7 +125,7 @@ struct EnhancedBookScannerView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                                 .glassEffect()
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                         }
                         
                         // Manual search button
@@ -142,10 +142,10 @@ struct EnhancedBookScannerView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .glassEffect()
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.bottom, 30)
                 }
                 
@@ -563,7 +563,7 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         isProcessing?.wrappedValue = true
         
         // Haptic feedback
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
         
         // Stop camera for processing
         captureSession?.stopRunning()

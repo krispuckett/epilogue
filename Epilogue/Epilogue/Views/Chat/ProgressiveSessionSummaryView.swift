@@ -21,10 +21,10 @@ struct ProgressiveSessionSummaryView: View {
                     HStack(spacing: 12) {
                         Label(session.formattedDuration, systemImage: "clock")
                             .font(.system(size: 13))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                         
                         Text("•")
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         
                         HStack(spacing: 6) {
                             Image(systemName: "quote.opening")
@@ -32,7 +32,7 @@ struct ProgressiveSessionSummaryView: View {
                             Text("\(session.quotes.count)")
                                 .font(.system(size: 13, weight: .medium))
                         }
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         
                         HStack(spacing: 6) {
                             Image(systemName: "note.text")
@@ -40,7 +40,7 @@ struct ProgressiveSessionSummaryView: View {
                             Text("\(session.notes.count)")
                                 .font(.system(size: 13, weight: .medium))
                         }
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         
                         HStack(spacing: 6) {
                             Image(systemName: "questionmark.circle")
@@ -48,7 +48,7 @@ struct ProgressiveSessionSummaryView: View {
                             Text("\(session.questions.count)")
                                 .font(.system(size: 13, weight: .medium))
                         }
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
                 }
                 
@@ -57,7 +57,7 @@ struct ProgressiveSessionSummaryView: View {
                 Button {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         isExpanded.toggle()
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     }
                 } label: {
                     Text(isExpanded ? "Hide Details" : "View Details")
@@ -67,11 +67,11 @@ struct ProgressiveSessionSummaryView: View {
             }
             .padding()
             .background {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
             }
             
@@ -95,7 +95,7 @@ struct ProgressiveSessionSummaryView: View {
                                     Text("Epilogue will help explore this question...")
                                         .font(.system(size: 13))
                                         .italic()
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                                         .lineLimit(2)
                                 }
                                 .padding(12)
@@ -107,7 +107,7 @@ struct ProgressiveSessionSummaryView: View {
                             if session.questions.count > 3 {
                                 Text("+ \(session.questions.count - 3) more questions")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                             }
                         }
                     }
@@ -133,14 +133,14 @@ struct ProgressiveSessionSummaryView: View {
                             if session.quotes.count > 2 {
                                 Text("+ \(session.quotes.count - 2) more quotes")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                             }
                         }
                     }
                     
                     // View Full Transcript Button
                     Button {
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                         // Navigate to full transcript
                     } label: {
                         HStack {
@@ -158,11 +158,11 @@ struct ProgressiveSessionSummaryView: View {
                 }
                 .padding()
                 .background {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                         .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6))
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                         .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
                 }
                 .transition(.asymmetric(

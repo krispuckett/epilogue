@@ -44,7 +44,7 @@ struct LiquidGlassModifier: ViewModifier {
             }
             .overlay {
                 // Subtle inner glow
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
@@ -156,7 +156,7 @@ struct RippleView: View {
             .fill(
                 RadialGradient(
                     colors: [
-                        Color.white.opacity(0.3),
+                        DesignSystem.Colors.textQuaternary,
                         Color.white.opacity(0.1),
                         Color.clear
                     ],
@@ -186,10 +186,10 @@ struct GlassMorphCard<Content: View>: View {
     var body: some View {
         content()
             .background {
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                     .fill(.ultraThinMaterial)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -203,14 +203,14 @@ struct GlassMorphCard<Content: View>: View {
                     }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                     .strokeBorder(
                         Color.white.opacity(0.2),
                         lineWidth: 0.5
                     )
             }
             .scaleEffect(isPressed ? 0.97 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .animation(DesignSystem.Animation.springStandard, value: isPressed)
             .onLongPressGesture(
                 minimumDuration: 0,
                 maximumDistance: .infinity,

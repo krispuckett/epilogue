@@ -56,7 +56,7 @@ final class UndoManager: ObservableObject {
         action.action()
         
         // Haptic feedback
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
     }
     
     func dismissUndo() {
@@ -119,11 +119,11 @@ struct UndoSnackbar: View {
                 Button(action: undoManager.performUndo) {
                     Text("UNDO")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                        .padding(.horizontal, 16)
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.vertical, 8)
                         .background(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                                 .fill(.white.opacity(0.15))
                         )
                 }
@@ -139,7 +139,7 @@ struct UndoSnackbar: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 24)
@@ -150,7 +150,7 @@ struct UndoSnackbar: View {
                     )
             )
             .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.bottom, 100) // Above tab bar
         }
         .allowsHitTesting(true)
@@ -223,7 +223,7 @@ struct SwipeToDeleteModifier: ViewModifier {
                             
                             // Haptic feedback at threshold
                             if offset.width < hapticThreshold && !hasTriggeredHaptic {
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                                 hasTriggeredHaptic = true
                             } else if offset.width > hapticThreshold {
                                 hasTriggeredHaptic = false
@@ -245,7 +245,7 @@ struct SwipeToDeleteModifier: ViewModifier {
                                     message: "Deleted \(itemDescription)",
                                     action: undoAction
                                 )
-                                HapticManager.shared.mediumTap()
+                                DesignSystem.HapticFeedback.medium()
                             }
                         } else {
                             // Snap back

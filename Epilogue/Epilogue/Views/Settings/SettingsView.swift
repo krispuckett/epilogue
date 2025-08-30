@@ -145,7 +145,7 @@ struct SettingsView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .tint(DesignSystem.Colors.primaryAccent)
                         }
                     }
                     
@@ -199,7 +199,7 @@ struct SettingsView: View {
                         }
                         
                         Slider(value: $gradientIntensity, in: 0...1)
-                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .tint(DesignSystem.Colors.primaryAccent)
                     }
                     
                     Toggle(isOn: $enableAnimations) {
@@ -300,6 +300,18 @@ struct SettingsView: View {
                     Text("Privacy & Data")
                 } footer: {
                     Text("Data sync will be available in a future update")
+                }
+                
+                // MARK: - Debug (TEMPORARY - Remove after testing!)
+                Section {
+                    NavigationLink("Test MeshGradient") {
+                        MeshGradientTestView()
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text("TEMPORARY: Remove this section after testing")
+                        .foregroundStyle(.orange)
                 }
                 
                 // MARK: - About

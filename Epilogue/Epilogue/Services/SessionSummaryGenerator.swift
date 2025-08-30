@@ -712,10 +712,10 @@ struct SessionStatsCard: View {
                 )
             }
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.listItemPadding)
         .glassEffect()
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
@@ -793,14 +793,14 @@ struct SessionTabSelector: View {
         HStack(spacing: 8) {
             ForEach(0..<tabs.count, id: \.self) { index in
                 Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         selectedTab = index
                     }
                 }) {
                     Text(tabs[index])
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(selectedTab == index ? .black : .white.opacity(0.6))
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.vertical, 10)
                         .background(
                             Capsule()
@@ -856,7 +856,7 @@ struct ThemeClusterCard: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.3),
+                                DesignSystem.Colors.textQuaternary,
                                 Color.white.opacity(0.1)
                             ],
                             startPoint: .topLeading,
@@ -894,14 +894,14 @@ struct ThemeClusterCard: View {
                 .padding(.top, 4)
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .glassEffect()
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
         .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isExpanded.toggle()
             }
         }
@@ -941,16 +941,16 @@ struct InsightCard: View {
                 
                 Text(insight.description)
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                     .lineLimit(3)
             }
             
             Spacer()
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .glassEffect()
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
@@ -987,17 +987,17 @@ struct GeneratedSuggestionCard: View {
             
             Text(suggestion.description)
                 .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
                 .lineLimit(2)
             
             Button(action: {
                 // Handle action
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }) {
                 Text(suggestion.actionText)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.black)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 8)
                     .background(
                         Capsule()
@@ -1005,10 +1005,10 @@ struct GeneratedSuggestionCard: View {
                     )
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .glassEffect()
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
@@ -1031,11 +1031,11 @@ struct KeyTakeawaysCard: View {
                 }
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect()
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
         )
     }

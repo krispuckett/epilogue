@@ -100,7 +100,7 @@ struct LiquidCommandPalette: View {
                     .onTapGesture {
                         if showQuickActions {
                             transitionCoordinator.handleContentChange()
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(DesignSystem.Animation.easeQuick) {
                                 showQuickActions = false
                             }
                         } else {
@@ -146,7 +146,7 @@ struct LiquidCommandPalette: View {
                                 .padding(.vertical, 8)
                             }
                             .frame(maxHeight: 300)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.bottom, 8)
                             .transition(.smoothSlide)
                         }
@@ -158,7 +158,7 @@ struct LiquidCommandPalette: View {
                                     .environmentObject(notesViewModel)
                             }
                             .frame(maxHeight: 300)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.bottom, 8) // 8px above input bar
                             .transition(.smoothSlide)
                         }
@@ -173,7 +173,7 @@ struct LiquidCommandPalette: View {
                             )
                             .environmentObject(libraryViewModel)
                             .environmentObject(notesViewModel)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.bottom, 16) // Above input bar
                             .transition(.glassAppear)
                         }
@@ -196,7 +196,7 @@ struct LiquidCommandPalette: View {
                             isRecording: .constant(voiceManager.isListening),
                             colorPalette: nil
                         )
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.top, 16)
                         .padding(.bottom, max(16, geometry.safeAreaInsets.bottom + 8))
                         .matchedGeometryEffect(id: "inputBar", in: animationNamespace)
@@ -396,7 +396,7 @@ struct LiquidCommandPalette: View {
             )
             dismissPalette()
         case .existingNote(let note):
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             NotificationCenter.default.post(
                 name: Notification.Name("NavigateToNote"),
                 object: note
@@ -436,7 +436,7 @@ struct LiquidCommandPalette: View {
         bookSearchQuery = query
         showBookSearch = true
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     // MARK: - Search Navigation
@@ -827,7 +827,7 @@ struct LiquidCommandPalette: View {
                 print("Failed to schedule reminder: \(error)")
             } else {
                 print("✅ Reminder scheduled for \(date)")
-                HapticManager.shared.success()
+                DesignSystem.HapticFeedback.success()
             }
         }
         
@@ -847,7 +847,7 @@ struct LiquidCommandPalette: View {
             object: ["book": book, "pagesPerDay": pagesPerDay]
         )
         
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         dismissPalette()
     }
 }
@@ -902,12 +902,12 @@ struct LiquidBookSearchRow: View {
                 // Add button
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color.white.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         }
         .buttonStyle(PlainButtonStyle())
     }

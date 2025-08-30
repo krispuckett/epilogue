@@ -67,13 +67,13 @@ struct PrivacyIndicator: View {
                 .foregroundStyle(isListening || isRecording ? .orange : .green)
                 .symbolEffect(.pulse, options: .repeating, value: isListening || isRecording)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .fill(Color.black.opacity(0.8))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                         .strokeBorder(
                             isListening || isRecording ? Color.red.opacity(0.5) : Color.white.opacity(0.2),
                             lineWidth: 1
@@ -84,7 +84,7 @@ struct PrivacyIndicator: View {
             pulseAnimation = true
         }
         .onChange(of: isListening || isRecording) { _, isActive in
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(DesignSystem.Animation.easeStandard) {
                 glowOpacity = isActive ? 0.5 : 0.3
             }
         }
@@ -358,13 +358,13 @@ struct AutoStopWarningView: View {
                 .tint(.orange)
             }
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .fill(.ultraThinMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
         )
         .shadow(radius: 20)
@@ -385,7 +385,7 @@ struct PrivacyBlurModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .blur(radius: blurRadius)
-            .animation(.easeInOut(duration: 0.3), value: blurRadius)
+            .animation(DesignSystem.Animation.easeStandard, value: blurRadius)
             .onChange(of: isActive) { _, newValue in
                 blurRadius = newValue ? 10 : 0
             }

@@ -23,33 +23,33 @@ final class BatchSelectionManager: ObservableObject {
     func enterSelectionMode() {
         isSelectionMode = true
         selectedItems.removeAll()
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     func exitSelectionMode() {
         isSelectionMode = false
         selectedItems.removeAll()
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     func toggleSelection(for id: UUID) {
         if selectedItems.contains(id) {
             selectedItems.remove(id)
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         } else {
             selectedItems.insert(id)
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
         }
     }
     
     func selectAll(items: [Note]) {
         selectedItems = Set(items.map { $0.id })
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
     }
     
     func deselectAll() {
         selectedItems.removeAll()
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     func deleteSelected() {
@@ -76,7 +76,7 @@ final class BatchSelectionManager: ObservableObject {
             }
         )
         
-        HapticManager.shared.warning()
+        DesignSystem.HapticFeedback.warning()
     }
     
     func isSelected(_ id: UUID) -> Bool {
@@ -99,7 +99,7 @@ struct BatchSelectionNavigationBar: View {
                 }
             }
             .font(.system(size: 17))
-            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            .foregroundStyle(DesignSystem.Colors.primaryAccent)
             
             Spacer()
             
@@ -107,7 +107,7 @@ struct BatchSelectionNavigationBar: View {
             Text("\(selectionManager.selectionCount) Selected")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
-                .animation(.easeInOut(duration: 0.2), value: selectionManager.selectionCount)
+                .animation(DesignSystem.Animation.easeQuick, value: selectionManager.selectionCount)
             
             Spacer()
             
@@ -115,7 +115,7 @@ struct BatchSelectionNavigationBar: View {
             HStack(spacing: 16) {
                 // Select All / Deselect All
                 Button(selectionManager.selectionCount == allItems.count ? "Deselect All" : "Select All") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         if selectionManager.selectionCount == allItems.count {
                             selectionManager.deselectAll()
                         } else {
@@ -137,12 +137,12 @@ struct BatchSelectionNavigationBar: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(selectionManager.hasSelection ? .red : .white.opacity(0.3))
+                        .foregroundStyle(selectionManager.hasSelection ? .red : DesignSystem.Colors.textQuaternary)
                 }
                 .disabled(!selectionManager.hasSelection)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .frame(height: 44)
     }
 }
@@ -161,7 +161,7 @@ struct SelectionIndicator: View {
                 
                 if isSelected {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .fill(DesignSystem.Colors.primaryAccent)
                         .frame(width: 20, height: 20)
                     
                     Image(systemName: "checkmark")
@@ -210,7 +210,7 @@ struct BatchDeleteConfirmationToast: View {
             VStack(spacing: 16) {
                 // Delete button - iOS 26 style
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         selectionManager.showingDeleteConfirmation = false
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -222,7 +222,7 @@ struct BatchDeleteConfirmationToast: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 50)
                         .background {
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                                 .fill(.red)
                         }
                 }
@@ -230,7 +230,7 @@ struct BatchDeleteConfirmationToast: View {
                 
                 // Cancel button - iOS 26 style
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         selectionManager.showingDeleteConfirmation = false
                     }
                 } label: {
@@ -239,14 +239,14 @@ struct BatchDeleteConfirmationToast: View {
                         .foregroundStyle(.white.opacity(0.9))
                         .frame(maxWidth: .infinity, minHeight: 50)
                         .background {
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(.white.opacity(0.12))
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                .fill(.white.opacity(0.10))
                         }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
         .padding(.vertical, 32)
         .glassEffect(in: .rect(cornerRadius: 28))
         .overlay {
@@ -301,6 +301,6 @@ struct SelectableNoteCard: View {
                     }
                 }
         }
-        .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectionMode)
+        .animation(DesignSystem.Animation.easeQuick, value: selectionManager.isSelectionMode)
     }
 }

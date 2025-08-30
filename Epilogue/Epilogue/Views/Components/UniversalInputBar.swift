@@ -54,7 +54,7 @@ struct UniversalInputBar: View {
         if let palette = colorPalette {
             return palette.adaptiveUIColor
         } else {
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
     }
     
@@ -65,7 +65,7 @@ struct UniversalInputBar: View {
                 // Command icon - amber accent
                 Image(systemName: "command")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .frame(height: 36)
                     .padding(.leading, 12)
                     .padding(.trailing, 8)
@@ -82,7 +82,7 @@ struct UniversalInputBar: View {
                 ZStack(alignment: .leading) {
                     if messageText.isEmpty {
                         Text(placeholderText)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                             .font(.system(size: 16))
                             .lineLimit(1)
                     }
@@ -91,7 +91,7 @@ struct UniversalInputBar: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
                         .foregroundStyle(.white)
-                        .accentColor(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .accentColor(DesignSystem.Colors.primaryAccent)
                         .focused($isInputFocused)
                         .lineLimit(1...5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -130,21 +130,21 @@ struct UniversalInputBar: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
                         .frame(width: 44, height: 44)
                         .glassEffect()
                     
                     Image(systemName: messageText.isEmpty ? "waveform" : "arrow.up")
                         .font(.system(size: 18, weight: messageText.isEmpty ? .medium : .semibold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         .contentTransition(.symbolEffect(.replace))
                         .scaleEffect(isRecording && messageText.isEmpty ? 1.1 : 1.0)
-                        .animation(.easeInOut(duration: 0.2), value: isRecording)
+                        .animation(DesignSystem.Animation.easeQuick, value: isRecording)
                 }
             }
             .buttonStyle(.plain)
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
+        .animation(DesignSystem.Animation.springStandard, value: messageText.isEmpty)
     }
 }
 
@@ -193,7 +193,7 @@ struct UniversalInputBarOverlay: View {
                     isRecording: $isRecording,
                     colorPalette: colorPalette
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 16)
             }
         }
@@ -208,7 +208,7 @@ struct UniversalInputBarOverlay: View {
     
     private func dismissInputBar() {
         isInputFocused = false
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(DesignSystem.Animation.easeStandard) {
             isPresented = false
         }
     }

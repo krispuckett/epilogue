@@ -11,7 +11,7 @@ struct EmbeddedAmbientProgress: View {
     @State private var isDragging = false
     @State private var dragProgress: Double = 0
     
-    private let amberColor = Color(red: 1.0, green: 0.55, blue: 0.26)
+    private let amberColor = DesignSystem.Colors.primaryAccent
     
     private var primaryColor: Color {
         colorPalette?.primary ?? amberColor
@@ -58,13 +58,13 @@ struct EmbeddedAmbientProgress: View {
                 // Bottom info - exact same as sheet
                 bottomInfo
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 20)
         }
         .frame(width: width, height: 200)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .strokeBorder(primaryColor.opacity(0.1), lineWidth: 1)
         }
     }
@@ -129,7 +129,7 @@ struct EmbeddedAmbientProgress: View {
                     .font(.system(size: 32, weight: .thin, design: .monospaced))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.3), value: displayProgress)
+                    .animation(DesignSystem.Animation.easeStandard, value: displayProgress)
             }
             .scaleEffect(isDragging ? 1.05 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
@@ -147,7 +147,7 @@ struct EmbeddedAmbientProgress: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background track - EXACT same as sheet
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.white.opacity(0.15))
                     .frame(height: 12)
                 
@@ -184,7 +184,7 @@ struct EmbeddedAmbientProgress: View {
                             )
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                 
                 // Current position indicator - EXACT same as sheet
                 if displayProgress > 0.02 {
@@ -197,7 +197,7 @@ struct EmbeddedAmbientProgress: View {
                             .frame(width: 16, height: 16)
                             .shadow(color: .black.opacity(0.3), radius: 4)
                             .scaleEffect(isDragging ? 1.3 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
+                            .animation(DesignSystem.Animation.springStandard, value: isDragging)
                         
                         Spacer()
                     }
@@ -226,11 +226,11 @@ struct EmbeddedAmbientProgress: View {
                     .font(.system(size: 24, weight: .light, design: .monospaced))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.2), value: displayPage)
+                    .animation(DesignSystem.Animation.easeQuick, value: displayPage)
                 
                 Text("current page")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .textCase(.uppercase)
                     .tracking(1)
             }
@@ -241,13 +241,13 @@ struct EmbeddedAmbientProgress: View {
                 if let pageCount = book.pageCount {
                     Text("\(pageCount - displayPage)")
                         .font(.system(size: 24, weight: .light, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .contentTransition(.numericText())
-                        .animation(.easeInOut(duration: 0.2), value: displayPage)
+                        .animation(DesignSystem.Animation.easeQuick, value: displayPage)
                     
                     Text("pages left")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .textCase(.uppercase)
                         .tracking(1)
                 }
@@ -275,7 +275,7 @@ struct EmbeddedAmbientProgress: View {
         // Auto-save immediately
         if targetPage != book.currentPage {
             viewModel.updateBookProgress(book, currentPage: targetPage)
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         }
     }
     
@@ -284,7 +284,7 @@ struct EmbeddedAmbientProgress: View {
         
         if !isDragging {
             isDragging = true
-            HapticManager.shared.selectionChanged()
+            DesignSystem.HapticFeedback.selection()
         }
         
         // Calculate progress based on drag location
@@ -298,7 +298,7 @@ struct EmbeddedAmbientProgress: View {
         let progressPercent = Int(newProgress * 100)
         let currentPercent = Int(progress * 100)
         if abs(progressPercent - currentPercent) >= 5 {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }
     }
     
@@ -317,7 +317,7 @@ struct EmbeddedAmbientProgress: View {
         // Auto-save immediately
         if targetPage != book.currentPage {
             viewModel.updateBookProgress(book, currentPage: targetPage)
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         }
     }
 }
@@ -326,7 +326,7 @@ struct EmbeddedAmbientProgress: View {
 
 #Preview {
     ZStack {
-        Color(red: 0.11, green: 0.105, blue: 0.102)
+        DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea()
         
         VStack(spacing: 30) {

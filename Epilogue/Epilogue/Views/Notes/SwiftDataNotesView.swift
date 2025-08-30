@@ -79,7 +79,7 @@ struct SwiftDataNotesView: View {
         do {
             try modelContext.save()
             SyncStatusManager.shared.incrementPendingChanges()
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         } catch {
             print("Error deleting question: \(error)")
         }
@@ -190,7 +190,7 @@ struct SwiftDataNotesView: View {
                                         rootViewController.present(activityController, animated: true)
                                     }
                                 }
-                                HapticManager.shared.success()
+                                DesignSystem.HapticFeedback.success()
                             } label: {
                                 Label("Share", systemImage: "square.and.arrow.up")
                             }
@@ -198,11 +198,11 @@ struct SwiftDataNotesView: View {
                             
                             Button {
                                 editingNote = note
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .tint(DesignSystem.Colors.primaryAccent)
                         }
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -269,11 +269,11 @@ struct SwiftDataNotesView: View {
     
     @ViewBuilder
     private func highlightOverlay(for note: Note) -> some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 1.5)
+        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+            .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 1.5)
             .opacity(navigationCoordinator.highlightedNoteID == note.id ? 0.8 : 0)
             .blur(radius: 0.5)
-            .animation(.easeInOut(duration: 0.3), value: navigationCoordinator.highlightedNoteID)
+            .animation(DesignSystem.Animation.easeStandard, value: navigationCoordinator.highlightedNoteID)
     }
     
     @ViewBuilder
@@ -385,7 +385,7 @@ struct SwiftDataNotesView: View {
                         Color.black.opacity(0.4)
                             .ignoresSafeArea()
                             .onTapGesture {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                withAnimation(DesignSystem.Animation.springStandard) {
                                     selectionManager.showingDeleteConfirmation = false
                                 }
                             }
@@ -399,7 +399,7 @@ struct SwiftDataNotesView: View {
                                 selectionManager.performDelete()
                             }
                         )
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     }
                     .zIndex(1000)
                 }
@@ -479,7 +479,7 @@ struct SwiftDataNoteContextMenu: View {
             .strokeBorder(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.3),
+                        DesignSystem.Colors.textQuaternary,
                         Color.white.opacity(0.1)
                     ],
                     startPoint: .topLeading,
@@ -570,7 +570,7 @@ struct SwiftDataNoteContextMenu: View {
             action: {
                 dismissMenu()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    HapticManager.shared.warning()
+                    DesignSystem.HapticFeedback.warning()
                     onDelete()
                 }
             }
@@ -589,7 +589,7 @@ struct SwiftDataNoteContextMenu: View {
     }
     
     private func shareAsImage() {
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
         let shareView = ShareableQuoteView(note: note)
         let renderer = ImageRenderer(content: shareView)
         renderer.scale = 3.0
@@ -609,7 +609,7 @@ struct SwiftDataNoteContextMenu: View {
     }
     
     private func copyText() {
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         var textToCopy = note.content
         
         if note.type == .quote {
@@ -650,7 +650,7 @@ private struct ContextMenuButton: View {
                 Spacer()
             }
             .foregroundStyle(isDestructive ? Color.red : .white)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 16)
             .contentShape(Rectangle())
         }
@@ -667,7 +667,7 @@ private struct ShareableQuoteView: View {
             // Large quote mark
             Text("\u{201C}")
                 .font(.custom("Georgia", size: 80))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             // Quote content
@@ -752,7 +752,7 @@ struct CapturedQuestionCard: View {
                     
                     Text(book.title)
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .lineLimit(1)
                     
                     if let pageNumber = question.pageNumber {
@@ -774,20 +774,20 @@ struct CapturedQuestionCard: View {
                 }
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color.white.opacity(0.05))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
         )
         .contextMenu {
             Button {
                 UIPasteboard.general.string = question.content
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
@@ -821,7 +821,7 @@ struct CapturedQuestionCard: View {
                 withAnimation(.smooth) {
                     modelContext.delete(question)
                     try? modelContext.save()
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
             }
             Button("Cancel", role: .cancel) {}

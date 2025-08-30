@@ -41,9 +41,9 @@ struct BreathingAmberGradient: View {
             // Top breathing gradient
             RadialGradient(
                 colors: [
-                    Color(red: 1.0, green: 0.55, blue: 0.26),
-                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
-                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                    DesignSystem.Colors.primaryAccent,
+                    DesignSystem.Colors.primaryAccent.opacity(0.6),
+                    DesignSystem.Colors.primaryAccent.opacity(0.3),
                     .clear
                 ],
                 center: UnitPoint(x: 0.5, y: breathe ? -0.1 : 0.1),
@@ -55,9 +55,9 @@ struct BreathingAmberGradient: View {
             // Bottom breathing gradient
             RadialGradient(
                 colors: [
-                    Color(red: 1.0, green: 0.55, blue: 0.26),
-                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
-                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                    DesignSystem.Colors.primaryAccent,
+                    DesignSystem.Colors.primaryAccent.opacity(0.6),
+                    DesignSystem.Colors.primaryAccent.opacity(0.3),
                     .clear
                 ],
                 center: UnitPoint(x: 0.5, y: breathe ? 1.1 : 0.9),
@@ -70,7 +70,7 @@ struct BreathingAmberGradient: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), .clear],
+                        colors: [DesignSystem.Colors.primaryAccent.opacity(0.3), .clear],
                         center: .center,
                         startRadius: 0,
                         endRadius: 200
@@ -164,7 +164,7 @@ struct RaycastInputBar: View {
                         .buttonStyle(ScaleButtonStyle())
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 12)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22))
                 .overlay {
@@ -182,16 +182,16 @@ struct RaycastInputBar: View {
                         )
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
         }
         .onChange(of: text) { _, newValue in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(DesignSystem.Animation.easeQuick) {
                 showingSuggestions = !newValue.isEmpty && isFocused
             }
         }
         .onChange(of: isFocused) { _, focused in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(DesignSystem.Animation.easeQuick) {
                 showingSuggestions = focused && !text.isEmpty
                 isExpanded = focused
             }
@@ -266,7 +266,7 @@ struct SmartSuggestionsView: View {
                             
                             Spacer()
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.vertical, 12)
                         .contentShape(Rectangle())
                     }
@@ -277,8 +277,8 @@ struct SmartSuggestionsView: View {
             }
             .padding(12)
         }
-        .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 16)
+        .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.bottom, 8)
     }
 }
@@ -288,6 +288,6 @@ struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(DesignSystem.Animation.springStandard, value: configuration.isPressed)
     }
 }

@@ -195,7 +195,7 @@ struct NotesView: View {
         .transition(.glassAppear)
         .onTapGesture(count: 2) {
             // Direct test - bypass the callback chain
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             contextMenuNote = note
             contextMenuSourceRect = CGRect(x: UIScreen.main.bounds.width/2, y: UIScreen.main.bounds.height/2, width: 100, height: 100)
         }
@@ -204,11 +204,11 @@ struct NotesView: View {
     // Helper function for highlight overlay
     @ViewBuilder
     private func highlightOverlay(for note: Note) -> some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 1.5)
+        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+            .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 1.5)
             .opacity(highlightedNoteId == note.id ? 0.8 : 0)
             .blur(radius: 0.5)
-            .animation(.easeInOut(duration: 0.3), value: highlightedNoteId)
+            .animation(DesignSystem.Animation.easeStandard, value: highlightedNoteId)
     }
     
     var body: some View {
@@ -256,21 +256,21 @@ struct NotesView: View {
     @ViewBuilder
     private var viewStyleToggleButton: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 viewStyle = viewStyle == .grid ? .stack : .grid
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }
         }) {
             Image(systemName: viewStyle.icon)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
                 .frame(width: 36, height: 36)
                 .glassEffect(
                     .regular.tint(Color.white.opacity(0.05)),
-                    in: RoundedRectangle(cornerRadius: 12)
+                    in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                         .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                 }
         }
@@ -304,7 +304,7 @@ struct NotesView: View {
             Button(action: { showingAddNote = true }) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .frame(width: 44, height: 44)
             }
             .glassEffect(
@@ -506,26 +506,26 @@ struct FilterPill: View {
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.6))
             }
-            .foregroundStyle(isActive ? .white : .white.opacity(0.7))
+            .foregroundStyle(isActive ? .white : DesignSystem.Colors.textSecondary)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .glassEffect(
                 isActive ? 
-                    .regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3)) :
+                    .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)) :
                     .regular.tint(Color.white.opacity(0.05)),
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .stroke(
                         isActive ?
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4) :
+                            DesignSystem.Colors.primaryAccent.opacity(0.4) :
                             Color.white.opacity(0.1),
                         lineWidth: 0.5
                     )
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isActive)
+        .animation(DesignSystem.Animation.springStandard, value: isActive)
     }
 }
 
@@ -540,7 +540,7 @@ struct EmptyNotesView: View {
             // Icon
             Image(systemName: emptyStateIcon)
                 .font(.system(size: 64))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.5))
             
             // Title
             Text(emptyStateTitle)
@@ -550,7 +550,7 @@ struct EmptyNotesView: View {
             // Subtitle
             Text(emptyStateSubtitle)
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 300)
             
@@ -559,7 +559,7 @@ struct EmptyNotesView: View {
                 VStack(spacing: 12) {
                     Text("Quick Actions")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                     
                     HStack(spacing: 12) {
                         Button {
@@ -567,7 +567,7 @@ struct EmptyNotesView: View {
                         } label: {
                             Label("Add Note", systemImage: "note.text.badge.plus")
                                 .font(.system(size: 14))
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                                 .padding(.vertical, 8)
                                 .glassEffect(in: Capsule())
                         }
@@ -577,7 +577,7 @@ struct EmptyNotesView: View {
                         } label: {
                             Label("Add Quote", systemImage: "quote.opening")
                                 .font(.system(size: 14))
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                                 .padding(.vertical, 8)
                                 .glassEffect(in: Capsule())
                         }

@@ -92,7 +92,7 @@ struct LiveTranscriptionBubble: View {
         
         // For short text, show immediately
         if newText.count < 20 {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(DesignSystem.Animation.easeQuick) {
                 displayedText = newText
             }
         } else {
@@ -132,7 +132,7 @@ struct SimplifiedTranscriptionBubble: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .padding(.vertical, 12)
                 .frame(minWidth: 60)
                 .frame(width: bubbleWidth, height: bubbleHeight)
@@ -150,7 +150,7 @@ struct SimplifiedTranscriptionBubble: View {
             
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .onPreferenceChange(SizePreferenceKey.self) { size in
             // Update bubble size to fit content
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -180,7 +180,7 @@ struct MinimalTranscriptionBubble: View {
             .foregroundColor(.white)
             .multilineTextAlignment(.center)
             .lineLimit(nil)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
             .padding(.vertical, 14)
             .frame(minHeight: 48)
             .glassEffect() // LIQUID GLASS ONLY!
@@ -194,10 +194,10 @@ struct MinimalTranscriptionBubble: View {
             }
             .onChange(of: text) { _, _ in
                 // Bounce effect on text change
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isVisible = false
                 }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6).delay(0.1)) {
+                withAnimation(DesignSystem.Animation.springStandard.delay(0.1)) {
                     isVisible = true
                 }
             }

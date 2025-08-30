@@ -50,12 +50,12 @@ struct ChatMessageView: View {
                 }
             }
         }
-        .padding(.horizontal, 16) // Equal padding for all messages
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding) // Equal padding for all messages
         .scaleEffect(isAnimatingIn ? 1 : 0.95)
         .opacity(isAnimatingIn ? 1 : 0)
         .onAppear {
             screenSize = geometry.size
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isAnimatingIn = true
             }
             
@@ -76,7 +76,7 @@ struct ChatMessageView: View {
     private var messageContent: some View {
         if showTypingIndicator && !message.isUser {
             TypingIndicatorView()
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 12)
         } else if message.isWhisperTranscription {
             whisperTranscriptionView
@@ -128,10 +128,10 @@ struct ChatMessageView: View {
             .padding(.vertical, 10)
             .frame(maxWidth: screenSize.width * 0.7, alignment: .trailing)
             .fixedSize(horizontal: false, vertical: true) // Allow vertical expansion
-            .glassEffect(in: .rect(cornerRadius: 18))
+            .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
             .overlay(alignment: .topTrailing) {
                 // Subtle border
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
@@ -182,12 +182,12 @@ struct ChatMessageView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.6))
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 10)
-        .glassEffect(in: .rect(cornerRadius: 16))
+        .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
             // Animated glowing border with angular gradient for smooth loop
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(colors: [
@@ -219,8 +219,8 @@ struct ChatMessageView: View {
     private var systemMessageView: some View {
         Text(message.content)
             .font(.system(size: 13))
-            .foregroundStyle(.white.opacity(0.5))
-            .padding(.horizontal, 16)
+            .foregroundStyle(DesignSystem.Colors.textTertiary)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.center)
@@ -250,12 +250,12 @@ struct ChatMessageView: View {
                     
                     Text("Switched to \(book.title)")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                 }
             } else {
                 Text("Cleared book context")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
             
             // Right line
@@ -291,9 +291,9 @@ struct ChatMessageView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
     }
@@ -467,7 +467,7 @@ struct NoteWithContextBubble: View {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "info.circle")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                 
                 Text(context)
                     .font(.caption)
@@ -477,11 +477,11 @@ struct NoteWithContextBubble: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.white.opacity(0.05))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
             )
         }

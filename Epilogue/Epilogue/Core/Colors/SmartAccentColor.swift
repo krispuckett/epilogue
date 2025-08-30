@@ -229,7 +229,7 @@ struct SmartAccentColor {
     // MARK: - Constants
     
     /// Default accent color (warm orange)
-    static let defaultAccent = Color(red: 1.0, green: 0.55, blue: 0.26)
+    static let defaultAccent = DesignSystem.Colors.primaryAccent
     
     // MARK: - Debug
     

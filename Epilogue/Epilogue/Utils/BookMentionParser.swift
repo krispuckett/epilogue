@@ -189,18 +189,18 @@ struct BookMentionSuggestionsView: View {
                                     .aspectRatio(contentMode: .fit)
                             } placeholder: {
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
                             }
                             .frame(width: 30, height: 45)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                         } else {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
                                 .frame(width: 30, height: 45)
                                 .overlay(
                                     Text(String(book.title.prefix(1)))
                                         .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                        .foregroundColor(DesignSystem.Colors.primaryAccent)
                                 )
                         }
                         
@@ -227,6 +227,6 @@ struct BookMentionSuggestionsView: View {
         }
         .padding(.vertical, 4)
         .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
     }
 }

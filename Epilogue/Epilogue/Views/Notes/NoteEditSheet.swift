@@ -17,7 +17,7 @@ struct NoteEditSheet: View {
         VStack(spacing: 0) {
             // Drag indicator
             Capsule()
-                .fill(Color.white.opacity(0.3))
+                .fill(DesignSystem.Colors.textQuaternary)
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
@@ -31,14 +31,14 @@ struct NoteEditSheet: View {
                 }
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 8)
                 .glassEffect(
                     .regular.interactive(),
                     in: .capsule
                 )
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.bottom, 12)
             
             // Text editor with proper padding
@@ -46,7 +46,7 @@ struct NoteEditSheet: View {
                 .font(.system(size: 16, design: note.type == .quote ? .serif : .default))
                 .foregroundStyle(.white)
                 .scrollContentBackground(.hidden)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.bottom, 16)
                 .focused($isTextFocused)
         }
@@ -66,7 +66,7 @@ struct NoteEditSheet: View {
                     saveAndDismiss()
                 }
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent)
             }
         }
     }

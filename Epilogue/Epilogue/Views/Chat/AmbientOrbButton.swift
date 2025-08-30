@@ -14,7 +14,7 @@ struct AmbientOrbButton: View {
     var body: some View {
         // Glass container with waveform icon
         Button(action: {
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             onTap?()
         }) {
             Image(systemName: "waveform")
@@ -31,7 +31,7 @@ struct AmbientOrbButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: breathingScale)
         .onAppear {
             breathingScale = 1.05

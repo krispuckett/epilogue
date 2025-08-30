@@ -59,16 +59,16 @@ struct iOS26SwipeActionsModifier: ViewModifier {
         Button {
             // Haptic feedback
             if action.isDestructive {
-                HapticManager.shared.warning()
+                DesignSystem.HapticFeedback.warning()
             } else {
-                HapticManager.shared.mediumTap()
+                DesignSystem.HapticFeedback.medium()
             }
             
             // Execute action
             action.handler()
             
             // Close swipe actions
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 offset = 0
                 isShowingActions = false
             }
@@ -85,7 +85,7 @@ struct iOS26SwipeActionsModifier: ViewModifier {
         }
         .scaleEffect(isShowingActions ? 1.0 : 0.8)
         .opacity(isShowingActions ? 1.0 : 0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(isShowingActions ? 0.05 : 0), value: isShowingActions)
+        .animation(DesignSystem.Animation.springStandard.delay(isShowingActions ? 0.05 : 0), value: isShowingActions)
     }
     
     private func handleDragChange(_ value: DragGesture.Value) {
@@ -102,7 +102,7 @@ struct iOS26SwipeActionsModifier: ViewModifier {
             
             // Trigger haptic when crossing threshold
             if abs(offset) > swipeThreshold && !hapticTriggered {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 hapticTriggered = true
             }
         }
@@ -116,14 +116,14 @@ struct iOS26SwipeActionsModifier: ViewModifier {
         
         if translation < -swipeThreshold || velocity < -200 {
             // Show actions
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 offset = -totalActionsWidth
                 isShowingActions = true
                 initialOffset = -totalActionsWidth
             }
         } else {
             // Hide actions
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 offset = 0
                 isShowingActions = false
                 initialOffset = 0
@@ -237,7 +237,7 @@ struct ContextualSwipeActionsModifier: ViewModifier {
     }
     
     private func handleDragEnd(_ value: DragGesture.Value) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             offset = 0
             activeDirection = .none
         }
@@ -253,7 +253,7 @@ struct SwipeActionButton: View {
     
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springQuick) {
                 isPressed = true
             }
             
@@ -294,7 +294,7 @@ struct GlassSwipeActionsModifier: ViewModifier {
                     ForEach(actions) { action in
                         Button {
                             selectedAction = action
-                            HapticManager.shared.mediumTap()
+                            DesignSystem.HapticFeedback.medium()
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 action.handler()

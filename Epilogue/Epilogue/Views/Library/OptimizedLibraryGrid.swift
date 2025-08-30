@@ -151,18 +151,18 @@ struct OptimizedGridItem: View {
                 
                 // Highlight overlay
                 if highlightedBookId == book.localId {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                         .stroke(Color.orange, lineWidth: 3)
-                        .animation(.easeInOut(duration: 0.3), value: highlightedBookId)
+                        .animation(DesignSystem.Animation.easeStandard, value: highlightedBookId)
                 }
             }
         }
         .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity) { pressing in
             isPressed = pressing
             if pressing {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }
         } perform: {}
         .simultaneousGesture(TapGesture().onEnded { _ in
@@ -177,7 +177,7 @@ struct OptimizedGridItem: View {
     @ViewBuilder
     private var bookContextMenu: some View {
         Button {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             withAnimation {
                 viewModel.toggleReadingStatus(for: book)
             }
@@ -191,7 +191,7 @@ struct OptimizedGridItem: View {
         Divider()
         
         Button {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             shareBook()
         } label: {
             Label("Share", systemImage: "square.and.arrow.up")
@@ -200,7 +200,7 @@ struct OptimizedGridItem: View {
         Divider()
         
         Button {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             onChangeCover(book)
         } label: {
             Label("Change Cover", systemImage: "photo")
@@ -209,7 +209,7 @@ struct OptimizedGridItem: View {
         Divider()
         
         Button(role: .destructive) {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             withAnimation {
                 viewModel.deleteBook(book)
             }
@@ -236,14 +236,14 @@ struct OptimizedBookCardSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover placeholder
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color.gray.opacity(0.2))
                 .frame(height: 240)
                 .overlay(
                     LinearGradient(
                         gradient: Gradient(colors: [
                             Color.white.opacity(0),
-                            Color.white.opacity(0.3),
+                            DesignSystem.Colors.textQuaternary,
                             Color.white.opacity(0)
                         ]),
                         startPoint: .leading,

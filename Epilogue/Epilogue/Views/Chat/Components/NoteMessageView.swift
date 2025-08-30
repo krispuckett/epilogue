@@ -28,10 +28,10 @@ struct NoteMessageView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(note.type.backgroundColor.opacity(0.1))
-            .glassEffect(.regular, in: .rect(cornerRadius: 12))
+            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             
             // Attribution and saved indicator
             HStack(spacing: 12) {

@@ -66,7 +66,7 @@ struct NotesIcon: View {
             
             // Archive slot/handle
             RoundedRectangle(cornerRadius: 1)
-                .fill(isSelected ? Color.white.opacity(0.9) : Color.white.opacity(0.3))
+                .fill(isSelected ? Color.white.opacity(0.9) : DesignSystem.Colors.textQuaternary)
                 .frame(width: 8, height: 2)
                 .offset(y: 5)
         }

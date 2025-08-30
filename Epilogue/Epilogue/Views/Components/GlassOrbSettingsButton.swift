@@ -24,7 +24,7 @@ struct GlassOrbSettingsButton: View {
             }
             
             // Haptic feedback
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }) {
             ZStack {
                 // Glass orb background
@@ -36,7 +36,7 @@ struct GlassOrbSettingsButton: View {
                             .strokeBorder(
                                 LinearGradient(
                                     colors: [
-                                        .white.opacity(0.3),
+                                        DesignSystem.Colors.textQuaternary,
                                         .white.opacity(0.1)
                                     ],
                                     startPoint: .topLeading,

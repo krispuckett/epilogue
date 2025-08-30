@@ -21,7 +21,7 @@ struct BookPickerSheet: View {
         NavigationStack {
             ZStack {
                 // Background
-                Color(red: 0.11, green: 0.105, blue: 0.102)
+                DesignSystem.Colors.surfaceBackground
                     .ignoresSafeArea()
                 
                 if libraryViewModel.books.isEmpty {
@@ -29,15 +29,15 @@ struct BookPickerSheet: View {
                     VStack(spacing: 16) {
                         Image(systemName: "books.vertical")
                             .font(.system(size: 48))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         
                         Text("No books in library")
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                         
                         Text("Add books to your library first")
                             .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
                 } else {
                     ScrollView {
@@ -126,7 +126,7 @@ struct BookPickerRow: View {
                         .overlay {
                             Image(systemName: "book.closed.fill")
                                 .font(.system(size: 20))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         }
                 }
                 
@@ -146,15 +146,15 @@ struct BookPickerRow: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
             }
             .padding()
             .background {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(Color.white.opacity(0.05))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
             }
         }

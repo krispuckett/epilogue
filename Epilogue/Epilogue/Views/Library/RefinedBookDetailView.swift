@@ -49,7 +49,7 @@ struct RefinedBookDetailView: View {
     
     private var accentColor: Color {
         guard let palette = colorPalette else {
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
         
         let bookAccent = palette.accent
@@ -80,7 +80,7 @@ struct RefinedBookDetailView: View {
             }
         }
         
-        return Color(red: 1.0, green: 0.55, blue: 0.26)
+        return DesignSystem.Colors.primaryAccent
     }
     
     // MARK: - Body
@@ -168,7 +168,7 @@ struct RefinedBookDetailView: View {
                                     }
                             }
                         }
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                         .padding(.bottom, 100)
                     }
                 }
@@ -242,7 +242,7 @@ struct RefinedBookDetailView: View {
                     }
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
     }
     
@@ -294,7 +294,7 @@ struct RefinedBookDetailView: View {
         }
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -487,7 +487,7 @@ private func generatePlaceholderPalette() -> ColorPalette {
     ColorPalette(
         primary: Color(red: 0.2, green: 0.2, blue: 0.3),
         secondary: Color(red: 0.3, green: 0.3, blue: 0.4),
-        accent: Color(red: 1.0, green: 0.55, blue: 0.26),
+        accent: DesignSystem.Colors.primaryAccent,
         background: Color.black,
         textColor: .white,
         luminance: 0.3,

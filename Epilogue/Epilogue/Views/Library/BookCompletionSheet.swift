@@ -31,7 +31,7 @@ struct BookCompletionSheet: View {
                 // Background gradient
                 LinearGradient(
                     colors: [
-                        Color(red: 0.11, green: 0.105, blue: 0.102),
+                        DesignSystem.Colors.surfaceBackground,
                         Color(red: 0.08, green: 0.075, blue: 0.072)
                     ],
                     startPoint: .top,
@@ -59,7 +59,7 @@ struct BookCompletionSheet: View {
                         // Emotional tags section (optional, at bottom)
                         tagsSection
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 32)
                 }
             }
@@ -68,10 +68,10 @@ struct BookCompletionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                         isPresented = false
                     }
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -79,7 +79,7 @@ struct BookCompletionSheet: View {
                         saveReview()
                     }
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
             }
         }
@@ -121,7 +121,7 @@ struct BookCompletionSheet: View {
                 
                 Text("by \(book.author)")
                     .font(.system(size: 14, weight: .regular, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
         }
     }
@@ -136,17 +136,17 @@ struct BookCompletionSheet: View {
             HStack(spacing: 12) {
                 ForEach(1...5, id: \.self) { star in
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             rating = star
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         }
                     } label: {
                         Image(systemName: star <= rating ? "star.fill" : "star")
                             .font(.system(size: 36))
                             .foregroundStyle(
                                 star <= rating ? 
-                                Color(red: 1.0, green: 0.55, blue: 0.26) : 
-                                Color.white.opacity(0.3)
+                                DesignSystem.Colors.primaryAccent : 
+                                DesignSystem.Colors.textQuaternary
                             )
                             .scaleEffect(animateStars && star <= rating ? 1.0 : 0.8)
                             .animation(
@@ -167,7 +167,7 @@ struct BookCompletionSheet: View {
             HStack {
                 Image(systemName: "text.alignleft")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 
                 Text("Review")
                     .font(.system(size: 16, weight: .medium))
@@ -178,7 +178,7 @@ struct BookCompletionSheet: View {
                 if !reviewText.isEmpty {
                     Text("\(reviewText.count) characters")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                 }
             }
             
@@ -189,13 +189,13 @@ struct BookCompletionSheet: View {
                 .background(Color.clear)
                 .frame(minHeight: 120)
                 .padding(12)
-                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 .focused($isReviewFocused)
                 .placeholder(when: reviewText.isEmpty) {
                     Text("What did you think about this book?")
                         .font(.system(size: 15, design: .serif))
-                        .foregroundStyle(.white.opacity(0.3))
-                        .padding(.horizontal, 16)
+                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.vertical, 20)
                         .allowsHitTesting(false)
                 }
@@ -208,7 +208,7 @@ struct BookCompletionSheet: View {
             HStack {
                 Image(systemName: "tag")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.7))
                 
                 Text("Tags (optional)")
                     .font(.system(size: 14, weight: .regular))
@@ -236,7 +236,7 @@ struct BookCompletionSheet: View {
                                     } else {
                                         selectedTags.insert(tag)
                                     }
-                                    HapticManager.shared.lightTap()
+                                    DesignSystem.HapticFeedback.light()
                                 }
                             }
                         )
@@ -244,8 +244,8 @@ struct BookCompletionSheet: View {
                 }
             }
         }
-        .padding(16)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .padding(DesignSystem.Spacing.inlinePadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
     }
     
     @ViewBuilder
@@ -254,7 +254,7 @@ struct BookCompletionSheet: View {
             HStack {
                 Image(systemName: "chart.bar.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 
                 Text("Reading Statistics")
                     .font(.system(size: 16, weight: .medium))
@@ -282,8 +282,8 @@ struct BookCompletionSheet: View {
                 
                 Spacer()
             }
-            .padding(16)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+            .padding(DesignSystem.Spacing.inlinePadding)
+            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         }
     }
     
@@ -294,8 +294,8 @@ struct BookCompletionSheet: View {
                 .font(.system(size: 20))
                 .foregroundStyle(
                     isFavorite ? 
-                    Color(red: 1.0, green: 0.55, blue: 0.26) : 
-                    Color.white.opacity(0.5)
+                    DesignSystem.Colors.primaryAccent : 
+                    DesignSystem.Colors.textTertiary
                 )
             
             Text("Mark as Favorite")
@@ -306,13 +306,13 @@ struct BookCompletionSheet: View {
             
             Toggle("", isOn: $isFavorite)
                 .labelsHidden()
-                .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .tint(DesignSystem.Colors.primaryAccent)
                 .onChange(of: isFavorite) { _, _ in
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
         }
-        .padding(16)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .padding(DesignSystem.Spacing.inlinePadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
     }
     
     // MARK: - Actions
@@ -335,7 +335,7 @@ struct BookCompletionSheet: View {
         libraryViewModel.updateBook(updatedBook)
         
         // Haptic feedback
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         // Dismiss
         isPresented = false
@@ -356,26 +356,26 @@ struct TagPill: View {
                 .foregroundStyle(
                     isSelected ? 
                     .white : 
-                    .white.opacity(0.7)
+                    DesignSystem.Colors.textSecondary
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 10)
                 .background {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3))
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.3))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 20)
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                     .strokeBorder(
-                                        Color(red: 1.0, green: 0.55, blue: 0.26),
+                                        DesignSystem.Colors.primaryAccent,
                                         lineWidth: 1
                                     )
                             }
                     } else {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(.white.opacity(0.08))
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                            .fill(.white.opacity(0.10))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 20)
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                     .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
                             }
                     }

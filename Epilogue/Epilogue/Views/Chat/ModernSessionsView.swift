@@ -71,12 +71,12 @@ struct ModernSessionsView: View {
                                 Text("Chat")
                                     .font(.system(size: 34, weight: .bold))
                                     .foregroundStyle(.white)
-                                    .padding(.horizontal, 20)
+                                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                                     .padding(.top, 60) // Account for status bar
                                 
                                 // Search bar
                                 searchBar
-                                    .padding(.horizontal, 20)
+                                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                                     .padding(.bottom, 8)
                             }
                             
@@ -135,7 +135,7 @@ struct ModernSessionsView: View {
                         
                         Spacer()
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
                     // NO BACKGROUND! Apply glass directly!
@@ -145,7 +145,7 @@ struct ModernSessionsView: View {
                     )
                     .opacity(scrollOffset > 100 ? 1 : 0)
                 }
-                .animation(.easeInOut(duration: 0.2), value: scrollOffset > 100)
+                .animation(DesignSystem.Animation.easeQuick, value: scrollOffset > 100)
             }
             .navigationBarHidden(true)
         }
@@ -162,10 +162,10 @@ struct ModernSessionsView: View {
                 .foregroundStyle(.white)
                 .font(.system(size: 17))
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color.white.opacity(0.1))
         )
     }
@@ -183,7 +183,7 @@ struct SectionHeader: View {
         HStack {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))  // Smaller date text
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.5)
             
             Spacer()
@@ -195,20 +195,20 @@ struct SectionHeader: View {
                 Text("sessions")
                     .font(.system(size: 13))
             }
-            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+            .foregroundStyle(DesignSystem.Colors.primaryAccent)
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .background(
                 Capsule()
-                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
             )
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         // NO BACKGROUND! Glass effect directly when sticky
         .glassEffect(
-            isSticky ? .regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)) : .regular,
+            isSticky ? .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.1)) : .regular,
             in: .rect
         )
         .opacity(isSticky ? 1 : 0.001) // Nearly invisible when not sticky
@@ -261,7 +261,7 @@ struct SessionRow: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(timeFormatter.string(from: session.startTime))
                             .font(.system(size: 15, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                         
                         // Show "Just started" for very recent sessions
                         if abs(session.startTime.timeIntervalSinceNow) < 300 &&
@@ -270,10 +270,10 @@ struct SessionRow: View {
                            session.capturedNotes.isEmpty {
                             Text("Just")
                                 .font(.system(size: 13))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                             Text("started")
                                 .font(.system(size: 13))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         }
                     }
                     .frame(width: 70, alignment: .leading)
@@ -332,13 +332,13 @@ struct SessionRow: View {
                     
                     // No chevron - removed per request
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .padding(.vertical, 20)
                 
                 // Divider if needed
                 if showDivider {
                     Rectangle()
-                        .fill(Color.white.opacity(0.06))
+                        .fill(Color.white.opacity(0.05))
                         .frame(height: 0.5)
                         .padding(.leading, 20)
                 }
@@ -417,7 +417,7 @@ struct AmbientSessionDetailView: View {
                                 if let answer = question.answer {
                                     Text(answer)
                                         .font(.callout)
-                                        .foregroundStyle(.white.opacity(0.7))
+                                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                                 }
                             }
                             .padding()
@@ -481,7 +481,7 @@ struct AmbientSessionDetailView: View {
                 Button("Done") {
                     dismiss()
                 }
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent)
             }
         }
     }

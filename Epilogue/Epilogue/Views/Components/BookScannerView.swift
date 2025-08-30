@@ -64,7 +64,7 @@ struct BookScannerView: View {
                             SimpleProgressIndicator(scale: 1.5)
                             Text("Initializing camera...")
                                 .font(.system(size: 16))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
                         }
                     }
             }
@@ -173,7 +173,7 @@ struct BookScannerView: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 10)
             .glassEffect(in: Capsule())
             
@@ -181,7 +181,7 @@ struct BookScannerView: View {
             if frameAlignment != .aligned {
                 Text("Hold phone parallel to book cover")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
         }
     }
@@ -199,7 +199,7 @@ struct BookScannerView: View {
                 Circle()
                     .trim(from: 0, to: CGFloat(captureCountdown) / 3.0)
                     .stroke(
-                        Color(red: 1.0, green: 0.55, blue: 0.26),
+                        DesignSystem.Colors.primaryAccent,
                         style: StrokeStyle(lineWidth: 4, lineCap: .round)
                     )
                     .frame(width: 90, height: 90)
@@ -211,18 +211,18 @@ struct BookScannerView: View {
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .scaleEffect(pulseAnimation ? 1.1 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: pulseAnimation)
+                    .animation(DesignSystem.Animation.springStandard, value: pulseAnimation)
             }
             
             Text("Hold steady")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
         }
-        .padding(24)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+        .padding(DesignSystem.Spacing.cardPadding)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.3), lineWidth: 0.5)
         }
     }
     
@@ -241,7 +241,7 @@ struct BookScannerView: View {
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26),
+                                DesignSystem.Colors.primaryAccent,
                                 Color(red: 1.0, green: 0.7, blue: 0.4)
                             ],
                             startPoint: .topLeading,
@@ -278,7 +278,7 @@ struct BookScannerView: View {
             RoundedRectangle(cornerRadius: 24)
                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
         }
-        .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), radius: 20, y: 10)
+        .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 20, y: 10)
         .onAppear {
             pulseAnimation = true
         }
@@ -296,12 +296,12 @@ struct BookScannerView: View {
                     .font(.system(size: 16, weight: .medium))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
             .padding(.vertical, 14)
             .glassEffect(in: Capsule())
             .overlay {
                 Capsule()
-                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
+                    .strokeBorder(DesignSystem.Colors.textQuaternary, lineWidth: 0.5)
             }
         }
     }
@@ -374,14 +374,14 @@ struct BookScannerView: View {
         countdownTimer?.invalidate()
         
         // Immediate countdown
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Slower countdown for better UX
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { timer in
             captureCountdown -= 1
             
             if captureCountdown > 0 {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 withAnimation {
                     pulseAnimation.toggle()
                 }
@@ -394,7 +394,7 @@ struct BookScannerView: View {
     }
     
     private func captureManually() {
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
         performCapture()
     }
     
@@ -402,13 +402,13 @@ struct BookScannerView: View {
         print("🟢 performCapture called")
         
         // Add haptic feedback
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
         
         // Freeze the camera preview for a smoother transition
         cameraManager.capturePhoto { image in
             guard let image = image else { 
                 print("🔴 Failed to capture photo")
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     scanState = .scanning
                 }
                 return 
@@ -418,11 +418,11 @@ struct BookScannerView: View {
             capturedImage = image
             
             // Smooth transition to processing
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 scanState = .processing
             }
             
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
             
             // Process with BookScannerService
             Task {
@@ -456,12 +456,12 @@ struct BookScannerView: View {
                 } else {
                     print("🔴 No valid info extracted")
                     await MainActor.run {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             scanState = .scanning
                         }
                         
                         // Show error toast
-                        HapticManager.shared.warning()
+                        DesignSystem.HapticFeedback.warning()
                         // TODO: Show error message to user
                     }
                 }
@@ -521,7 +521,7 @@ struct CameraOverlay: View {
                 // Dark background with cutout
                 Color.black.opacity(0.6)
                     .reverseMask {
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                             .frame(
                                 width: geometry.size.width * 0.85,
                                 height: geometry.size.height * 0.5
@@ -529,7 +529,7 @@ struct CameraOverlay: View {
                     }
                 
                 // Guide frame
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                     .strokeBorder(frameAlignment.color, lineWidth: 3)
                     .frame(
                         width: geometry.size.width * 0.85,

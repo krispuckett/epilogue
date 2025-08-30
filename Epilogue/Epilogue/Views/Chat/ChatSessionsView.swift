@@ -62,7 +62,7 @@ struct ChatSessionsView: View {
                     VStack(spacing: 0) {
                         // Elegant grouping selector
                         groupingSelector
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             .padding(.vertical, 16)
                         
                         // Content based on grouping
@@ -137,10 +137,10 @@ struct ChatSessionsView: View {
                     grouping: grouping,
                     isSelected: selectedGrouping == grouping,
                     onTap: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             selectedGrouping = grouping
                         }
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     }
                 )
             }
@@ -166,7 +166,7 @@ struct ChatSessionsView: View {
                 ))
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
     }
     
     // MARK: - Date Grouped Sessions
@@ -177,7 +177,7 @@ struct ChatSessionsView: View {
                     // Date header
                     Text(formatDateHeader(group.date))
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .textCase(.uppercase)
                         .tracking(1.5)
                     
@@ -203,7 +203,7 @@ struct ChatSessionsView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
     }
     
     // MARK: - Insight Grouped Sessions (AI-powered)
@@ -245,7 +245,7 @@ struct ChatSessionsView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
     }
     
     // MARK: - Helper Functions
@@ -353,7 +353,7 @@ struct GroupingChip: View {
                     .font(.system(size: 14, weight: .medium))
             }
             .foregroundStyle(isSelected ? .white : .white.opacity(0.6))
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 8)
             .glassEffect(in: Capsule())
             .overlay {
@@ -455,13 +455,13 @@ struct AmbientSessionCard: View {
                             ForEach(metrics, id: \.self) { metric in
                                 Text(metric)
                                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                                     .tracking(1.2)
                             }
                         }
                     }
                 }
-                .padding(20)
+                .padding(DesignSystem.Spacing.listItemPadding)
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -485,7 +485,7 @@ struct AmbientSessionCard: View {
                     
                     Button(action: {
                         // Continue session
-                        HapticManager.shared.mediumTap()
+                        DesignSystem.HapticFeedback.medium()
                     }) {
                         HStack {
                             Spacer()
@@ -497,13 +497,13 @@ struct AmbientSessionCard: View {
                         .foregroundStyle(.white)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .padding(.bottom, 8)
             }
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
@@ -525,10 +525,10 @@ struct BookSessionGroup: View {
         VStack(alignment: .leading, spacing: 16) {
             // Book header
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }) {
                 HStack(spacing: 12) {
                     // Book cover
@@ -619,7 +619,7 @@ struct InsightGroup: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
             }) {

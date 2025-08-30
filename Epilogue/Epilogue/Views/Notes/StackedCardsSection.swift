@@ -41,7 +41,7 @@ struct StackedCardsSection: View {
                     expandedSections.insert(section.id)
                 }
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         } label: {
             HStack {
                 Text(section.title)
@@ -59,7 +59,7 @@ struct StackedCardsSection: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.gray)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
             .padding(.vertical, 14)
         }
         .buttonStyle(PlainButtonStyle())
@@ -77,7 +77,7 @@ struct StackedCardsSection: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.bottom, 12)
     }
     
@@ -88,7 +88,7 @@ struct StackedCardsSection: View {
                 expandedCard(note: note, at: index)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.bottom, CGFloat(section.notes.count) * 8 + 20)
     }
     
@@ -126,11 +126,11 @@ struct StackedCardsSection: View {
     // MARK: - Background Card (Collapsed)
     @ViewBuilder
     private func backgroundCard(at index: Int) -> some View {
-        RoundedRectangle(cornerRadius: 16)
+        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
             .fill(Color(white: index == 1 ? 0.08 : 0.06))
             .frame(height: 150)
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .stroke(Color(white: 0.1), lineWidth: 0.5)
             )
             .offset(y: CGFloat(index) * 2.5)  // Very tight 2.5pt stacking

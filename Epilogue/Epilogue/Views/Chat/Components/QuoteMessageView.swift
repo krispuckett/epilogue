@@ -21,7 +21,7 @@ struct QuoteMessageView: View {
                     .italic()
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.vertical, 8)
                 
                 // Closing quote mark
@@ -33,9 +33,9 @@ struct QuoteMessageView: View {
                         .offset(x: 8, y: -8)
                 }
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
             
             // Attribution and saved indicator
             if book != nil {

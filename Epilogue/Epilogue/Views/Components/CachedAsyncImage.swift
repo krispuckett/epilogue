@@ -46,7 +46,7 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
             // Use thumbnail for smaller images (typical AsyncImage use case)
             if let image = await SharedBookCoverManager.shared.loadThumbnail(from: url.absoluteString) {
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(DesignSystem.Animation.easeQuick) {
                         self.loadedImage = image
                         self.isLoading = false
                     }

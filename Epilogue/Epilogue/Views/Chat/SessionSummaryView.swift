@@ -8,7 +8,7 @@ struct SessionSummaryView: View {
     var body: some View {
         ZStack {
             // Dark background matching app aesthetic
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             ScrollView {
@@ -47,11 +47,11 @@ struct SessionSummaryView: View {
                             Spacer()
                         }
                     }
-                    .padding(24)
-                    .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: 16))
+                    .padding(DesignSystem.Spacing.cardPadding)
+                    .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
                     }
                     
                     // Stats row
@@ -88,12 +88,12 @@ struct SessionSummaryView: View {
                                 .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.9))
                                 .lineSpacing(4)
                         }
-                        .padding(20)
+                        .padding(DesignSystem.Spacing.listItemPadding)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: 16))
+                        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                .stroke(Color.white.opacity(0.10), lineWidth: 1)
                         }
                     }
                     
@@ -113,7 +113,7 @@ struct SessionSummaryView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                                 .background(Color.warmAmber)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                         }
                         
                         Button(action: onDismiss) {
@@ -122,16 +122,16 @@ struct SessionSummaryView: View {
                                 .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 12))
+                                .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                                 .overlay {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
                                 }
                         }
                     }
                     .padding(.top, 8)
                 }
-                .padding(20)
+                .padding(DesignSystem.Spacing.listItemPadding)
             }
         }
     }
@@ -180,10 +180,10 @@ struct StatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.4)), in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.4)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .stroke(Color.white.opacity(0.05), lineWidth: 1)
         }
     }
 }
@@ -250,11 +250,11 @@ struct TranscriptNoteCard: View {
                 }
             }
         }
-        .padding(24)
-        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.cardPadding)
+        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
     }
@@ -341,8 +341,8 @@ struct TranscriptQuoteCard: View {
         }
         .padding(32)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.11, green: 0.105, blue: 0.102))
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .fill(DesignSystem.Colors.surfaceBackground)
         )
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
     }

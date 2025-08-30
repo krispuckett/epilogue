@@ -33,16 +33,16 @@ struct RecentCommandCard: View {
                         
                         Text("•")
                             .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         
                         Text(command.relativeTime)
                             .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                         
                         if command.count > 1 {
                             Text("•")
                                 .font(.system(size: 10))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                             
                             Text("\(command.count)x")
                                 .font(.system(size: 11, weight: .semibold))
@@ -56,13 +56,13 @@ struct RecentCommandCard: View {
                 // Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .background(Color.white.opacity(0.05))
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
@@ -75,9 +75,9 @@ struct RecentCommandCard: View {
                         lineWidth: 0.5
                     )
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .animation(DesignSystem.Animation.springStandard, value: isPressed)
         }
         .buttonStyle(PlainButtonStyle())
         .opacity(opacity)

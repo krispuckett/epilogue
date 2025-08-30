@@ -92,7 +92,7 @@ class BookScannerService: NSObject, ObservableObject {
         viewController.present(scannerViewController, animated: true)
         
         // Haptic feedback
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
     }
     
     func processScannedImage(_ image: UIImage) async -> ExtractedBookInfo {
@@ -329,7 +329,7 @@ class BookScannerService: NSObject, ObservableObject {
         
         // Show the search sheet
         showSearchResults = true
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
     }
     
     // MARK: - Helper Methods
@@ -416,7 +416,7 @@ struct BookScannerLoadingOverlay: View {
                         .foregroundColor(.white)
                 }
                 .padding(40)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
             }
             .transition(.opacity)
         }

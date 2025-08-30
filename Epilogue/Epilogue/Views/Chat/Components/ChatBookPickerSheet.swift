@@ -35,7 +35,7 @@ struct ChatBookPickerSheet: View {
                 text: $searchText,
                 placeholder: "Search books..."
             )
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             
             // Results
             ScrollView {
@@ -49,7 +49,7 @@ struct ChatBookPickerSheet: View {
                         
                         if index < filteredBooks.count - 1 || selectedBook != nil {
                             Divider()
-                                .foregroundStyle(.white.opacity(0.08))
+                                .foregroundStyle(.white.opacity(0.10))
                                 .padding(.leading, 60)
                         }
                     }
@@ -59,7 +59,7 @@ struct ChatBookPickerSheet: View {
                         Button {
                             selectedBook = nil
                             dismiss()
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         } label: {
                             HStack(spacing: 16) {
                                 // Icon
@@ -69,7 +69,7 @@ struct ChatBookPickerSheet: View {
                                     .frame(width: 32, height: 32)
                                     .background(
                                         Circle()
-                                            .fill(.white.opacity(0.08))
+                                            .fill(.white.opacity(0.10))
                                     )
                                 
                                 // Text
@@ -79,7 +79,7 @@ struct ChatBookPickerSheet: View {
                                 
                                 Spacer()
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.vertical, 12)
                             .contentShape(Rectangle())
                         }
@@ -91,10 +91,10 @@ struct ChatBookPickerSheet: View {
                         VStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                             Text("No books found")
                                 .font(.system(size: 15))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
@@ -105,9 +105,9 @@ struct ChatBookPickerSheet: View {
             .frame(maxHeight: 320)
         }
         .frame(maxWidth: 340)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
         .offset(y: dragOffset)
@@ -122,7 +122,7 @@ struct ChatBookPickerSheet: View {
                     if value.translation.height < -50 {
                         dismiss()
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             dragOffset = 0
                         }
                     }
@@ -165,10 +165,10 @@ struct ChatBookPickerSheet: View {
             if selectedBook?.id == book.id {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
@@ -176,7 +176,7 @@ struct ChatBookPickerSheet: View {
     // MARK: - Actions
     
     private func handleBookSelection(_ book: Book) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         selectedBook = book
         isPresented = false
         dismiss()

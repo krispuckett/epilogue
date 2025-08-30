@@ -69,7 +69,7 @@ struct OptimisticUIModifier: ViewModifier {
                         .background(Color.black.opacity(0.1))
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: isPending)
+            .animation(DesignSystem.Animation.easeQuick, value: isPending)
     }
 }
 

@@ -109,7 +109,7 @@ struct LiquidSearchResultsView: View {
         _ = CommandParser.parse(query, books: libraryViewModel.books, notes: notesViewModel.notes)
         
         // Show cards based on what we find
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             // Check for exact book match first
             if let book = libraryViewModel.books.first(where: { 
                 $0.title.localizedCaseInsensitiveContains(query) || 
@@ -136,7 +136,7 @@ struct LiquidSearchResultsView: View {
     // MARK: - Action Handlers
     
     private func handleRecentCommand(_ command: RecentCommand) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Re-execute the recent command based on its type
         switch command.intentType {
@@ -166,7 +166,7 @@ struct LiquidSearchResultsView: View {
     }
     
     private func handleBookTap(_ book: Book) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToBook"),
             object: book
@@ -174,7 +174,7 @@ struct LiquidSearchResultsView: View {
     }
     
     private func handleNoteTap(_ note: Note) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToNote"),
             object: note
@@ -211,7 +211,7 @@ struct BookResultCard: View {
                     
                     Text("by \(book.author)")
                         .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .lineLimit(1)
                 }
                 
@@ -220,16 +220,16 @@ struct BookResultCard: View {
                 // Arrow
                 Image(systemName: "arrow.right.circle")
                     .font(.system(size: 20))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(red: 0.11, green: 0.105, blue: 0.102)) // Dark charcoal matching NotesView
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                    .fill(DesignSystem.Colors.surfaceBackground) // Dark charcoal matching NotesView
             )
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .animation(DesignSystem.Animation.springStandard, value: isPressed)
         }
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(
@@ -258,17 +258,17 @@ struct NoteResultCard: View {
                 HStack {
                     Image(systemName: note.type == .quote ? "quote.opening" : "note.text")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     
                     Text(note.type == .quote ? "Quote" : "Note")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                     
                     Spacer()
                     
                     Text(note.formattedDate)
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                 }
                 
                 // Content preview
@@ -289,14 +289,14 @@ struct NoteResultCard: View {
                     .foregroundStyle(.white.opacity(0.6))
                 }
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(red: 0.11, green: 0.105, blue: 0.102)) // Dark charcoal matching NotesView
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                    .fill(DesignSystem.Colors.surfaceBackground) // Dark charcoal matching NotesView
             )
             .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+            .animation(DesignSystem.Animation.springStandard, value: isPressed)
         }
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(

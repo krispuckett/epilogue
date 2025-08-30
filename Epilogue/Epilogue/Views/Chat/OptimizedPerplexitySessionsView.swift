@@ -51,29 +51,29 @@ struct OptimizedPerplexitySessionsView: View {
     @ViewBuilder
     private var searchButton: some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isSearching.toggle()
                 if !isSearching {
                     searchText = ""
                 }
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         } label: {
             if isSearching {
                 ZStack {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
                         .frame(width: 28, height: 28)
                         .glassEffect()
                     
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
             } else {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
         }
     }
@@ -84,7 +84,7 @@ struct OptimizedPerplexitySessionsView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                 
                 TextField("Search sessions...", text: $searchText)
                     .font(.system(size: 15))
@@ -95,7 +95,7 @@ struct OptimizedPerplexitySessionsView: View {
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
@@ -103,18 +103,18 @@ struct OptimizedPerplexitySessionsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(Color.white.opacity(0.05))
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.top, 16)
         .padding(.bottom, 8)
     }
@@ -122,7 +122,7 @@ struct OptimizedPerplexitySessionsView: View {
     @ViewBuilder
     private var mainContent: some View {
         ZStack {
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             ScrollView {
@@ -237,10 +237,10 @@ struct OptimizedStickyHeader: View {
                     weight: isPinned ? .bold : .semibold
                 ))
                 .foregroundStyle(
-                    isPinned ? .white : .white.opacity(0.5)
+                    isPinned ? .white : DesignSystem.Colors.textTertiary
                 )
                 .tracking(isPinned ? 1.4 : 1.2)
-                .animation(.easeInOut(duration: 0.2), value: isPinned)
+                .animation(DesignSystem.Animation.easeQuick, value: isPinned)
             
             Spacer()
             
@@ -250,11 +250,11 @@ struct OptimizedStickyHeader: View {
                     weight: .medium
                 ))
                 .foregroundStyle(
-                    isPinned ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3)
+                    isPinned ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary
                 )
-                .animation(.easeInOut(duration: 0.2), value: isPinned)
+                .animation(DesignSystem.Animation.easeQuick, value: isPinned)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
@@ -267,7 +267,7 @@ struct OptimizedStickyHeader: View {
                         // Only update if state actually changes to reduce updates
                         let shouldPin = newValue <= 150
                         if shouldPin != isPinned {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(DesignSystem.Animation.easeQuick) {
                                 isPinned = shouldPin
                             }
                         }
@@ -280,13 +280,13 @@ struct OptimizedStickyHeader: View {
             
             if isPinned {
                 // Beautiful amber tinted glass effect
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.08))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                    .padding(.horizontal, 16)
-                    .animation(.easeInOut(duration: 0.3), value: isPinned)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
+                    .animation(DesignSystem.Animation.easeStandard, value: isPinned)
             } else {
-                Color(red: 0.11, green: 0.105, blue: 0.102)
+                DesignSystem.Colors.surfaceBackground
             }
         }
     }
@@ -352,7 +352,7 @@ struct OptimizedSessionRow: View {
                             
                             Text("\(displayData.contentCount)")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                         }
                     }
                 }
@@ -362,7 +362,7 @@ struct OptimizedSessionRow: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.2))
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
@@ -420,7 +420,7 @@ struct SessionDisplayData {
             self.contentColor = Color(red: 0.8, green: 0.4, blue: 1.0)
         } else {
             self.contentIcon = "quote.bubble.fill"
-            self.contentColor = Color(red: 1.0, green: 0.55, blue: 0.26)
+            self.contentColor = DesignSystem.Colors.primaryAccent
         }
     }
 }

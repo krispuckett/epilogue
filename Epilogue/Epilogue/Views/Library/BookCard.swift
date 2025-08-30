@@ -60,7 +60,7 @@ struct BookCard: View {
             },
             perform: {
                 showingProgress = true
-                HapticManager.shared.mediumTap()
+                DesignSystem.HapticFeedback.medium()
             }
         )
         .popover(isPresented: $showingProgress) {
@@ -88,7 +88,7 @@ struct ProgressPopover: View {
     init(book: Book, viewModel: LibraryViewModel, accentColor: Color? = nil) {
         self.book = book
         self.viewModel = viewModel
-        self.accentColor = accentColor ?? Color(red: 1.0, green: 0.55, blue: 0.26)
+        self.accentColor = accentColor ?? DesignSystem.Colors.primaryAccent
         let page = book.currentPage
         _currentPage = State(initialValue: page)
         _sliderValue = State(initialValue: Double(page))
@@ -193,7 +193,7 @@ struct ProgressPopover: View {
                         .multilineTextAlignment(.center)
                         .frame(width: 80)
                         .padding(.vertical, 10)
-                        .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                         .focused($isTextFieldFocused)
                         .onSubmit {
                             sliderValue = Double(currentPage)
@@ -240,7 +240,7 @@ struct ProgressPopover: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .frame(width: 320)
         .presentationBackground(.ultraThinMaterial)
         .onTapGesture {
@@ -255,7 +255,7 @@ struct ProgressPopover: View {
         // Update book progress
         viewModel.updateBookProgress(book, currentPage: currentPage)
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isUpdating = false
@@ -312,7 +312,7 @@ struct CircularProgressView: View {
 
 #Preview {
     ZStack {
-        Color(red: 0.11, green: 0.105, blue: 0.102)
+        DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea()
         
         BookCard(

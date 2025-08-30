@@ -26,7 +26,7 @@ struct EditBookSheet: View {
         NavigationStack {
             ZStack {
                 // Background - warm charcoal
-                Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
+                DesignSystem.Colors.surfaceBackground // #1C1B1A
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -42,7 +42,7 @@ struct EditBookSheet: View {
                             resultsSection
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.top, 16)
                     .padding(.bottom, 32)
                 }
@@ -68,7 +68,7 @@ struct EditBookSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Current Book")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
+                .foregroundStyle(DesignSystem.Colors.primaryAccent) // Warm orange
             
             CurrentBookRow(book: currentBook)
             
@@ -92,7 +92,7 @@ struct EditBookSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Search for Replacement")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
+                .foregroundStyle(DesignSystem.Colors.primaryAccent) // Warm orange
             
             HStack {
                 // Standardized search field
@@ -110,7 +110,7 @@ struct EditBookSheet: View {
                         .foregroundStyle(.white)
                         .frame(width: 48, height: 48)
                 }
-                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 .disabled(searchTerm.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -121,7 +121,7 @@ struct EditBookSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Search Results")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
+                .foregroundStyle(DesignSystem.Colors.primaryAccent) // Warm orange
             
             if isLoading {
                 LiteraryLoadingView(message: "Searching for \"\(searchTerm)\"...")
@@ -131,7 +131,7 @@ struct EditBookSheet: View {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 36))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent) // Warm orange
                     
                     Text("Search Error")
                         .font(.system(size: 18, weight: .medium, design: .serif))
@@ -139,7 +139,7 @@ struct EditBookSheet: View {
                     
                     Text(error)
                         .font(.bodyMedium)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 20)
@@ -147,7 +147,7 @@ struct EditBookSheet: View {
                 VStack(spacing: 12) {
                     Image(systemName: "books.vertical")
                         .font(.system(size: 36))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     
                     Text("No books found")
                         .font(.system(size: 18, weight: .medium, design: .serif))
@@ -155,7 +155,7 @@ struct EditBookSheet: View {
                     
                     Text("Try searching with different keywords")
                         .font(.bodyMedium)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
                 .padding(.top, 20)
             } else {
@@ -189,7 +189,7 @@ struct EditBookSheet: View {
     }
     
     private func replaceBook(with book: Book) {
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         onBookReplaced(book)
     }
 }
@@ -232,24 +232,24 @@ struct CurrentBookRow: View {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                 .fill(Color.gray.opacity(0.2))
                                 .overlay {
                                     ProgressView()
-                                        .tint(.white.opacity(0.5))
+                                        .tint(DesignSystem.Colors.textTertiary)
                                 }
                         case .success(let image):
                             image
                                 .resizable()
                                 .scaledToFill()
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         case .failure(_):
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                 .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
                                 .overlay {
                                     Image(systemName: "book.closed.fill")
                                         .font(.system(size: 24))
-                                        .foregroundStyle(.white.opacity(0.3))
+                                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
                                 }
                         @unknown default:
                             EmptyView()
@@ -257,12 +257,12 @@ struct CurrentBookRow: View {
                     }
                     }
                 } else {
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
                         .overlay {
                             Image(systemName: "book.closed.fill")
                                 .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         }
                 }
             }
@@ -294,15 +294,15 @@ struct CurrentBookRow: View {
             
             Spacer()
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .frame(height: 114)
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.4)) // Slightly less opacity for current book
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1) // Orange border
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.3), lineWidth: 1) // Orange border
         }
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
     }
@@ -352,24 +352,24 @@ struct EditBookResultRow: View {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                 .fill(Color.gray.opacity(0.2))
                                 .overlay {
                                     ProgressView()
-                                        .tint(.white.opacity(0.5))
+                                        .tint(DesignSystem.Colors.textTertiary)
                                 }
                         case .success(let image):
                             image
                                 .resizable()
                                 .scaledToFill()
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         case .failure(_):
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                 .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
                                 .overlay {
                                     Image(systemName: "book.closed.fill")
                                         .font(.system(size: 24))
-                                        .foregroundStyle(.white.opacity(0.3))
+                                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
                                 }
                         @unknown default:
                             EmptyView()
@@ -377,12 +377,12 @@ struct EditBookResultRow: View {
                     }
                     }
                 } else {
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
                         .overlay {
                             Image(systemName: "book.closed.fill")
                                 .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         }
                 }
             }
@@ -418,38 +418,38 @@ struct EditBookResultRow: View {
             if isCurrentBook {
                 Text("Current")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                    .padding(.horizontal, 16)
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 8)
                     .background {
                         Capsule()
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
                     }
                     .overlay {
                         Capsule()
-                            .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), lineWidth: 1)
+                            .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.3), lineWidth: 1)
                     }
             } else {
                 Button(action: onReplace) {
                     Text("Replace")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.vertical, 8)
                 }
                 .glassEffect(in: Capsule())
-                .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), radius: 8)
+                .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8)
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .frame(height: 114)
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)) // #262524 with transparency
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(isCurrentBook ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3) : .white.opacity(0.08), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(isCurrentBook ? DesignSystem.Colors.primaryAccent.opacity(0.3) : .white.opacity(0.10), lineWidth: 0.5)
         }
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
     }

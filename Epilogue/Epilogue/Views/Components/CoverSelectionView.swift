@@ -16,7 +16,7 @@ struct CoverSelectionView: View {
         NavigationStack {
             ZStack {
                 // Background
-                Color(red: 0.11, green: 0.105, blue: 0.102)
+                DesignSystem.Colors.surfaceBackground
                     .ignoresSafeArea()
                 
                 if isLoading {
@@ -26,7 +26,7 @@ struct CoverSelectionView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.system(size: 48))
-                            .foregroundColor(.white.opacity(0.3))
+                            .foregroundColor(DesignSystem.Colors.textQuaternary)
                         Text("No alternative covers found")
                             .foregroundColor(.white.opacity(0.6))
                     }
@@ -41,7 +41,7 @@ struct CoverSelectionView: View {
                                     isSelected: coverURL == selectedCoverURL,
                                     onTap: {
                                         selectedCoverURL = coverURL
-                                        HapticManager.shared.lightTap()
+                                        DesignSystem.HapticFeedback.light()
                                     }
                                 )
                             }
@@ -117,17 +117,17 @@ struct CoverOption: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                 } else {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .fill(Color.white.opacity(0.1))
                         .aspectRatio(0.66, contentMode: .fit)
                         .overlay {
                             ProgressView()
-                                .tint(.white.opacity(0.5))
+                                .tint(DesignSystem.Colors.textTertiary)
                         }
                 }
                 
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .stroke(Color.orange, lineWidth: 3)
                     
                     Circle()
@@ -142,7 +142,7 @@ struct CoverOption: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
         }
         .task {
             await loadCover()

@@ -30,7 +30,7 @@ struct SimpleQuoteCard: View {
                     Text(formatDate(note.dateCreated).uppercased())
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .kerning(1.2)
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
                     
                     Spacer()
                     
@@ -45,16 +45,16 @@ struct SimpleQuoteCard: View {
                                 Image(systemName: "arrow.right")
                                     .font(.system(size: 9, weight: .bold))
                             }
-                            .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                            .foregroundColor(DesignSystem.Colors.primaryAccent.opacity(0.7))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 5)
                             .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1))
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                    .stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 1)
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -136,21 +136,21 @@ struct SimpleQuoteCard: View {
         }
         .padding(32) // Generous padding
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color.white.opacity(0.05))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showDate)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: showDate)
         .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 showDate.toggle()
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }
         .pressEvents(onPress: {
             withAnimation(.spring(response: 0.1)) {

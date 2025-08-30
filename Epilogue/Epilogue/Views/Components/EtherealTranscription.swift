@@ -69,7 +69,7 @@ struct EtherealTranscription: View {
     private var previousLineView: some View {
         Text(previousLine)
             .font(.system(size: 17, weight: .medium, design: .rounded))
-            .foregroundColor(.white.opacity(0.5))
+            .foregroundColor(DesignSystem.Colors.textTertiary)
             .multilineTextAlignment(.center)
             .lineLimit(1)
             .blur(radius: oldTextBlur)
@@ -113,7 +113,7 @@ struct EtherealTranscription: View {
                             .animation(.easeOut(duration: 0.3), value: wordRevealProgress)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .frame(height: containerHeight)
                 .frame(maxWidth: geometry.size.width - 60)
             }

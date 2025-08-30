@@ -37,10 +37,10 @@ struct TemporalInsightsCard: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
     }
@@ -185,10 +185,10 @@ struct CharacterCompanionsCard: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
     }
@@ -226,10 +226,10 @@ struct ThemeConnectionsCard: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
     }

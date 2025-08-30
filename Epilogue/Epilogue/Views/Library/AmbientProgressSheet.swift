@@ -12,7 +12,7 @@ struct AmbientProgressSheet: View {
     // Floating indicator removed per user request
     @State private var hasUnsavedChanges = false
     
-    private let amberColor = Color(red: 1.0, green: 0.55, blue: 0.26)
+    private let amberColor = DesignSystem.Colors.primaryAccent
     
     private var primaryColor: Color {
         colorPalette?.primary ?? amberColor
@@ -185,7 +185,7 @@ struct AmbientProgressSheet: View {
                     .font(.system(size: 32, weight: .thin, design: .monospaced))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.3), value: displayProgress)
+                    .animation(DesignSystem.Animation.easeStandard, value: displayProgress)
             }
             .scaleEffect(isDragging ? 1.05 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
@@ -200,7 +200,7 @@ struct AmbientProgressSheet: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background track
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.white.opacity(0.15))
                     .frame(height: 12)
                 
@@ -237,7 +237,7 @@ struct AmbientProgressSheet: View {
                             )
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                 
                 // Current position indicator
                 if displayProgress > 0.02 {
@@ -250,7 +250,7 @@ struct AmbientProgressSheet: View {
                             .frame(width: 16, height: 16)
                             .shadow(color: .black.opacity(0.3), radius: 4)
                             .scaleEffect(isDragging ? 1.3 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
+                            .animation(DesignSystem.Animation.springStandard, value: isDragging)
                         
                         Spacer()
                     }
@@ -279,11 +279,11 @@ struct AmbientProgressSheet: View {
                     .font(.system(size: 24, weight: .light, design: .monospaced))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.2), value: displayPage)
+                    .animation(DesignSystem.Animation.easeQuick, value: displayPage)
                 
                 Text("current page")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .textCase(.uppercase)
                     .tracking(1)
             }
@@ -294,13 +294,13 @@ struct AmbientProgressSheet: View {
                 if let pageCount = book.pageCount {
                     Text("\(pageCount - displayPage)")
                         .font(.system(size: 24, weight: .light, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .contentTransition(.numericText())
-                        .animation(.easeInOut(duration: 0.2), value: displayPage)
+                        .animation(DesignSystem.Animation.easeQuick, value: displayPage)
                     
                     Text("pages left")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .textCase(.uppercase)
                         .tracking(1)
                 }
@@ -335,7 +335,7 @@ struct AmbientProgressSheet: View {
         
         if !isDragging {
             isDragging = true
-            HapticManager.shared.selectionChanged()
+            DesignSystem.HapticFeedback.selection()
         }
         
         // Use the actual timeline width from GeometryReader
@@ -351,7 +351,7 @@ struct AmbientProgressSheet: View {
         let progressPercent = Int(newProgress * 100)
         let currentPercent = Int(progress * 100)
         if abs(progressPercent - currentPercent) >= 5 {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }
     }
     
@@ -374,7 +374,7 @@ struct AmbientProgressSheet: View {
     private func saveProgress() {
         viewModel.updateBookProgress(book, currentPage: currentPage)
         hasUnsavedChanges = false
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         // Close sheet after brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

@@ -195,21 +195,21 @@ struct CleanNotesView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(Color.white.opacity(0.05))
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.top, 16)
             .padding(.bottom, 8)
             .transition(.asymmetric(
@@ -224,7 +224,7 @@ struct CleanNotesView: View {
         NavigationStack {
             ZStack {
                 // Dark background matching library
-                Color(red: 0.11, green: 0.105, blue: 0.102)
+                DesignSystem.Colors.surfaceBackground
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -249,15 +249,15 @@ struct CleanNotesView: View {
                         // Selection mode button (only show when in selection mode)
                         if isSelectionMode {
                             Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                withAnimation(DesignSystem.Animation.springStandard) {
                                     isSelectionMode = false
                                     selectedItems.removeAll()
                                 }
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                             } label: {
                                 Text("Done")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                             }
                             
                             if !selectedItems.isEmpty {
@@ -272,30 +272,30 @@ struct CleanNotesView: View {
                         }
                         // Search button - simple
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 showSearchBar.toggle()
                                 if !showSearchBar {
                                     searchText = ""
                                 }
                             }
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         } label: {
                             if showSearchBar {
                                 // Liquid glass close button with amber tint
                                 ZStack {
                                     Circle()
-                                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
                                         .frame(width: 28, height: 28)
                                         .glassEffect()
                                     
                                     Image(systemName: "xmark")
                                         .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                                 }
                             } else {
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 16, weight: .regular))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                             }
                         }
                         
@@ -303,10 +303,10 @@ struct CleanNotesView: View {
                         Menu {
                             ForEach(FilterType.allCases, id: \.self) { filter in
                                 Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    withAnimation(DesignSystem.Animation.springStandard) {
                                         selectedFilter = filter
                                     }
-                                    HapticManager.shared.lightTap()
+                                    DesignSystem.HapticFeedback.light()
                                 } label: {
                                     Label {
                                         HStack {
@@ -335,7 +335,7 @@ struct CleanNotesView: View {
                         // Settings button - simple
                         Button {
                             showingSettings = true
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         } label: {
                             Image(systemName: "gearshape.fill")
                                 .font(.system(size: 16))
@@ -407,7 +407,7 @@ struct CleanNotesView: View {
                                             .id(quote.id)
                                     }
                                 }
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                                 .transition(.asymmetric(
                                     insertion: .scale(scale: 0.95).combined(with: .opacity),
                                     removal: .scale(scale: 0.95).combined(with: .opacity)
@@ -426,14 +426,14 @@ struct CleanNotesView: View {
                         scrollOffset: scrollOffset,
                         onToggle: {
                             if selectedFilter == .byBook {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                withAnimation(DesignSystem.Animation.springStandard) {
                                     if collapsedSections.contains(section) {
                                         collapsedSections.remove(section)
                                     } else {
                                         collapsedSections.insert(section)
                                     }
                                 }
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                             }
                         }
                     )
@@ -442,7 +442,7 @@ struct CleanNotesView: View {
             
             // Bottom padding with subtle gradient fade
             LinearGradient(
-                colors: [Color.clear, Color(red: 0.11, green: 0.105, blue: 0.102)],
+                colors: [Color.clear, DesignSystem.Colors.surfaceBackground],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -460,43 +460,43 @@ struct CleanNotesView: View {
                 if isSelectionMode {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 22))
-                        .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+                        .foregroundStyle(isSelected ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
                         .padding(12)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springQuick) {
                                 if isSelected {
                                     selectedItems.remove(note.id)
                                 } else {
                                     selectedItems.insert(note.id)
                                 }
                             }
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         }
                 }
             }
             .scaleEffect(isSelected ? 0.98 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isSelected)
+            .animation(DesignSystem.Animation.springQuick, value: isSelected)
             .contentShape(Rectangle())
             .onTapGesture {
                 if isSelectionMode {
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springQuick) {
                         if isSelected {
                             selectedItems.remove(note.id)
                         } else {
                             selectedItems.insert(note.id)
                         }
                     }
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
             }
             .onLongPressGesture(minimumDuration: 0.5) {
                 if !isSelectionMode {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         isSelectionMode = true
                         selectedItems.insert(note.id)
                     }
-                    HapticManager.shared.mediumTap()
+                    DesignSystem.HapticFeedback.medium()
                 }
             }
             .contextMenu {
@@ -549,43 +549,43 @@ struct CleanNotesView: View {
                 if isSelectionMode {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 22))
-                        .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+                        .foregroundStyle(isSelected ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
                         .padding(12)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springQuick) {
                                 if isSelected {
                                     selectedItems.remove(quote.id)
                                 } else {
                                     selectedItems.insert(quote.id)
                                 }
                             }
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         }
                 }
             }
             .scaleEffect(isSelected ? 0.98 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isSelected)
+            .animation(DesignSystem.Animation.springQuick, value: isSelected)
             .contentShape(Rectangle())
             .onTapGesture {
                 if isSelectionMode {
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springQuick) {
                         if isSelected {
                             selectedItems.remove(quote.id)
                         } else {
                             selectedItems.insert(quote.id)
                         }
                     }
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
             }
             .onLongPressGesture(minimumDuration: 0.5) {
                 if !isSelectionMode {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         isSelectionMode = true
                         selectedItems.insert(quote.id)
                     }
-                    HapticManager.shared.mediumTap()
+                    DesignSystem.HapticFeedback.medium()
                 }
             }
             .onTapGesture(count: 2) {
@@ -593,7 +593,7 @@ struct CleanNotesView: View {
                 if quote.source == .ambient {
                     selectedSessionQuote = quote
                     showingSessionSummary = true
-                    HapticManager.shared.mediumTap()
+                    DesignSystem.HapticFeedback.medium()
                 }
             }
         .contextMenu {
@@ -706,7 +706,7 @@ struct CleanNotesView: View {
         editedText = note.content
         notesViewModel.isEditingNote = true
         showEditSheet = true
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func startEdit(quote: CapturedQuote) {
@@ -715,18 +715,18 @@ struct CleanNotesView: View {
         editedText = quote.text
         notesViewModel.isEditingNote = true
         showEditSheet = true
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func saveEdit() {
         if let note = editingNote {
             note.content = editedText
             try? modelContext.save()
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         } else if let quote = editingQuote {
             quote.text = editedText
             try? modelContext.save()
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         }
         cancelEdit()
     }
@@ -753,13 +753,13 @@ struct CleanNotesView: View {
     private func deleteNote(_ note: CapturedNote) {
         modelContext.delete(note)
         try? modelContext.save()
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
     }
     
     private func deleteQuote(_ quote: CapturedQuote) {
         modelContext.delete(quote)
         try? modelContext.save()
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
     }
     
     private func deleteSelectedItems() {
@@ -773,12 +773,12 @@ struct CleanNotesView: View {
         
         try? modelContext.save()
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             selectedItems.removeAll()
             isSelectionMode = false
         }
         
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
     }
     
     // MARK: - Share Actions
@@ -805,7 +805,7 @@ struct CleanNotesView: View {
             rootViewController.present(activityController, animated: true)
         }
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func shareQuote(_ quote: CapturedQuote) {
@@ -830,7 +830,7 @@ struct CleanNotesView: View {
             rootViewController.present(activityController, animated: true)
         }
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
 }
 
@@ -854,7 +854,7 @@ private struct NoteStickyHeader: View {
                 if isCollapsible {
                     Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
                         .font(.system(size: isPinned ? 15 : 14, weight: .medium))
-                        .foregroundStyle(isPinned ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.6))
+                        .foregroundStyle(isPinned ? DesignSystem.Colors.primaryAccent : .white.opacity(0.6))
                         .frame(width: 20)
                 }
                 
@@ -864,7 +864,7 @@ private struct NoteStickyHeader: View {
                         size: isPinned ? 15 : 13,
                         weight: isPinned ? .bold : .semibold
                     ))
-                    .foregroundStyle(isPinned ? .white : .white.opacity(0.5))
+                    .foregroundStyle(isPinned ? .white : DesignSystem.Colors.textTertiary)
                     .tracking(isPinned ? 1.4 : 1.2)
                 
                 Spacer()
@@ -882,12 +882,12 @@ private struct NoteStickyHeader: View {
                             weight: .medium
                         ))
                 }
-                .foregroundStyle(isPinned ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+                .foregroundStyle(isPinned ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
             }
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!isCollapsible)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
@@ -910,14 +910,14 @@ private struct NoteStickyHeader: View {
             
             if isPinned {
                 // Amber tinted rectangular card with proper glass effect
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.08))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                    .padding(.horizontal, 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             } else {
                 // Non-pinned background
-                Color(red: 0.11, green: 0.105, blue: 0.102)
-                    .opacity(0.98)
+                DesignSystem.Colors.surfaceBackground
+                    .opacity(1.0)
             }
         }
         // Removed the bottom border overlay completely
@@ -938,7 +938,7 @@ private struct NoteCardView: View {
                 .kerning(1.2)
                 .foregroundStyle(
                     capturedNote?.source == .ambient 
-                        ? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6)
+                        ? DesignSystem.Colors.primaryAccent.opacity(0.6)
                         : .white.opacity(0.4)
                 )
             
@@ -955,16 +955,16 @@ private struct NoteCardView: View {
                         Image(systemName: "arrow.right")
                             .font(.system(size: 9, weight: .bold))
                     }
-                    .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                    .foregroundColor(DesignSystem.Colors.primaryAccent.opacity(0.7))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 5)
                     .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1))
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                            .stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 1)
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -992,13 +992,13 @@ private struct NoteCardView: View {
                     Text(bookTitle.uppercased())
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .kerning(0.8)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                     
                     if let author = note.author {
                         Text(author.uppercased())
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
                             .kerning(0.6)
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
                 }
                 .padding(.top, 12)
@@ -1017,19 +1017,19 @@ private struct NoteCardView: View {
             
             bookContext
         }
-        .padding(24)
+        .padding(DesignSystem.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .fill(Color.white.opacity(0.05))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.06)
+                            Color.white.opacity(0.10),
+                            Color.white.opacity(0.05)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -1037,12 +1037,12 @@ private struct NoteCardView: View {
                     lineWidth: 0.5
                 )
         )
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showDate)
+        .animation(DesignSystem.Animation.springStandard, value: showDate)
         .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 showDate.toggle()
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }
     }
     

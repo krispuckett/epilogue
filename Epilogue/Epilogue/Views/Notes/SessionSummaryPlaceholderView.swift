@@ -74,7 +74,7 @@ struct SessionSummaryPlaceholderView: View {
                 
                 Image(systemName: "waveform.circle")
                     .font(.system(size: 64))
-                    .foregroundStyle(Color.white.opacity(0.3))
+                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
                 
                 Text("Session Details")
                     .font(.system(size: 28, weight: .semibold, design: .default))
@@ -84,7 +84,7 @@ struct SessionSummaryPlaceholderView: View {
                     VStack(spacing: 12) {
                         Text("Note from Ambient Session")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                         
                         Text(note.content)
                             .font(.system(size: 17))
@@ -100,7 +100,7 @@ struct SessionSummaryPlaceholderView: View {
                     VStack(spacing: 12) {
                         Text("Quote from Ambient Session")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                         
                         Text("\"\(quote.text)\"")
                             .font(.custom("Georgia", size: 20))
@@ -141,7 +141,7 @@ struct SessionSummaryPlaceholderView: View {
                 .padding(.bottom, 32)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(red: 0.11, green: 0.105, blue: 0.102))
+            .background(DesignSystem.Colors.surfaceBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -150,7 +150,7 @@ struct SessionSummaryPlaceholderView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     }
                 }
             }

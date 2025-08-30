@@ -93,7 +93,7 @@ struct WaveformHeroButton: View {
                 )
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
     }
 }
 

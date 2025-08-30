@@ -23,8 +23,8 @@ final class PaletteTransitionCoordinator: ObservableObject {
     // MARK: - Animation Configurations
     private let enterAnimation = Animation.spring(response: 0.35, dampingFraction: 0.85)
     private let exitAnimation = Animation.spring(response: 0.25, dampingFraction: 0.95)
-    private let contentAnimation = Animation.easeInOut(duration: 0.2)
-    private let backdropAnimation = Animation.easeInOut(duration: 0.3)
+    private let contentAnimation = DesignSystem.Animation.easeQuick
+    private let backdropAnimation = DesignSystem.Animation.easeStandard
     
     // MARK: - Timing Constants
     private let keyboardDismissDelay: TimeInterval = 0.05 // 50ms before palette

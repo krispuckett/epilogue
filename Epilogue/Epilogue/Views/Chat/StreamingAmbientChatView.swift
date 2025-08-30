@@ -212,7 +212,7 @@ struct StreamingAmbientChatView: View {
                 Text(message.content)
                     .padding(12)
                     .foregroundColor(.white)
-                    .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                    .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                     .cornerRadius(16)
                 
                 Text(formatTimestamp(message.timestamp))
@@ -233,7 +233,7 @@ struct StreamingAmbientChatView: View {
                         Text(message.content)
                             .padding(12)
                             .background(Color.secondary.opacity(0.1))
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                         
                         // Metadata
                         if let metadata = message.metadata {
@@ -301,10 +301,10 @@ struct StreamingAmbientChatView: View {
                             Text(message.content)
                                 .padding(12)
                                 .background(Color.secondary.opacity(0.1))
-                                .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                                .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                                 .overlay(
                                     // Streaming indicator
-                                    RoundedRectangle(cornerRadius: 16)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                                         .stroke(Color.green.opacity(0.5), lineWidth: 1)
                                         .scaleEffect(1.02)
                                         .opacity(message.isComplete ? 0 : 1)

@@ -78,10 +78,10 @@ struct IntelligentCommandPalette: View {
                         ))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 12)
                 .glassEffect()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                 
                 // Real-time command preview
                 if !commandText.isEmpty && parsedIntent != .unknown {
@@ -92,7 +92,7 @@ struct IntelligentCommandPalette: View {
                         ))
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             
             // @Book mention suggestions
             if showingBookMentions && !mentionSuggestions.isEmpty {
@@ -103,7 +103,7 @@ struct IntelligentCommandPalette: View {
                             .foregroundColor(.white.opacity(0.6))
                         Spacer()
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 8)
                     
                     ScrollView {
@@ -114,13 +114,13 @@ struct IntelligentCommandPalette: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     }
                     .frame(maxHeight: 200)
                 }
                 .glassEffect()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 16)
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .transition(.asymmetric(
                     insertion: .push(from: .top).combined(with: .opacity),
                     removal: .push(from: .bottom).combined(with: .opacity)
@@ -136,7 +136,7 @@ struct IntelligentCommandPalette: View {
                             .foregroundColor(.white.opacity(0.6))
                         Spacer()
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     
                     VStack(spacing: 4) {
                         ForEach(suggestions) { suggestion in
@@ -146,7 +146,7 @@ struct IntelligentCommandPalette: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 }
                 .padding(.vertical, 12)
             }
@@ -154,7 +154,7 @@ struct IntelligentCommandPalette: View {
             // Examples section
             if commandText.isEmpty {
                 ExamplesSection()
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.bottom, 16)
             }
         }
@@ -185,8 +185,8 @@ struct IntelligentCommandPalette: View {
         .onAppear {
             isFocused = true
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingBookMentions)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: parsedIntent)
+        .animation(DesignSystem.Animation.springStandard, value: showingBookMentions)
+        .animation(DesignSystem.Animation.springStandard, value: parsedIntent)
     }
     
     // MARK: - Text Change Handler
@@ -239,7 +239,7 @@ struct IntelligentCommandPalette: View {
         processor.processInlineCommand(commandText)
         
         // Haptic feedback
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         // Clear and dismiss
         commandText = ""
@@ -324,7 +324,7 @@ struct CommandPreviewCard: View {
         }
         .padding(12)
         .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
     }
     
     private var previewTitle: String {
@@ -377,18 +377,18 @@ struct BookMentionRow: View {
                             .aspectRatio(contentMode: .fit)
                     } placeholder: {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
                     }
                     .frame(width: 28, height: 42)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
                         .frame(width: 28, height: 42)
                         .overlay(
                             Text(String(book.title.prefix(1)))
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .foregroundColor(DesignSystem.Colors.primaryAccent)
                         )
                 }
                 
@@ -409,7 +409,7 @@ struct BookMentionRow: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .glassEffect()
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         }
         .buttonStyle(.plain)
     }
@@ -425,7 +425,7 @@ struct SmartSuggestionRow: View {
             HStack {
                 Image(systemName: suggestion.icon)
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -470,15 +470,15 @@ struct ExamplesSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(example)
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .foregroundColor(DesignSystem.Colors.primaryAccent)
                         Text(description)
                             .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(8)
                     .glassEffect()
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                 }
             }
         }

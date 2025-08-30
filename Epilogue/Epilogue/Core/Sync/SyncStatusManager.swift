@@ -134,7 +134,7 @@ struct SyncStatusView: View {
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
-        .animation(.easeInOut(duration: 0.2), value: syncManager.status)
+        .animation(DesignSystem.Animation.easeQuick, value: syncManager.status)
     }
     
     @ViewBuilder

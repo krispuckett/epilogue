@@ -104,9 +104,9 @@ struct SessionTimelineCard: View {
                     Text(sessionMetrics.duration)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                 }
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
-            .padding(20)
+            .padding(DesignSystem.Spacing.listItemPadding)
             
             // Expanded content
             if isExpanded {
@@ -117,7 +117,7 @@ struct SessionTimelineCard: View {
                     HStack(spacing: 12) {
                         // Continue button
                         Button {
-                            HapticManager.shared.mediumTap()
+                            DesignSystem.HapticFeedback.medium()
                             onContinue()
                         } label: {
                             Label("Continue", systemImage: "arrow.right.circle")
@@ -126,14 +126,14 @@ struct SessionTimelineCard: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .background {
-                                    RoundedRectangle(cornerRadius: 10)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                                         .fill(.white.opacity(0.1))
                                 }
                         }
                         
                         // View details button
                         Button {
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                             onViewDetail()
                         } label: {
                             Label("View", systemImage: "doc.text")
@@ -142,12 +142,12 @@ struct SessionTimelineCard: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .background {
-                                    RoundedRectangle(cornerRadius: 10)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                                         .fill(.white.opacity(0.1))
                                 }
                         }
                     }
-                    .padding(16)
+                    .padding(DesignSystem.Spacing.inlinePadding)
                 }
             }
         }
@@ -164,24 +164,24 @@ struct SessionTimelineCard: View {
                 )
             }
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
         .onTapGesture {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springQuick) {
                 isPressed = true
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             onTap()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springQuick) {
                     isPressed = false
                 }
             }

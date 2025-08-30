@@ -29,8 +29,8 @@ struct InitialEmptyStateView: View {
                     .foregroundStyle(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26),
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7)
+                                DesignSystem.Colors.primaryAccent,
+                                DesignSystem.Colors.primaryAccent.opacity(0.7)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -38,7 +38,7 @@ struct InitialEmptyStateView: View {
                     )
                     .offset(y: iconOffset)
                     .opacity(iconOpacity)
-                    .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3), radius: 20, y: 10)
+                    .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.3), radius: 20, y: 10)
             }
             
             // Welcome message
@@ -50,7 +50,7 @@ struct InitialEmptyStateView: View {
                     
                     Text("Just start talking about what you're reading")
                         .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .multilineTextAlignment(.center)
                 } else {
                     Text("Welcome to your reading companion")
@@ -60,7 +60,7 @@ struct InitialEmptyStateView: View {
                     
                     Text("Let's explore your library together")
                         .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
             }
@@ -94,11 +94,11 @@ struct InitialEmptyStateView: View {
                                 .font(.system(size: 16, weight: .medium))
                         }
                         .foregroundStyle(.white.opacity(0.8))
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         .padding(.vertical, 12)
                         .background {
                             Capsule()
-                                .fill(.white.opacity(0.08))
+                                .fill(.white.opacity(0.10))
                                 .overlay {
                                     Capsule()
                                         .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
@@ -174,7 +174,7 @@ struct BookEmptyStateView: View {
                 
                 Text("by \(book.author)")
                     .font(.system(size: 16, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
             .opacity(contentOpacity)
             .padding(.top, -20) // Move higher
@@ -187,11 +187,11 @@ struct BookEmptyStateView: View {
                     height: 180,
                     loadFullImage: false
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                 .opacity(1.0 * coverOpacity)
                 .scaleEffect(coverScale)
                 .shadow(
-                    color: (colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26)).opacity(0.2),
+                    color: (colorPalette?.primary ?? DesignSystem.Colors.primaryAccent).opacity(0.2),
                     radius: 30,
                     y: 15
                 )
@@ -215,7 +215,7 @@ struct BookEmptyStateView: View {
                     ForEach(bookQuotes) { quote in
                         QuoteStarter(
                             quote: quote,
-                            color: colorPalette?.secondary ?? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8)
+                            color: colorPalette?.secondary ?? DesignSystem.Colors.primaryAccent.opacity(0.8)
                         ) {
                             onSuggestionTap("Let's discuss this quote: \"\(quote.content)\"")
                         }
@@ -265,15 +265,15 @@ struct SuggestionChip: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 14)
             .background {
                 Capsule()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15),
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.08)
+                                DesignSystem.Colors.primaryAccent.opacity(0.15),
+                                DesignSystem.Colors.primaryAccent.opacity(0.10)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -282,7 +282,7 @@ struct SuggestionChip: View {
                     .overlay {
                         Capsule()
                             .strokeBorder(
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2),
+                                DesignSystem.Colors.primaryAccent.opacity(0.2),
                                 lineWidth: 1
                             )
                     }
@@ -293,7 +293,7 @@ struct SuggestionChip: View {
         .buttonStyle(.plain)
         .onTapGesture {
             isPressed = true
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isPressed = false
                 action()
@@ -321,14 +321,14 @@ struct QuestionChip: View {
             Text(text)
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.8))
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
                 .background {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.white.opacity(0.06))
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                        .fill(.white.opacity(0.05))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                                 .strokeBorder(color.opacity(0.2), lineWidth: 0.5)
                         }
                 }
@@ -359,17 +359,17 @@ struct QuoteStarter: View {
                 
                 Text(quote.content)
                     .font(.system(size: 14, design: .serif))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(color.opacity(0.08))
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(color.opacity(0.10))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                             .strokeBorder(color.opacity(0.15), lineWidth: 0.5)
                     }
             }

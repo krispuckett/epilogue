@@ -46,7 +46,7 @@ struct OptimizedBookDetailView: View {
     
     private var accentColor: Color {
         guard let palette = colorPalette ?? cachedPalette else {
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
         
         let bookAccent = palette.accent
@@ -77,7 +77,7 @@ struct OptimizedBookDetailView: View {
             }
         }
         
-        return Color(red: 1.0, green: 0.55, blue: 0.26)
+        return DesignSystem.Colors.primaryAccent
     }
     
     var body: some View {
@@ -219,7 +219,7 @@ struct OptimizedBookDetailView: View {
                 .font(.system(size: 28, weight: .semibold, design: .serif))
                 .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             
             // Author
             Text("by \(book.author)")
@@ -247,10 +247,10 @@ struct OptimizedBookDetailView: View {
             .padding(.vertical, 6)
             .background(accentColor.opacity(0.2))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(accentColor.opacity(0.5), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
     }
     
     // MARK: - Lazy Sections
@@ -259,7 +259,7 @@ struct OptimizedBookDetailView: View {
         HStack(spacing: 0) {
             ForEach(BookSection.allCases, id: \.self) { section in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         selectedSection = section
                     }
                 } label: {
@@ -285,7 +285,7 @@ struct OptimizedBookDetailView: View {
         }
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     private var progressSection: some View {
@@ -399,11 +399,11 @@ struct OptimizedBookCoverView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: width, height: height)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             } else {
                 // Placeholder
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: width, height: height)
                     .overlay(
@@ -454,7 +454,7 @@ private func generatePlaceholderPalette() -> ColorPalette {
     ColorPalette(
         primary: Color(red: 0.2, green: 0.2, blue: 0.3),
         secondary: Color(red: 0.3, green: 0.3, blue: 0.4),
-        accent: Color(red: 1.0, green: 0.55, blue: 0.26),
+        accent: DesignSystem.Colors.primaryAccent,
         background: Color.black,
         textColor: .white,
         luminance: 0.3,

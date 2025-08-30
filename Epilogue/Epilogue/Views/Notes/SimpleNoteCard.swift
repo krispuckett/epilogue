@@ -70,15 +70,15 @@ struct SimpleNoteCard: View {
                 .padding(.top, 4)
             }
         }
-        .padding(20)
-        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .onTapGesture {
             // Handle tap
         }

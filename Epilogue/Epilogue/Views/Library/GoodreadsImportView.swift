@@ -158,9 +158,9 @@ struct GoodreadsImportView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(Color.green.opacity(0.3), lineWidth: 1)
         )
         .padding(.horizontal)
@@ -168,7 +168,7 @@ struct GoodreadsImportView: View {
         .onAppear {
             // Auto-dismiss after 3 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignSystem.Animation.easeStandard) {
                     showingSuccessToast = false
                 }
             }
@@ -199,7 +199,7 @@ struct GoodreadsImportView: View {
                     
                     Text("Bring your entire Goodreads library to Epilogue")
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 32)
@@ -218,9 +218,9 @@ struct GoodreadsImportView: View {
                         InstructionRow(number: "5", text: "Download the CSV file")
                     }
                 }
-                .padding(24)
+                .padding(DesignSystem.Spacing.cardPadding)
                 .frame(maxWidth: .infinity)
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
                 .padding(.horizontal)
                 
                 // What gets imported
@@ -237,9 +237,9 @@ struct GoodreadsImportView: View {
                         ImportFeatureRow(icon: "folder.fill", text: "Shelves as collections", color: .orange)
                     }
                 }
-                .padding(24)
+                .padding(DesignSystem.Spacing.cardPadding)
                 .frame(maxWidth: .infinity)
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
                 .padding(.horizontal)
                 
                 // Import button
@@ -255,12 +255,12 @@ struct GoodreadsImportView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                             .stroke(Color.orange.opacity(0.3), lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                 }
                 .padding(.horizontal)
                 
@@ -269,22 +269,22 @@ struct GoodreadsImportView: View {
                     Toggle(isOn: $overwriteDuplicates) {
                         HStack(spacing: 8) {
                             Image(systemName: overwriteDuplicates ? "arrow.triangle.2.circlepath" : "books.vertical")
-                                .foregroundColor(overwriteDuplicates ? .orange : .white.opacity(0.7))
+                                .foregroundColor(overwriteDuplicates ? .orange : DesignSystem.Colors.textSecondary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(overwriteDuplicates ? "Update Existing Books" : "Skip Duplicates")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                 Text(overwriteDuplicates ? "Overwrite book data with CSV values" : "Keep existing books unchanged")
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(DesignSystem.Colors.textTertiary)
                             }
                         }
                     }
                     .toggleStyle(SwitchToggleStyle(tint: .orange))
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.vertical, 12)
                     .background(Color.white.opacity(0.05))
-                    .glassEffect(in: .rect(cornerRadius: 12))
+                    .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
@@ -292,7 +292,7 @@ struct GoodreadsImportView: View {
                 // Note about processing
                 Text("Large libraries may take a few minutes to import")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 32)
             }
@@ -333,7 +333,7 @@ struct GoodreadsImportView: View {
                     if let progress = importService.currentProgress {
                         Text("\(progress.current) of \(progress.total)")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
                     }
                 }
             }
@@ -343,7 +343,7 @@ struct GoodreadsImportView: View {
                 VStack(spacing: 8) {
                     Text("Processing")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
                     
                     Text(currentBook)
                         .font(.headline)
@@ -352,9 +352,9 @@ struct GoodreadsImportView: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 300)
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                 .padding(.vertical, 16)
-                .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             }
             
             // Stats grid
@@ -388,7 +388,7 @@ struct GoodreadsImportView: View {
                     VStack(spacing: 8) {
                         Text("Import Speed")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                         
                         Picker("Speed", selection: $selectedSpeed) {
                             ForEach(GoodreadsImportService.ImportSpeed.allCases, id: \.self) { speed in
@@ -431,7 +431,7 @@ struct GoodreadsImportView: View {
                         }
                         .foregroundColor(.white)
                         .frame(width: 120, height: 44)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     }
                     
                     Button {
@@ -441,7 +441,7 @@ struct GoodreadsImportView: View {
                         Text("Cancel")
                             .foregroundColor(.red)
                             .frame(width: 120, height: 44)
-                            .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     }
                 }
             }
@@ -511,7 +511,7 @@ struct GoodreadsImportView: View {
                     HStack(spacing: 12) {
                         ForEach(ResultsTab.allCases, id: \.self) { tab in
                             Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                withAnimation(DesignSystem.Animation.easeQuick) {
                                     selectedTab = tab
                                 }
                             } label: {
@@ -523,17 +523,17 @@ struct GoodreadsImportView: View {
                                         .fontWeight(selectedTab == tab ? .semibold : .regular)
                                 }
                                 .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.6))
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                                 .padding(.vertical, 8)
-                                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                         .stroke(
                                             selectedTab == tab ? Color.orange.opacity(0.3) : Color.clear,
                                             lineWidth: 1
                                         )
                                 )
-                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
                             }
                         }
                     }
@@ -545,14 +545,14 @@ struct GoodreadsImportView: View {
                 if totalResultsCount > 20 {
                     HStack {
                         Image(systemName: "magnifyingglass")
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                         
                         TextField("Search books...", text: $searchText)
                             .foregroundColor(.white)
                             .autocorrectionDisabled()
                     }
                     .padding(12)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     .padding(.horizontal)
                     .padding(.bottom, 16)
                 }
@@ -692,7 +692,7 @@ struct GoodreadsImportView: View {
                         }
                         
                         self.successMessage = "\(result.successful.count) books successfully added to your library"
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             self.showingSuccessToast = true
                         }
                     }
@@ -844,7 +844,7 @@ struct ImportStatCard: View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
             
             Text(value)
                 .font(.headline)
@@ -853,11 +853,11 @@ struct ImportStatCard: View {
             
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
     }
 }
 
@@ -879,7 +879,7 @@ struct ResultStatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
     }
 }
 
@@ -906,7 +906,7 @@ struct ImportedBookRow: View {
                         .overlay(
                             Image(systemName: "book.fill")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.3))
+                                .foregroundColor(DesignSystem.Colors.textQuaternary)
                         )
                 }
             }
@@ -952,7 +952,7 @@ struct ImportedBookRow: View {
                 .foregroundColor(.green.opacity(0.8))
         }
         .padding(12)
-        .glassEffect(in: .rect(cornerRadius: 12))
+        .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
         .task {
             await loadCover()
         }
@@ -1034,11 +1034,11 @@ struct UnmatchedBookRow: View {
                     .foregroundColor(.orange)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.small))
             }
         }
         .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
     }
 }
 
@@ -1080,7 +1080,7 @@ struct DuplicateBookRow: View {
                 .foregroundColor(.blue.opacity(0.8))
         }
         .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
     }
 }
 
@@ -1145,7 +1145,7 @@ struct ManualMatchView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                     .frame(width: 44, height: 44)
             }
             
@@ -1159,7 +1159,7 @@ struct ManualMatchView: View {
                 
                 Text("Select the correct edition")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
             }
             
             Spacer()
@@ -1171,10 +1171,10 @@ struct ManualMatchView: View {
                 Text("Skip")
                     .font(.subheadline)
                     .foregroundColor(.orange)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 8)
                     .glassEffect()
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
             }
         }
         .padding()
@@ -1186,7 +1186,7 @@ struct ManualMatchView: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 // Book icon placeholder
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(LinearGradient(
                         colors: [Color.orange.opacity(0.3), Color.orange.opacity(0.1)],
                         startPoint: .topLeading,
@@ -1208,13 +1208,13 @@ struct ManualMatchView: View {
                     
                     Text(unmatchedBook.goodreadsBook.author)
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                         .lineLimit(1)
                     
                     if let isbn = unmatchedBook.goodreadsBook.primaryISBN {
                         Text("ISBN: \(isbn)")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
                 }
                 
@@ -1261,13 +1261,13 @@ struct ManualMatchView: View {
                 Spacer()
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .glassEffect()
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(Color.orange.opacity(0.2), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     // MARK: - Search Bar
@@ -1276,7 +1276,7 @@ struct ManualMatchView: View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .font(.body)
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
             
             TextField("Search for this book...", text: $searchQuery)
                 .foregroundColor(.white)
@@ -1292,7 +1292,7 @@ struct ManualMatchView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.body)
-                        .foregroundColor(.white.opacity(0.3))
+                        .foregroundColor(DesignSystem.Colors.textQuaternary)
                 }
             }
             
@@ -1305,11 +1305,11 @@ struct ManualMatchView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.small))
             }
         }
         .padding(14)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     // MARK: - Loading View
@@ -1332,15 +1332,15 @@ struct ManualMatchView: View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass.circle")
                 .font(.system(size: 48))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(DesignSystem.Colors.textQuaternary)
             
             Text("No results found")
                 .font(.headline)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(DesignSystem.Colors.textSecondary)
             
             Text("Try adjusting your search terms")
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
         }
     }
     
@@ -1354,7 +1354,7 @@ struct ManualMatchView: View {
                         book: book,
                         isSelected: selectedBookId == book.id,
                         onSelect: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(DesignSystem.Animation.easeQuick) {
                                 if selectedBookId == book.id {
                                     matchBook(book)
                                 } else {
@@ -1467,7 +1467,7 @@ struct BookMatchRow: View {
             HStack(spacing: 12) {
                 // Cover with async loading
                 ZStack {
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .fill(Color.white.opacity(0.05))
                         .frame(width: 60, height: 90)
                     
@@ -1478,14 +1478,14 @@ struct BookMatchRow: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 60, height: 90)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         case .failure(_):
                             Image(systemName: "book.fill")
                                 .font(.title2)
                                 .foregroundColor(.white.opacity(0.2))
                         case .empty:
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.3)))
+                                .progressViewStyle(CircularProgressViewStyle(tint: DesignSystem.Colors.textQuaternary))
                                 .scaleEffect(0.6)
                         @unknown default:
                             EmptyView()
@@ -1493,7 +1493,7 @@ struct BookMatchRow: View {
                     }
                 }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 2)
                 )
                 
@@ -1508,7 +1508,7 @@ struct BookMatchRow: View {
                     
                     Text(book.author)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                         .lineLimit(1)
                     
                     HStack(spacing: 12) {
@@ -1519,7 +1519,7 @@ struct BookMatchRow: View {
                                     .foregroundColor(.white.opacity(0.4))
                                 Text(year)
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(DesignSystem.Colors.textTertiary)
                             }
                         }
                         
@@ -1530,7 +1530,7 @@ struct BookMatchRow: View {
                                     .foregroundColor(.white.opacity(0.4))
                                 Text("\(pageCount) pages")
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(DesignSystem.Colors.textTertiary)
                             }
                         }
                         
@@ -1559,14 +1559,14 @@ struct BookMatchRow: View {
                 }
             }
             .padding(12)
-            .glassEffect(.regular, in: .rect(cornerRadius: 12))
+            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .stroke(isSelected ? Color.orange.opacity(0.3) : Color.white.opacity(0.05), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
             .scaleEffect(isSelected ? 1.02 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: isSelected)
+            .animation(DesignSystem.Animation.easeQuick, value: isSelected)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -1593,7 +1593,7 @@ struct BookSearchRow: View {
                         } placeholder: {
                             Image(systemName: "book.fill")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.3))
+                                .foregroundColor(DesignSystem.Colors.textQuaternary)
                         }
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -1622,11 +1622,11 @@ struct BookSearchRow: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(DesignSystem.Colors.textQuaternary)
             }
             .padding(12)
             .glassEffect()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         }
     }
 }

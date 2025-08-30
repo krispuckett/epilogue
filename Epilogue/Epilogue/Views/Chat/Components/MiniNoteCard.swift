@@ -43,7 +43,7 @@ struct MiniNoteCard: View {
                         
                         Text(book.title)
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                             .textCase(.uppercase)
                         
                         if let pageNumber = note.pageNumber {
@@ -57,9 +57,9 @@ struct MiniNoteCard: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(in: .rect(cornerRadius: 12))
+            .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
             )
         }
@@ -80,7 +80,7 @@ struct MiniQuoteCard: View {
                 // Small quotation mark like original design
                 Text("\u{201C}")
                     .font(.custom("Georgia", size: 36))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.4))
                     .frame(height: 16)
                     .offset(y: 8)
                 
@@ -98,14 +98,14 @@ struct MiniQuoteCard: View {
                     if let author = quote.author ?? quote.book?.author {
                         Text("— \(author)")
                             .font(.system(size: 12, weight: .medium, design: .serif))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
                     }
                     
                     if let book = quote.book {
                         HStack(spacing: 4) {
                             Text(book.title)
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                                 .textCase(.uppercase)
                             
                             if let pageNumber = quote.pageNumber {
@@ -119,12 +119,12 @@ struct MiniQuoteCard: View {
                 }
                 .padding(.top, 4)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(in: .rect(cornerRadius: 12))
+            .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.2), lineWidth: 0.5)
             )
         }
         .buttonStyle(PlainButtonStyle())

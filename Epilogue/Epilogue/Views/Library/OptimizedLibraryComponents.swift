@@ -38,9 +38,9 @@ struct OptimizedLibraryGridItem: View {
     @ViewBuilder
     private var highlightOverlay: some View {
         if isHighlighted {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
-                .animation(.easeInOut(duration: 0.3), value: isHighlighted)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 2)
+                .animation(DesignSystem.Animation.easeStandard, value: isHighlighted)
         }
     }
     
@@ -89,7 +89,7 @@ struct OptimizedLibraryGridItem: View {
         // Check cache first
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: book.id) {
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignSystem.Animation.easeStandard) {
                     colorPalette = cachedPalette
                 }
                 isLoadingPalette = false
@@ -106,7 +106,7 @@ struct OptimizedLibraryGridItem: View {
                 await BookColorPaletteCache.shared.cachePalette(palette, for: book.id, coverURL: coverURL)
                 
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignSystem.Animation.easeStandard) {
                         colorPalette = palette
                     }
                     isLoadingPalette = false
@@ -141,10 +141,10 @@ struct OptimizedBookListRow: View {
         NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
             rowContent
                 .scaleEffect(isPressed ? 0.98 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+                .animation(DesignSystem.Animation.springStandard, value: isPressed)
                 .onHover { hovering in
                     if !isScrolling {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(DesignSystem.Animation.easeQuick) {
                             isHovered = hovering
                         }
                     }
@@ -169,7 +169,7 @@ struct OptimizedBookListRow: View {
     private var rowContent: some View {
         ZStack {
             // Simplified background
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color.black.opacity(0.2))
             
             // Gradient overlay only when not scrolling
@@ -185,14 +185,14 @@ struct OptimizedBookListRow: View {
                     endPoint: .trailing
                 )
                 .blur(radius: 20)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                 .opacity(isHovered ? 1 : 0.7)
             }
             
             // Border
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(
-                    isHighlighted ? Color(red: 1.0, green: 0.55, blue: 0.26) : Color.white.opacity(0.1),
+                    isHighlighted ? DesignSystem.Colors.primaryAccent : Color.white.opacity(0.1),
                     lineWidth: isHighlighted ? 2 : 1
                 )
             
@@ -206,7 +206,7 @@ struct OptimizedBookListRow: View {
                     loadFullImage: false,
                     isLibraryView: true
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                 .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
                 .padding(.trailing, 12)
                 
@@ -250,8 +250,8 @@ struct OptimizedBookListRow: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26),
-                                    colorPalette?.secondary ?? Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8)
+                                    colorPalette?.primary ?? DesignSystem.Colors.primaryAccent,
+                                    colorPalette?.secondary ?? DesignSystem.Colors.primaryAccent.opacity(0.8)
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing

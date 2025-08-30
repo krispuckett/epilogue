@@ -179,7 +179,7 @@ struct AmbientReadingView: View {
         NotificationCenter.default.publisher(for: Notification.Name("VisualFeedbackRequested"))
             .compactMap { $0.object as? VisualHint }
             .sink { hint in
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignSystem.Animation.easeStandard) {
                     visualEffect = hint
                 }
                 
@@ -229,21 +229,21 @@ struct ResponseCard: View {
             HStack(spacing: 16) {
                 Button("Yes, please") {
                     // Handle acceptance
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     onDismiss()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Not now") {
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                     onDismiss()
                 }
                 .buttonStyle(.bordered)
             }
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.listItemPadding)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(.regularMaterial)
                 .shadow(color: Color(hexString: response.reaction.type.color).opacity(0.3), radius: 20)
         )

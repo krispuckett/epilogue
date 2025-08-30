@@ -44,7 +44,7 @@ struct AmbientSessionSummaryView: View {
                         // Primary content card - show most recent or most relevant question
                         if let mostRelevantQuestion = findMostRelevantQuestion() {
                             primaryInsightCard(question: mostRelevantQuestion)
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                                 .padding(.bottom, 24)
                         }
                         
@@ -60,11 +60,30 @@ struct AmbientSessionSummaryView: View {
                                 .padding(.bottom, 32)
                         }
                         
-                        // Follow-up messages
-                        ForEach(additionalMessages) { message in
-                            MinimalMessageView(message: message)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 16)
+                        // Follow-up messages in ambient style
+                        if !additionalMessages.isEmpty {
+                            VStack(alignment: .leading, spacing: 20) {
+                                Text("FOLLOW-UP")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                                    .tracking(1.2)
+                                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                                
+                                VStack(spacing: 1) {
+                                    // Start numbering after existing questions
+                                    // Only show AI messages (which contain both Q&A)
+                                    let aiMessages = additionalMessages.filter { !$0.isUser }
+                                    let startIndex = session.capturedQuestions.count
+                                    ForEach(Array(aiMessages.enumerated()), id: \.element.id) { index, message in
+                                        MinimalMessageView(
+                                            message: message,
+                                            index: startIndex + index
+                                        )
+                                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                                    }
+                                }
+                            }
+                            .padding(.bottom, 32)
                         }
                         
                         Spacer(minLength: 120)
@@ -170,7 +189,7 @@ struct AmbientSessionSummaryView: View {
                     .frame(width: 44, height: 44)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 8)
         .frame(height: 56)
     }
@@ -187,7 +206,7 @@ struct AmbientSessionSummaryView: View {
                         width: 80,
                         height: 120
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                     .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
                 }
                 
@@ -200,7 +219,7 @@ struct AmbientSessionSummaryView: View {
                     
                     Text(book.author)
                         .font(.system(size: 16, weight: .medium, design: .default))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
         }
@@ -244,7 +263,7 @@ struct AmbientSessionSummaryView: View {
                             
                             Image(systemName: "pencil")
                                 .font(.system(size: 10))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         }
                         
                         Text("PAGE")
@@ -266,7 +285,7 @@ struct AmbientSessionSummaryView: View {
                 metricItem(value: "\(session.capturedNotes.count)", label: "NOTES")
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .onTapGesture {
             if editingPage {
                 savePageNumber()
@@ -291,16 +310,16 @@ struct AmbientSessionSummaryView: View {
     private func primaryInsightCard(question: CapturedQuestion) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isKeyInsightExpanded.toggle()
                 }
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }) {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack {
                         Text("KEY INSIGHT")
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                             .tracking(1.2)
                         
                         Spacer()
@@ -327,7 +346,7 @@ struct AmbientSessionSummaryView: View {
                             .multilineTextAlignment(.leading)
                     }
                 }
-                .padding(24)
+                .padding(DesignSystem.Spacing.cardPadding)
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -342,7 +361,7 @@ struct AmbientSessionSummaryView: View {
                         .foregroundStyle(.white.opacity(0.85))
                         .lineSpacing(6)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                         .padding(.bottom, 24)
                 }
                 .transition(.asymmetric(
@@ -352,12 +371,12 @@ struct AmbientSessionSummaryView: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                 .fill(Color.white.opacity(0.02))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
         )
         .clipped()
     }
@@ -367,9 +386,9 @@ struct AmbientSessionSummaryView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("CONVERSATION")
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.2)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             
             VStack(spacing: 1) {
                 ForEach(Array(session.capturedQuestions.enumerated()), id: \.element.id) { index, question in
@@ -378,7 +397,7 @@ struct AmbientSessionSummaryView: View {
                         index: index,
                         isExpanded: expandedQuestions.contains(question.id.uuidString),
                         onToggle: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(DesignSystem.Animation.easeQuick) {
                                 if expandedQuestions.contains(question.id.uuidString) {
                                     expandedQuestions.remove(question.id.uuidString)
                                 } else {
@@ -389,7 +408,7 @@ struct AmbientSessionSummaryView: View {
                     )
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
     }
     
@@ -398,9 +417,9 @@ struct AmbientSessionSummaryView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("CAPTURED")
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.2)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             
             VStack(spacing: 12) {
                 ForEach(session.capturedQuotes) { quote in
@@ -419,24 +438,37 @@ struct AmbientSessionSummaryView: View {
                     )
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
     }
     
     // MARK: - Input Bar (Universal Input Bar WITHOUT .background())
     private var minimalInputBar: some View {
         VStack(spacing: 0) {
-            // Processing indicator
+            // Processing indicator with scrolling text pill
             if isProcessingFollowUp {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                    Text("Thinking...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                HStack {
+                    Spacer()
+                    
+                    // Scrolling text pill - like in ambient mode
+                    HStack(spacing: 12) {
+                        ScrollingBookMessages()
+                            .frame(maxWidth: 200)
+                    }
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                    .padding(.vertical, 12)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.05))
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                            )
+                    )
+                    
+                    Spacer()
                 }
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
             }
             
             // Universal Input Bar - matching UnifiedChatView
@@ -451,7 +483,7 @@ struct AmbientSessionSummaryView: View {
                 colorPalette: colorPalette,
                 isAmbientMode: true
             )
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 16)
         }
     }
@@ -471,7 +503,7 @@ struct AmbientSessionSummaryView: View {
                 commandText: $continuationText
             )
             .environmentObject(libraryViewModel)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.bottom, 100)
         }
     }
@@ -505,16 +537,18 @@ struct AmbientSessionSummaryView: View {
     private func sendFollowUp() {
         guard !continuationText.isEmpty else { return }
         
-        let userMessage = UnifiedChatMessage(
-            content: continuationText,
-            isUser: true,
+        let questionText = continuationText
+        continuationText = ""
+        
+        // Add thinking message (just like ambient mode - ONE message that shows question and gets updated)
+        let thinkingMessage = UnifiedChatMessage(
+            content: "**\(questionText)**",  // Format like ambient mode
+            isUser: false,
             timestamp: Date(),
             bookContext: session.book
         )
-        additionalMessages.append(userMessage)
+        additionalMessages.append(thinkingMessage)
         
-        let questionText = continuationText
-        continuationText = ""
         isProcessingFollowUp = true
         
         Task {
@@ -523,17 +557,19 @@ struct AmbientSessionSummaryView: View {
                 let response = try await aiService.processMessage(
                     questionText,
                     bookContext: session.book,
-                    conversationHistory: additionalMessages
+                    conversationHistory: additionalMessages.dropLast() // Exclude thinking message
                 )
                 
                 await MainActor.run {
-                    let aiMessage = UnifiedChatMessage(
-                        content: response,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: session.book
-                    )
-                    additionalMessages.append(aiMessage)
+                    // Update thinking message with the answer (exactly like ambient mode)
+                    if let lastIndex = additionalMessages.indices.last {
+                        additionalMessages[lastIndex] = UnifiedChatMessage(
+                            content: "**\(questionText)**\n\n\(response)",  // Format like ambient mode
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: session.book
+                        )
+                    }
                     
                     // CRITICAL: Save follow-up question to the session
                     let capturedQuestion = CapturedQuestion(
@@ -571,7 +607,7 @@ struct AmbientSessionSummaryView: View {
     
     private func handleMicrophoneTap() {
         isRecording.toggle()
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func exportSession() {
@@ -709,7 +745,7 @@ struct MinimalThreadView: View {
             HStack(alignment: .center, spacing: 16) {
                 Text(String(format: "%02d", index + 1))
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .frame(width: 24)
                 
                 Text(question.content)
@@ -719,7 +755,7 @@ struct MinimalThreadView: View {
                 
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
             }
             .padding(.vertical, 16)
             .contentShape(Rectangle())
@@ -731,7 +767,7 @@ struct MinimalThreadView: View {
             if isExpanded, let answer = question.answer {
                 VStack(alignment: .leading, spacing: 12) {
                     Rectangle()
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Color.white.opacity(0.10))
                         .frame(height: 0.5)
                     
                     Text(try! AttributedString(markdown: answer))
@@ -743,7 +779,7 @@ struct MinimalThreadView: View {
                         .padding(.vertical, 12)
                     
                     Rectangle()
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Color.white.opacity(0.10))
                         .frame(height: 0.5)
                 }
             }
@@ -761,7 +797,7 @@ struct MinimalThreadedCard: View {
         HStack(alignment: .top, spacing: 16) {
             Text(type)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.2)
                 .frame(width: 60, alignment: .leading)
                 .padding(.top, 2)  // Small adjustment to align with text cap height
@@ -776,7 +812,7 @@ struct MinimalThreadedCard: View {
                 if let author = author {
                     Text("— \(author)")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -785,26 +821,173 @@ struct MinimalThreadedCard: View {
     }
 }
 
-// MARK: - Minimal Message View
+// MARK: - Minimal Message View (Ambient Style)
 struct MinimalMessageView: View {
     let message: UnifiedChatMessage
+    let index: Int
+    @State private var messageOpacity: Double = 0
+    @State private var messageBlur: Double = 12
+    @State private var messageScale: CGFloat = 0.96
+    @State private var isExpanded = false  // Start collapsed like in ambient
+    @State private var answerOpacity: Double = 0
+    @State private var answerBlur: Double = 8
+    @State private var hasShownAnswer = false
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            if message.isUser {
-                Spacer(minLength: 60)
+        VStack(alignment: .leading, spacing: 0) {
+            // Question row - exactly like ambient mode
+            HStack(alignment: .center, spacing: 16) {
+                Text(String(format: "%02d", index + 1))
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .frame(width: 24)
+                
+                Text(extractQuestion(from: message.content))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
+            }
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
+            .opacity(messageOpacity)
+            .blur(radius: messageBlur)
+            .scaleEffect(messageScale)
+            .onTapGesture {
+                withAnimation(DesignSystem.Animation.easeQuick) {
+                    isExpanded.toggle()
+                }
+            }
+            .onAppear {
+                // Sophisticated blur revelation animation
+                withAnimation(
+                    .timingCurve(0.215, 0.61, 0.355, 1, duration: 0.6)
+                ) {
+                    messageOpacity = 1.0
+                    messageBlur = 0
+                    messageScale = 1.0
+                }
             }
             
-            Text(try! AttributedString(markdown: message.content))
-                .font(message.isUser ? .system(size: 15, weight: .regular) : .custom("Georgia", size: 15))
-                .foregroundStyle(message.isUser ? .white.opacity(0.95) : .white.opacity(0.8))
-                .padding(16)
-                .glassEffect()
-                .clipShape(Rectangle())
-            
-            if !message.isUser {
-                Spacer(minLength: 60)
+            // Answer (expandable) - exactly like ambient mode
+            if isExpanded && !extractAnswer(from: message.content).isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.10))
+                        .frame(height: 0.5)
+                    
+                    Text(formatResponseText(extractAnswer(from: message.content)))
+                        .font(.custom("Georgia", size: 17))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineSpacing(8)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 40)  // Indent under the number
+                        .padding(.vertical, 12)
+                    
+                    Rectangle()
+                        .fill(Color.white.opacity(0.10))
+                        .frame(height: 0.5)
+                }
+                .opacity(answerOpacity)
+                .blur(radius: answerBlur)
+                .onAppear {
+                    if !hasShownAnswer {
+                        hasShownAnswer = true
+                        withAnimation(
+                            .timingCurve(0.215, 0.61, 0.355, 1, duration: 0.8)
+                            .delay(0.3)
+                        ) {
+                            answerOpacity = 1.0
+                            answerBlur = 0
+                        }
+                    } else {
+                        answerOpacity = 1.0
+                        answerBlur = 0
+                    }
+                }
+                .onChange(of: isExpanded) { _, newValue in
+                    if hasShownAnswer {
+                        answerOpacity = newValue ? 1.0 : 0
+                        answerBlur = newValue ? 0 : 8
+                    }
+                }
             }
+        }
+    }
+    
+    private func extractQuestion(from content: String) -> String {
+        // Extract question from formatted content "**question**\n\nanswer"
+        if content.contains("**") && content.contains("\n\n") {
+            let parts = content.components(separatedBy: "\n\n")
+            if parts.count >= 1 {
+                let question = parts[0].replacingOccurrences(of: "**", with: "")
+                return question
+            }
+        }
+        // For user messages, return as-is
+        return content
+    }
+    
+    private func extractAnswer(from content: String) -> String {
+        // Extract answer from formatted content "**question**\n\nanswer"
+        if content.contains("**") && content.contains("\n\n") {
+            let parts = content.components(separatedBy: "\n\n")
+            if parts.count >= 2 {
+                let answer = parts.dropFirst().joined(separator: "\n\n")
+                return answer
+            }
+        }
+        // If no answer yet (still thinking), return empty
+        return ""
+    }
+    
+    private func formatResponseText(_ text: String) -> AttributedString {
+        // Split text into sentences and group into paragraphs
+        let sentences = text.components(separatedBy: ". ")
+        var paragraphs: [String] = []
+        var currentParagraph = ""
+        
+        for (index, sentence) in sentences.enumerated() {
+            let cleanSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleanSentence.isEmpty {
+                currentParagraph += cleanSentence
+                if !cleanSentence.hasSuffix(".") {
+                    currentParagraph += "."
+                }
+                
+                // Create paragraph break every 2-3 sentences or at natural breaks
+                if (index + 1) % 3 == 0 || 
+                   cleanSentence.contains("However") || 
+                   cleanSentence.contains("Additionally") ||
+                   cleanSentence.contains("Furthermore") ||
+                   cleanSentence.contains("In conclusion") ||
+                   cleanSentence.contains("First") ||
+                   cleanSentence.contains("Second") ||
+                   cleanSentence.contains("Finally") {
+                    paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
+                    currentParagraph = ""
+                } else if index < sentences.count - 1 {
+                    currentParagraph += " "
+                }
+            }
+        }
+        
+        // Add any remaining text as final paragraph
+        if !currentParagraph.trimmingCharacters(in: .whitespaces).isEmpty {
+            paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
+        }
+        
+        // Join paragraphs with double newlines for spacing
+        let formattedText = paragraphs.joined(separator: "\n\n")
+        
+        // Convert to AttributedString with markdown support
+        do {
+            return try AttributedString(markdown: formattedText)
+        } catch {
+            return AttributedString(formattedText)
         }
     }
 }

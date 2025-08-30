@@ -104,7 +104,7 @@ struct SharedBookCoverView: View {
                 if let fullImage = await SharedBookCoverManager.shared.loadFullImage(from: urlString) {
                     print("🖼️ BookDetailView full image loaded: \(fullImage.size)")
                     await MainActor.run {
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             self.fullImage = fullImage
                             self.isLoading = false
                         }
@@ -135,7 +135,7 @@ struct SharedBookCoverView: View {
                 
                 await MainActor.run {
                     if let thumbnail = thumbnail {
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
                             self.thumbnailImage = thumbnail
                             self.isLoading = false
                         }
@@ -161,7 +161,7 @@ struct SharedBookCoverView: View {
     var body: some View {
         ZStack {
             // Lightweight placeholder
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
                 .onAppear {
                     loadImage()
@@ -207,7 +207,7 @@ struct SharedBookCoverView: View {
             }
         }
         .frame(width: width, height: height)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
         .drawingGroup() // Cache the shadow rendering
     }

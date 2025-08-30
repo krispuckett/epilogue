@@ -85,7 +85,7 @@ struct ChatSessionsViewRefined: View {
     var body: some View {
         ZStack {
             // LibraryView background
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -153,15 +153,15 @@ struct ChatSessionsViewRefined: View {
                 if !filteredSessions.isEmpty {
                     if isSelectionMode {
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 isSelectionMode = false
                                 selectedSessionIds.removeAll()
                             }
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         } label: {
                             Text("Done")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         }
                         
                         if !selectedSessionIds.isEmpty {
@@ -175,44 +175,44 @@ struct ChatSessionsViewRefined: View {
                         }
                     } else {
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 isSelectionMode = true
                             }
-                            HapticManager.shared.lightTap()
+                            DesignSystem.HapticFeedback.light()
                         } label: {
                             Text("Edit")
                                 .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
                         }
                     }
                 }
                 
                 // Search button - simple like Notes
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         isSearching.toggle()
                         if !isSearching {
                             searchText = ""
                         }
                     }
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 } label: {
                     if isSearching {
                         // Liquid glass close button with amber tint
                         ZStack {
                             Circle()
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
                                 .frame(width: 28, height: 28)
                                 .glassEffect()
                             
                             Image(systemName: "xmark")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         }
                     } else {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
                 }
                 
@@ -222,10 +222,10 @@ struct ChatSessionsViewRefined: View {
                     Section("View") {
                         ForEach(SessionGrouping.allCases, id: \.self) { grouping in
                             Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                withAnimation(DesignSystem.Animation.springStandard) {
                                     selectedGrouping = grouping
                                 }
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                             } label: {
                                 Label {
                                     HStack {
@@ -246,10 +246,10 @@ struct ChatSessionsViewRefined: View {
                     Section("Filter") {
                         ForEach(SessionFilter.allCases, id: \.self) { filter in
                             Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                withAnimation(DesignSystem.Animation.springStandard) {
                                     selectedFilter = filter
                                 }
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                             } label: {
                                 Label {
                                     HStack {
@@ -290,7 +290,7 @@ struct ChatSessionsViewRefined: View {
                     } label: {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.system(size: 16))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     }
                 }
             }
@@ -305,15 +305,15 @@ struct ChatSessionsViewRefined: View {
                 VStack(spacing: 20) {
                     Image(systemName: "bubble.left.and.bubble.right")
                         .font(.system(size: 48))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     
                     Text("No Reading Sessions Yet")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                     
                     Text("Start an ambient reading session to capture\nyour thoughts, questions, and favorite quotes")
                         .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -342,7 +342,7 @@ struct ChatSessionsViewRefined: View {
                         )
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .padding(.vertical, 16)
                 .padding(.bottom, 100)
             }
@@ -384,7 +384,7 @@ struct ChatSessionsViewRefined: View {
                     )
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 16)
             .padding(.bottom, 100)
         }
@@ -393,14 +393,14 @@ struct ChatSessionsViewRefined: View {
     
     // MARK: - Helper Functions
     private func toggleSessionSelection(_ session: AmbientSession) {
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springQuick) {
             if selectedSessionIds.contains(session.id) {
                 selectedSessionIds.remove(session.id)
             } else {
                 selectedSessionIds.insert(session.id)
             }
         }
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private func deleteSelectedSessions() {
@@ -412,11 +412,11 @@ struct ChatSessionsViewRefined: View {
         
         do {
             try modelContext.save()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 selectedSessionIds.removeAll()
                 isSelectionMode = false
             }
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         } catch {
             print("❌ Failed to delete sessions: \(error)")
         }
@@ -535,10 +535,10 @@ struct BookSessionGroupWithSelection: View {
         VStack(alignment: .leading, spacing: 16) {
             // Book header
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }) {
                 HStack(spacing: 12) {
                     // Book cover with HTTPS conversion
@@ -564,8 +564,8 @@ struct BookSessionGroupWithSelection: View {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                                    DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.1)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -755,7 +755,7 @@ struct IntelligentSessionCard: View {
                         if isSelectionMode {
                             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 22))
-                                .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3))
+                                .foregroundStyle(isSelected ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
                                 .contentShape(Circle())
                                 .padding(.trailing, 8)
                         }
@@ -768,20 +768,20 @@ struct IntelligentSessionCard: View {
                             
                             Text(timeDisplay)
                                 .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                         }
                         
                         Spacer()
                         
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     }
                     
                     // Session preview (always show)
                     Text(sessionSummary)
                         .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .lineLimit(isExpanded ? nil : 2)
                         .fixedSize(horizontal: false, vertical: !isExpanded)
                     
@@ -797,7 +797,7 @@ struct IntelligentSessionCard: View {
                         }
                     }
                 }
-                .padding(24)
+                .padding(DesignSystem.Spacing.cardPadding)
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -805,7 +805,7 @@ struct IntelligentSessionCard: View {
             if isExpanded {
                 VStack(spacing: 0) {
                     Rectangle()
-                        .fill(.white.opacity(0.06))
+                        .fill(.white.opacity(0.05))
                         .frame(height: 0.5)
                     
                     HStack(spacing: 10) {
@@ -819,11 +819,11 @@ struct IntelligentSessionCard: View {
                             .foregroundStyle(.white.opacity(0.9))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                         }
                         
                         Button(action: {
-                            HapticManager.shared.mediumTap()
+                            DesignSystem.HapticFeedback.medium()
                         }) {
                             HStack(spacing: 6) {
                                 Image(systemName: "arrow.right.circle")
@@ -831,31 +831,31 @@ struct IntelligentSessionCard: View {
                                 Text("Continue")
                                     .font(.system(size: 14, weight: .medium))
                             }
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.08))
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 12)
                 }
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.white.opacity(0.03))
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                .fill(.white.opacity(0.05))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                .strokeBorder(.white.opacity(0.05), lineWidth: 0.5)
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .animation(DesignSystem.Animation.springStandard, value: isSelected)
     }
 }

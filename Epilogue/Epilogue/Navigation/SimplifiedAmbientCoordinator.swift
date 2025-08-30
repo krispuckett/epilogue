@@ -95,7 +95,7 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         
         // Use EpilogueAmbientCoordinator which ContentView observes
         // This will present the NEW AmbientModeView
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             EpilogueAmbientCoordinator.shared.isActive = true
             EpilogueAmbientCoordinator.shared.initialBook = book
             print("🎙️ DEBUG: isPresented set to true, initial book: \(book?.title ?? "none")")
@@ -107,7 +107,7 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         logger.info("Closing ambient reading")
         
         // Light haptic feedback
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Dismiss
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
@@ -127,7 +127,7 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         currentBook = book
         
         // Light haptic for confirmation
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Post notification for UI updates
         NotificationCenter.default.post(

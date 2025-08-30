@@ -94,14 +94,14 @@ struct BookContextPill: View {
                 // Chevron indicator
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .rotationEffect(.degrees(isPressed ? 180 : 0))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
             }
             .scaleEffect(isPressed ? 0.95 : 1.0)
@@ -117,9 +117,9 @@ struct BookContextPill: View {
         }
         .onLongPressGesture(minimumDuration: 0.5) {
             // Long press to show book info/history (future feature)
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
         } onPressingChanged: { pressing in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isPressed = pressing
             }
         }
@@ -136,17 +136,17 @@ struct BookContextPill: View {
                 
                 Text("Select a book")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
             }
             .scaleEffect(isPressed ? 0.95 : 1.0)
@@ -161,11 +161,11 @@ struct BookContextPill: View {
             }
         }
         .onLongPressGesture(minimumDuration: 0) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isPressed = true
             }
         } onPressingChanged: { pressing in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isPressed = pressing
             }
         }

@@ -66,7 +66,7 @@ struct SessionsArchiveView: View {
                     VStack(spacing: 0) {
                         // View mode selector
                         viewModeSelector
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             .padding(.vertical, 16)
                         
                         // Main content based on view mode
@@ -120,10 +120,10 @@ struct SessionsArchiveView: View {
         HStack(spacing: 0) {
             ForEach([ViewMode.timeline, .byBook, .connections], id: \.self) { mode in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = mode
                     }
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: mode.icon)
@@ -131,7 +131,7 @@ struct SessionsArchiveView: View {
                         Text(String(describing: mode).capitalized)
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundStyle(viewMode == mode ? .white : .white.opacity(0.5))
+                    .foregroundStyle(viewMode == mode ? .white : DesignSystem.Colors.textTertiary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background {
@@ -159,7 +159,7 @@ struct SessionsArchiveView: View {
                     Text(dayGroup.date.formatted(date: .abbreviated, time: .omitted))
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.6))
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     
                     // Sessions for this day
                     ForEach(dayGroup.sessions) { session in
@@ -179,7 +179,7 @@ struct SessionsArchiveView: View {
                                 showingSessionDetail = session
                             }
                         )
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     }
                 }
             }
@@ -200,11 +200,11 @@ struct SessionsArchiveView: View {
                                     .resizable()
                                     .scaledToFill()
                             } placeholder: {
-                                RoundedRectangle(cornerRadius: 6)
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                     .fill(Color.gray.opacity(0.3))
                             }
                             .frame(width: 40, height: 60)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         }
                         
                         VStack(alignment: .leading, spacing: 2) {
@@ -218,7 +218,7 @@ struct SessionsArchiveView: View {
                         
                         Spacer()
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     
                     // Sessions for this book
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -236,7 +236,7 @@ struct SessionsArchiveView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     }
                 }
             }
@@ -248,17 +248,17 @@ struct SessionsArchiveView: View {
         VStack(spacing: 20) {
             // Temporal insights
             TemporalInsightsCard(sessions: sessions)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             
             // Character companions
             if !characterCompanions.isEmpty {
                 CharacterCompanionsCard(companions: characterCompanions)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             }
             
             // Theme connections
             ThemeConnectionsCard(sessions: sessions)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
     }
     

@@ -24,9 +24,9 @@ struct QuoteHighlighterView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxHeight: 300)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                                         .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
                                 )
                         }
@@ -37,7 +37,7 @@ struct QuoteHighlighterView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("EXTRACTED TEXT")
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                                 .tracking(1.2)
                             
                             // Text editor for selecting/editing the quote
@@ -46,17 +46,17 @@ struct QuoteHighlighterView: View {
                                 .foregroundStyle(.white)
                                 .scrollContentBackground(.hidden)
                                 .background(Color.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                                 .frame(minHeight: 100)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                         .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                                 )
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     
                     // Page number input
                     HStack {
@@ -73,9 +73,9 @@ struct QuoteHighlighterView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(Color.white.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     
                     Spacer()
                 }
@@ -98,7 +98,7 @@ struct QuoteHighlighterView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
             }
             .toolbarBackground(.visible, for: .navigationBar)

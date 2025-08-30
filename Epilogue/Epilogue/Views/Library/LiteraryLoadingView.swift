@@ -22,8 +22,8 @@ struct LiteraryLoadingView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.0)
+                                DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                DesignSystem.Colors.primaryAccent.opacity(0.0)
                             ],
                             center: .center,
                             startRadius: 20,
@@ -39,7 +39,7 @@ struct LiteraryLoadingView: View {
                     .foregroundStyle(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26),
+                                DesignSystem.Colors.primaryAccent,
                                 Color(red: 1.0, green: 0.7, blue: 0.4)
                             ],
                             startPoint: .topLeading,
@@ -73,7 +73,7 @@ struct LiteraryLoadingView: View {
                 HStack(spacing: 2) {
                     ForEach(0..<3) { index in
                         Circle()
-                            .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .fill(DesignSystem.Colors.primaryAccent)
                             .frame(width: 4, height: 4)
                             .opacity(rotationAngle > Double(index * 120) ? 1.0 : 0.3)
                             .animation(.easeInOut(duration: 0.5), value: rotationAngle)
@@ -93,15 +93,15 @@ struct LiteraryLoadingView: View {
                 
                 HStack(spacing: 8) {
                     Rectangle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.5))
                         .frame(width: 20, height: 1)
                     
                     Text(currentQuote.author)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     
                     Rectangle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.5))
                         .frame(width: 20, height: 1)
                 }
             }
@@ -134,7 +134,7 @@ struct LiteraryLoadingView: View {
 
 #Preview {
     ZStack {
-        Color(red: 0.11, green: 0.105, blue: 0.102)
+        DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea()
         
         LiteraryLoadingView(message: "Searching for books...")

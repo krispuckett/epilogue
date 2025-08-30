@@ -125,7 +125,7 @@ struct AmbientOrbView: View {
             
             lastStateChange = Date()
             
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(DesignSystem.Animation.easeStandard) {
                 switch newState {
                 case .idle:
                     glowIntensity = 0.3
@@ -153,7 +153,7 @@ struct AmbientOrbView: View {
     }
     
     private func handleTap() {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         print("🎤 AmbientOrb: Tap detected, isListening = \(voiceManager.isListening)")
         
@@ -204,7 +204,7 @@ struct SoundWaveView: View {
                 LinearGradient(
                     colors: [
                         Color.white.opacity(0.8),
-                        Color.white.opacity(0.3)
+                        DesignSystem.Colors.textQuaternary
                     ],
                     startPoint: .leading,
                     endPoint: .trailing

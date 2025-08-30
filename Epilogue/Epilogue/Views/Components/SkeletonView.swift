@@ -56,7 +56,7 @@ struct BookCardSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover image skeleton
-            SkeletonView(cornerRadius: 8)
+            SkeletonView(cornerRadius: DesignSystem.CornerRadius.small)
                 .aspectRatio(2/3, contentMode: .fit)
             
             // Title skeleton
@@ -70,7 +70,7 @@ struct BookCardSkeleton: View {
         }
         .padding(12)
         .background(Color.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
     }
 }
 
@@ -79,7 +79,7 @@ struct ListRowSkeleton: View {
     var body: some View {
         HStack(spacing: 12) {
             // Cover skeleton
-            SkeletonView(cornerRadius: 8)
+            SkeletonView(cornerRadius: DesignSystem.CornerRadius.small)
                 .frame(width: 60, height: 80)
             
             VStack(alignment: .leading, spacing: 8) {
@@ -104,10 +104,10 @@ struct ListRowSkeleton: View {
         .padding(12)
         .frame(height: 104)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color.black.opacity(0.2))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                         .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
                 }
         )
@@ -147,9 +147,9 @@ struct NoteCardSkeleton: View {
             SkeletonView(cornerRadius: 4)
                 .frame(width: 120, height: 12)
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color.white.opacity(0.05))
         )
     }

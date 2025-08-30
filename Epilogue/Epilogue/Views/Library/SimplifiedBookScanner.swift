@@ -37,7 +37,7 @@ struct SimplifiedBookScanner: View {
                         Text("Point at book cover or ISBN barcode")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             .padding(.vertical, 12)
                             .glassEffect()
                             .clipShape(Capsule())
@@ -52,7 +52,7 @@ struct SimplifiedBookScanner: View {
                             }
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.vertical, 14)
                             .glassEffect()
                             .clipShape(Capsule())

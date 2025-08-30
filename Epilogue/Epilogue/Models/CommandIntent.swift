@@ -50,7 +50,7 @@ enum CommandIntent {
         case .addBook, .batchAddBooks:
             return Color(red: 0.6, green: 0.4, blue: 0.8) // Purple for new books
         case .createQuote, .createNote, .createQuoteWithBook, .createNoteWithBook:
-            return Color(red: 1.0, green: 0.55, blue: 0.26) // Orange for notes
+            return DesignSystem.Colors.primaryAccent // Orange for notes
         case .searchLibrary, .existingBook, .searchNotes, .existingNote, .searchAll:
             return Color(red: 0.4, green: 0.6, blue: 0.9) // Blue for search
         case .multiStepCommand:

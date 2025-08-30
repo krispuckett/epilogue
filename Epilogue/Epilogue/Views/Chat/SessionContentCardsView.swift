@@ -97,7 +97,7 @@ struct SessionContentCardsView: View {
                     library: libraryViewModel.books
                 )
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 16)
         }
         .overlay {
@@ -110,10 +110,10 @@ struct SessionContentCardsView: View {
                         // Save edited content
                         if editingQuote != nil {
                             // Update quote
-                            HapticManager.shared.success()
+                            DesignSystem.HapticFeedback.success()
                         } else if editingNote != nil {
                             // Update note
-                            HapticManager.shared.success()
+                            DesignSystem.HapticFeedback.success()
                         }
                         editingQuote = nil
                         editingNote = nil
@@ -138,13 +138,13 @@ struct SessionContentCardsView: View {
                     editContent = quote.text
                     editingQuote = quote
                     showEditSheet = true
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
                 .onLongPressGesture {
                     editContent = quote.text
                     editingQuote = quote
                     showEditSheet = true
-                    HapticManager.shared.mediumTap()
+                    DesignSystem.HapticFeedback.medium()
                 }
             }
         case .note:
@@ -159,13 +159,13 @@ struct SessionContentCardsView: View {
                     editContent = note.text
                     editingNote = note
                     showEditSheet = true
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
                 .onLongPressGesture {
                     editContent = note.text
                     editingNote = note
                     showEditSheet = true
-                    HapticManager.shared.mediumTap()
+                    DesignSystem.HapticFeedback.medium()
                 }
             }
         case .question:
@@ -212,7 +212,7 @@ struct ChatQuoteCard: View {
                 if let title = bookTitle {
                     Text("— \(title)")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
                 
                 Spacer()
@@ -222,13 +222,13 @@ struct ChatQuoteCard: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.listItemPadding)
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.8))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(
                     LinearGradient(
                         colors: [
@@ -272,7 +272,7 @@ struct ChatNoteCard: View {
                 if let title = bookTitle {
                     Text(title)
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .lineLimit(1)
                 }
                 
@@ -285,11 +285,11 @@ struct ChatNoteCard: View {
         }
         .padding(18)
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.13, green: 0.125, blue: 0.12).opacity(0.9))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
         }
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
@@ -328,7 +328,7 @@ struct ChatQuestionCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     Text("A")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                     
                     Text(response)
                         .font(.system(size: 15))
@@ -342,7 +342,7 @@ struct ChatQuestionCard: View {
                 if let title = bookTitle {
                     Text(title)
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .lineLimit(1)
                 }
                 
@@ -353,13 +353,13 @@ struct ChatQuestionCard: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.listItemPadding)
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.14, green: 0.135, blue: 0.13).opacity(0.85))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(Color.warmAmber.opacity(0.1), lineWidth: 0.5)
         }
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
@@ -388,13 +388,13 @@ struct IntelligentSuggestionsSection: View {
                     Spacer()
                     
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             showingSuggestions = false
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.3))
+                            .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     }
                 }
                 
@@ -402,10 +402,10 @@ struct IntelligentSuggestionsSection: View {
                     SuggestionCard(suggestion: suggestion)
                 }
             }
-            .padding(16)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+            .padding(DesignSystem.Spacing.inlinePadding)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .strokeBorder(Color.warmAmber.opacity(0.2), lineWidth: 0.5)
             }
             .transition(.asymmetric(
@@ -432,7 +432,7 @@ struct SuggestionCard: View {
     
     var body: some View {
         Button {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             // Action disabled for now
         } label: {
             HStack(spacing: 12) {
@@ -450,12 +450,12 @@ struct SuggestionCard: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(Color.white.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         }
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(isPressed ? 0.98 : 1.0)
@@ -463,7 +463,7 @@ struct SuggestionCard: View {
             minimumDuration: 0,
             maximumDistance: .infinity,
             pressing: { pressing in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isPressed = pressing
                 }
             },
@@ -524,7 +524,7 @@ struct ProgressUpdateCard: View {
             Spacer()
             
             Button {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
                 // Action disabled for now
             } label: {
                 Text("Update")
@@ -537,9 +537,9 @@ struct ProgressUpdateCard: View {
             }
         }
         .padding(12)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .strokeBorder(Color.warmAmber.opacity(0.1), lineWidth: 0.5)
         }
     }
@@ -605,9 +605,9 @@ struct BookReferenceCard: View {
             Spacer()
         }
         .padding(12)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .strokeBorder(Color.warmAmber.opacity(0.1), lineWidth: 0.5)
         }
     }

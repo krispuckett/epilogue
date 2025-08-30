@@ -41,16 +41,16 @@ struct SubtleLiquidThinking: View {
                 .blur(radius: mistRing3Blur)
             
             // Main thinking bubble with pulsing blur
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .fill(.clear)
-                .glassEffect(in: RoundedRectangle(cornerRadius: 20 + morphPhase * 3))
+                .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large + morphPhase * 3))
                 .blur(radius: blurPulse)
                 .overlay {
                     // Vibrant animated dots with coordinated blur
                     HStack(spacing: 8) {
                         ForEach(0..<3) { index in
                             Circle()
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.8))
                                 .frame(width: 8, height: 8)
                                 .scaleEffect(1.0 + morphPhase * 0.2)
                                 .opacity(0.6 + morphPhase * 0.4)
@@ -150,9 +150,9 @@ struct MessageWithThinking: View {
             } else if let message = message {
                 // Show the actual message
                 Text(message)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 12)
-                    .glassEffect(in: RoundedRectangle(cornerRadius: 20))
+                    .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.95).combined(with: .opacity),
                         removal: .opacity

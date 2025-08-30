@@ -62,8 +62,8 @@ struct AmbientListeningIndicator: View {
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                                    DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.1)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -86,12 +86,12 @@ struct AmbientListeningIndicator: View {
                                 .animation(.easeOut(duration: 0.1), value: amplitude)
                         }
                         .shadow(
-                            color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
+                            color: DesignSystem.Colors.primaryAccent.opacity(0.3),
                             radius: 8,
                             y: 2
                         )
                 }
-                .padding(24)
+                .padding(DesignSystem.Spacing.cardPadding)
             }
         }
         .onAppear {
@@ -130,7 +130,7 @@ struct VoiceInterfaceView: View {
                             .font(.system(size: 20, weight: .medium, design: .serif))
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                     
@@ -142,7 +142,7 @@ struct VoiceInterfaceView: View {
                         
                         Text(statusText)
                             .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
                 }
                 
@@ -152,9 +152,9 @@ struct VoiceInterfaceView: View {
                         Text(responseText)
                             .font(.system(size: 16, design: .serif))
                             .foregroundStyle(.white.opacity(0.9))
-                            .padding(20)
+                            .padding(DesignSystem.Spacing.listItemPadding)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                     }
                     .frame(maxHeight: 200)
                     .transition(.asymmetric(
@@ -185,16 +185,16 @@ struct VoiceInterfaceView: View {
                             }
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             .padding(.vertical, 10)
                             .glassEffect(
-                                .regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3)),
+                                .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)),
                                 in: Capsule()
                             )
                         }
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
             }
             .padding(.vertical, 32)
             .frame(maxWidth: 400)
@@ -213,7 +213,7 @@ struct VoiceInterfaceView: View {
         case .listening:
             return .blue
         case .processing:
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
     }
     
@@ -241,7 +241,7 @@ struct VoiceInterfaceView: View {
     }
     
     private func dismissInterface() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             isShowing = false
         }
         
@@ -263,8 +263,8 @@ struct VoiceVisualizer: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.55, blue: 0.26),
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5)
+                                    DesignSystem.Colors.primaryAccent,
+                                    DesignSystem.Colors.primaryAccent.opacity(0.5)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom

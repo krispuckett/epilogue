@@ -48,7 +48,7 @@ struct UnifiedProcessorDebugView: View {
         }
         .padding(12)
         .background(Color.black.opacity(0.3))
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         .padding(.horizontal)
     }
     

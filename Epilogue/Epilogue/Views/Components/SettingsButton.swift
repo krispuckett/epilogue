@@ -24,7 +24,7 @@ struct SettingsButton: View {
             }
             
             // Haptic feedback
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         }) {
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 18, weight: .medium))

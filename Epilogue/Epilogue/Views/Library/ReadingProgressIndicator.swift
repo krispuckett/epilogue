@@ -36,7 +36,7 @@ struct ReadingProgressIndicator: View {
                         LinearGradient(
                             colors: [
                                 Color(red: 1.0, green: 0.7, blue: 0.3), // Bright amber
-                                Color(red: 1.0, green: 0.55, blue: 0.26) // Deep amber
+                                DesignSystem.Colors.primaryAccent // Deep amber
                             ],
                             startPoint: .leading,
                             endPoint: .trailing
@@ -44,7 +44,7 @@ struct ReadingProgressIndicator: View {
                     )
                     .frame(width: animateProgress ? width * progress : 0, height: 2)
                     .clipShape(Capsule())
-                    .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), radius: 2, y: 1)
+                    .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.4), radius: 2, y: 1)
                     .overlay(alignment: .trailing) {
                         // Bookmark ribbon tail effect
                         if progress > 0.1 {
@@ -61,7 +61,7 @@ struct ReadingProgressIndicator: View {
                                     path.addLine(to: CGPoint(x: 0, y: height/2))
                                     path.closeSubpath()
                                 }
-                                .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .fill(DesignSystem.Colors.primaryAccent)
                                 .shadow(color: .black.opacity(0.2), radius: 1, x: 0.5, y: 0.5)
                             }
                             .offset(x: 2)
@@ -89,7 +89,7 @@ extension Book {
 
 #Preview {
     ZStack {
-        Color(red: 0.11, green: 0.105, blue: 0.102)
+        DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea()
         
         VStack(spacing: 20) {

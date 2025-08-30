@@ -52,7 +52,7 @@ struct ErrorFallbackView: View {
                 Text("Try Again")
                     .fontWeight(.medium)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 12)
                     .background(Color.orange)
                     .clipShape(Capsule())

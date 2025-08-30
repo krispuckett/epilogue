@@ -180,7 +180,7 @@ struct UnifiedChatView: View {
             return palette.adaptiveUIColor
         } else {
             // Default warm amber
-            return Color(red: 1.0, green: 0.55, blue: 0.26)
+            return DesignSystem.Colors.primaryAccent
         }
     }
     
@@ -300,7 +300,7 @@ struct UnifiedChatView: View {
                 audioLevel = newAmplitude
             }
             .overlay(alignment: .bottom) { commandPaletteOverlay }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingCommandPalette)
+            .animation(DesignSystem.Animation.springStandard, value: showingCommandPalette)
             .onReceive(voiceManager.$transcribedText, perform: handleTranscribedText)
             // Processing handled via detectedContent observable
             .onReceive(processor.$detectedContent) { content in
@@ -352,7 +352,7 @@ struct UnifiedChatView: View {
                                 print("🛡️ SAFETY: Prevented book strip toggle in ambient mode")
                                 return
                             }
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 showingBookStrip.toggle()
                             }
                         } label: {
@@ -383,7 +383,7 @@ struct UnifiedChatView: View {
                     print("🛡️ SAFETY: Blocked ShowAmbientBookSelector in ambient mode")
                     return
                 }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     showingBookStrip = true
                 }
             }
@@ -394,9 +394,9 @@ struct UnifiedChatView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookDetected"))) { notification in
                 if let book = notification.object as? Book {
                     guard currentBookContext?.id != book.id else { return }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         currentBookContext = book
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                         Task {
                             await extractColorsForBook(book)
                         }
@@ -404,7 +404,7 @@ struct UnifiedChatView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AmbientBookCleared"))) { _ in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     currentBookContext = nil
                     colorPalette = nil
                 }
@@ -521,19 +521,19 @@ struct UnifiedChatView: View {
                             HStack {
                                 Image(systemName: "bubble.left.and.bubble.right.fill")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
                                 Text("Chat thread persists across books")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.3))
+                                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
                             }
                             .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .background(Color.white.opacity(0.05))
                             .clipShape(Capsule())
                             .padding(.top, 12)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.top, 16) // Top padding for content
                     .padding(.bottom, 100) // Extra bottom padding to account for tab bar
                 }
@@ -604,7 +604,7 @@ struct UnifiedChatView: View {
                         
                         Spacer()
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
@@ -616,7 +616,7 @@ struct UnifiedChatView: View {
                         isTranscribing: isRecording,
                         onCancel: cancelTranscription
                     )
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .overlay(alignment: .topTrailing) {
                         // Real-time processing indicator
@@ -648,7 +648,7 @@ struct UnifiedChatView: View {
                 colorPalette: colorPalette,
                 isAmbientMode: isAmbientMode
             )
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 16)
         }
     }
@@ -676,7 +676,7 @@ struct UnifiedChatView: View {
             messages.remove(at: lastIndex)
         }
         
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
     }
     
     private var mainContent: some View {
@@ -724,7 +724,7 @@ struct UnifiedChatView: View {
                 commandText: $messageText
             )
             .environmentObject(libraryViewModel)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.bottom, 80)
             .transition(.asymmetric(
                 insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
@@ -917,9 +917,9 @@ struct UnifiedChatView: View {
             Button {
                 currentBookContext = nil
                 showingBookStrip = false
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             } label: {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.white.opacity(0.1))
                     .aspectRatio(2/3, contentMode: .fit)
                     .overlay {
@@ -929,8 +929,8 @@ struct UnifiedChatView: View {
                     }
                     .overlay {
                         if currentBookContext == nil {
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 2)
                         }
                     }
             }
@@ -941,7 +941,7 @@ struct UnifiedChatView: View {
                 Button {
                     currentBookContext = book
                     showingBookStrip = false
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 } label: {
                     SharedBookCoverView(
                         coverURL: book.coverImageURL,
@@ -949,11 +949,11 @@ struct UnifiedChatView: View {
                         height: 135
                     )
                     .aspectRatio(2/3, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                     .overlay {
                         if currentBookContext?.id == book.id {
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(red: 1.0, green: 0.55, blue: 0.26), lineWidth: 2)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                                .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 2)
                         }
                     }
                 }
@@ -1066,7 +1066,7 @@ struct UnifiedChatView: View {
             messages.append(systemMessage)
             
             // Haptic feedback
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         } catch {
             print("❌ Failed to save note: \(error)")
         }
@@ -1137,7 +1137,7 @@ struct UnifiedChatView: View {
             messages.append(systemMessage)
             
             // Haptic feedback
-            HapticManager.shared.success()
+            DesignSystem.HapticFeedback.success()
         } catch {
             print("❌ Failed to save quote: \(error)")
         }
@@ -1253,7 +1253,7 @@ struct UnifiedChatView: View {
         messages.append(transcriptionMessage)
         
         // Haptic feedback
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
     }
     
     private func endAmbientSession() {
@@ -1267,7 +1267,7 @@ struct UnifiedChatView: View {
         voiceManager.stopListening()
         
         // Quick haptic
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         // Remove transcription message immediately if present
         if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
@@ -1294,7 +1294,7 @@ struct UnifiedChatView: View {
             // Scroll to bottom after adding message to keep chat thread visible
             let scrollToBottom = {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         if let lastMessage = messages.last {
                             scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
                         }
@@ -1334,7 +1334,7 @@ struct UnifiedChatView: View {
                 ))
                 
                 // Visual feedback - green checkmark animation
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     // Could trigger a temporary overlay here
                     logger.info("✅ Quote saved and displayed immediately!")
                 }
@@ -1475,17 +1475,17 @@ struct UnifiedChatView: View {
         
         // Update detection state with visual feedback
         await MainActor.run {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 switch result.type {
                 case .question:
                     detectionState = .processingQuestion
-                    HapticManager.shared.lightTap() // Immediate feedback
+                    DesignSystem.HapticFeedback.light() // Immediate feedback
                 case .quote:
                     detectionState = .detectingQuote
-                    HapticManager.shared.mediumTap() // Quote detected
+                    DesignSystem.HapticFeedback.medium() // Quote detected
                 case .note, .thought:
                     detectionState = .savingNote
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 case .ambient, .unknown:
                     detectionState = .idle
                 }
@@ -1605,10 +1605,10 @@ struct UnifiedChatView: View {
             messages.append(aiMessage)
             
             // Visual feedback for AI response
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             
             // Smooth scroll to show response
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 scrollProxy?.scrollTo(aiMessage.id, anchor: .bottom)
             }
             
@@ -1678,7 +1678,7 @@ struct UnifiedChatView: View {
                 messages.append(quoteMessage)
                 
                 // Update detection state to saved
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     detectionState = .saved
                 }
                 
@@ -1690,7 +1690,7 @@ struct UnifiedChatView: View {
                 }
                 
                 // Haptic feedback
-                HapticManager.shared.success()
+                DesignSystem.HapticFeedback.success()
                 
                 // Scroll to show quote
                 withAnimation {
@@ -1775,7 +1775,7 @@ struct UnifiedChatView: View {
                 }
                 
                 // Haptic feedback
-                HapticManager.shared.success()
+                DesignSystem.HapticFeedback.success()
                 
                 // Scroll to show note
                 withAnimation {
@@ -2188,7 +2188,7 @@ struct UnifiedChatView: View {
             quote.text = newText
             do {
                 try modelContext.save()
-                HapticManager.shared.success()
+                DesignSystem.HapticFeedback.success()
             } catch {
                 print("Failed to update quote: \(error)")
             }
@@ -2198,7 +2198,7 @@ struct UnifiedChatView: View {
             note.content = newText
             do {
                 try modelContext.save()
-                HapticManager.shared.success()
+                DesignSystem.HapticFeedback.success()
             } catch {
                 print("Failed to update note: \(error)")
             }
@@ -2294,7 +2294,7 @@ struct UnifiedChatView: View {
     private func generatePlaceholderPalette(for book: Book) -> ColorPalette {
         // Use warm amber gradient as placeholder until colors are extracted
         return ColorPalette(
-            primary: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8),     // Warm amber
+            primary: DesignSystem.Colors.primaryAccent.opacity(0.8),     // Warm amber
             secondary: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.6),   // Deeper orange
             accent: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.5),    // Light amber
             background: Color(white: 0.1),
@@ -2470,13 +2470,13 @@ struct LiveTranscriptionView: View {
                 Button(action: onCancel) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3), .white.opacity(0.1))
+                        .foregroundStyle(DesignSystem.Colors.textQuaternary, .white.opacity(0.1))
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.vertical, 16)
         .glassEffect(in: .rect(cornerRadius: 24))
         .overlay {
@@ -2520,9 +2520,9 @@ struct MessageWithQuickActions: View {
                 colorPalette: colorPalette
             )
             .onLongPressGesture {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     showActions.toggle()
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
             }
             
@@ -2614,12 +2614,12 @@ struct QuickActionButton: View {
                 
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
             .frame(width: 50, height: 50)
-            .glassEffect(in: .rect(cornerRadius: 12))
+            .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(color.opacity(0.3), lineWidth: 0.5)
             }
         }
@@ -2644,7 +2644,7 @@ struct EditContentOverlay: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         isPresented = false
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     }
                 
                 VStack {
@@ -2656,7 +2656,7 @@ struct EditContentOverlay: View {
                         TextField("", text: $editedText, axis: .vertical)
                             .font(.system(size: 17, weight: .regular))
                             .foregroundStyle(.white)
-                            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .tint(DesignSystem.Colors.primaryAccent)
                             .focused($isFocused)
                             .lineLimit(1...8) // Allow vertical expansion
                             .textFieldStyle(.plain)
@@ -2666,12 +2666,12 @@ struct EditContentOverlay: View {
                         // Single arrow button for save/submit
                         Button {
                             if editedText != originalText && !editedText.isEmpty {
-                                HapticManager.shared.success()
+                                DesignSystem.HapticFeedback.success()
                                 onSave()
                                 isPresented = false
                             } else if editedText.isEmpty {
                                 // If empty, just close
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                                 isPresented = false
                             }
                         } label: {
@@ -2679,8 +2679,8 @@ struct EditContentOverlay: View {
                                 .font(.system(size: 24, weight: .medium))
                                 .foregroundStyle(
                                     editedText != originalText && !editedText.isEmpty
-                                        ? Color(red: 1.0, green: 0.55, blue: 0.26)
-                                        : .white.opacity(0.3)
+                                        ? DesignSystem.Colors.primaryAccent
+                                        : DesignSystem.Colors.textQuaternary
                                 )
                                 .padding(.trailing, 16)
                                 .padding(.vertical, 12)
@@ -2695,7 +2695,7 @@ struct EditContentOverlay: View {
                                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
                             )
                     )
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.bottom, keyboardHeight > 0 ? 20 : 30) // Adjust padding when keyboard shown
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -2755,7 +2755,7 @@ struct VoiceResponsiveBottomGradient: View {
         guard let palette = colorPalette else {
             // Fallback to warm amber gradient
             return [
-                Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.6),
+                DesignSystem.Colors.primaryAccent.opacity(0.6),
                 Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.4),
                 Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.2),
                 Color.clear
@@ -2843,7 +2843,7 @@ struct VoiceResponsiveBottomGradient: View {
         .onChange(of: audioLevel) { _, newLevel in
             // Pulse effect on high audio levels
             if newLevel > 0.3 {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(DesignSystem.Animation.easeQuick) {
                     pulsePhase = pulsePhase + 0.5
                 }
             }
@@ -2863,7 +2863,7 @@ struct AmbientChatGradientView: View {
             // Warm sunset glow gradient for empty state - top only
             LinearGradient(
                 stops: [
-                    .init(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.4), location: 0.0),
+                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.4), location: 0.0),
                     .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.25), location: 0.15),
                     .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.15), location: 0.3),
                     .init(color: Color.clear, location: 0.5)
@@ -2901,7 +2901,7 @@ struct SimplifiedUnifiedChatInputBar: View {
             // Command icon
             Image(systemName: "command")
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 .padding(.leading, 12)
                 .padding(.trailing, 8)
                 .onTapGesture {
@@ -2912,7 +2912,7 @@ struct SimplifiedUnifiedChatInputBar: View {
             ZStack(alignment: .leading) {
                 if messageText.isEmpty {
                     Text(placeholderText)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
                         .font(.system(size: 16))
                 }
                 
@@ -2940,11 +2940,11 @@ struct SimplifiedUnifiedChatInputBar: View {
                     if isRecording {
                         Image(systemName: "stop.fill")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     } else {
                         Image(systemName: "waveform")
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.7))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.7))
                     }
                 }
                 .buttonStyle(.plain)
@@ -2954,7 +2954,7 @@ struct SimplifiedUnifiedChatInputBar: View {
                     Button(action: onSend) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 32))
-                            .foregroundStyle(.white, Color(red: 1.0, green: 0.55, blue: 0.26))
+                            .foregroundStyle(.white, DesignSystem.Colors.primaryAccent)
                     }
                     .buttonStyle(.plain)
                     .transition(.asymmetric(
@@ -2967,12 +2967,12 @@ struct SimplifiedUnifiedChatInputBar: View {
         }
         .frame(minHeight: 36)
         .overlay {
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                            DesignSystem.Colors.primaryAccent.opacity(0.3),
+                            DesignSystem.Colors.primaryAccent.opacity(0.1)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -2980,7 +2980,7 @@ struct SimplifiedUnifiedChatInputBar: View {
                     lineWidth: 0.5
                 )
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: messageText.isEmpty)
+        .animation(DesignSystem.Animation.springStandard, value: messageText.isEmpty)
     }
 }
 
@@ -2998,7 +2998,7 @@ extension UnifiedChatView {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.55, blue: 0.26),
+                                    DesignSystem.Colors.primaryAccent,
                                     Color(red: 1.0, green: 0.45, blue: 0.2)
                                 ],
                                 startPoint: .top,
@@ -3023,7 +3023,7 @@ extension UnifiedChatView {
                 
                 Text("Just start talking about what you're reading")
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 60)
             }

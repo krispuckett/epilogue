@@ -28,12 +28,12 @@ struct ChatInputBar: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.3))
                         .frame(width: 20, height: 30)
                         .overlay {
                             Image(systemName: "book.fill")
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
                         }
                 }
             }
@@ -43,7 +43,7 @@ struct ChatInputBar: View {
                 placeholder: "Ask your books anything...",
                 isProcessing: isProcessing,
                 shimmerColors: [
-                    Color(red: 1.0, green: 0.55, blue: 0.26),
+                    DesignSystem.Colors.primaryAccent,
                     Color(red: 1.0, green: 0.7, blue: 0.4),
                     Color(red: 1.0, green: 0.8, blue: 0.6)
                 ]
@@ -72,7 +72,7 @@ struct ChatInputBar: View {
                 onStartAmbient()
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.vertical, 16)
         .frame(height: 60)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 30))
@@ -91,7 +91,7 @@ struct ChatInputBar: View {
                 )
         }
         .shadow(color: .black.opacity(0.1), radius: 20, y: 8)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.bottom, 20)
         .confirmationDialog("Navigate to", isPresented: $showNavigationMenu) {
             Button {
@@ -152,16 +152,16 @@ struct ChatSuggestionPills: View {
                                 .font(.system(size: 14, weight: .medium))
                         }
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.vertical, 8)
-                        .glassEffect(.regular.tint(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3)), in: RoundedRectangle(cornerRadius: 16))
+                        .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                                 .strokeBorder(
                                     LinearGradient(
                                         colors: [
-                                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5),
-                                            Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2)
+                                            DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                            DesignSystem.Colors.primaryAccent.opacity(0.2)
                                         ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
@@ -169,11 +169,11 @@ struct ChatSuggestionPills: View {
                                     lineWidth: 0.5
                                 )
                         }
-                        .shadow(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.2), radius: 8, y: 4)
+                        .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         }
         .frame(height: 40)
     }

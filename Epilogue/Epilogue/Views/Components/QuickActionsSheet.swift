@@ -134,7 +134,7 @@ struct QuickActionsSheet: View {
                     handleSubmit()
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             
             // Results
             ScrollView {
@@ -159,7 +159,7 @@ struct QuickActionsSheet: View {
                                     .foregroundStyle(.white.opacity(0.4))
                                 Spacer()
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.vertical, 12)
                         }
                         
@@ -181,7 +181,7 @@ struct QuickActionsSheet: View {
                                     .foregroundStyle(.white.opacity(0.4))
                                 Spacer()
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.vertical, 12)
                         }
                         
@@ -198,10 +198,10 @@ struct QuickActionsSheet: View {
                         VStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                             Text("No results found")
                                 .font(.system(size: 15))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
@@ -211,9 +211,9 @@ struct QuickActionsSheet: View {
             }
             .frame(maxHeight: 400)
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
         .offset(y: dragOffset)
@@ -228,7 +228,7 @@ struct QuickActionsSheet: View {
                     if value.translation.height > 50 {
                         dismiss()
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DesignSystem.Animation.springStandard) {
                             dragOffset = 0
                         }
                     }
@@ -268,7 +268,7 @@ struct QuickActionsSheet: View {
             
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
@@ -301,7 +301,7 @@ struct QuickActionsSheet: View {
             
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
@@ -333,7 +333,7 @@ struct QuickActionsSheet: View {
             
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
@@ -357,7 +357,7 @@ struct QuickActionsSheet: View {
     }
     
     private func handleCommandSelection(_ command: Command) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         
         switch command.action {
         case .newNote:
@@ -382,7 +382,7 @@ struct QuickActionsSheet: View {
     }
     
     private func handleBookSelection(_ book: Book) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         // Navigate to book
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToBook"),
@@ -392,7 +392,7 @@ struct QuickActionsSheet: View {
     }
     
     private func handleNoteSelection(_ note: Note) {
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         // Navigate to note
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToNote"),

@@ -58,7 +58,7 @@ struct NoteCard: View {
             }
         }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .animation(DesignSystem.Animation.springStandard, value: isSelected)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(isSelectionMode ? "Tap to select or deselect" : "Double tap to edit, long press for more options")
@@ -189,13 +189,13 @@ struct QuoteCard: View {
         }
         .padding(32) // Generous padding
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.11, green: 0.105, blue: 0.102)) // Dark charcoal matching LibraryView
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                .fill(DesignSystem.Colors.surfaceBackground) // Dark charcoal matching LibraryView
         )
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
-        .animation(.easeInOut(duration: 0.3), value: showDate)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
+        .animation(DesignSystem.Animation.easeStandard, value: showDate)
         .onTapGesture {
             handleTap()
         }
@@ -207,20 +207,20 @@ struct QuoteCard: View {
         
         if timeSinceLastTap < 0.3 {
             // Double tap detected
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             navigateToAmbientSession()
             tapCount = 0
         } else {
             // Single tap - show date
-            HapticManager.shared.lightTap()
-            withAnimation(.easeInOut(duration: 0.3)) {
+            DesignSystem.HapticFeedback.light()
+            withAnimation(DesignSystem.Animation.easeStandard) {
                 showDate.toggle()
             }
             
             // Auto-hide after 3 seconds when showing
             if showDate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignSystem.Animation.easeStandard) {
                         showDate = false
                     }
                 }
@@ -308,17 +308,17 @@ struct RegularNoteCard: View {
                 .padding(.top, 4)
             }
         }
-        .padding(20)
-        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(.regular.tint(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .onTapGesture(count: 2) {
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             showingOptions = true
         }
     }

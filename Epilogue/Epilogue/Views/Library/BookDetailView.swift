@@ -37,7 +37,7 @@ struct BookColorScheme {
 
 // MARK: - Color Extensions
 extension Color {
-    static let midnightScholar = Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
+    static let midnightScholar = DesignSystem.Colors.surfaceBackground // #1C1B1A
     static let warmWhite = Color(red: 0.98, green: 0.97, blue: 0.96) // #FAF8F5
     static let warmAmber = Color(red: 1.0, green: 0.549, blue: 0.259) // #FF8C42
     
@@ -127,7 +127,7 @@ struct BookDetailView: View {
     private var accentColor: Color {
         // Smart accent color that adapts to book colors while ensuring readability
         guard let palette = colorPalette else {
-            return Color(red: 1.0, green: 0.55, blue: 0.26) // Default warm amber
+            return DesignSystem.Colors.primaryAccent // Default warm amber
         }
         
         // Try to use the book's actual colors if they're suitable
@@ -166,7 +166,7 @@ struct BookDetailView: View {
         }
         
         // Fallback to warm amber for unsuitable colors
-        return Color(red: 1.0, green: 0.55, blue: 0.26)
+        return DesignSystem.Colors.primaryAccent
     }
     
     private var shadowColor: Color {
@@ -263,7 +263,7 @@ struct BookDetailView: View {
                         // Summary section wrapped in padding container
                         if let description = book.description {
                             summarySection(description: description)
-                                .padding(.horizontal, 24)
+                                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                                 .padding(.top, 32)
                                 .transition(.asymmetric(
                                     insertion: .opacity
@@ -276,7 +276,7 @@ struct BookDetailView: View {
                         // Progress section
                         if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
                             progressSection
-                                .padding(.horizontal, 24)
+                                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                                 .padding(.top, 24)
                                 .transition(.asymmetric(
                                     insertion: .opacity
@@ -290,7 +290,7 @@ struct BookDetailView: View {
                     if delayedContentLoaded {
                         // Contextual content based on reading status
                         contextualContentSections
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.top, 24)
                             .padding(.bottom, 100) // Space for tab bar
                             .transition(.asymmetric(
@@ -325,7 +325,7 @@ struct BookDetailView: View {
                 Button("Edit Book") {
                     editedTitle = book.title
                     showingBookSearch = true
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 }
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
@@ -462,7 +462,7 @@ struct BookDetailView: View {
                 .foregroundColor(textColor)
                 .shadow(color: shadowColor, radius: 1, x: 0, y: 1)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 .opacity(titleOpacity)
             
             // Author(s) - Handle multiple authors by splitting on comma
@@ -499,9 +499,9 @@ struct BookDetailView: View {
                 Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                                 
                                 // Show completion sheet when marking as read
                                 if status == .read && book.readingStatus != .read {
@@ -546,7 +546,7 @@ struct BookDetailView: View {
         HStack(spacing: 0) {
             ForEach(BookSection.allCases, id: \.self) { section in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         selectedSection = section
                     }
                 } label: {
@@ -561,10 +561,10 @@ struct BookDetailView: View {
                     .frame(height: 40)
                     .background {
                         if selectedSection == section {
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                 .fill(Color.warmAmber.opacity(0.15))
                                 .overlay {
-                                    RoundedRectangle(cornerRadius: 20)
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
                                         .strokeBorder(Color.warmAmber.opacity(0.3), lineWidth: 1)
                                 }
                                 .shadow(color: Color.warmAmber.opacity(0.3), radius: 6)
@@ -587,7 +587,7 @@ struct BookDetailView: View {
         HStack(spacing: 20) {
             ForEach(BookSection.allCases, id: \.self) { section in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         selectedSection = section
                     }
                 } label: {
@@ -661,7 +661,7 @@ struct BookDetailView: View {
                 allQuotesSection
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: book.readingStatus)
+        .animation(DesignSystem.Animation.easeStandard, value: book.readingStatus)
     }
     
     private func summarySection(description: String) -> some View {
@@ -704,9 +704,9 @@ struct BookDetailView: View {
                 }
             }
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.listItemPadding)
         .frame(maxWidth: .infinity)  // Fixed width from start
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         // NO transition modifier
     }
     
@@ -728,7 +728,7 @@ struct BookDetailView: View {
                 // Edit button
                 Button {
                     showingProgressEditor = true
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 } label: {
                     Text("Edit")
                         .font(.system(size: 14, weight: .medium))
@@ -780,8 +780,8 @@ struct BookDetailView: View {
                 BookQuoteCard(quote: quote)
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -820,8 +820,8 @@ struct BookDetailView: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     // MARK: - Contextual Sections for Want to Read
@@ -838,20 +838,20 @@ struct BookDetailView: View {
                 .foregroundStyle(.white)
             
             Button {
-                HapticManager.shared.mediumTap()
+                DesignSystem.HapticFeedback.medium()
                 withAnimation(.spring(response: 0.3)) {
                     libraryViewModel.updateReadingStatus(for: book.id, status: .currentlyReading)
                 }
                 
                 // Delayed success haptic
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    HapticManager.shared.success()
+                    DesignSystem.HapticFeedback.success()
                 }
             } label: {
                 Text("Start Reading")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 12)
                     .background(accentColor)
                     .clipShape(Capsule())
@@ -859,7 +859,7 @@ struct BookDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(32)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -895,8 +895,8 @@ struct BookDetailView: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -938,8 +938,8 @@ struct BookDetailView: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     // MARK: - Contextual Sections for Finished Reading
@@ -956,7 +956,7 @@ struct BookDetailView: View {
                 
                 Button {
                     showingCompletionSheet = true
-                    HapticManager.shared.lightTap()
+                    DesignSystem.HapticFeedback.light()
                 } label: {
                     Text("Edit")
                         .font(.system(size: 14))
@@ -982,8 +982,8 @@ struct BookDetailView: View {
                     .lineSpacing(8)
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -999,16 +999,16 @@ struct BookDetailView: View {
             
             Text("Add your private rating and review")
                 .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
             
             Button {
                 showingCompletionSheet = true
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             } label: {
                 Text("Add Review")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 12)
                     .background(accentColor)
                     .clipShape(Capsule())
@@ -1016,7 +1016,7 @@ struct BookDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(32)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -1050,8 +1050,8 @@ struct BookDetailView: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -1103,8 +1103,8 @@ struct BookDetailView: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     // MARK: - Always Available Sections
@@ -1142,7 +1142,7 @@ struct BookDetailView: View {
                                     name: Notification.Name("EditNote"),
                                     object: note
                                 )
-                                HapticManager.shared.lightTap()
+                                DesignSystem.HapticFeedback.light()
                             }
                         ),
                         SwipeAction(
@@ -1158,8 +1158,8 @@ struct BookDetailView: View {
                     ])
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     @ViewBuilder
@@ -1192,7 +1192,7 @@ struct BookDetailView: View {
                             backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
                             handler: {
                                 ShareQuoteService.shareQuote(quote)
-                                HapticManager.shared.success()
+                                DesignSystem.HapticFeedback.success()
                             }
                         ),
                         SwipeAction(
@@ -1208,8 +1208,8 @@ struct BookDetailView: View {
                     ])
             }
         }
-        .padding(20)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     private var quotesSection: some View {
@@ -1237,7 +1237,7 @@ struct BookDetailView: View {
                                         name: Notification.Name("EditNote"),
                                         object: quote
                                     )
-                                    HapticManager.shared.lightTap()
+                                    DesignSystem.HapticFeedback.light()
                                 }
                             ),
                             SwipeAction(
@@ -1246,7 +1246,7 @@ struct BookDetailView: View {
                                 handler: {
                                     // Share quote
                                     ShareQuoteService.shareQuote(quote)
-                                    HapticManager.shared.success()
+                                    DesignSystem.HapticFeedback.success()
                                 }
                             ),
                             SwipeAction(
@@ -1290,7 +1290,7 @@ struct BookDetailView: View {
                                         name: Notification.Name("EditNote"),
                                         object: note
                                     )
-                                    HapticManager.shared.lightTap()
+                                    DesignSystem.HapticFeedback.light()
                                 }
                             ),
                             SwipeAction(
@@ -1314,7 +1314,7 @@ struct BookDetailView: View {
                                         rootViewController.present(activityController, animated: true)
                                     }
                                     
-                                    HapticManager.shared.success()
+                                    DesignSystem.HapticFeedback.success()
                                 }
                             ),
                             SwipeAction(
@@ -1738,10 +1738,10 @@ struct BookDetailView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(textColor.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                         .strokeBorder(textColor.opacity(0.1), lineWidth: 1)
                 )
         )
@@ -1755,7 +1755,7 @@ struct BookDetailView: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                        .strokeBorder(DesignSystem.Colors.textQuaternary, lineWidth: 1)
                 )
             
             Text(label)
@@ -1830,7 +1830,7 @@ struct BookQuoteCard: View {
             // Large transparent opening quote
             Text("\u{201C}")
                 .font(.custom("Georgia", size: 80))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
                 .offset(x: -10, y: 20)
                 .frame(height: 0)
             
@@ -1839,14 +1839,14 @@ struct BookQuoteCard: View {
                 // Drop cap
                 Text(firstLetter)
                     .font(.custom("Georgia", size: 56))
-                    .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102))
+                    .foregroundStyle(DesignSystem.Colors.surfaceBackground)
                     .padding(.trailing, 4)
                     .offset(y: -8)
                 
                 // Rest of quote
                 Text(restOfContent)
                     .font(.custom("Georgia", size: 24))
-                    .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102))
+                    .foregroundStyle(DesignSystem.Colors.surfaceBackground)
                     .lineSpacing(11) // Line height 1.5
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
@@ -1858,9 +1858,9 @@ struct BookQuoteCard: View {
                 // Thin horizontal rule with gradient
                 LinearGradient(
                     gradient: Gradient(stops: [
-                        .init(color: Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.1), location: 0),
-                        .init(color: Color(red: 0.11, green: 0.105, blue: 0.102).opacity(1.0), location: 0.5),
-                        .init(color: Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.1), location: 1.0)
+                        .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 0),
+                        .init(color: DesignSystem.Colors.surfaceBackground.opacity(1.0), location: 0.5),
+                        .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 1.0)
                     ]),
                     startPoint: .leading,
                     endPoint: .trailing
@@ -1874,28 +1874,28 @@ struct BookQuoteCard: View {
                         Text(author.uppercased())
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                             .kerning(1.5)
-                            .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.8))
+                            .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.8))
                     }
                     
                     if let bookTitle = quote.bookTitle {
                         Text(bookTitle.uppercased())
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                             .kerning(1.2)
-                            .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.6))
+                            .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.6))
                     }
                     
                     if let pageNumber = quote.pageNumber {
                         Text("PAGE \(pageNumber)")
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
                             .kerning(1.0)
-                            .foregroundStyle(Color(red: 0.11, green: 0.105, blue: 0.102).opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.5))
                     }
                 }
             }
         }
         .padding(32) // Generous padding
         .background {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color(red: 0.98, green: 0.97, blue: 0.96)) // #FAF8F5
                 .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         }
@@ -1940,7 +1940,7 @@ struct BookNoteCard: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color(hex: "FAF8F5"))
                 .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         )
@@ -2001,7 +2001,7 @@ struct QuestionCard: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                 .fill(Color(hex: "FAF8F5"))
                 .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         )
@@ -2028,10 +2028,10 @@ struct ChatMessageBubble: View {
                 Text(message.content)
                     .font(.system(size: 16))
                     .foregroundColor(message.isUser ? .white : .black.opacity(0.85))
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 10)
                     .background(
-                        RoundedRectangle(cornerRadius: 18)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                             .fill(message.isUser ? accentColor : Color(hex: "FAF8F5"))
                     )
                 

@@ -68,7 +68,7 @@ struct BookCoverBackgroundView: View {
             // Subtle noise texture overlay
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .opacity(0.03) // EXACTLY 0.03
+                .opacity(0.05) // EXACTLY 0.03
                 .ignoresSafeArea()
                 .blendMode(.plusLighter)
         }

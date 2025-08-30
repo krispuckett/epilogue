@@ -37,7 +37,7 @@ struct MinimalSessionsView: View {
     var body: some View {
         ZStack {
             // Clean dark background like LibraryView
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             if sessions.isEmpty {
@@ -72,7 +72,7 @@ struct MinimalSessionsView: View {
         VStack(spacing: 20) {
             Image(systemName: "bubble.left.and.bubble.right.fill")
                 .font(.system(size: 60))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent)
         
             Text("No conversations yet")
                 .font(.system(size: 24, weight: .medium))
@@ -95,13 +95,13 @@ struct MinimalSessionsView: View {
                         // Date header
                         Text(formatDateHeader(group.date))
                             .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.horizontal, 20)
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         
                         // Sessions for this day
                         ForEach(group.sessions) { session in
                             MinimalSessionCard(session: session)
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         }
                     }
                 }
@@ -115,7 +115,7 @@ struct MinimalSessionsView: View {
     // MARK: - New Chat Button
     private var newChatButton: some View {
         Button {
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             showingNewChat = true
         } label: {
             Image(systemName: "plus")
@@ -124,7 +124,7 @@ struct MinimalSessionsView: View {
                 .frame(width: 56, height: 56)
                 .background {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .fill(DesignSystem.Colors.primaryAccent)
                 }
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
         }
@@ -184,7 +184,7 @@ struct MinimalSessionCard: View {
     
     var body: some View {
         Button {
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             showingDetail = true
         } label: {
             HStack(spacing: 16) {
@@ -206,7 +206,7 @@ struct MinimalSessionCard: View {
                         .frame(width: 44, height: 66)
                         .overlay {
                             Image(systemName: "book.closed.fill")
-                                .foregroundStyle(.white.opacity(0.3))
+                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
                         }
                 }
                 
@@ -223,13 +223,13 @@ struct MinimalSessionCard: View {
                         
                         Text(timeAgo)
                             .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
                     
                     // Key insight
                     Text(keyInsight)
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .lineLimit(2)
                     
                     // Metrics
@@ -240,9 +240,9 @@ struct MinimalSessionCard: View {
                 
                 Spacer(minLength: 0)
             }
-            .padding(16)
+            .padding(DesignSystem.Spacing.inlinePadding)
             .background {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(Color.white.opacity(0.05))
             }
         }
@@ -251,7 +251,7 @@ struct MinimalSessionCard: View {
         .onLongPressGesture(minimumDuration: 0.1, maximumDistance: .infinity) {
             // Action handled by button
         } onPressingChanged: { pressing in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isPressed = pressing
             }
         }

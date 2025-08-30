@@ -20,7 +20,7 @@ struct AmbientReadingProgressView: View {
     
     // MARK: - Color Properties
     private var primaryColor: Color {
-        colorPalette?.primary ?? Color(red: 1.0, green: 0.55, blue: 0.26)
+        colorPalette?.primary ?? DesignSystem.Colors.primaryAccent
     }
     
     private var secondaryColor: Color {
@@ -92,7 +92,7 @@ struct AmbientReadingProgressView: View {
                 
                 Text("of \(totalPages)")
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                 
                 Spacer()
                 
@@ -144,7 +144,7 @@ struct AmbientReadingProgressView: View {
             ZStack {
                 // Background ring
                 Circle()
-                    .stroke(Color.white.opacity(0.08), lineWidth: 3)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 3)
                     .frame(width: 120, height: 120)
                 
                 // Animated progress ring
@@ -179,7 +179,7 @@ struct AmbientReadingProgressView: View {
                     
                     Text("%")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.7))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
         }
@@ -191,7 +191,7 @@ struct AmbientReadingProgressView: View {
             ZStack(alignment: .leading) {
                 // Base timeline track
                 Capsule()
-                    .fill(Color.white.opacity(0.06))
+                    .fill(Color.white.opacity(0.05))
                     .frame(height: 4)
                 
                 // Progress fill
@@ -244,8 +244,8 @@ struct AmbientReadingProgressView: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // Base track
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.04))
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                        .fill(Color.white.opacity(0.05))
                         .frame(height: 8)
                     
                     // Segment progress
@@ -286,11 +286,11 @@ struct AmbientReadingProgressView: View {
                                 )
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                     
                     // Add subtle glow effect
                     if animatedProgress > 0 {
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -423,7 +423,7 @@ struct AmbientReadingProgressDemo: View {
     
     var body: some View {
         ZStack {
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             ScrollView {
@@ -452,9 +452,9 @@ struct AmbientReadingProgressDemo: View {
                 showDetailed: false,
                 colorPalette: nil
             )
-            .padding(20)
+            .padding(DesignSystem.Spacing.listItemPadding)
             .background(Color.white.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         }
     }
     
@@ -472,7 +472,7 @@ struct AmbientReadingProgressDemo: View {
             )
             .padding(30)
             .background(Color.white.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
         }
     }
 }

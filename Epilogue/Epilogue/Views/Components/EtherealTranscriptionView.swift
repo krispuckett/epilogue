@@ -47,7 +47,7 @@ struct EtherealTranscriptionView: View {
             .scaleEffect(containerScale)
             .blur(radius: containerBlur)
             .shadow(
-                color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(glowIntensity * 0.3),
+                color: DesignSystem.Colors.primaryAccent.opacity(glowIntensity * 0.3),
                 radius: 20 * glowIntensity,
                 x: 0,
                 y: 0
@@ -279,7 +279,7 @@ struct EtherealTranscriptionLineView: View {
                         .blur(radius: isRevealed ? 0 : 12)
                         .scaleEffect(isRevealed ? 1.0 : 0.8)
                         .shadow(
-                            color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(isRevealed ? glowIntensity * 0.5 : 0),
+                            color: DesignSystem.Colors.primaryAccent.opacity(isRevealed ? glowIntensity * 0.5 : 0),
                             radius: 4,
                             x: 0,
                             y: 0
@@ -352,11 +352,11 @@ struct SimplifiedLiquidGlassTranscription: View {
                     )
                     .blur(radius: (1 - revealProgress) * 10)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
             .padding(.vertical, 16)
             .frame(maxWidth: geometry.size.width - 80)
             .glassEffect() // ONLY YOUR LIQUID GLASS
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
             .scaleEffect(containerScale)
             .onChange(of: currentText) { _, newText in
                 // Reset for new text

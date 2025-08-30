@@ -93,7 +93,7 @@ struct ClaudeInspiredGradient: View {
                 )
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: voiceManager.currentAmplitude)
+        .animation(DesignSystem.Animation.easeQuick, value: voiceManager.currentAmplitude)
         .onAppear {
             startWaveAnimation()
         }
@@ -171,7 +171,7 @@ struct EnhancedAmberGradient: View {
                     LinearGradient(
                         stops: [
                             .init(color: Color(red: 1.0, green: 0.35, blue: 0.1), location: 0.0),
-                            .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.15),
+                            .init(color: DesignSystem.Colors.primaryAccent, location: 0.15),
                             .init(color: Color(red: 1.0, green: 0.7, blue: 0.4).opacity(0.5), location: 0.3),
                             .init(color: Color.clear, location: 0.6)
                         ],
@@ -194,8 +194,8 @@ struct EnhancedAmberGradient: View {
                         
                         LinearGradient(
                             stops: [
-                                .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0.0),
-                                .init(color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.5), location: 0.3),
+                                .init(color: DesignSystem.Colors.primaryAccent, location: 0.0),
+                                .init(color: DesignSystem.Colors.primaryAccent.opacity(0.5), location: 0.3),
                                 .init(color: Color.clear, location: 0.6)
                             ],
                             startPoint: .bottom,
@@ -212,15 +212,15 @@ struct EnhancedAmberGradient: View {
                         LinearGradient(
                             stops: [
                                 .init(
-                                    color: voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity),
+                                    color: voiceModulatedColor(base: DesignSystem.Colors.primaryAccent, level: voiceIntensity),
                                     location: 0.0
                                 ),
                                 .init(
-                                    color: voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity).opacity(0.6),
+                                    color: voiceModulatedColor(base: DesignSystem.Colors.primaryAccent, level: voiceIntensity).opacity(0.6),
                                     location: 0.2 + (voiceIntensity * 0.1)
                                 ),
                                 .init(
-                                    color: voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity).opacity(0.3),
+                                    color: voiceModulatedColor(base: DesignSystem.Colors.primaryAccent, level: voiceIntensity).opacity(0.3),
                                     location: 0.4 + (voiceIntensity * 0.2)
                                 ),
                                 .init(
@@ -239,7 +239,7 @@ struct EnhancedAmberGradient: View {
                             anchor: .bottom
                         )
                         .opacity(0.5 + (voiceIntensity * 0.5)) // Fade in with voice
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: voiceIntensity)
+                        .animation(DesignSystem.Animation.springStandard, value: voiceIntensity)
                     }
                     
                     // Gentle pulsing glow at the base
@@ -247,7 +247,7 @@ struct EnhancedAmberGradient: View {
                         Spacer()
                         
                         Circle()
-                            .fill(voiceModulatedColor(base: Color(red: 1.0, green: 0.55, blue: 0.26), level: voiceIntensity))
+                            .fill(voiceModulatedColor(base: DesignSystem.Colors.primaryAccent, level: voiceIntensity))
                             .blur(radius: 80)
                             .frame(width: 300, height: 300)
                             .scaleEffect(1.0 + (voiceIntensity * 0.3))
@@ -436,7 +436,7 @@ struct BookSpecificGradient: View {
                             anchor: .bottom
                         )
                         .opacity(0.5 + (voiceIntensity * 0.5)) // Fade in with voice
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: voiceIntensity)
+                        .animation(DesignSystem.Animation.springStandard, value: voiceIntensity)
                     }
                     
                     // Gentle pulsing glow at the base
@@ -481,7 +481,7 @@ struct MinimalBookSelection: View {
             
             Text("Say the book title or tap to select")
                 .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
             
             Button {
                 showingBookPicker = true
@@ -560,7 +560,7 @@ struct AmbientChatOverlay: View {
                     }
                 }
                 .padding(.top, 60)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 
                 Spacer()
                 
@@ -576,13 +576,13 @@ struct AmbientChatOverlay: View {
                                 .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
                         } else {
                             // Fallback if no cover
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                                 .fill(Color.white.opacity(0.1))
                                 .frame(width: 80, height: 112)
                                 .overlay(
                                     Image(systemName: "book.fill")
                                         .font(.system(size: 32))
-                                        .foregroundStyle(.white.opacity(0.3))
+                                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
                                 )
                         }
                         
@@ -591,7 +591,7 @@ struct AmbientChatOverlay: View {
                             VStack(spacing: 4) {
                                 Image(systemName: "waveform")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                                     .symbolEffect(.variableColor.iterative, options: .repeating)
                                 
                                 // Show pattern indicator if detected
@@ -654,7 +654,7 @@ struct AmbientChatOverlay: View {
                                 .cornerRadius(25)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 25)
-                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        .stroke(DesignSystem.Colors.textQuaternary, lineWidth: 1)
                                 )
                         }
                     }
@@ -723,7 +723,7 @@ struct AmbientChatOverlay: View {
                 // Detect cognitive patterns in real-time
                 let patterns = CognitivePatternRecognizer.shared.recognizePatterns(in: newValue)
                 if !patterns.isEmpty {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         detectedPatterns.append(contentsOf: patterns)
                         showPatternVisualizer = true
                     }
@@ -775,7 +775,7 @@ struct AmbientChatOverlay: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .autoStopWarning)) { _ in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 showAutoStopWarning = true
             }
         }
@@ -840,7 +840,7 @@ struct AmbientChatOverlay: View {
         autoStopManager.startMonitoring()
         
         // Haptic feedback
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
     }
     
     private func stopSession() {
@@ -855,7 +855,7 @@ struct AmbientChatOverlay: View {
         session?.endTime = Date()
         
         // Haptic feedback
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         // Show processing view
         withAnimation {
@@ -1361,7 +1361,7 @@ struct AmbientChatOverlay: View {
                 try? modelContext.save()
                 
                 // Haptic feedback for response
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }
             */
             

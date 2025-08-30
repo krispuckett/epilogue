@@ -18,7 +18,7 @@ struct PerplexityStyleSessionsView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                 
                 TextField("Search sessions...", text: $searchText)
                     .font(.system(size: 15))
@@ -29,7 +29,7 @@ struct PerplexityStyleSessionsView: View {
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
-                        HapticManager.shared.lightTap()
+                        DesignSystem.HapticFeedback.light()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
@@ -37,18 +37,18 @@ struct PerplexityStyleSessionsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(Color.white.opacity(0.05))
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         .padding(.top, 16)
         .padding(.bottom, 8)
     }
@@ -146,30 +146,30 @@ struct PerplexityStyleSessionsView: View {
     @ViewBuilder
     private var searchButton: some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DesignSystem.Animation.springStandard) {
                 isSearching.toggle()
                 if !isSearching {
                     searchText = ""
                 }
             }
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
         } label: {
             if isSearching {
                 // Liquid glass close button with amber tint
                 ZStack {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.15))
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
                         .frame(width: 28, height: 28)
                         .glassEffect()
                     
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
             } else {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
             }
         }
     }
@@ -178,7 +178,7 @@ struct PerplexityStyleSessionsView: View {
     private var mainContent: some View {
         ZStack {
             // Dark background matching library and notes
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             ScrollView {
@@ -255,7 +255,7 @@ struct StickyDateHeader: View {
                     weight: isPinned ? .bold : .semibold
                 ))
                 .foregroundStyle(
-                    isPinned ? .white : .white.opacity(0.5)
+                    isPinned ? .white : DesignSystem.Colors.textTertiary
                 )
                 .tracking(isPinned ? 1.4 : 1.2)
             
@@ -267,10 +267,10 @@ struct StickyDateHeader: View {
                     weight: .medium
                 ))
                 .foregroundStyle(
-                    isPinned ? Color(red: 1.0, green: 0.55, blue: 0.26) : .white.opacity(0.3)
+                    isPinned ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary
                 )
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
@@ -293,13 +293,13 @@ struct StickyDateHeader: View {
             
             if isPinned {
                 // Amber tinted rectangular card with proper glass effect
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.08))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                    .padding(.horizontal, 16)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             } else {
                 // Base background
-                Color(red: 0.11, green: 0.105, blue: 0.102)
+                DesignSystem.Colors.surfaceBackground
             }
         }
     }
@@ -390,7 +390,7 @@ struct PerplexitySessionRow: View {
         } else if !session.capturedNotes.isEmpty {
             return ("square.and.pencil", Color(red: 0.8, green: 0.4, blue: 1.0))
         } else if !session.capturedQuotes.isEmpty {
-            return ("quote.bubble.fill", Color(red: 1.0, green: 0.55, blue: 0.26))
+            return ("quote.bubble.fill", DesignSystem.Colors.primaryAccent)
         }
         return nil
     }
@@ -455,7 +455,7 @@ struct PerplexitySessionRow: View {
                             }
                             Text("\(contentCount)")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(DesignSystem.Colors.textTertiary)
                         }
                     }
                 }
@@ -466,7 +466,7 @@ struct PerplexitySessionRow: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.2))
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }

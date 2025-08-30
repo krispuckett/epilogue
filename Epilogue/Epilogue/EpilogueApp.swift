@@ -32,11 +32,11 @@ struct EpilogueApp: App {
             } else {
                 // Minimal launch screen while loading
                 ZStack {
-                    Color(red: 0.11, green: 0.105, blue: 0.102)
+                    DesignSystem.Colors.surfaceBackground
                         .ignoresSafeArea()
                     
                     ProgressView()
-                        .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+                        .tint(DesignSystem.Colors.primaryAccent)
                         .scaleEffect(1.5)
                 }
                 .task {

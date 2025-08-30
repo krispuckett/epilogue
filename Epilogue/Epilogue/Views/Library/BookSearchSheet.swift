@@ -20,7 +20,7 @@ struct BookSearchSheet: View {
         NavigationStack {
             ZStack {
                 // Background - warm charcoal
-                Color(red: 0.11, green: 0.105, blue: 0.102) // #1C1B1A
+                DesignSystem.Colors.surfaceBackground // #1C1B1A
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -33,7 +33,7 @@ struct BookSearchSheet: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "exclamationmark.triangle")
                                     .font(.system(size: 48))
-                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26)) // Warm orange
+                                    .foregroundStyle(DesignSystem.Colors.primaryAccent) // Warm orange
                                 
                                 Text("Search Error")
                                     .font(.system(size: 20, weight: .medium, design: .serif))
@@ -41,10 +41,10 @@ struct BookSearchSheet: View {
                                 
                                 Text(error)
                                     .font(.bodyMedium)
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
                                     .multilineTextAlignment(.center)
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.top, 16)
                             .padding(.bottom, 32)
                         } else if searchResults.isEmpty {
@@ -53,7 +53,7 @@ struct BookSearchSheet: View {
                                 VStack(spacing: 12) {
                                     Image(systemName: "magnifyingglass.circle")
                                         .font(.system(size: 56))
-                                        .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
                                     
                                     Text("No results for \"\(searchQuery)\"")
                                         .font(.system(size: 20, weight: .semibold, design: .serif))
@@ -73,8 +73,8 @@ struct BookSearchSheet: View {
                                         } label: {
                                             Text(suggestion)
                                                 .font(.system(size: 16, weight: .medium))
-                                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
-                                                .padding(.horizontal, 16)
+                                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                                                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                                                 .padding(.vertical, 8)
                                                 .glassEffect(in: Capsule())
                                         }
@@ -85,16 +85,16 @@ struct BookSearchSheet: View {
                                 VStack(spacing: 12) {
                                     Text("Refine your search:")
                                         .font(.system(size: 14))
-                                        .foregroundStyle(.white.opacity(0.7))
+                                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                                     
                                     HStack {
                                         TextField("Try another title or author...", text: $refinedSearchQuery)
                                             .font(.system(size: 16))
                                             .foregroundStyle(.white)
                                             .textFieldStyle(.plain)
-                                            .padding(.horizontal, 16)
+                                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                                             .padding(.vertical, 12)
-                                            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                                            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
                                             .focused($isSearchFocused)
                                             .onSubmit {
                                                 if !refinedSearchQuery.isEmpty {
@@ -109,18 +109,18 @@ struct BookSearchSheet: View {
                                         } label: {
                                             Image(systemName: "arrow.right.circle.fill")
                                                 .font(.title2)
-                                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                                         }
                                         .disabled(refinedSearchQuery.isEmpty)
                                     }
-                                    .padding(.horizontal, 20)
+                                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                                 }
                                 
                                 // Tips
                                 VStack(spacing: 8) {
                                     Text("Search tips:")
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                        .foregroundStyle(DesignSystem.Colors.textTertiary)
                                     
                                     VStack(alignment: .leading, spacing: 4) {
                                         Label("Try the author's name", systemImage: "person.fill")
@@ -132,7 +132,7 @@ struct BookSearchSheet: View {
                                 }
                                 .padding(.top, 8)
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.top, 40)
                             .padding(.bottom, 32)
                         } else {
@@ -140,8 +140,8 @@ struct BookSearchSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Found \(searchResults.count) books")
                                     .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.5))
-                                    .padding(.horizontal, 16)
+                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             }
                             
                             VStack(spacing: 12) {
@@ -152,7 +152,7 @@ struct BookSearchSheet: View {
                                     .id(book.id) // Force unique ID for each row
                                 }
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.top, 16)
                             .padding(.bottom, 32)
                         }
@@ -196,7 +196,7 @@ struct BookSearchSheet: View {
     }
     
     private func addBookToLibrary(_ book: Book) {
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         onBookSelected(book)
         dismiss()
     }
@@ -332,7 +332,7 @@ struct BookSearchResultRow: View {
                 loadFullImage: false,
                 isLibraryView: false
             )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             
             // Book details
@@ -364,18 +364,18 @@ struct BookSearchResultRow: View {
             Button(action: onSelect) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
             }
         }
-        .padding(16)
+        .padding(DesignSystem.Spacing.inlinePadding)
         .frame(height: 114) // Match library list item height
         .background {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .fill(Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6)) // #262524 with transparency
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 0.5)
         }
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
     }

@@ -27,7 +27,7 @@ struct AIModelIndicator: View {
             switch self {
             case .foundationModels: return .blue
             case .perplexity: return .purple
-            case .hybrid: return Color(red: 1.0, green: 0.55, blue: 0.26)
+            case .hybrid: return DesignSystem.Colors.primaryAccent
             }
         }
     }

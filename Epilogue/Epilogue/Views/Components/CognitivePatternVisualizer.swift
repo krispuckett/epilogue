@@ -307,10 +307,10 @@ struct RealTimePatternDisplay: View {
                 }
                 .padding()
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                         .fill(Color(hexString: current.pattern.color).opacity(0.1))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                                 .strokeBorder(Color(hexString: current.pattern.color).opacity(0.3), lineWidth: 1)
                         )
                 )
@@ -329,7 +329,7 @@ struct RealTimePatternDisplay: View {
                 }
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: currentPatterns)
+        .animation(DesignSystem.Animation.springStandard, value: currentPatterns)
     }
     
     private func iconForPattern(_ pattern: CognitivePattern) -> String {

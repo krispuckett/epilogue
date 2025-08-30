@@ -62,11 +62,11 @@ struct NotesMicroInteractions {
             content
                 .scaleEffect(isHovered ? 1.02 : 1.0)
                 .shadow(
-                    color: Color(red: 1.0, green: 0.55, blue: 0.26).opacity(isHovered ? 0.2 : 0),
+                    color: DesignSystem.Colors.primaryAccent.opacity(isHovered ? 0.2 : 0),
                     radius: isHovered ? 20 : 10,
                     y: isHovered ? 5 : 2
                 )
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+                .animation(DesignSystem.Animation.springStandard, value: isHovered)
                 .onHover { hovering in
                     isHovered = hovering
                 }
@@ -127,7 +127,7 @@ struct NotesMicroInteractions {
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.55, blue: 0.26),
+                                DesignSystem.Colors.primaryAccent,
                                 Color(red: 1.0, green: 0.45, blue: 0.16)
                             ],
                             startPoint: .topLeading,
@@ -140,7 +140,7 @@ struct NotesMicroInteractions {
                 
                 Image(systemName: "sparkles")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .scaleEffect(progress)
                     .opacity(Double(progress))
             }
@@ -225,7 +225,7 @@ struct NotesMicroInteractions {
         
         var body: some View {
             Circle()
-                .fill(Color(red: 1.0, green: 0.55, blue: 0.26))
+                .fill(DesignSystem.Colors.primaryAccent)
                 .frame(width: 50, height: 50)
                 .scaleEffect(scale)
                 .opacity(opacity)
@@ -251,7 +251,7 @@ struct NotesMicroInteractions {
                     if now.timeIntervalSince(lastShakeTime) > 2 {
                         onShake()
                         lastShakeTime = now
-                        HapticManager.shared.success()
+                        DesignSystem.HapticFeedback.success()
                     }
                 }
         }
@@ -290,8 +290,8 @@ struct NotesMicroInteractions {
                             path,
                             with: .linearGradient(
                                 Gradient(colors: [
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.3),
-                                    Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.1)
+                                    DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.1)
                                 ]),
                                 startPoint: startPos,
                                 endPoint: endPos

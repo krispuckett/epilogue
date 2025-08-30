@@ -21,7 +21,7 @@ struct EnhancedQuickActionsBar: View {
     @State private var glowIntensity: Double = 0
     @Namespace private var animation
     
-    private let warmAmber = Color(red: 1.0, green: 0.55, blue: 0.26)
+    private let warmAmber = DesignSystem.Colors.primaryAccent
     
     var body: some View {
         ZStack {
@@ -69,7 +69,7 @@ struct EnhancedQuickActionsBar: View {
         }
         .onReceive(voiceManager.$currentAmplitude) { amplitude in
             if voiceManager.isListening {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignSystem.Animation.easeStandard) {
                     glowIntensity = Double(amplitude)
                 }
             }
@@ -80,7 +80,7 @@ struct EnhancedQuickActionsBar: View {
     // MARK: - Plus Button
     private var plusButton: some View {
         Button {
-            HapticManager.shared.mediumTap()
+            DesignSystem.HapticFeedback.medium()
             NotificationCenter.default.post(name: Notification.Name("ShowCommandInput"), object: nil)
         } label: {
             Image(systemName: "plus")
@@ -154,7 +154,7 @@ struct EnhancedQuickActionsBar: View {
     
     private func handleSingleTap() {
         print("🎯 DEBUG: Waveform single tap detected")
-        HapticManager.shared.lightTap()
+        DesignSystem.HapticFeedback.light()
         startGlowAnimation()
         
         // Check if we're viewing a specific book
@@ -168,7 +168,7 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func handleDoubleTap() {
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         
         // Double tap also checks for current book context
         if let currentBook = libraryViewModel.currentDetailBook {
@@ -181,12 +181,12 @@ struct EnhancedQuickActionsBar: View {
     private func handleSwipeGesture(_ translation: CGSize) {
         if translation.height < -30 {
             // Swipe up - Quick note capture
-            HapticManager.shared.lightTap()
+            DesignSystem.HapticFeedback.light()
             NotificationCenter.default.post(name: Notification.Name("StartVoiceNote"), object: nil)
         } else if translation.height > 30 {
             // Swipe down - Show recent captures
-            HapticManager.shared.lightTap()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            DesignSystem.HapticFeedback.light()
+            withAnimation(DesignSystem.Animation.springStandard) {
                 showRecentCaptures = true
             }
             
@@ -255,9 +255,9 @@ struct EnhancedQuickActionsBar: View {
                     .frame(width: 60)
             }
             .padding(8)
-            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .strokeBorder(warmAmber.opacity(0.3), lineWidth: 1)
             }
         }
@@ -277,12 +277,12 @@ struct EnhancedQuickActionsBar: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Recent Captures")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
             
             if capturedContent.isEmpty {
                 Text("No recent captures")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .italic()
             } else {
                 ForEach(capturedContent.prefix(3), id: \.self) { content in
@@ -292,13 +292,13 @@ struct EnhancedQuickActionsBar: View {
                         .lineLimit(2)
                         .padding(6)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .glassEffect(in: RoundedRectangle(cornerRadius: 6))
+                        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                 }
             }
         }
         .padding(12)
         .frame(width: 200)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
         .offset(y: -80)
         .transition(.asymmetric(
             insertion: .scale(scale: 0.8, anchor: .bottom).combined(with: .opacity),
@@ -309,7 +309,7 @@ struct EnhancedQuickActionsBar: View {
     // MARK: - Helper Functions
     
     private func startGlowAnimation() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(DesignSystem.Animation.easeStandard) {
             waveformGlow = true
             pulseAnimation = true
             waveformScale = 1.1
@@ -330,7 +330,7 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func selectBook(_ book: Book) {
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         dismissRadialMenu()
         
         // Open ambient mode with the selected book
@@ -338,7 +338,7 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func dismissRadialMenu() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        withAnimation(DesignSystem.Animation.springStandard) {
             showRadialMenu = false
             waveformScale = 1.0
         }
@@ -424,7 +424,7 @@ extension EnhancedQuickActionsBar {
 
 #Preview {
     ZStack {
-        Color(red: 0.11, green: 0.105, blue: 0.102)
+        DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea()
         
         VStack {

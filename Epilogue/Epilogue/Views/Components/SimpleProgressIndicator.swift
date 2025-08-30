@@ -5,7 +5,7 @@ struct SimpleProgressIndicator: View {
     let tintColor: Color
     let scale: CGFloat
     
-    init(tintColor: Color = Color(red: 1.0, green: 0.55, blue: 0.26), scale: CGFloat = 1.0) {
+    init(tintColor: Color = DesignSystem.Colors.primaryAccent, scale: CGFloat = 1.0) {
         self.tintColor = tintColor
         self.scale = scale
     }

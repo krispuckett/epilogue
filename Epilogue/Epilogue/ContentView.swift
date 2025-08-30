@@ -22,7 +22,7 @@ struct GlassToastModifier: ViewModifier {
                     Text(message)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         .padding(.vertical, 12)
                         .glassEffect()
                         .clipShape(Capsule())
@@ -182,7 +182,7 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowNoQuotesToast"))) { _ in
                 showNoQuotesToast = true
-                HapticManager.shared.warning()
+                DesignSystem.HapticFeedback.warning()
             }
             .glassToast(
                 isShowing: $showNoQuotesToast,
@@ -274,14 +274,14 @@ struct ContentView: View {
                 }
                 
                 // Prepare only essential haptic generators
-                HapticManager.shared.lightTap() // Prepare the most used one
+                DesignSystem.HapticFeedback.light() // Prepare the most used one
             }
     }
     
     private var mainContent: some View {
         ZStack(alignment: .bottom) {
             // Background
-            Color(red: 0.11, green: 0.105, blue: 0.102)
+            DesignSystem.Colors.surfaceBackground
                 .ignoresSafeArea()
             
             // Native TabView with automatic blur - DO NOT MODIFY
@@ -323,7 +323,7 @@ struct ContentView: View {
                 }
                 .tag(2)
             }
-            .tint(Color(red: 1.0, green: 0.55, blue: 0.26))
+            .tint(DesignSystem.Colors.primaryAccent)
             .environmentObject(libraryViewModel)
             .environmentObject(notesViewModel)
             .environmentObject(navigationCoordinator)
@@ -337,7 +337,7 @@ struct ContentView: View {
                         } label: {
                             Image(systemName: "lock.shield")
                                 .font(.system(size: 18))
-                                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26))
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         }
                         .sensoryFeedback(.impact(flexibility: .soft), trigger: showPrivacySettings)
                     }
@@ -391,7 +391,7 @@ struct ContentView: View {
         }
         .onChange(of: selectedTab) { oldValue, newValue in
             // Haptic feedback on tab change
-            HapticManager.shared.selectionChanged()
+            DesignSystem.HapticFeedback.selection()
             
             // Sync with navigation coordinator
             switch newValue {
@@ -440,7 +440,7 @@ struct ContentView: View {
                         )
                         .environmentObject(libraryViewModel)
                         .environmentObject(notesViewModel)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.bottom, 16) // Above input bar
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity),
@@ -467,15 +467,15 @@ struct ContentView: View {
                         },
                         onCommandTap: {
                             // Toggle command palette
-                            HapticManager.shared.lightTap()
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            DesignSystem.HapticFeedback.light()
+                            withAnimation(DesignSystem.Animation.springStandard) {
                                 showingLibraryCommandPalette.toggle()
                             }
                         },
                         isRecording: .constant(false),
                         colorPalette: nil
                     )
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.bottom, 16) // Above tab bar
                 }
             }
@@ -503,7 +503,7 @@ struct ContentView: View {
         processor.processInlineCommand(trimmedText)
         
         // Provide haptic feedback and dismiss
-        HapticManager.shared.success()
+        DesignSystem.HapticFeedback.success()
         dismissCommandInput()
     }
     

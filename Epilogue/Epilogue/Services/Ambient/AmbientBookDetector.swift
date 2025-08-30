@@ -289,7 +289,7 @@ class AmbientBookDetector: ObservableObject {
             
             // Haptic feedback for successful detection
             if confidence > 0.7 {
-                HapticManager.shared.lightTap()
+                DesignSystem.HapticFeedback.light()
             }
         }
     }

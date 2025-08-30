@@ -85,7 +85,7 @@ struct NoteContextMenu: View {
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.3),
+                                    DesignSystem.Colors.textQuaternary,
                                     Color.white.opacity(0.1)
                                 ],
                                 startPoint: .topLeading,
@@ -151,7 +151,7 @@ struct NoteContextMenu: View {
     }
     
     private func shareAsImage() {
-        HapticManager.shared.mediumTap()
+        DesignSystem.HapticFeedback.medium()
         // Create shareable image view
         let shareView = ShareableQuoteView(note: note)
         let renderer = ImageRenderer(content: shareView)
@@ -194,7 +194,7 @@ struct NoteContextMenu: View {
     }
     
     private func deleteNote() {
-        HapticManager.shared.warning()
+        DesignSystem.HapticFeedback.warning()
         // Use sync-aware deletion
         notesViewModel.deleteNoteWithSync(note)
     }
@@ -224,7 +224,7 @@ private struct ContextMenuButton: View {
                     .opacity(0.3)
             }
             .foregroundStyle(isDestructive ? Color.red : .white)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             .padding(.vertical, 16)
             .contentShape(Rectangle())
         }
@@ -241,7 +241,7 @@ private struct ShareableQuoteView: View {
             // Large quote mark
             Text("\u{201C}")
                 .font(.custom("Georgia", size: 80))
-                .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.26).opacity(0.8))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             // Quote content
