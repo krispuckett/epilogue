@@ -117,7 +117,7 @@ struct BookContextPill: View {
         }
         .onLongPressGesture(minimumDuration: 0.5) {
             // Long press to show book info/history (future feature)
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
         } onPressingChanged: { pressing in
             withAnimation(DesignSystem.Animation.springStandard) {
                 isPressed = pressing

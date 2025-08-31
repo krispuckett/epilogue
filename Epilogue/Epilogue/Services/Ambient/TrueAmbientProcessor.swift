@@ -353,6 +353,13 @@ public class TrueAmbientProcessor: ObservableObject {
                        (evolving.base.hasPrefix("why is") && normalizedText.hasPrefix("why is")) ||
                        (evolving.base.hasPrefix("how is") && normalizedText.hasPrefix("how is")) {
                         
+                        // IMPORTANT: Only treat as evolution if the new text is MORE complete (longer)
+                        // This prevents "Who is Bilbo Baggins?" from being replaced by "Who is Bilbo Ba?"
+                        if normalizedText.count < evolving.base.count {
+                            logger.info("⚠️ Ignoring shorter variant: '\(normalizedText)' (keeping '\(evolving.base)')")
+                            return  // Don't process this shorter version
+                        }
+                        
                         // This is likely a correction - remove the old question
                         logger.info("🔄 Detected question evolution: '\(evolving.base)' → '\(normalizedText)'")
                         
@@ -375,8 +382,16 @@ public class TrueAmbientProcessor: ObservableObject {
                 }
             }
             
-            // Track this as potential base for evolution
-            evolvingQuestion = (base: normalizedText, timestamp: now)
+            // Track this as potential base for evolution - BUT only if it's longer or more complete
+            // This prevents keeping shortened versions like "Who is Bilbo Ba?" over "Who is Bilbo Baggins?"
+            if let evolving = evolvingQuestion {
+                // Only update if the new text is longer (more complete)
+                if normalizedText.count > evolving.base.count {
+                    evolvingQuestion = (base: normalizedText, timestamp: now)
+                }
+            } else {
+                evolvingQuestion = (base: normalizedText, timestamp: now)
+            }
             
             // Step 2: Check if we're actively processing this or a very similar question
             let isAlreadyActive = activeQuestions.contains { activeQuestion in
@@ -553,7 +568,16 @@ public class TrueAmbientProcessor: ObservableObject {
                     }
                     
                     if stillLatest {
-                        await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
+                        // Check if we're not already fetching this question
+                        let normalizedText = text.lowercased()
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                        
+                        if !self.questionsBeingFetched.contains(normalizedText) {
+                            await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
+                        } else {
+                            logger.info("⏭️ Question already being fetched, skipping duplicate processing")
+                        }
                     }
                     
                     // Remove from active questions
@@ -605,7 +629,17 @@ public class TrueAmbientProcessor: ObservableObject {
                 // Process the question
                 Task {
                     try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 second delay - allow transcription to complete
-                    await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
+                    
+                    // Double-check we're not already fetching this
+                    let normalizedForCheck = correctedText.lowercased()
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                    
+                    if !self.questionsBeingFetched.contains(normalizedForCheck) {
+                        await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
+                    } else {
+                        logger.info("⏭️ Question already being fetched, avoiding duplicate API call")
+                    }
                     
                     // Remove from active questions
                     let normalizedText = text.lowercased()
@@ -1618,12 +1652,27 @@ extension TrueAmbientProcessor {
         // Check if they're exactly the same
         if clean1 == clean2 { return true }
         
-        // Only consider similar if one is clearly a truncation of the other
-        // AND they're asking about the SAME subject
+        // Check if one is a truncation/evolution of the other
+        // Like "Who is Bilbo Ba" vs "Who is Bilbo Baggins"
         if clean1.hasPrefix(clean2) || clean2.hasPrefix(clean1) {
             let diff = abs(clean1.count - clean2.count)
-            // Very conservative - only if difference is tiny (like punctuation or 1-2 words)
-            return diff < 5
+            // Allow up to 15 char difference for truncations/evolutions
+            return diff < 15
+        }
+        
+        // Check if they share the same question stem (first few words)
+        let words1 = clean1.split(separator: " ")
+        let words2 = clean2.split(separator: " ")
+        
+        if words1.count >= 3 && words2.count >= 3 {
+            // If the first 3 words match, likely the same question
+            let stem1 = words1.prefix(3).joined(separator: " ")
+            let stem2 = words2.prefix(3).joined(separator: " ")
+            if stem1 == stem2 {
+                // Also check if the core subject is similar
+                // This handles "Who is Bilbo Ba" vs "Who is Bilbo Baggins"
+                return true
+            }
         }
         
         return false

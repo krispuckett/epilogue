@@ -127,7 +127,7 @@ struct IntelligentSectionView: View {
                         }
                     }
                     .onLongPressGesture {
-                        DesignSystem.HapticFeedback.medium()
+                        SensoryFeedback.medium()
                         onLongPress(firstNote, CGRect(origin: .zero, size: .zero))
                     }
             }
@@ -178,7 +178,7 @@ struct IntelligentSectionView: View {
                 onNoteTap(note)
             }
             .onLongPressGesture {
-                DesignSystem.HapticFeedback.medium()
+                SensoryFeedback.medium()
                 onLongPress(note, CGRect(origin: .zero, size: .zero))
             }
             .gesture(
@@ -285,7 +285,7 @@ struct IntelligentSectionView: View {
     private func toggleExpansion() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             isExpanded.toggle()
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }
     }
     

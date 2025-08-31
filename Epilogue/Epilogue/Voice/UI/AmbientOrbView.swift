@@ -153,7 +153,7 @@ struct AmbientOrbView: View {
     }
     
     private func handleTap() {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         print("🎤 AmbientOrb: Tap detected, isListening = \(voiceManager.isListening)")
         

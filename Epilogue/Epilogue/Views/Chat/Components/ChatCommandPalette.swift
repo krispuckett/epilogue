@@ -265,7 +265,7 @@ struct ChatCommandPalette: View {
     }
     
     private func handleCommandSelection(_ command: Command) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         switch command.action {
         case .switchBook:
@@ -287,7 +287,7 @@ struct ChatCommandPalette: View {
     }
     
     private func handleBookSelection(_ book: Book) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         selectedBook = book
         dismiss()
     }

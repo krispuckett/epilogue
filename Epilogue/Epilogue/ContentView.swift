@@ -182,7 +182,7 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowNoQuotesToast"))) { _ in
                 showNoQuotesToast = true
-                DesignSystem.HapticFeedback.warning()
+                SensoryFeedback.warning()
             }
             .glassToast(
                 isShowing: $showNoQuotesToast,
@@ -274,7 +274,7 @@ struct ContentView: View {
                 }
                 
                 // Prepare only essential haptic generators
-                DesignSystem.HapticFeedback.light() // Prepare the most used one
+                SensoryFeedback.light() // Prepare the most used one
             }
     }
     
@@ -391,7 +391,7 @@ struct ContentView: View {
         }
         .onChange(of: selectedTab) { oldValue, newValue in
             // Haptic feedback on tab change
-            DesignSystem.HapticFeedback.selection()
+            SensoryFeedback.selection()
             
             // Sync with navigation coordinator
             switch newValue {
@@ -467,7 +467,7 @@ struct ContentView: View {
                         },
                         onCommandTap: {
                             // Toggle command palette
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 showingLibraryCommandPalette.toggle()
                             }
@@ -503,7 +503,7 @@ struct ContentView: View {
         processor.processInlineCommand(trimmedText)
         
         // Provide haptic feedback and dismiss
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         dismissCommandInput()
     }
     

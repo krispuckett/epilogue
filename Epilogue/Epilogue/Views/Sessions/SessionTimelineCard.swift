@@ -117,7 +117,7 @@ struct SessionTimelineCard: View {
                     HStack(spacing: 12) {
                         // Continue button
                         Button {
-                            DesignSystem.HapticFeedback.medium()
+                            SensoryFeedback.medium()
                             onContinue()
                         } label: {
                             Label("Continue", systemImage: "arrow.right.circle")
@@ -133,7 +133,7 @@ struct SessionTimelineCard: View {
                         
                         // View details button
                         Button {
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                             onViewDetail()
                         } label: {
                             Label("View", systemImage: "doc.text")
@@ -177,7 +177,7 @@ struct SessionTimelineCard: View {
             withAnimation(DesignSystem.Animation.springQuick) {
                 isPressed = true
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             onTap()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

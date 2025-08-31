@@ -14,7 +14,7 @@ struct AmbientOrbButton: View {
     var body: some View {
         // Glass container with waveform icon
         Button(action: {
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             onTap?()
         }) {
             Image(systemName: "waveform")

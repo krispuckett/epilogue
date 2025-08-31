@@ -57,7 +57,7 @@ struct OptimizedPerplexitySessionsView: View {
                     searchText = ""
                 }
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         } label: {
             if isSearching {
                 ZStack {
@@ -95,7 +95,7 @@ struct OptimizedPerplexitySessionsView: View {
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
@@ -329,12 +329,6 @@ struct OptimizedSessionRow: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.4))
                                 .tracking(1.0)
-                            
-                            if displayData.hasQuestions {
-                                Image(systemName: "questionmark.circle.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color(red: 0.4, green: 0.6, blue: 1.0))
-                            }
                         }
                     }
                     
@@ -345,15 +339,9 @@ struct OptimizedSessionRow: View {
                         .multilineTextAlignment(.leading)
                     
                     if displayData.contentCount > 1 {
-                        HStack(spacing: 8) {
-                            Image(systemName: displayData.contentIcon)
-                                .font(.system(size: 11))
-                                .foregroundStyle(displayData.contentColor)
-                            
-                            Text("\(displayData.contentCount)")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(DesignSystem.Colors.textTertiary)
-                        }
+                        Text("\(displayData.contentCount) items")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -69,21 +69,9 @@ struct MinimalSessionsView: View {
     
     // MARK: - Empty State
     private var emptyState: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "bubble.left.and.bubble.right.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(DesignSystem.Colors.primaryAccent)
-        
-            Text("No conversations yet")
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-            
-            Text("Start a reading session with any book")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.6))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
+        ModernEmptyStates.noSessions
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, 100)
     }
     
     // MARK: - Sessions List
@@ -115,7 +103,7 @@ struct MinimalSessionsView: View {
     // MARK: - New Chat Button
     private var newChatButton: some View {
         Button {
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             showingNewChat = true
         } label: {
             Image(systemName: "plus")
@@ -184,7 +172,7 @@ struct MinimalSessionCard: View {
     
     var body: some View {
         Button {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             showingDetail = true
         } label: {
             HStack(spacing: 16) {

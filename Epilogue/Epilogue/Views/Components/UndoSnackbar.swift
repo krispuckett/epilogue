@@ -56,7 +56,7 @@ final class UndoManager: ObservableObject {
         action.action()
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
     }
     
     func dismissUndo() {
@@ -223,7 +223,7 @@ struct SwipeToDeleteModifier: ViewModifier {
                             
                             // Haptic feedback at threshold
                             if offset.width < hapticThreshold && !hasTriggeredHaptic {
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                                 hasTriggeredHaptic = true
                             } else if offset.width > hapticThreshold {
                                 hasTriggeredHaptic = false
@@ -245,7 +245,7 @@ struct SwipeToDeleteModifier: ViewModifier {
                                     message: "Deleted \(itemDescription)",
                                     action: undoAction
                                 )
-                                DesignSystem.HapticFeedback.medium()
+                                SensoryFeedback.medium()
                             }
                         } else {
                             // Snap back

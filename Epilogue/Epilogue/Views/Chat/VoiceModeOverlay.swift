@@ -265,7 +265,7 @@ struct VoiceModeOverlay: View {
         autoStopManager.maxDuration = 60.0 // 1 minute for voice mode
         autoStopManager.startMonitoring()
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func stopListening() {
@@ -285,7 +285,7 @@ struct VoiceModeOverlay: View {
         
         voiceManager.stopListening()
         onSendTranscript(transcript)
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         // Close overlay after sending
         withAnimation {

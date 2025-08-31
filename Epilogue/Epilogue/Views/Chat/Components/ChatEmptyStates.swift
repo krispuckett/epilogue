@@ -293,7 +293,7 @@ struct SuggestionChip: View {
         .buttonStyle(.plain)
         .onTapGesture {
             isPressed = true
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isPressed = false
                 action()

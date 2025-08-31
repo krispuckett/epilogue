@@ -992,7 +992,7 @@ struct GeneratedSuggestionCard: View {
             
             Button(action: {
                 // Handle action
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }) {
                 Text(suggestion.actionText)
                     .font(.system(size: 13, weight: .semibold))

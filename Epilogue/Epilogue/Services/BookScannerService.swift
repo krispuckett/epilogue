@@ -92,7 +92,7 @@ class BookScannerService: NSObject, ObservableObject {
         viewController.present(scannerViewController, animated: true)
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
     }
     
     func processScannedImage(_ image: UIImage) async -> ExtractedBookInfo {
@@ -329,7 +329,7 @@ class BookScannerService: NSObject, ObservableObject {
         
         // Show the search sheet
         showSearchResults = true
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
     }
     
     // MARK: - Helper Methods

@@ -73,7 +73,7 @@ struct SessionBookCard: View {
             // Action buttons
             HStack(spacing: 0) {
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     onViewDetail()
                 } label: {
                     Text("View")
@@ -88,7 +88,7 @@ struct SessionBookCard: View {
                     .frame(height: 20)
                 
                 Button {
-                    DesignSystem.HapticFeedback.medium()
+                    SensoryFeedback.medium()
                     onContinue()
                 } label: {
                     Text("Continue")
@@ -126,7 +126,7 @@ struct SessionBookCard: View {
             withAnimation(DesignSystem.Animation.springQuick) {
                 isPressed = true
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             onViewDetail()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

@@ -24,7 +24,7 @@ struct GlassOrbSettingsButton: View {
             }
             
             // Haptic feedback
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }) {
             ZStack {
                 // Glass orb background

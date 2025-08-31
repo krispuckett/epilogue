@@ -157,7 +157,7 @@ struct LibraryCommandPalette: View {
     // MARK: - Actions
     
     private func handleCommandSelection(_ command: Command) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         switch command.action {
         case .scanBook:

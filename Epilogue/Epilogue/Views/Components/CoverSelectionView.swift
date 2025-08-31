@@ -41,7 +41,7 @@ struct CoverSelectionView: View {
                                     isSelected: coverURL == selectedCoverURL,
                                     onTap: {
                                         selectedCoverURL = coverURL
-                                        DesignSystem.HapticFeedback.light()
+                                        SensoryFeedback.light()
                                     }
                                 )
                             }

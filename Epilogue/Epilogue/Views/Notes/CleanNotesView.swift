@@ -253,7 +253,7 @@ struct CleanNotesView: View {
                                     isSelectionMode = false
                                     selectedItems.removeAll()
                                 }
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                             } label: {
                                 Text("Done")
                                     .font(.system(size: 16, weight: .medium))
@@ -278,7 +278,7 @@ struct CleanNotesView: View {
                                     searchText = ""
                                 }
                             }
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         } label: {
                             if showSearchBar {
                                 // Liquid glass close button with amber tint
@@ -306,7 +306,7 @@ struct CleanNotesView: View {
                                     withAnimation(DesignSystem.Animation.springStandard) {
                                         selectedFilter = filter
                                     }
-                                    DesignSystem.HapticFeedback.light()
+                                    SensoryFeedback.light()
                                 } label: {
                                     Label {
                                         HStack {
@@ -335,7 +335,7 @@ struct CleanNotesView: View {
                         // Settings button - simple
                         Button {
                             showingSettings = true
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         } label: {
                             Image(systemName: "gearshape.fill")
                                 .font(.system(size: 16))
@@ -433,7 +433,7 @@ struct CleanNotesView: View {
                                         collapsedSections.insert(section)
                                     }
                                 }
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                             }
                         }
                     )
@@ -471,7 +471,7 @@ struct CleanNotesView: View {
                                     selectedItems.insert(note.id)
                                 }
                             }
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         }
                 }
             }
@@ -487,7 +487,7 @@ struct CleanNotesView: View {
                             selectedItems.insert(note.id)
                         }
                     }
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
             }
             .onLongPressGesture(minimumDuration: 0.5) {
@@ -496,7 +496,7 @@ struct CleanNotesView: View {
                         isSelectionMode = true
                         selectedItems.insert(note.id)
                     }
-                    DesignSystem.HapticFeedback.medium()
+                    SensoryFeedback.medium()
                 }
             }
             .contextMenu {
@@ -560,7 +560,7 @@ struct CleanNotesView: View {
                                     selectedItems.insert(quote.id)
                                 }
                             }
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         }
                 }
             }
@@ -576,7 +576,7 @@ struct CleanNotesView: View {
                             selectedItems.insert(quote.id)
                         }
                     }
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
             }
             .onLongPressGesture(minimumDuration: 0.5) {
@@ -585,7 +585,7 @@ struct CleanNotesView: View {
                         isSelectionMode = true
                         selectedItems.insert(quote.id)
                     }
-                    DesignSystem.HapticFeedback.medium()
+                    SensoryFeedback.medium()
                 }
             }
             .onTapGesture(count: 2) {
@@ -593,7 +593,7 @@ struct CleanNotesView: View {
                 if quote.source == .ambient {
                     selectedSessionQuote = quote
                     showingSessionSummary = true
-                    DesignSystem.HapticFeedback.medium()
+                    SensoryFeedback.medium()
                 }
             }
         .contextMenu {
@@ -622,56 +622,9 @@ struct CleanNotesView: View {
     }
     
     private var emptyState: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            // Animated icon
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.1), Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 100, height: 100)
-                    .blur(radius: 20)
-                
-                Image(systemName: "note.text")
-                    .font(.system(size: 48))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.4), Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            }
-            .scaleEffect(1.0)
-            
-            VStack(spacing: 12) {
-                Text("Your thoughts await")
-                    .font(.system(size: 24, weight: .semibold, design: .default))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white.opacity(0.9), .white.opacity(0.6)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                
-                Text("Capture quotes, notes, and reflections from your reading journey")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
-            }
-            
-            Spacer()
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ModernEmptyStates.noNotes
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, 100)
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -706,7 +659,7 @@ struct CleanNotesView: View {
         editedText = note.content
         notesViewModel.isEditingNote = true
         showEditSheet = true
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func startEdit(quote: CapturedQuote) {
@@ -715,18 +668,18 @@ struct CleanNotesView: View {
         editedText = quote.text
         notesViewModel.isEditingNote = true
         showEditSheet = true
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func saveEdit() {
         if let note = editingNote {
             note.content = editedText
             try? modelContext.save()
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         } else if let quote = editingQuote {
             quote.text = editedText
             try? modelContext.save()
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         }
         cancelEdit()
     }
@@ -753,13 +706,13 @@ struct CleanNotesView: View {
     private func deleteNote(_ note: CapturedNote) {
         modelContext.delete(note)
         try? modelContext.save()
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
     }
     
     private func deleteQuote(_ quote: CapturedQuote) {
         modelContext.delete(quote)
         try? modelContext.save()
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
     }
     
     private func deleteSelectedItems() {
@@ -778,7 +731,7 @@ struct CleanNotesView: View {
             isSelectionMode = false
         }
         
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
     }
     
     // MARK: - Share Actions
@@ -805,7 +758,7 @@ struct CleanNotesView: View {
             rootViewController.present(activityController, animated: true)
         }
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func shareQuote(_ quote: CapturedQuote) {
@@ -830,14 +783,14 @@ struct CleanNotesView: View {
             rootViewController.present(activityController, animated: true)
         }
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
 }
 
 // Extension removed - already exists in SwiftDataNotesBridge.swift
 // EditContentSheet already exists in UnifiedChatView.swift
 
-// MARK: - Sticky Header with Amber Glass Effect
+// MARK: - Sticky Header (Exactly Matching Chat Tab)
 private struct NoteStickyHeader: View {
     let section: String
     let itemCount: Int
@@ -849,79 +802,74 @@ private struct NoteStickyHeader: View {
     @State private var isPinned = false
     
     var body: some View {
-        Button(action: onToggle) {
-            HStack(alignment: .center, spacing: 12) {
-                if isCollapsible {
-                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.system(size: isPinned ? 15 : 14, weight: .medium))
-                        .foregroundStyle(isPinned ? DesignSystem.Colors.primaryAccent : .white.opacity(0.6))
-                        .frame(width: 20)
-                }
-                
-                // Section title - matches chat tab style
-                Text(section.uppercased())
-                    .font(.system(
-                        size: isPinned ? 15 : 13,
-                        weight: isPinned ? .bold : .semibold
-                    ))
-                    .foregroundStyle(isPinned ? .white : DesignSystem.Colors.textTertiary)
-                    .tracking(isPinned ? 1.4 : 1.2)
-                
-                Spacer()
-                
-                // Count with "items" text - orange like chat tab
-                HStack(spacing: 4) {
-                    Text("\(itemCount)")
-                        .font(.system(
-                            size: isPinned ? 15 : 13,
-                            weight: .semibold
-                        ))
-                    Text(itemCount == 1 ? "item" : "items")
-                        .font(.system(
-                            size: isPinned ? 15 : 13,
-                            weight: .medium
-                        ))
-                }
-                .foregroundStyle(isPinned ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
-            }
+        HStack {
+            // Section title - no button wrapper, just like chat tab
+            Text(section.uppercased())
+                .font(.system(
+                    size: isPinned ? 15 : 13,
+                    weight: isPinned ? .bold : .semibold
+                ))
+                .foregroundStyle(
+                    isPinned ? .white : DesignSystem.Colors.textTertiary
+                )
+                .tracking(isPinned ? 1.4 : 1.2)
+                .animation(DesignSystem.Animation.easeQuick, value: isPinned)
+            
+            Spacer()
+            
+            // Count - format like chat tab
+            Text("\(itemCount) \(itemCount == 1 ? "item" : "items")")
+                .font(.system(
+                    size: isPinned ? 12 : 11,
+                    weight: .medium
+                ))
+                .foregroundStyle(
+                    isPinned ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary
+                )
+                .animation(DesignSystem.Animation.easeQuick, value: isPinned)
         }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isCollapsible)
         .padding(.horizontal, DesignSystem.Spacing.cardPadding)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
+            // Optimized background with preference-based updates
             GeometryReader { geo in
-                let minY = geo.frame(in: .global).minY
-                // Header is pinned when it's at the top of the screen
-                let pinned = minY <= 150  // Adjust threshold as needed
-                
                 Color.clear
+                    .preference(key: HeaderPinnedPreferenceKey.self, value: geo.frame(in: .global).minY)
                     .onAppear {
-                        isPinned = pinned
-                    }
-                    .onChange(of: minY) { _, newValue in
-                        withAnimation(.smooth(duration: 0.2)) {
-                            isPinned = newValue <= 150
-                        }
+                        isPinned = geo.frame(in: .global).minY <= 150
                     }
             }
             .frame(height: 0)
             
             if isPinned {
-                // Amber tinted rectangular card with proper glass effect
+                // Beautiful amber tinted glass effect
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                     .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
                     .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
+                    .animation(DesignSystem.Animation.easeStandard, value: isPinned)
             } else {
-                // Non-pinned background
                 DesignSystem.Colors.surfaceBackground
-                    .opacity(1.0)
             }
         }
-        // Removed the bottom border overlay completely
-        .animation(.smooth(duration: 0.2), value: isPinned)
+        .onPreferenceChange(HeaderPinnedPreferenceKey.self) { minY in
+            // Only update if state actually changes to reduce updates
+            let shouldPin = minY <= 150
+            if shouldPin != isPinned {
+                withAnimation(DesignSystem.Animation.easeQuick) {
+                    isPinned = shouldPin
+                }
+            }
+        }
+    }
+}
+
+// Preference key for header pinning
+private struct HeaderPinnedPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
@@ -1042,7 +990,7 @@ private struct NoteCardView: View {
             withAnimation(DesignSystem.Animation.springStandard) {
                 showDate.toggle()
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }
     }
     

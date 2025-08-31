@@ -244,13 +244,13 @@ class SmartContentBuffer: ObservableObject {
         
         // Smart filtering: check if this content is worth saving
         guard shouldSaveContent(cleanedContent) else {
-            print("🚫 Content filtered out (not meaningful): \"\(cleanedContent)\"")
+            // print("🚫 Content filtered out (not meaningful): \"\(cleanedContent)\"")
             return nil
         }
         
         // Final length check after cleaning
         guard cleanedContent.count >= minimumContentLength else {
-            print("📝 Buffer too short after cleaning (\(cleanedContent.count) chars): \"\(cleanedContent)\"")
+            // print("📝 Buffer too short after cleaning (\(cleanedContent.count) chars): \"\(cleanedContent)\"")
             return nil
         }
         
@@ -279,7 +279,7 @@ class SmartContentBuffer: ObservableObject {
             processingTime: processingTime
         )
         
-        print("✅ SmartBuffer processed \(contentType): \"\(cleanedContent)\"")
+        // print("✅ SmartBuffer processed \(contentType): \"\(cleanedContent)\"")
         
         // Send for saving
         await saveProcessedContent(result)
@@ -498,7 +498,7 @@ class SmartContentBuffer: ObservableObject {
             Task {
                 // Pause detected - process buffer
                 if !self.textBuffer.isEmpty {
-                    await self.processBuffer()
+                    _ = await self.processBuffer()
                 }
             }
         }
@@ -511,7 +511,7 @@ class SmartContentBuffer: ObservableObject {
             Task {
                 // Max duration reached - force process
                 if !self.textBuffer.isEmpty {
-                    await self.processBuffer()
+                    _ = await self.processBuffer()
                 }
             }
         }
@@ -606,7 +606,7 @@ class SmartContentBuffer: ObservableObject {
                 await saveProcessedContent(switchNote)
             }
             
-            print("📚 Book context switch: \(oldBook.title) → \(newBook.title)")
+            // print("📚 Book context switch: \(oldBook.title) → \(newBook.title)")
         } else if let newBook = book, previousBook == nil {
             // First book detection - only if we have meaningful context
             if !textBuffer.isEmpty && textBuffer.lowercased().contains("reading") {
@@ -622,7 +622,7 @@ class SmartContentBuffer: ObservableObject {
                     await saveProcessedContent(switchNote)
                 }
                 
-                print("📚 First book detected: \(newBook.title)")
+                // print("📚 First book detected: \(newBook.title)")
             }
         }
         

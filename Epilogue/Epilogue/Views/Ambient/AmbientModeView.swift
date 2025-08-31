@@ -268,7 +268,7 @@ struct AmbientModeView: View {
                     inputMode = .textInput
                     isKeyboardFocused = true
                 }
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }
         }
         // Top gradient overlay for fake blur effect (like BookView)
@@ -738,7 +738,7 @@ struct AmbientModeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                             startRecording()
                         }
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     }
             }
             
@@ -986,7 +986,7 @@ struct AmbientModeView: View {
                     isKeyboardFocused = true
                 }
             }
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
         }
     }
     .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
@@ -1268,7 +1268,7 @@ struct AmbientModeView: View {
                             messageType: .text
                         )
                         // Check if this is the first response BEFORE adding it
-                        let isFirstResponse = messages.filter { !$0.isUser }.count == 0
+                        _ = messages.filter { !$0.isUser }.count == 0
                         
                         messages.append(aiMessage)
                         
@@ -1432,7 +1432,7 @@ struct AmbientModeView: View {
         do {
             try modelContext.save()
             print("✅ Quote saved to SwiftData with session: \(quoteText.prefix(50))...")
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
             return capturedQuote
         } catch {
             print("❌ Failed to save quote: \(error)")
@@ -1489,7 +1489,7 @@ struct AmbientModeView: View {
         do {
             try modelContext.save()
             print("✅ Note saved to SwiftData with session: \(content.text.prefix(50))...")
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
             return capturedNote
         } catch {
             print("❌ Failed to save note: \(error)")
@@ -1679,7 +1679,7 @@ struct AmbientModeView: View {
         processor.startSession()
         voiceManager.startAmbientListeningMode()
         bookDetector.startDetection()
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
     }
     
     private func stopRecording() {
@@ -1690,7 +1690,7 @@ struct AmbientModeView: View {
         transcriptionFadeTimer = nil
         voiceManager.stopListening()
         voiceManager.transcribedText = "" // Force clear the source
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Don't force scroll - let the content stay where it is
         // The onChange handler will scroll when new messages arrive
@@ -1709,7 +1709,7 @@ struct AmbientModeView: View {
             inputMode = .paused
         }
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func resumeVoiceInput() {
@@ -2329,7 +2329,7 @@ struct AmbientModeView: View {
             await extractColorsForBook(book)
         }
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     // MARK: - Page Detection
@@ -2446,7 +2446,7 @@ struct AmbientModeView: View {
         
         // End processor session
         Task {
-            await processor.endSession()
+            _ = await processor.endSession()
         }
         
         // Dismiss the view immediately
@@ -2466,7 +2466,7 @@ struct AmbientModeView: View {
         
         // Clean up processor in background
         Task {
-            await processor.endSession()
+            _ = await processor.endSession()
         }
         
         // Finalize the session
@@ -2535,7 +2535,7 @@ struct AmbientModeView: View {
         
         // End processor session in background
         Task.detached { [weak processor] in
-            await processor?.endSession()
+            _ = await processor?.endSession()
             await AmbientLiveActivityManager.shared.endActivity()
         }
         
@@ -2677,7 +2677,7 @@ struct AmbientModeView: View {
                                 print("❌ Failed to create new session: \(error)")
                             }
                         }
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     } label: {
                         RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                             .fill(Color.white.opacity(0.1))
@@ -2706,7 +2706,7 @@ struct AmbientModeView: View {
                             Task {
                                 await extractColorsForBook(book)
                             }
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         } label: {
                             SharedBookCoverView(
                                 coverURL: book.coverImageURL,
@@ -2775,7 +2775,7 @@ struct AmbientQuoteView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                         onEdit(quote.text)
                     }
                 
@@ -2910,7 +2910,7 @@ struct AmbientMessageThreadView: View {
                 if message.isUser {
                     // Edit user questions
                     if let onEdit = onEdit {
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                         onEdit(message.content)
                     }
                 } else {

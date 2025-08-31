@@ -79,7 +79,7 @@ struct SwiftDataNotesView: View {
         do {
             try modelContext.save()
             SyncStatusManager.shared.incrementPendingChanges()
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         } catch {
             print("Error deleting question: \(error)")
         }
@@ -190,7 +190,7 @@ struct SwiftDataNotesView: View {
                                         rootViewController.present(activityController, animated: true)
                                     }
                                 }
-                                DesignSystem.HapticFeedback.success()
+                                SensoryFeedback.success()
                             } label: {
                                 Label("Share", systemImage: "square.and.arrow.up")
                             }
@@ -198,7 +198,7 @@ struct SwiftDataNotesView: View {
                             
                             Button {
                                 editingNote = note
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
@@ -570,7 +570,7 @@ struct SwiftDataNoteContextMenu: View {
             action: {
                 dismissMenu()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    DesignSystem.HapticFeedback.warning()
+                    SensoryFeedback.warning()
                     onDelete()
                 }
             }
@@ -589,7 +589,7 @@ struct SwiftDataNoteContextMenu: View {
     }
     
     private func shareAsImage() {
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
         let shareView = ShareableQuoteView(note: note)
         let renderer = ImageRenderer(content: shareView)
         renderer.scale = 3.0
@@ -609,7 +609,7 @@ struct SwiftDataNoteContextMenu: View {
     }
     
     private func copyText() {
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         var textToCopy = note.content
         
         if note.type == .quote {
@@ -787,7 +787,7 @@ struct CapturedQuestionCard: View {
         .contextMenu {
             Button {
                 UIPasteboard.general.string = question.content
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
@@ -821,7 +821,7 @@ struct CapturedQuestionCard: View {
                 withAnimation(.smooth) {
                     modelContext.delete(question)
                     try? modelContext.save()
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
             }
             Button("Cancel", role: .cancel) {}

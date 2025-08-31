@@ -195,9 +195,9 @@ struct NotesView: View {
         .transition(.glassAppear)
         .onTapGesture(count: 2) {
             // Direct test - bypass the callback chain
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             contextMenuNote = note
-            contextMenuSourceRect = CGRect(x: UIScreen.main.bounds.width/2, y: UIScreen.main.bounds.height/2, width: 100, height: 100)
+            contextMenuSourceRect = CGRect(x: 200, y: 400, width: 100, height: 100)
         }
     }
     
@@ -258,7 +258,7 @@ struct NotesView: View {
         Button(action: {
             withAnimation(DesignSystem.Animation.springStandard) {
                 viewStyle = viewStyle == .grid ? .stack : .grid
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }
         }) {
             Image(systemName: viewStyle.icon)

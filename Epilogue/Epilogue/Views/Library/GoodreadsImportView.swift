@@ -179,67 +179,111 @@ struct GoodreadsImportView: View {
     
     private var startView: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                // Icon and title
-                VStack(spacing: 16) {
-                    Image(systemName: "books.vertical.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.orange, .orange.opacity(0.7)],
-                                startPoint: .top,
-                                endPoint: .bottom
+            VStack(spacing: 28) {
+                // Icon and title - more refined
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.2),
+                                        Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.1)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
+                            .frame(width: 100, height: 100)
+                            .blur(radius: 20)
+                        
+                        Image(systemName: "books.vertical.fill")
+                            .font(.system(size: 48, weight: .medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.45, blue: 0.16),
+                                        Color(red: 0.95, green: 0.35, blue: 0.25)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
                     
-                    Text("Import Your Library")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("Bring your entire Goodreads library to Epilogue")
-                        .font(.subheadline)
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 32)
-                
-                // Instructions card
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("How to Export from Goodreads")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    VStack(alignment: .leading, spacing: 16) {
-                        InstructionRow(number: "1", text: "Go to goodreads.com and sign in")
-                        InstructionRow(number: "2", text: "Click My Books in the header")
-                        InstructionRow(number: "3", text: "Click Import and export at the bottom")
-                        InstructionRow(number: "4", text: "Click Export Library")
-                        InstructionRow(number: "5", text: "Download the CSV file")
+                    VStack(spacing: 8) {
+                        Text("Import Your Library")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("Transfer your Goodreads collection")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white.opacity(0.6))
                     }
                 }
-                .padding(DesignSystem.Spacing.cardPadding)
-                .frame(maxWidth: .infinity)
-                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
+                .padding(.top, 24)
+                
+                // Streamlined instructions
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("EXPORT STEPS")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .kerning(1.5)
+                        Spacer()
+                    }
+                    
+                    VStack(spacing: 0) {
+                        InstructionStep(number: 1, text: "Visit goodreads.com", isFirst: true)
+                        InstructionStep(number: 2, text: "Go to My Books")
+                        InstructionStep(number: 3, text: "Find Import/Export")
+                        InstructionStep(number: 4, text: "Export Library")
+                        InstructionStep(number: 5, text: "Download CSV", isLast: true)
+                    }
+                }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.white.opacity(0.1), lineWidth: 1)
+                        )
+                )
                 .padding(.horizontal)
                 
-                // What gets imported
-                VStack(alignment: .leading, spacing: 16) {
-                    Label("What Gets Imported", systemImage: "info.circle.fill")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                // What's included - more compact
+                VStack(spacing: 16) {
+                    HStack {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.4))
+                        Text("INCLUDED DATA")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .kerning(1.5)
+                        Spacer()
+                    }
                     
-                    VStack(alignment: .leading, spacing: 12) {
-                        ImportFeatureRow(icon: "book.fill", text: "Book details & covers", color: .blue)
-                        ImportFeatureRow(icon: "star.fill", text: "Your ratings", color: .yellow)
-                        ImportFeatureRow(icon: "note.text", text: "Private notes", color: .purple)
-                        ImportFeatureRow(icon: "bookmark.fill", text: "Reading status", color: .green)
-                        ImportFeatureRow(icon: "folder.fill", text: "Shelves as collections", color: .orange)
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 12) {
+                        ImportFeature(icon: "book.fill", text: "Books", color: .blue)
+                        ImportFeature(icon: "star.fill", text: "Ratings", color: .yellow)
+                        ImportFeature(icon: "note.text", text: "Notes", color: .purple)
+                        ImportFeature(icon: "bookmark.fill", text: "Status", color: .green)
                     }
                 }
-                .padding(DesignSystem.Spacing.cardPadding)
-                .frame(maxWidth: .infinity)
-                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.white.opacity(0.1), lineWidth: 1)
+                        )
+                )
                 .padding(.horizontal)
                 
                 // Import button
@@ -1637,4 +1681,73 @@ struct BookSearchRow: View {
         googleBooksService: GoogleBooksService(),
         libraryViewModel: LibraryViewModel()
     )
+}
+// MARK: - New Helper Views for Redesigned UI
+
+struct InstructionStep: View {
+    let number: Int
+    let text: String
+    var isFirst: Bool = false
+    var isLast: Bool = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    
+                    Text("\(number)")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(red: 1.0, green: 0.45, blue: 0.16))
+                }
+                
+                Text(text)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                
+                Spacer()
+                
+                if !isLast {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+            }
+            .padding(.vertical, isFirst || isLast ? 0 : 8)
+            
+            if !isLast {
+                Divider()
+                    .background(.white.opacity(0.1))
+            }
+        }
+    }
+}
+
+struct ImportFeature: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(color)
+                .frame(width: 24)
+            
+            Text(text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.1))
+        )
+    }
 }

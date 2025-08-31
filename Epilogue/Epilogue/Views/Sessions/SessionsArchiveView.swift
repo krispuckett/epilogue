@@ -123,7 +123,7 @@ struct SessionsArchiveView: View {
                     withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = mode
                     }
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: mode.icon)

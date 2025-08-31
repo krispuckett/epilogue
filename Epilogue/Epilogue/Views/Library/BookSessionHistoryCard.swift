@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Session History Data Model
 struct SessionHistoryData: Identifiable {
@@ -64,78 +65,103 @@ struct SessionHistoryData: Identifiable {
 
 struct BookSessionHistoryCard: View {
     let book: Book
-    @State private var sessions: [SessionHistoryData] = []
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allSessions: [AmbientSession]
     @State private var isExpanded = false
-    @State private var selectedSession: SessionHistoryData?
+    @State private var selectedSession: AmbientSession?
     @State private var showingFullSession = false
+    
+    // Filter sessions for this book
+    private var bookSessions: [AmbientSession] {
+        allSessions.filter { session in
+            session.bookModel?.id == book.id || 
+            session.bookModel?.isbn == book.isbn ||
+            session.bookModel?.title == book.title
+        }.sorted { $0.startTime > $1.startTime }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack {
-                Label("Reading Sessions", systemImage: "clock.arrow.circlepath")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                if !sessions.isEmpty {
-                    Text("\(sessions.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(8)
-                }
-                
-                Button(action: { withAnimation { isExpanded.toggle() } }) {
+            // Header with cleaner design
+            Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { isExpanded.toggle() } }) {
+                HStack {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color(red: 1.0, green: 0.45, blue: 0.16))
+                    
+                    Text("Reading Sessions")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    if !bookSessions.isEmpty {
+                        Text("\(bookSessions.count)")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(.white.opacity(0.1))
+                            )
+                    }
+                    
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .rotationEffect(.degrees(isExpanded ? 0 : 0))
+                        .animation(.spring(response: 0.3), value: isExpanded)
                 }
             }
+            .buttonStyle(PlainButtonStyle())
             
-            if isExpanded && !sessions.isEmpty {
+            if isExpanded && !bookSessions.isEmpty {
                 VStack(spacing: 8) {
-                    ForEach(sessions.prefix(5), id: \.id) { session in
-                        SessionRowView(session: session) {
+                    ForEach(bookSessions.prefix(5), id: \.id) { session in
+                        AmbientSessionRow(session: session) {
                             selectedSession = session
                             showingFullSession = true
                         }
                     }
                     
-                    if sessions.count > 5 {
-                        Text("+ \(sessions.count - 5) more sessions")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
+                    if bookSessions.count > 5 {
+                        HStack {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.4))
+                            Text("\(bookSessions.count - 5) more sessions")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        .padding(.top, 4)
                     }
                 }
-            } else if isExpanded && sessions.isEmpty {
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            } else if isExpanded && bookSessions.isEmpty {
                 Text("No reading sessions yet")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.4))
                     .italic()
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
             }
         }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
-        .onAppear {
-            loadSessions()
-        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.1), lineWidth: 1)
+                )
+        )
         .sheet(isPresented: $showingFullSession) {
             if let session = selectedSession {
-                FullSessionView(session: session, book: book)
+                AmbientSessionSummaryView(session: session, colorPalette: nil)
             }
         }
-    }
-    
-    private func loadSessions() {
-        sessions = SessionHistoryData.loadForBook(book.id)
-            .sorted { $0.startTime > $1.startTime } // Most recent first
     }
 }
 
@@ -406,4 +432,118 @@ struct ChatHistoryBubble: View {
         coverImageURL: nil,
         localId: UUID()
     ))
+}
+// MARK: - Ambient Session Row
+struct AmbientSessionRow: View {
+    let session: AmbientSession
+    let onTap: () -> Void
+    
+    private var formattedDate: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: session.startTime, relativeTo: Date())
+    }
+    
+    private var durationText: String {
+        let minutes = Int(session.duration / 60)
+        if minutes < 60 {
+            return "\(minutes)m"
+        } else {
+            let hours = minutes / 60
+            let remainingMinutes = minutes % 60
+            return remainingMinutes > 0 ? "\(hours)h \(remainingMinutes)m" : "\(hours)h"
+        }
+    }
+    
+    private var sessionSummary: String {
+        // Generate a smart summary based on content
+        if !session.capturedQuestions.isEmpty {
+            return session.capturedQuestions.first?.content ?? "Discussion session"
+        } else if !session.capturedQuotes.isEmpty {
+            return "Captured \(session.capturedQuotes.count) quotes"
+        } else if !session.capturedNotes.isEmpty {
+            return session.capturedNotes.first?.content ?? "Reading session"
+        } else {
+            return "Reading session"
+        }
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Time and duration header
+                HStack {
+                    Text(formattedDate)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                    
+                    Circle()
+                        .fill(.white.opacity(0.3))
+                        .frame(width: 3, height: 3)
+                    
+                    Text(durationText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+                
+                // Summary text
+                Text(sessionSummary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                // Content indicators
+                HStack(spacing: 16) {
+                    if session.capturedQuestions.count > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "questionmark.circle")
+                                .font(.system(size: 11))
+                            Text("\(session.capturedQuestions.count)")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(.blue.opacity(0.8))
+                    }
+                    
+                    if session.capturedQuotes.count > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "quote.bubble")
+                                .font(.system(size: 11))
+                            Text("\(session.capturedQuotes.count)")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(.purple.opacity(0.8))
+                    }
+                    
+                    if session.capturedNotes.count > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 11))
+                            Text("\(session.capturedNotes.count)")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(.green.opacity(0.8))
+                    }
+                    
+                    Spacer()
+                }
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
 }

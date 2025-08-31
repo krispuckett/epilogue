@@ -68,7 +68,7 @@ struct BookCompletionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                         isPresented = false
                     }
                     .foregroundStyle(DesignSystem.Colors.primaryAccent)
@@ -138,7 +138,7 @@ struct BookCompletionSheet: View {
                     Button {
                         withAnimation(DesignSystem.Animation.springStandard) {
                             rating = star
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         }
                     } label: {
                         Image(systemName: star <= rating ? "star.fill" : "star")
@@ -236,7 +236,7 @@ struct BookCompletionSheet: View {
                                     } else {
                                         selectedTags.insert(tag)
                                     }
-                                    DesignSystem.HapticFeedback.light()
+                                    SensoryFeedback.light()
                                 }
                             }
                         )
@@ -308,7 +308,7 @@ struct BookCompletionSheet: View {
                 .labelsHidden()
                 .tint(DesignSystem.Colors.primaryAccent)
                 .onChange(of: isFavorite) { _, _ in
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
         }
         .padding(DesignSystem.Spacing.inlinePadding)
@@ -335,7 +335,7 @@ struct BookCompletionSheet: View {
         libraryViewModel.updateBook(updatedBook)
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         // Dismiss
         isPresented = false

@@ -357,7 +357,7 @@ struct QuickActionsSheet: View {
     }
     
     private func handleCommandSelection(_ command: Command) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         switch command.action {
         case .newNote:
@@ -382,7 +382,7 @@ struct QuickActionsSheet: View {
     }
     
     private func handleBookSelection(_ book: Book) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         // Navigate to book
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToBook"),
@@ -392,7 +392,7 @@ struct QuickActionsSheet: View {
     }
     
     private func handleNoteSelection(_ note: Note) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         // Navigate to note
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToNote"),

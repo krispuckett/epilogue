@@ -193,7 +193,7 @@ struct EndAmbientSessionIntent: AppIntent {
     
     func perform() async throws -> some IntentResult {
         // End the session
-        await TrueAmbientProcessor.shared.endSession()
+        _ = await TrueAmbientProcessor.shared.endSession()
         
         // End Live Activity
         await AmbientLiveActivityManager.shared.endActivity()

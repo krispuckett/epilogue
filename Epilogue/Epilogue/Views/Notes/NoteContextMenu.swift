@@ -151,7 +151,7 @@ struct NoteContextMenu: View {
     }
     
     private func shareAsImage() {
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
         // Create shareable image view
         let shareView = ShareableQuoteView(note: note)
         let renderer = ImageRenderer(content: shareView)
@@ -194,7 +194,7 @@ struct NoteContextMenu: View {
     }
     
     private func deleteNote() {
-        DesignSystem.HapticFeedback.warning()
+        SensoryFeedback.warning()
         // Use sync-aware deletion
         notesViewModel.deleteNoteWithSync(note)
     }

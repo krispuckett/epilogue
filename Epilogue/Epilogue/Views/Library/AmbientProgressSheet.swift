@@ -335,7 +335,7 @@ struct AmbientProgressSheet: View {
         
         if !isDragging {
             isDragging = true
-            DesignSystem.HapticFeedback.selection()
+            SensoryFeedback.selection()
         }
         
         // Use the actual timeline width from GeometryReader
@@ -351,7 +351,7 @@ struct AmbientProgressSheet: View {
         let progressPercent = Int(newProgress * 100)
         let currentPercent = Int(progress * 100)
         if abs(progressPercent - currentPercent) >= 5 {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }
     }
     
@@ -374,7 +374,7 @@ struct AmbientProgressSheet: View {
     private func saveProgress() {
         viewModel.updateBookProgress(book, currentPage: currentPage)
         hasUnsavedChanges = false
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         // Close sheet after brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

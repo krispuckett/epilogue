@@ -396,7 +396,7 @@ struct LiquidCommandPalette: View {
             )
             dismissPalette()
         case .existingNote(let note):
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             NotificationCenter.default.post(
                 name: Notification.Name("NavigateToNote"),
                 object: note
@@ -436,7 +436,7 @@ struct LiquidCommandPalette: View {
         bookSearchQuery = query
         showBookSearch = true
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     // MARK: - Search Navigation
@@ -827,7 +827,7 @@ struct LiquidCommandPalette: View {
                 print("Failed to schedule reminder: \(error)")
             } else {
                 print("✅ Reminder scheduled for \(date)")
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
             }
         }
         
@@ -847,7 +847,7 @@ struct LiquidCommandPalette: View {
             object: ["book": book, "pagesPerDay": pagesPerDay]
         )
         
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         dismissPalette()
     }
 }

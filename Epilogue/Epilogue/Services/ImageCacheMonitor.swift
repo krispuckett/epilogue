@@ -146,7 +146,7 @@ struct ImageCacheDebugView: View {
             
             Button(role: .destructive) {
                 monitor.clearCaches()
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
             } label: {
                 Label("Clear All Caches", systemImage: "trash")
                     .foregroundStyle(.red)

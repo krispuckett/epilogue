@@ -275,7 +275,7 @@ struct EmbeddedAmbientProgress: View {
         // Auto-save immediately
         if targetPage != book.currentPage {
             viewModel.updateBookProgress(book, currentPage: targetPage)
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         }
     }
     
@@ -284,7 +284,7 @@ struct EmbeddedAmbientProgress: View {
         
         if !isDragging {
             isDragging = true
-            DesignSystem.HapticFeedback.selection()
+            SensoryFeedback.selection()
         }
         
         // Calculate progress based on drag location
@@ -298,7 +298,7 @@ struct EmbeddedAmbientProgress: View {
         let progressPercent = Int(newProgress * 100)
         let currentPercent = Int(progress * 100)
         if abs(progressPercent - currentPercent) >= 5 {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }
     }
     
@@ -317,7 +317,7 @@ struct EmbeddedAmbientProgress: View {
         // Auto-save immediately
         if targetPage != book.currentPage {
             viewModel.updateBookProgress(book, currentPage: targetPage)
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         }
     }
 }

@@ -235,7 +235,7 @@ struct MessageBubbleView: View {
                     }
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.isUser ? .trailing : .leading)
+            .frame(maxWidth: 300, alignment: message.isUser ? .trailing : .leading)
             
             if !message.isUser {
                 Spacer()
@@ -271,7 +271,7 @@ struct StreamingBubbleView: View {
                     CitationPillsView(citations: citations) { _ in }
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: .leading)
+            .frame(maxWidth: 300, alignment: .leading)
             
             Spacer()
         }

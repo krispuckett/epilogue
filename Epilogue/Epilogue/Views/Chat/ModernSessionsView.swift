@@ -7,6 +7,7 @@ struct ModernSessionsView: View {
     
     @State private var searchText = ""
     @State private var scrollOffset: CGFloat = 0
+    @State private var isHeaderVisible = false
     @Environment(\.modelContext) private var modelContext
     
     private var groupedSessions: [(String, [AmbientSession])] {
@@ -117,7 +118,15 @@ struct ModernSessionsView: View {
                     }
                     .coordinateSpace(name: "scroll")
                     .onPreferenceChange(ModernScrollOffsetPreferenceKey.self) { value in
-                        scrollOffset = value
+                        // Only update header visibility when crossing threshold to avoid continuous updates
+                        let shouldShowHeader = value > 100
+                        if isHeaderVisible != shouldShowHeader {
+                            isHeaderVisible = shouldShowHeader
+                        }
+                        // Only update scrollOffset for section headers, throttled
+                        if abs(scrollOffset - value) > 5 {
+                            scrollOffset = value
+                        }
                     }
                 }
                 
@@ -143,9 +152,9 @@ struct ModernSessionsView: View {
                         .regular.tint(Color(red: 0.11, green: 0.11, blue: 0.12).opacity(0.5)),
                         in: .rect
                     )
-                    .opacity(scrollOffset > 100 ? 1 : 0)
+                    .opacity(isHeaderVisible ? 1 : 0)
                 }
-                .animation(DesignSystem.Animation.easeQuick, value: scrollOffset > 100)
+                .animation(DesignSystem.Animation.easeQuick, value: isHeaderVisible)
             }
             .navigationBarHidden(true)
         }
@@ -215,8 +224,11 @@ struct SectionHeader: View {
         .onAppear {
             checkSticky()
         }
-        .onChange(of: scrollOffset) { _, _ in
-            checkSticky()
+        .onChange(of: scrollOffset) { oldValue, newValue in
+            // Only check sticky when there's significant scroll change
+            if abs(oldValue - newValue) > 10 {
+                checkSticky()
+            }
         }
     }
     

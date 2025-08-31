@@ -136,7 +136,7 @@ struct LiquidSearchResultsView: View {
     // MARK: - Action Handlers
     
     private func handleRecentCommand(_ command: RecentCommand) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Re-execute the recent command based on its type
         switch command.intentType {
@@ -166,7 +166,7 @@ struct LiquidSearchResultsView: View {
     }
     
     private func handleBookTap(_ book: Book) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToBook"),
             object: book
@@ -174,7 +174,7 @@ struct LiquidSearchResultsView: View {
     }
     
     private func handleNoteTap(_ note: Note) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         NotificationCenter.default.post(
             name: Notification.Name("NavigateToNote"),
             object: note

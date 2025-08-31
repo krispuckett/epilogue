@@ -374,14 +374,14 @@ struct BookScannerView: View {
         countdownTimer?.invalidate()
         
         // Immediate countdown
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Slower countdown for better UX
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { timer in
             captureCountdown -= 1
             
             if captureCountdown > 0 {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     pulseAnimation.toggle()
                 }
@@ -394,7 +394,7 @@ struct BookScannerView: View {
     }
     
     private func captureManually() {
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
         performCapture()
     }
     
@@ -402,7 +402,7 @@ struct BookScannerView: View {
         print("🟢 performCapture called")
         
         // Add haptic feedback
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
         
         // Freeze the camera preview for a smoother transition
         cameraManager.capturePhoto { image in
@@ -422,7 +422,7 @@ struct BookScannerView: View {
                 scanState = .processing
             }
             
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
             
             // Process with BookScannerService
             Task {
@@ -461,7 +461,7 @@ struct BookScannerView: View {
                         }
                         
                         // Show error toast
-                        DesignSystem.HapticFeedback.warning()
+                        SensoryFeedback.warning()
                         // TODO: Show error message to user
                     }
                 }

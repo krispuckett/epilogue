@@ -563,7 +563,7 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         isProcessing?.wrappedValue = true
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
         
         // Stop camera for processing
         captureSession?.stopRunning()

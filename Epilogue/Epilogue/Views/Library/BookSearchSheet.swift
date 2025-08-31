@@ -196,7 +196,7 @@ struct BookSearchSheet: View {
     }
     
     private func addBookToLibrary(_ book: Book) {
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         onBookSelected(book)
         dismiss()
     }

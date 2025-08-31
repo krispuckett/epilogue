@@ -46,7 +46,7 @@ struct AmbientSectionsNavigator: View {
                                     )
                                     .onTapGesture {
                                         selectedSection = section
-                                        DesignSystem.HapticFeedback.light()
+                                        SensoryFeedback.light()
                                         
                                         // Animate selection then navigate
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -222,7 +222,7 @@ struct EdgeSwipeGesture: ViewModifier {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                         isShowingNavigator = true
                                     }
-                                    DesignSystem.HapticFeedback.medium()
+                                    SensoryFeedback.medium()
                                 }
                             }
                         }

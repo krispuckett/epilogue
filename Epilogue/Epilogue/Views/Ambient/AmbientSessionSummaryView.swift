@@ -313,7 +313,7 @@ struct AmbientSessionSummaryView: View {
                 withAnimation(DesignSystem.Animation.springStandard) {
                     isKeyInsightExpanded.toggle()
                 }
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }) {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack {
@@ -607,7 +607,7 @@ struct AmbientSessionSummaryView: View {
     
     private func handleMicrophoneTap() {
         isRecording.toggle()
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func exportSession() {

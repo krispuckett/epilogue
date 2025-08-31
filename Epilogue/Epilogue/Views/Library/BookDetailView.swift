@@ -325,7 +325,7 @@ struct BookDetailView: View {
                 Button("Edit Book") {
                     editedTitle = book.title
                     showingBookSearch = true
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
@@ -501,7 +501,7 @@ struct BookDetailView: View {
                         Button {
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                                 
                                 // Show completion sheet when marking as read
                                 if status == .read && book.readingStatus != .read {
@@ -728,7 +728,7 @@ struct BookDetailView: View {
                 // Edit button
                 Button {
                     showingProgressEditor = true
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 } label: {
                     Text("Edit")
                         .font(.system(size: 14, weight: .medium))
@@ -838,14 +838,14 @@ struct BookDetailView: View {
                 .foregroundStyle(.white)
             
             Button {
-                DesignSystem.HapticFeedback.medium()
+                SensoryFeedback.medium()
                 withAnimation(.spring(response: 0.3)) {
                     libraryViewModel.updateReadingStatus(for: book.id, status: .currentlyReading)
                 }
                 
                 // Delayed success haptic
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    DesignSystem.HapticFeedback.success()
+                    SensoryFeedback.success()
                 }
             } label: {
                 Text("Start Reading")
@@ -956,7 +956,7 @@ struct BookDetailView: View {
                 
                 Button {
                     showingCompletionSheet = true
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 } label: {
                     Text("Edit")
                         .font(.system(size: 14))
@@ -1003,7 +1003,7 @@ struct BookDetailView: View {
             
             Button {
                 showingCompletionSheet = true
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             } label: {
                 Text("Add Review")
                     .font(.system(size: 16, weight: .medium))
@@ -1142,7 +1142,7 @@ struct BookDetailView: View {
                                     name: Notification.Name("EditNote"),
                                     object: note
                                 )
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                             }
                         ),
                         SwipeAction(
@@ -1192,7 +1192,7 @@ struct BookDetailView: View {
                             backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
                             handler: {
                                 ShareQuoteService.shareQuote(quote)
-                                DesignSystem.HapticFeedback.success()
+                                SensoryFeedback.success()
                             }
                         ),
                         SwipeAction(
@@ -1237,7 +1237,7 @@ struct BookDetailView: View {
                                         name: Notification.Name("EditNote"),
                                         object: quote
                                     )
-                                    DesignSystem.HapticFeedback.light()
+                                    SensoryFeedback.light()
                                 }
                             ),
                             SwipeAction(
@@ -1246,7 +1246,7 @@ struct BookDetailView: View {
                                 handler: {
                                     // Share quote
                                     ShareQuoteService.shareQuote(quote)
-                                    DesignSystem.HapticFeedback.success()
+                                    SensoryFeedback.success()
                                 }
                             ),
                             SwipeAction(
@@ -1290,7 +1290,7 @@ struct BookDetailView: View {
                                         name: Notification.Name("EditNote"),
                                         object: note
                                     )
-                                    DesignSystem.HapticFeedback.light()
+                                    SensoryFeedback.light()
                                 }
                             ),
                             SwipeAction(
@@ -1314,7 +1314,7 @@ struct BookDetailView: View {
                                         rootViewController.present(activityController, animated: true)
                                     }
                                     
-                                    DesignSystem.HapticFeedback.success()
+                                    SensoryFeedback.success()
                                 }
                             ),
                             SwipeAction(

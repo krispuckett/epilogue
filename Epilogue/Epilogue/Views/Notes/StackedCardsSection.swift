@@ -41,7 +41,7 @@ struct StackedCardsSection: View {
                     expandedSections.insert(section.id)
                 }
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         } label: {
             HStack {
                 Text(section.title)

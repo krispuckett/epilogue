@@ -23,33 +23,33 @@ final class BatchSelectionManager: ObservableObject {
     func enterSelectionMode() {
         isSelectionMode = true
         selectedItems.removeAll()
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     func exitSelectionMode() {
         isSelectionMode = false
         selectedItems.removeAll()
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     func toggleSelection(for id: UUID) {
         if selectedItems.contains(id) {
             selectedItems.remove(id)
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         } else {
             selectedItems.insert(id)
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
         }
     }
     
     func selectAll(items: [Note]) {
         selectedItems = Set(items.map { $0.id })
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
     }
     
     func deselectAll() {
         selectedItems.removeAll()
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     func deleteSelected() {
@@ -76,7 +76,7 @@ final class BatchSelectionManager: ObservableObject {
             }
         )
         
-        DesignSystem.HapticFeedback.warning()
+        SensoryFeedback.warning()
     }
     
     func isSelected(_ id: UUID) -> Bool {

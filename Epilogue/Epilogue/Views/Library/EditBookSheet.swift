@@ -189,7 +189,7 @@ struct EditBookSheet: View {
     }
     
     private func replaceBook(with book: Book) {
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         onBookReplaced(book)
     }
 }

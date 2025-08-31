@@ -164,7 +164,7 @@ struct ProgressiveTranscriptView: View {
             
             // Haptic feedback for certain characters
             if transcription[index] == "?" || transcription[index] == "!" {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }
         }
     }
@@ -199,13 +199,13 @@ struct ProgressiveTranscriptView: View {
             // Haptic feedback based on entity type
             switch entity.type {
             case .question:
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 startThinkingAnimation()
             case .quote:
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 pulseQuoteAnimation()
             case .insight, .reflection:
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             default:
                 break
             }
@@ -260,7 +260,7 @@ struct ProgressiveTranscriptView: View {
             showSaveConfirmation = true
         }
         
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.easeOut(duration: 0.3)) {

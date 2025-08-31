@@ -1,5 +1,13 @@
 import SwiftUI
 
+// Preference key for card rect tracking
+private struct CardRectPreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
 // MARK: - Note Card
 struct NoteCard: View {
     let note: Note
@@ -36,14 +44,18 @@ struct NoteCard: View {
         .overlay(
             GeometryReader { geo in
                 Color.clear
+                    .preference(key: CardRectPreferenceKey.self, value: geo.frame(in: .global))
                     .onAppear {
                         cardRect = geo.frame(in: .global)
                     }
-                    .onChange(of: geo.frame(in: .global)) { _, newValue in
-                        cardRect = newValue
-                    }
             }
         )
+        .onPreferenceChange(CardRectPreferenceKey.self) { newValue in
+            // Only update if rect actually changed significantly
+            if abs(cardRect.minY - newValue.minY) > 1 || abs(cardRect.minX - newValue.minX) > 1 {
+                cardRect = newValue
+            }
+        }
         .onChange(of: showingOptions) { _, newValue in
             if newValue {
                 openOptionsNoteId = note.id
@@ -207,12 +219,12 @@ struct QuoteCard: View {
         
         if timeSinceLastTap < 0.3 {
             // Double tap detected
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             navigateToAmbientSession()
             tapCount = 0
         } else {
             // Single tap - show date
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             withAnimation(DesignSystem.Animation.easeStandard) {
                 showDate.toggle()
             }
@@ -318,7 +330,7 @@ struct RegularNoteCard: View {
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .onTapGesture(count: 2) {
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             showingOptions = true
         }
     }

@@ -2,8 +2,6 @@ import SwiftUI
 
 struct BookCard: View {
     let book: Book
-    @State private var showingProgress = false
-    @State private var longPressLocation: CGPoint = .zero
     @State private var isPressed = false
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.sizeCategory) var sizeCategory
@@ -13,7 +11,7 @@ struct BookCard: View {
         let currentPage = book.currentPage
         let progress = pages > 0 ? Int((Double(currentPage) / Double(pages)) * 100) : 0
         
-        return "\(book.title) by \(book.author). Reading progress: \(progress)% complete, page \(currentPage) of \(pages). Long press to adjust reading progress."
+        return "\(book.title) by \(book.author). Reading progress: \(progress)% complete, page \(currentPage) of \(pages)."
     }
     
     var body: some View {
@@ -50,27 +48,9 @@ struct BookCard: View {
             // Progress indicator removed per user request
         }
         .smoothScale(0.96, isActive: isPressed)
-        .onLongPressGesture(
-            minimumDuration: 0.5,
-            maximumDistance: .infinity,
-            pressing: { pressing in
-                withAnimation(SmoothAnimationType.snappy.animation) {
-                    isPressed = pressing
-                }
-            },
-            perform: {
-                showingProgress = true
-                DesignSystem.HapticFeedback.medium()
-            }
-        )
-        .popover(isPresented: $showingProgress) {
-            ProgressPopover(book: book, viewModel: viewModel)
-                .presentationCompactAdaptation(.popover)
-                .preferredColorScheme(.dark)
-        }
+        // Long press removed per user request - no more progress popup
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Long press to update reading progress")
         .accessibilityAddTraits(.isButton)
     }
 }
@@ -255,7 +235,7 @@ struct ProgressPopover: View {
         // Update book progress
         viewModel.updateBookProgress(book, currentPage: currentPage)
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isUpdating = false

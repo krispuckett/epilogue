@@ -97,6 +97,7 @@ struct NotesMicroInteractions {
     // MARK: - Section Header Sticky Effect
     struct StickyHeaderModifier: ViewModifier {
         @State private var offset: CGFloat = 0
+        @State private var lastUpdateTime: Date = Date()
         
         func body(content: Content) -> some View {
             GeometryReader { geometry in
@@ -104,10 +105,29 @@ struct NotesMicroInteractions {
                     .offset(y: min(0, -offset))
                     .opacity(1.0 - min(0.3, abs(offset / 100)))
                     .blur(radius: min(3, abs(offset / 50)))
-                    .onChange(of: geometry.frame(in: .global).minY) { _, newValue in
-                        offset = -newValue
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
+                        }
+                    )
+                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                        // Throttle updates to avoid multiple per frame
+                        let now = Date()
+                        if now.timeIntervalSince(lastUpdateTime) > 0.016 { // ~60fps max
+                            offset = -value
+                            lastUpdateTime = now
+                        }
                     }
             }
+        }
+    }
+    
+    // Preference key for scroll offset
+    private struct ScrollOffsetPreferenceKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+            value = nextValue()
         }
     }
     
@@ -251,7 +271,7 @@ struct NotesMicroInteractions {
                     if now.timeIntervalSince(lastShakeTime) > 2 {
                         onShake()
                         lastShakeTime = now
-                        DesignSystem.HapticFeedback.success()
+                        SensoryFeedback.success()
                     }
                 }
         }

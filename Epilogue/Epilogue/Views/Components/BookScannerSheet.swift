@@ -171,7 +171,7 @@ struct BookSearchResultsView: View {
                     ForEach(books) { book in
                         BookSearchResultCard(book: book) {
                             libraryViewModel.addBook(book)
-                            DesignSystem.HapticFeedback.success()
+                            SensoryFeedback.success()
                             
                             // Show success and dismiss
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

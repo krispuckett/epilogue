@@ -301,19 +301,6 @@ struct SettingsView: View {
                 } footer: {
                     Text("Data sync will be available in a future update")
                 }
-                
-                // MARK: - Debug (TEMPORARY - Remove after testing!)
-                Section {
-                    NavigationLink("Test MeshGradient") {
-                        MeshGradientTestView()
-                    }
-                } header: {
-                    Text("Debug")
-                } footer: {
-                    Text("TEMPORARY: Remove this section after testing")
-                        .foregroundStyle(.orange)
-                }
-                
                 // MARK: - About
                 Section {
                     HStack {
@@ -652,47 +639,227 @@ struct APIKeyEntrySheet: View {
 // MARK: - Credits View
 
 struct CreditsView: View {
+    @State private var appeared = false
+    
     var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Epilogue")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    Text("A thoughtful reading companion")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical)
-            }
-            
-            Section("Created By") {
-                HStack {
-                    Image(systemName: "person.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(.gray)
-                    VStack(alignment: .leading) {
-                        Text("Your Name")
-                            .font(.headline)
-                        Text("Developer")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 32) {
+                // Hero Section with App Icon
+                VStack(spacing: 20) {
+                    // Animated App Icon
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.45, blue: 0.16),
+                                        Color(red: 0.95, green: 0.35, blue: 0.25)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 120, height: 120)
+                            .shadow(color: Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.5), radius: 20)
+                            .scaleEffect(appeared ? 1.0 : 0.8)
+                            .opacity(appeared ? 1.0 : 0)
+                        
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 50, weight: .bold))
+                            .foregroundColor(.white)
+                            .rotationEffect(.degrees(appeared ? 0 : -10))
+                    }
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1), value: appeared)
+                    
+                    VStack(spacing: 8) {
+                        Text("Epilogue")
+                            .font(.system(size: 48, weight: .bold, design: .serif))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        
+                        Text("A thoughtful reading companion")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .kerning(0.5)
+                        
+                        Text("Version 1.0")
+                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.top, 4)
                     }
                 }
+                .padding(.top, 40)
+                .padding(.bottom, 20)
+                
+                // Creator Section
+                VStack(spacing: 24) {
+                    Text("CREATED BY")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .kerning(2)
+                    
+                    VStack(spacing: 16) {
+                        // Profile image placeholder with gradient
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.3, green: 0.5, blue: 0.9),
+                                            Color(red: 0.5, green: 0.3, blue: 0.9)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 80, height: 80)
+                            
+                            Text("KP")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        }
+                        .shadow(color: .blue.opacity(0.3), radius: 15)
+                        
+                        VStack(spacing: 4) {
+                            Text("Kris Puckett")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.white)
+                            
+                            Text("iOS Developer & Book Enthusiast")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+                }
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(.white.opacity(0.1), lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal)
+                
+                // Technologies Section
+                VStack(spacing: 20) {
+                    Text("POWERED BY")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .kerning(2)
+                    
+                    VStack(spacing: 12) {
+                        TechCard(
+                            icon: "swift",
+                            title: "SwiftUI & iOS 26",
+                            description: "Built with the latest technologies",
+                            color: .orange
+                        )
+                        
+                        TechCard(
+                            icon: "mic.fill",
+                            title: "WhisperKit",
+                            description: "On-device voice transcription",
+                            color: .blue
+                        )
+                        
+                        TechCard(
+                            icon: "brain",
+                            title: "Perplexity AI",
+                            description: "Intelligent reading companion",
+                            color: .purple
+                        )
+                        
+                        TechCard(
+                            icon: "icloud.fill",
+                            title: "CloudKit",
+                            description: "Seamless sync across devices",
+                            color: .cyan
+                        )
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Special Thanks
+                VStack(spacing: 16) {
+                    Text("SPECIAL THANKS")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .kerning(2)
+                    
+                    Text("To all the beta testers, early adopters, and book lovers who helped shape Epilogue into what it is today.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                    Text("Made with ❤️ for readers everywhere")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.top, 8)
+                }
+                .padding(.vertical, 32)
             }
-            
-            Section("Open Source Libraries") {
-                Link("SwiftUI", destination: URL(string: "https://developer.apple.com/xcode/swiftui/")!)
-                Link("WhisperKit", destination: URL(string: "https://github.com/argmaxinc/whisperkit")!)
-            }
-            
-            Section("Special Thanks") {
-                Text("To all beta testers and contributors")
-                    .foregroundStyle(.secondary)
-            }
+            .padding(.bottom, 40)
         }
+        .background(Color(red: 0.11, green: 0.11, blue: 0.118))
         .navigationTitle("Credits")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            withAnimation {
+                appeared = true
+            }
+        }
+    }
+}
+
+// Tech Card Component
+struct TechCard: View {
+    let icon: String
+    let title: String
+    let description: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.2))
+                    .frame(width: 44, height: 44)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(color)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text(description)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 

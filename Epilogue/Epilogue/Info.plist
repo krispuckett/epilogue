@@ -6,17 +6,5 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Epilogue saves diagnostic images to help debug color extraction issues.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Epilogue needs access to save diagnostic images for debugging color extraction.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Epilogue uses device motion to create subtle parallax effects on book covers.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Epilogue uses your microphone for voice commands and dictation to quickly add books, notes, and quotes.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Epilogue uses speech recognition to understand your voice commands for hands-free library management.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Epilogue uses your camera to scan book covers and ISBNs for quick library additions.</string>
 </dict>
 </plist>

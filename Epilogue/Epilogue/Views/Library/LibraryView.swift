@@ -6,7 +6,7 @@ import Combine
 
 struct LibraryView: View {
     @EnvironmentObject var viewModel: LibraryViewModel
-    @State private var searchText = ""
+    // Removed searchText - no longer needed
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @Namespace private var viewModeAnimation
     @Namespace private var listTransition
@@ -37,6 +37,11 @@ struct LibraryView: View {
         case grid, list
     }
     
+    // Return all books since we removed search
+    private var filteredBooks: [Book] {
+        return viewModel.books
+    }
+    
     // Helper function to change book cover
     private func changeCover(for book: Book) {
         selectedBookForEdit = book
@@ -45,7 +50,7 @@ struct LibraryView: View {
     
     // Refresh library data
     private func refreshLibrary() async {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Simulate network delay for smooth UX
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -53,7 +58,7 @@ struct LibraryView: View {
         await MainActor.run {
             // Trigger refresh - loadBooks is private
             NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }
     }
     
@@ -79,35 +84,9 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "books.vertical.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-            
-            VStack(spacing: 8) {
-                Text("Your library awaits")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                
-                Text("Start your reading journey by adding your first book")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            Button {
-                showingBookSearch = true
-            } label: {
-                Text("Add Book")
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                    .padding(.vertical, 12)
-                    .background(Color.orange)
-                    .clipShape(Capsule())
-            }
-            .padding(.top, 10)
+        ModernEmptyStates.noBooks {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showingBookSearch = true
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -133,7 +112,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var gridContent: some View {
         OptimizedLibraryGrid(
-            books: viewModel.books,
+            books: filteredBooks,
             viewModel: viewModel,
             highlightedBookId: highlightedBookId,
             onChangeCover: { book in changeCover(for: book) }
@@ -143,7 +122,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var listContent: some View {
         LibraryBookListView(
-            books: viewModel.books,
+            books: filteredBooks,
             viewModel: viewModel,
             highlightedBookId: highlightedBookId,
             onChangeCover: { book in changeCover(for: book) },
@@ -160,7 +139,7 @@ struct LibraryView: View {
                 Button {
                     withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = .grid
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     }
                 } label: {
                     Image(systemName: "square.grid.2x2")
@@ -177,7 +156,7 @@ struct LibraryView: View {
                 Button {
                     withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = .list
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     }
                 } label: {
                     Image(systemName: "list.bullet")
@@ -193,7 +172,7 @@ struct LibraryView: View {
                 // Settings button
                 Button {
                     showingSettings = true
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 } label: {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 16))
@@ -277,6 +256,7 @@ struct LibraryView: View {
                     .transition(.opacity)
                 } else if viewModel.books.isEmpty {
                     emptyStateView
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
                     ZStack {
                         if viewMode == .grid {
@@ -399,7 +379,7 @@ struct LibraryGridItem: View {
         .contextMenu {
                 // Same menu items as card
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     withAnimation {
                         viewModel.toggleReadingStatus(for: book)
                     }
@@ -413,7 +393,7 @@ struct LibraryGridItem: View {
                 Divider()
                 
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     // Share functionality
                     let text = "Check out \"\(book.title)\" by \(book.author)"
                     let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
@@ -429,7 +409,7 @@ struct LibraryGridItem: View {
                 Divider()
                 
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     onChangeCover(book)
                 } label: {
                     Label("Change Cover", systemImage: "photo")
@@ -438,7 +418,7 @@ struct LibraryGridItem: View {
                 Divider()
                 
                 Button(role: .destructive) {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     withAnimation {
                         viewModel.deleteBook(book)
                     }
@@ -479,7 +459,7 @@ struct LibraryListItemWrapper: View {
             .contextMenu {
                 // Same menu items
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     withAnimation {
                         viewModel.toggleReadingStatus(for: book)
                     }
@@ -493,7 +473,7 @@ struct LibraryListItemWrapper: View {
                 Divider()
                 
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     let text = "Check out \"\(book.title)\" by \(book.author)"
                     let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
                     
@@ -508,7 +488,7 @@ struct LibraryListItemWrapper: View {
                 Divider()
                 
                 Button {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     onChangeCover(book)
                 } label: {
                     Label("Change Cover", systemImage: "photo")
@@ -517,7 +497,7 @@ struct LibraryListItemWrapper: View {
                 Divider()
                 
                 Button(role: .destructive) {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     withAnimation {
                         viewModel.deleteBook(book)
                     }
@@ -584,7 +564,7 @@ struct LibraryBookCard: View {
                 .animation(DesignSystem.Animation.springStandard, value: isPressed)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isHovered)
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(book.title)
                     .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96)) // Warm white
@@ -598,6 +578,7 @@ struct LibraryBookCard: View {
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .padding(.top, 1) // Just 1 point of spacing
                 
                 // Progress bar removed per user request
             }
@@ -608,7 +589,7 @@ struct LibraryBookCard: View {
         .contextMenu {
             // Mark as Read/Want to Read
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     viewModel.toggleReadingStatus(for: book)
                 }
@@ -623,7 +604,7 @@ struct LibraryBookCard: View {
             
             // Share
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 shareBook()
             } label: {
                 Label("Share", systemImage: "square.and.arrow.up")
@@ -633,7 +614,7 @@ struct LibraryBookCard: View {
             
             // Change Cover
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 onChangeCover?(book)
             } label: {
                 Label("Change Cover", systemImage: "photo")
@@ -643,7 +624,7 @@ struct LibraryBookCard: View {
             
             // Delete
             Button(role: .destructive) {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     viewModel.deleteBook(book)
                 }
@@ -677,7 +658,7 @@ struct ViewModeToggle: View {
             Button(action: {
                 withAnimation(DesignSystem.Animation.springStandard) {
                     viewMode = .grid
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
             }) {
                 Image(systemName: "square.grid.2x2")
@@ -691,7 +672,7 @@ struct ViewModeToggle: View {
             Button(action: {
                 withAnimation(DesignSystem.Animation.springStandard) {
                     viewMode = .list
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
             }) {
                 Image(systemName: "list.bullet")
@@ -889,7 +870,7 @@ struct LibraryBookListItem: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPressed)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showActions)
         .onTapGesture {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             
             if showActions {
                 withAnimation {
@@ -900,7 +881,7 @@ struct LibraryBookListItem: View {
         .contextMenu {
             // Same menu items
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     viewModel.toggleReadingStatus(for: book)
                 }
@@ -914,7 +895,7 @@ struct LibraryBookListItem: View {
             Divider()
             
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 let text = "Check out \"\(book.title)\" by \(book.author)"
                 let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
                 
@@ -929,7 +910,7 @@ struct LibraryBookListItem: View {
             Divider()
             
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 onChangeCover?(book)
             } label: {
                 Label("Change Cover", systemImage: "photo")
@@ -938,7 +919,7 @@ struct LibraryBookListItem: View {
             Divider()
             
             Button(role: .destructive) {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     viewModel.deleteBook(book)
                 }
@@ -1225,7 +1206,7 @@ struct LibraryBookListRow: View {
         )
         .contextMenu {
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     viewModel.toggleReadingStatus(for: book)
                 }
@@ -1239,7 +1220,7 @@ struct LibraryBookListRow: View {
             Divider()
             
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 onChangeCover(book)
             } label: {
                 Label("Change Cover", systemImage: "photo")
@@ -1248,7 +1229,7 @@ struct LibraryBookListRow: View {
             Divider()
             
             Button(role: .destructive) {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 withAnimation {
                     viewModel.deleteBook(book)
                 }

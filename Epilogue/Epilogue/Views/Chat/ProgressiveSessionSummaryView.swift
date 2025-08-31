@@ -57,7 +57,7 @@ struct ProgressiveSessionSummaryView: View {
                 Button {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         isExpanded.toggle()
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     }
                 } label: {
                     Text(isExpanded ? "Hide Details" : "View Details")
@@ -140,7 +140,7 @@ struct ProgressiveSessionSummaryView: View {
                     
                     // View Full Transcript Button
                     Button {
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                         // Navigate to full transcript
                     } label: {
                         HStack {

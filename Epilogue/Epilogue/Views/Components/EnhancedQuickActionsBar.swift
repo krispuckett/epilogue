@@ -80,7 +80,7 @@ struct EnhancedQuickActionsBar: View {
     // MARK: - Plus Button
     private var plusButton: some View {
         Button {
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             NotificationCenter.default.post(name: Notification.Name("ShowCommandInput"), object: nil)
         } label: {
             Image(systemName: "plus")
@@ -154,7 +154,7 @@ struct EnhancedQuickActionsBar: View {
     
     private func handleSingleTap() {
         print("🎯 DEBUG: Waveform single tap detected")
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         startGlowAnimation()
         
         // Check if we're viewing a specific book
@@ -168,7 +168,7 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func handleDoubleTap() {
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         // Double tap also checks for current book context
         if let currentBook = libraryViewModel.currentDetailBook {
@@ -181,11 +181,11 @@ struct EnhancedQuickActionsBar: View {
     private func handleSwipeGesture(_ translation: CGSize) {
         if translation.height < -30 {
             // Swipe up - Quick note capture
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             NotificationCenter.default.post(name: Notification.Name("StartVoiceNote"), object: nil)
         } else if translation.height > 30 {
             // Swipe down - Show recent captures
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             withAnimation(DesignSystem.Animation.springStandard) {
                 showRecentCaptures = true
             }
@@ -330,7 +330,7 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func selectBook(_ book: Book) {
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         dismissRadialMenu()
         
         // Open ambient mode with the selected book

@@ -840,7 +840,7 @@ struct AmbientChatOverlay: View {
         autoStopManager.startMonitoring()
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
     }
     
     private func stopSession() {
@@ -855,7 +855,7 @@ struct AmbientChatOverlay: View {
         session?.endTime = Date()
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         // Show processing view
         withAnimation {
@@ -1361,7 +1361,7 @@ struct AmbientChatOverlay: View {
                 try? modelContext.save()
                 
                 // Haptic feedback for response
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }
             */
             

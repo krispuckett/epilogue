@@ -162,7 +162,7 @@ struct OptimizedGridItem: View {
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity) { pressing in
             isPressed = pressing
             if pressing {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }
         } perform: {}
         .simultaneousGesture(TapGesture().onEnded { _ in
@@ -177,7 +177,7 @@ struct OptimizedGridItem: View {
     @ViewBuilder
     private var bookContextMenu: some View {
         Button {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             withAnimation {
                 viewModel.toggleReadingStatus(for: book)
             }
@@ -191,7 +191,7 @@ struct OptimizedGridItem: View {
         Divider()
         
         Button {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             shareBook()
         } label: {
             Label("Share", systemImage: "square.and.arrow.up")
@@ -200,7 +200,7 @@ struct OptimizedGridItem: View {
         Divider()
         
         Button {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             onChangeCover(book)
         } label: {
             Label("Change Cover", systemImage: "photo")
@@ -209,7 +209,7 @@ struct OptimizedGridItem: View {
         Divider()
         
         Button(role: .destructive) {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             withAnimation {
                 viewModel.deleteBook(book)
             }

@@ -140,7 +140,7 @@ struct ChatSessionsView: View {
                         withAnimation(DesignSystem.Animation.springStandard) {
                             selectedGrouping = grouping
                         }
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     }
                 )
             }
@@ -485,7 +485,7 @@ struct AmbientSessionCard: View {
                     
                     Button(action: {
                         // Continue session
-                        DesignSystem.HapticFeedback.medium()
+                        SensoryFeedback.medium()
                     }) {
                         HStack {
                             Spacer()
@@ -528,7 +528,7 @@ struct BookSessionGroup: View {
                 withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }) {
                 HStack(spacing: 12) {
                     // Book cover

@@ -169,7 +169,7 @@ struct APIConfigurationView: View {
             hasExistingKey = true
             showingSaveConfirmation = true
             
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         } catch {
             errorMessage = "Failed to save API key: \(error.localizedDescription)"
             showingError = true
@@ -182,7 +182,7 @@ struct APIConfigurationView: View {
             try KeychainManager.shared.deletePerplexityAPIKey()
             hasExistingKey = false
             apiKey = ""
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         } catch {
             errorMessage = "Failed to remove API key: \(error.localizedDescription)"
             showingError = true

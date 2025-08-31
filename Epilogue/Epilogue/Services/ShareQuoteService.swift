@@ -50,7 +50,7 @@ class ShareQuoteService {
             }
             
             viewController.present(activityController, animated: true) {
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
             }
         } else {
             // Fallback: present from key window
@@ -64,7 +64,7 @@ class ShareQuoteService {
                 }
                 
                 rootViewController.present(activityController, animated: true) {
-                    DesignSystem.HapticFeedback.success()
+                    SensoryFeedback.success()
                 }
             }
         }

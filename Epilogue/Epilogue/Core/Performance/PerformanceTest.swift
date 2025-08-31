@@ -200,7 +200,7 @@ struct PerformanceTestView: View {
                 isRunning = false
                 
                 // Haptic feedback on completion
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
             }
         }
     }

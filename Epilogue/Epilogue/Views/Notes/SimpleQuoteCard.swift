@@ -150,7 +150,7 @@ struct SimpleQuoteCard: View {
             withAnimation(DesignSystem.Animation.springStandard) {
                 showDate.toggle()
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         }
         .pressEvents(onPress: {
             withAnimation(.spring(response: 0.1)) {

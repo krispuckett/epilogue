@@ -59,9 +59,9 @@ struct iOS26SwipeActionsModifier: ViewModifier {
         Button {
             // Haptic feedback
             if action.isDestructive {
-                DesignSystem.HapticFeedback.warning()
+                SensoryFeedback.warning()
             } else {
-                DesignSystem.HapticFeedback.medium()
+                SensoryFeedback.medium()
             }
             
             // Execute action
@@ -102,7 +102,7 @@ struct iOS26SwipeActionsModifier: ViewModifier {
             
             // Trigger haptic when crossing threshold
             if abs(offset) > swipeThreshold && !hapticTriggered {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 hapticTriggered = true
             }
         }
@@ -294,7 +294,7 @@ struct GlassSwipeActionsModifier: ViewModifier {
                     ForEach(actions) { action in
                         Button {
                             selectedAction = action
-                            DesignSystem.HapticFeedback.medium()
+                            SensoryFeedback.medium()
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 action.handler()

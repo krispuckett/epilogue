@@ -107,7 +107,7 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         logger.info("Closing ambient reading")
         
         // Light haptic feedback
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Dismiss
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
@@ -127,7 +127,7 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         currentBook = book
         
         // Light haptic for confirmation
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Post notification for UI updates
         NotificationCenter.default.post(

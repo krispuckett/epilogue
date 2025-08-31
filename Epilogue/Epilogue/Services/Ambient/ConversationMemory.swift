@@ -224,6 +224,20 @@ public class ConversationMemory {
             topic = "General \(memory.intent.primary.baseType) thread"
         }
         
+        // Check if we already have a recent thread with the same topic
+        let recentCutoff = Date().addingTimeInterval(-10) // Within last 10 seconds
+        let existingThread = threads.firstIndex { thread in
+            thread.topic == topic && thread.lastUpdateTime > recentCutoff
+        }
+        
+        if let existingIndex = existingThread {
+            // Add to existing thread instead of creating duplicate
+            threads[existingIndex].entries.append(memory)
+            threads[existingIndex].lastUpdateTime = Date()
+            logger.info("📎 Added to recent thread: \(topic)")
+            return
+        }
+        
         let thread = ConversationThread(
             startTime: Date(),
             lastUpdateTime: Date(),

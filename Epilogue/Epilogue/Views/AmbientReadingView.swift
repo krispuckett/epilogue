@@ -229,13 +229,13 @@ struct ResponseCard: View {
             HStack(spacing: 16) {
                 Button("Yes, please") {
                     // Handle acceptance
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     onDismiss()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Not now") {
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                     onDismiss()
                 }
                 .buttonStyle(.bordered)

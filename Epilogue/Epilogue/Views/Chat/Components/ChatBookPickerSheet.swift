@@ -59,7 +59,7 @@ struct ChatBookPickerSheet: View {
                         Button {
                             selectedBook = nil
                             dismiss()
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         } label: {
                             HStack(spacing: 16) {
                                 // Icon
@@ -176,7 +176,7 @@ struct ChatBookPickerSheet: View {
     // MARK: - Actions
     
     private func handleBookSelection(_ book: Book) {
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         selectedBook = book
         isPresented = false
         dismiss()

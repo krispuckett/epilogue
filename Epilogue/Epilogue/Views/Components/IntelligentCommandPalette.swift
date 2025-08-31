@@ -239,7 +239,7 @@ struct IntelligentCommandPalette: View {
         processor.processInlineCommand(commandText)
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.success()
+        SensoryFeedback.success()
         
         // Clear and dismiss
         commandText = ""

@@ -157,7 +157,7 @@ struct ChatSessionsViewRefined: View {
                                 isSelectionMode = false
                                 selectedSessionIds.removeAll()
                             }
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         } label: {
                             Text("Done")
                                 .font(.system(size: 16, weight: .medium))
@@ -178,7 +178,7 @@ struct ChatSessionsViewRefined: View {
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 isSelectionMode = true
                             }
-                            DesignSystem.HapticFeedback.light()
+                            SensoryFeedback.light()
                         } label: {
                             Text("Edit")
                                 .font(.system(size: 16, weight: .regular))
@@ -195,7 +195,7 @@ struct ChatSessionsViewRefined: View {
                             searchText = ""
                         }
                     }
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 } label: {
                     if isSearching {
                         // Liquid glass close button with amber tint
@@ -225,7 +225,7 @@ struct ChatSessionsViewRefined: View {
                                 withAnimation(DesignSystem.Animation.springStandard) {
                                     selectedGrouping = grouping
                                 }
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                             } label: {
                                 Label {
                                     HStack {
@@ -249,7 +249,7 @@ struct ChatSessionsViewRefined: View {
                                 withAnimation(DesignSystem.Animation.springStandard) {
                                     selectedFilter = filter
                                 }
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                             } label: {
                                 Label {
                                     HStack {
@@ -400,7 +400,7 @@ struct ChatSessionsViewRefined: View {
                 selectedSessionIds.insert(session.id)
             }
         }
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private func deleteSelectedSessions() {
@@ -416,7 +416,7 @@ struct ChatSessionsViewRefined: View {
                 selectedSessionIds.removeAll()
                 isSelectionMode = false
             }
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         } catch {
             print("❌ Failed to delete sessions: \(error)")
         }
@@ -538,7 +538,7 @@ struct BookSessionGroupWithSelection: View {
                 withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             }) {
                 HStack(spacing: 12) {
                     // Book cover with HTTPS conversion
@@ -823,7 +823,7 @@ struct IntelligentSessionCard: View {
                         }
                         
                         Button(action: {
-                            DesignSystem.HapticFeedback.medium()
+                            SensoryFeedback.medium()
                         }) {
                             HStack(spacing: 6) {
                                 Image(systemName: "arrow.right.circle")

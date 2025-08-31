@@ -29,7 +29,7 @@ struct PerplexityStyleSessionsView: View {
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16))
@@ -152,7 +152,7 @@ struct PerplexityStyleSessionsView: View {
                     searchText = ""
                 }
             }
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
         } label: {
             if isSearching {
                 // Liquid glass close button with amber tint
@@ -430,11 +430,6 @@ struct PerplexitySessionRow: View {
                                 .foregroundStyle(.white.opacity(0.4))
                                 .tracking(1.0)
                             
-                            if let icon = contentIcon {
-                                Image(systemName: icon.name)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(icon.color)
-                            }
                         }
                     }
                     
@@ -448,11 +443,6 @@ struct PerplexitySessionRow: View {
                     // Content count badge if there's content
                     if hasContent && contentCount > 1 {
                         HStack(spacing: 8) {
-                            if let icon = contentIcon {
-                                Image(systemName: icon.name)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(icon.color)
-                            }
                             Text("\(contentCount)")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(DesignSystem.Colors.textTertiary)

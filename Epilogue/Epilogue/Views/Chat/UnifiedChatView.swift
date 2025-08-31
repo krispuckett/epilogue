@@ -396,7 +396,7 @@ struct UnifiedChatView: View {
                     guard currentBookContext?.id != book.id else { return }
                     withAnimation(DesignSystem.Animation.springStandard) {
                         currentBookContext = book
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                         Task {
                             await extractColorsForBook(book)
                         }
@@ -676,7 +676,7 @@ struct UnifiedChatView: View {
             messages.remove(at: lastIndex)
         }
         
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
     }
     
     private var mainContent: some View {
@@ -917,7 +917,7 @@ struct UnifiedChatView: View {
             Button {
                 currentBookContext = nil
                 showingBookStrip = false
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
             } label: {
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                     .fill(Color.white.opacity(0.1))
@@ -941,7 +941,7 @@ struct UnifiedChatView: View {
                 Button {
                     currentBookContext = book
                     showingBookStrip = false
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 } label: {
                     SharedBookCoverView(
                         coverURL: book.coverImageURL,
@@ -1066,7 +1066,7 @@ struct UnifiedChatView: View {
             messages.append(systemMessage)
             
             // Haptic feedback
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         } catch {
             print("❌ Failed to save note: \(error)")
         }
@@ -1137,7 +1137,7 @@ struct UnifiedChatView: View {
             messages.append(systemMessage)
             
             // Haptic feedback
-            DesignSystem.HapticFeedback.success()
+            SensoryFeedback.success()
         } catch {
             print("❌ Failed to save quote: \(error)")
         }
@@ -1253,7 +1253,7 @@ struct UnifiedChatView: View {
         messages.append(transcriptionMessage)
         
         // Haptic feedback
-        DesignSystem.HapticFeedback.medium()
+        SensoryFeedback.medium()
     }
     
     private func endAmbientSession() {
@@ -1267,7 +1267,7 @@ struct UnifiedChatView: View {
         voiceManager.stopListening()
         
         // Quick haptic
-        DesignSystem.HapticFeedback.light()
+        SensoryFeedback.light()
         
         // Remove transcription message immediately if present
         if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
@@ -1479,13 +1479,13 @@ struct UnifiedChatView: View {
                 switch result.type {
                 case .question:
                     detectionState = .processingQuestion
-                    DesignSystem.HapticFeedback.light() // Immediate feedback
+                    SensoryFeedback.light() // Immediate feedback
                 case .quote:
                     detectionState = .detectingQuote
-                    DesignSystem.HapticFeedback.medium() // Quote detected
+                    SensoryFeedback.medium() // Quote detected
                 case .note, .thought:
                     detectionState = .savingNote
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 case .ambient, .unknown:
                     detectionState = .idle
                 }
@@ -1605,7 +1605,7 @@ struct UnifiedChatView: View {
             messages.append(aiMessage)
             
             // Visual feedback for AI response
-            DesignSystem.HapticFeedback.medium()
+            SensoryFeedback.medium()
             
             // Smooth scroll to show response
             withAnimation(DesignSystem.Animation.springStandard) {
@@ -1690,7 +1690,7 @@ struct UnifiedChatView: View {
                 }
                 
                 // Haptic feedback
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
                 
                 // Scroll to show quote
                 withAnimation {
@@ -1775,7 +1775,7 @@ struct UnifiedChatView: View {
                 }
                 
                 // Haptic feedback
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
                 
                 // Scroll to show note
                 withAnimation {
@@ -2188,7 +2188,7 @@ struct UnifiedChatView: View {
             quote.text = newText
             do {
                 try modelContext.save()
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
             } catch {
                 print("Failed to update quote: \(error)")
             }
@@ -2198,7 +2198,7 @@ struct UnifiedChatView: View {
             note.content = newText
             do {
                 try modelContext.save()
-                DesignSystem.HapticFeedback.success()
+                SensoryFeedback.success()
             } catch {
                 print("Failed to update note: \(error)")
             }
@@ -2522,7 +2522,7 @@ struct MessageWithQuickActions: View {
             .onLongPressGesture {
                 withAnimation(DesignSystem.Animation.springStandard) {
                     showActions.toggle()
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
             }
             
@@ -2644,7 +2644,7 @@ struct EditContentOverlay: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         isPresented = false
-                        DesignSystem.HapticFeedback.light()
+                        SensoryFeedback.light()
                     }
                 
                 VStack {
@@ -2666,12 +2666,12 @@ struct EditContentOverlay: View {
                         // Single arrow button for save/submit
                         Button {
                             if editedText != originalText && !editedText.isEmpty {
-                                DesignSystem.HapticFeedback.success()
+                                SensoryFeedback.success()
                                 onSave()
                                 isPresented = false
                             } else if editedText.isEmpty {
                                 // If empty, just close
-                                DesignSystem.HapticFeedback.light()
+                                SensoryFeedback.light()
                                 isPresented = false
                             }
                         } label: {

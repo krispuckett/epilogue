@@ -110,10 +110,10 @@ struct SessionContentCardsView: View {
                         // Save edited content
                         if editingQuote != nil {
                             // Update quote
-                            DesignSystem.HapticFeedback.success()
+                            SensoryFeedback.success()
                         } else if editingNote != nil {
                             // Update note
-                            DesignSystem.HapticFeedback.success()
+                            SensoryFeedback.success()
                         }
                         editingQuote = nil
                         editingNote = nil
@@ -138,13 +138,13 @@ struct SessionContentCardsView: View {
                     editContent = quote.text
                     editingQuote = quote
                     showEditSheet = true
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
                 .onLongPressGesture {
                     editContent = quote.text
                     editingQuote = quote
                     showEditSheet = true
-                    DesignSystem.HapticFeedback.medium()
+                    SensoryFeedback.medium()
                 }
             }
         case .note:
@@ -159,13 +159,13 @@ struct SessionContentCardsView: View {
                     editContent = note.text
                     editingNote = note
                     showEditSheet = true
-                    DesignSystem.HapticFeedback.light()
+                    SensoryFeedback.light()
                 }
                 .onLongPressGesture {
                     editContent = note.text
                     editingNote = note
                     showEditSheet = true
-                    DesignSystem.HapticFeedback.medium()
+                    SensoryFeedback.medium()
                 }
             }
         case .question:
@@ -432,7 +432,7 @@ struct SuggestionCard: View {
     
     var body: some View {
         Button {
-            DesignSystem.HapticFeedback.light()
+            SensoryFeedback.light()
             // Action disabled for now
         } label: {
             HStack(spacing: 12) {
@@ -524,7 +524,7 @@ struct ProgressUpdateCard: View {
             Spacer()
             
             Button {
-                DesignSystem.HapticFeedback.light()
+                SensoryFeedback.light()
                 // Action disabled for now
             } label: {
                 Text("Update")
