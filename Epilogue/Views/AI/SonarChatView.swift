@@ -174,7 +174,7 @@ struct ChatHeaderView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(Color(UIColor.systemBackground))
+        .background(.systemBackground)
         .overlay(
             Divider(),
             alignment: .bottom
@@ -396,7 +396,7 @@ struct ChatInputBar: View {
             .cornerRadius(20)
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(.systemBackground)
         .overlay(
             Divider(),
             alignment: .top

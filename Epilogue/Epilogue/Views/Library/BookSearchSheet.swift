@@ -17,167 +17,279 @@ struct BookSearchSheet: View {
     @FocusState private var isSearchFocused: Bool
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background - warm charcoal
-                DesignSystem.Colors.surfaceBackground // #1C1B1A
-                    .ignoresSafeArea()
+        ZStack {
+            // Beautiful gradient background like ambient sessions
+            LinearGradient(
+                colors: [
+                    Color.black,
+                    Color.black.opacity(0.95),
+                    Color(red: 0.1, green: 0.08, blue: 0.06)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // iOS 26 Style Header with glass effect
+                headerView
+                    .padding(.top, 8)
                 
+                // Content
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 0) {
                         if isLoading {
-                            LiteraryLoadingView(message: "Searching for \"\(searchQuery)\"...")
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 60)
+                            loadingView
                         } else if let error = searchError {
-                            VStack(spacing: 12) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 48))
-                                    .foregroundStyle(DesignSystem.Colors.primaryAccent) // Warm orange
-                                
-                                Text("Search Error")
-                                    .font(.system(size: 20, weight: .medium, design: .serif))
-                                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                                
-                                Text(error)
-                                    .font(.bodyMedium)
-                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                            .padding(.top, 16)
-                            .padding(.bottom, 32)
+                            errorView(error: error)
                         } else if searchResults.isEmpty {
-                            VStack(spacing: 20) {
-                                // Icon and title
-                                VStack(spacing: 12) {
-                                    Image(systemName: "magnifyingglass.circle")
-                                        .font(.system(size: 56))
-                                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
-                                    
-                                    Text("No results for \"\(searchQuery)\"")
-                                        .font(.system(size: 20, weight: .semibold, design: .serif))
-                                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                                        .multilineTextAlignment(.center)
-                                }
-                                
-                                // Spell check suggestion if available
-                                if let suggestion = getSpellingSuggestion(for: searchQuery) {
-                                    VStack(spacing: 8) {
-                                        Text("Did you mean:")
-                                            .font(.system(size: 14))
-                                            .foregroundStyle(.white.opacity(0.6))
-                                        
-                                        Button {
-                                            performSearchWithQuery(suggestion)
-                                        } label: {
-                                            Text(suggestion)
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                                                .padding(.vertical, 8)
-                                                .glassEffect(in: Capsule())
-                                        }
-                                    }
-                                }
-                                
-                                // Search refinement input
-                                VStack(spacing: 12) {
-                                    Text("Refine your search:")
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-                                    
-                                    HStack {
-                                        TextField("Try another title or author...", text: $refinedSearchQuery)
-                                            .font(.system(size: 16))
-                                            .foregroundStyle(.white)
-                                            .textFieldStyle(.plain)
-                                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                                            .padding(.vertical, 12)
-                                            .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
-                                            .focused($isSearchFocused)
-                                            .onSubmit {
-                                                if !refinedSearchQuery.isEmpty {
-                                                    performSearchWithQuery(refinedSearchQuery)
-                                                }
-                                            }
-                                        
-                                        Button {
-                                            if !refinedSearchQuery.isEmpty {
-                                                performSearchWithQuery(refinedSearchQuery)
-                                            }
-                                        } label: {
-                                            Image(systemName: "arrow.right.circle.fill")
-                                                .font(.title2)
-                                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                        }
-                                        .disabled(refinedSearchQuery.isEmpty)
-                                    }
-                                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                                }
-                                
-                                // Tips
-                                VStack(spacing: 8) {
-                                    Text("Search tips:")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(DesignSystem.Colors.textTertiary)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Label("Try the author's name", systemImage: "person.fill")
-                                        Label("Use fewer keywords", systemImage: "textformat")
-                                        Label("Check spelling", systemImage: "character.cursor.ibeam")
-                                    }
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.4))
-                                }
-                                .padding(.top, 8)
-                            }
-                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                            .padding(.top, 40)
-                            .padding(.bottom, 32)
+                            emptyStateView
                         } else {
-                            // Debug info
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Found \(searchResults.count) books")
-                                    .font(.caption)
-                                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                            }
-                            
-                            VStack(spacing: 12) {
-                                ForEach(searchResults) { book in
-                                    BookSearchResultRow(book: book) {
-                                        addBookToLibrary(book)
-                                    }
-                                    .id(book.id) // Force unique ID for each row
-                                }
-                            }
-                            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                            .padding(.top, 16)
-                            .padding(.bottom, 32)
+                            resultsView
                         }
                     }
-                }
-            }
-            .navigationTitle("Select Book")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(.system(size: 17))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    .padding(.top, 24)
                 }
             }
         }
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(32)
+        .presentationBackground(.clear)
         .onAppear {
             performSearch()
             refinedSearchQuery = searchQuery
         }
+    }
+    
+    // MARK: - Header View (iOS 26 Style)
+    private var headerView: some View {
+        HStack {
+            // Drag indicator pill
+            Capsule()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .trailing) {
+                    // Cancel button
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+                    .padding(.trailing, DesignSystem.Spacing.listItemPadding)
+                }
+        }
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) {
+            // Title
+            Text("Select Book")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.bottom, 16)
+        }
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        .background {
+            // Glass effect background
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            DesignSystem.Colors.primaryAccent.opacity(0.05),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        }
+    }
+    
+    // MARK: - Loading View
+    private var loadingView: some View {
+        VStack(spacing: 24) {
+            // Animated dots like ambient mode
+            HStack(spacing: 8) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.8))
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(1.0)
+                        .animation(
+                            .easeInOut(duration: 0.6)
+                                .repeatForever()
+                                .delay(Double(index) * 0.2),
+                            value: isLoading
+                        )
+                }
+            }
+            
+            Text("Searching for \"\(searchQuery)\"...")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 100)
+    }
+    
+    // MARK: - Error View
+    private func errorView(error: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
+                .symbolRenderingMode(.hierarchical)
+            
+            Text("Search Error")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+            
+            Text(error)
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
+    }
+    
+    // MARK: - Empty State View (Ultra Polished)
+    private var emptyStateView: some View {
+        VStack(spacing: 32) {
+            // Icon with glass background
+            ZStack {
+                Circle()
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
+                    .frame(width: 120, height: 120)
+                    .overlay {
+                        Circle()
+                            .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.2), lineWidth: 1)
+                    }
+                    .glassEffect()
+                
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+            }
+            
+            VStack(spacing: 12) {
+                Text("No results for \"\"")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .overlay {
+                        // Inject the search query with orange color
+                        Text("No results for \"\(searchQuery)\"")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                
+                Text("Refine your search:")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            
+            // Search input with glass effect
+            HStack(spacing: 0) {
+                TextField("Try another title or author...", text: $refinedSearchQuery)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
+                    .onSubmit {
+                        if !refinedSearchQuery.isEmpty {
+                            performSearchWithQuery(refinedSearchQuery)
+                        }
+                    }
+                
+                Button {
+                    if !refinedSearchQuery.isEmpty {
+                        performSearchWithQuery(refinedSearchQuery)
+                    }
+                } label: {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(refinedSearchQuery.isEmpty ? .white.opacity(0.3) : DesignSystem.Colors.primaryAccent)
+                }
+                .disabled(refinedSearchQuery.isEmpty)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                    }
+            }
+            .glassEffect()
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            
+            // Search tips with monospace styling
+            VStack(spacing: 12) {
+                Text("Search tips:")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .tracking(1.2)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    tipRow(icon: "person", text: "Try the author's name")
+                    tipRow(icon: "Aa", text: "Use fewer keywords")
+                    tipRow(icon: "A|", text: "Check spelling")
+                }
+            }
+            .padding(.top, 8)
+        }
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        .padding(.top, 60)
+    }
+    
+    private func tipRow(icon: String, text: String) -> some View {
+        HStack(spacing: 12) {
+            Text(icon)
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                .frame(width: 20)
+            
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.5))
+        }
+    }
+    
+    // MARK: - Results View
+    private var resultsView: some View {
+        VStack(spacing: 16) {
+            // Results count header
+            HStack {
+                Text("RESULTS")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .tracking(1.2)
+                
+                Spacer()
+                
+                Text("\(searchResults.count) books")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
+            }
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            
+            // Book results with glass cards
+            VStack(spacing: 12) {
+                ForEach(searchResults) { book in
+                    BookSearchResultCard(book: book) {
+                        addBookToLibrary(book)
+                    }
+                }
+            }
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        }
+        .padding(.bottom, 32)
     }
     
     private func performSearch() {
@@ -317,7 +429,109 @@ struct BookSearchSheet: View {
     }
 }
 
-// MARK: - Book Search Result Row
+// MARK: - Book Search Result Card (Ultra Polished)
+struct BookSearchResultCard: View {
+    let book: Book
+    let onAdd: () -> Void
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: onAdd) {
+            HStack(spacing: 16) {
+                // Book cover with glass effect
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.05))
+                        .frame(width: 60, height: 90)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                        }
+                    
+                    if let coverURL = book.coverImageURL {
+                        AsyncImage(url: URL(string: coverURL)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 60, height: 90)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
+                                .overlay {
+                                    Image(systemName: "book.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.3))
+                                }
+                        }
+                    } else {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.3))
+                    }
+                }
+                
+                // Book details
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(book.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    
+                    Text(book.author)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                    
+                    if let year = book.publishedDate?.prefix(4) {
+                        Text(String(year))
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Add button
+                ZStack {
+                    Circle()
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                }
+            }
+            .padding(16)
+            .background {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(isPressed ? 0.08 : 0.05))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(
+                                isPressed ? DesignSystem.Colors.primaryAccent.opacity(0.3) : Color.white.opacity(0.1),
+                                lineWidth: 0.5
+                            )
+                    }
+            }
+            .glassEffect()
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onLongPressGesture(
+            minimumDuration: 0.1,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = pressing
+                }
+            },
+            perform: {}
+        )
+    }
+}
+
+// MARK: - Book Search Result Row (Legacy - to be removed)
 struct BookSearchResultRow: View {
     let book: Book
     let onSelect: () -> Void

@@ -249,7 +249,7 @@ struct BookSearchResultCard: View {
             .disabled(isAdded)
         }
         .padding()
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(.secondarySystemBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
 }

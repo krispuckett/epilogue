@@ -32,18 +32,18 @@
 
 /* Begin PBXFileReference section */
 		015808262E383E72006DC492 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		015D10F22E318D5D002633FE /* Epilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Epilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		015D10F22E318D5D002633FE /* ReadEpilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReadEpilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		015D11032E318D5E002633FE /* EpilogueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		015D110D2E318D5E002633FE /* EpilogueUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		015D13852E328EA6002633FE /* Exceptions for "Epilogue" folder in "Epilogue" target */ = {
+		015D13852E328EA6002633FE /* Exceptions for "Epilogue" folder in "ReadEpilogue" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 015D10F12E318D5D002633FE /* Epilogue */;
+			target = 015D10F12E318D5D002633FE /* ReadEpilogue */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -51,7 +51,7 @@
 		015D10F42E318D5D002633FE /* Epilogue */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				015D13852E328EA6002633FE /* Exceptions for "Epilogue" folder in "Epilogue" target */,
+				015D13852E328EA6002633FE /* Exceptions for "Epilogue" folder in "ReadEpilogue" target */,
 			);
 			path = Epilogue;
 			sourceTree = "<group>";
@@ -110,7 +110,7 @@
 		015D10F32E318D5D002633FE /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				015D10F22E318D5D002633FE /* Epilogue.app */,
+				015D10F22E318D5D002633FE /* ReadEpilogue.app */,
 				015D11032E318D5E002633FE /* EpilogueTests.xctest */,
 				015D110D2E318D5E002633FE /* EpilogueUITests.xctest */,
 			);
@@ -120,9 +120,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		015D10F12E318D5D002633FE /* Epilogue */ = {
+		015D10F12E318D5D002633FE /* ReadEpilogue */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 015D11162E318D5E002633FE /* Build configuration list for PBXNativeTarget "Epilogue" */;
+			buildConfigurationList = 015D11162E318D5E002633FE /* Build configuration list for PBXNativeTarget "ReadEpilogue" */;
 			buildPhases = (
 				015D10EE2E318D5D002633FE /* Sources */,
 				015D10EF2E318D5D002633FE /* Frameworks */,
@@ -135,14 +135,14 @@
 			fileSystemSynchronizedGroups = (
 				015D10F42E318D5D002633FE /* Epilogue */,
 			);
-			name = Epilogue;
+			name = ReadEpilogue;
 			packageProductDependencies = (
 				015D13AF2E3353A7002633FE /* WhisperKit */,
 				015D13B12E3353A7002633FE /* whisperkit-cli */,
 				015807FD2E3601C0006DC492 /* UIImageColors */,
 			);
 			productName = Epilogue;
-			productReference = 015D10F22E318D5D002633FE /* Epilogue.app */;
+			productReference = 015D10F22E318D5D002633FE /* ReadEpilogue.app */;
 			productType = "com.apple.product-type.application";
 		};
 		015D11022E318D5E002633FE /* EpilogueTests */ = {
@@ -232,7 +232,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				015D10F12E318D5D002633FE /* Epilogue */,
+				015D10F12E318D5D002633FE /* ReadEpilogue */,
 				015D11022E318D5E002633FE /* EpilogueTests */,
 				015D110C2E318D5E002633FE /* EpilogueUITests */,
 			);
@@ -291,12 +291,12 @@
 /* Begin PBXTargetDependency section */
 		015D11052E318D5E002633FE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 015D10F12E318D5D002633FE /* Epilogue */;
+			target = 015D10F12E318D5D002633FE /* ReadEpilogue */;
 			targetProxy = 015D11042E318D5E002633FE /* PBXContainerItemProxy */;
 		};
 		015D110F2E318D5E002633FE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 015D10F12E318D5D002633FE /* Epilogue */;
+			target = 015D10F12E318D5D002633FE /* ReadEpilogue */;
 			targetProxy = 015D110E2E318D5E002633FE /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -314,6 +314,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Epilogue/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Epilogue ";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Epilogue uses your camera to scan book covers and ISBNs for quick library additions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Epilogue uses your microphone for voice commands and dictation to quickly add books, notes, and quotes.";
@@ -326,12 +327,14 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Kris-Puckett.Epilogue";
+				PRODUCT_BUNDLE_IDENTIFIER = com.readepilogue.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -355,6 +358,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Epilogue/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Epilogue ";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Epilogue uses your camera to scan book covers and ISBNs for quick library additions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Epilogue uses your microphone for voice commands and dictation to quickly add books, notes, and quotes.";
@@ -367,12 +371,13 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Epilogue;
+				PRODUCT_BUNDLE_IDENTIFIER = com.readepilogue.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -604,7 +609,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		015D11162E318D5E002633FE /* Build configuration list for PBXNativeTarget "Epilogue" */ = {
+		015D11162E318D5E002633FE /* Build configuration list for PBXNativeTarget "ReadEpilogue" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				015D11172E318D5E002633FE /* Debug */,

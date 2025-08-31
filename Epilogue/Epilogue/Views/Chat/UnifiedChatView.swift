@@ -1537,13 +1537,6 @@ struct UnifiedChatView: View {
     
     // DEPRECATED - SmartContentBuffer and ImprovedUnifiedProcessor replaced by TrueAmbientProcessor
     
-    // DEPRECATED - now handled by TrueAmbientProcessor in VoiceRecognitionManager
-    func processAmbientChunk(_ text: String) async {
-        // This method is deprecated - TrueAmbientProcessor now handles all processing
-        // VoiceRecognitionManager routes directly to TrueAmbientProcessor
-        logger.warning("⚠️ processAmbientChunk is deprecated - processing now handled by TrueAmbientProcessor")
-        return
-    }
     
     // MARK: - Real-time Content Display Methods
     

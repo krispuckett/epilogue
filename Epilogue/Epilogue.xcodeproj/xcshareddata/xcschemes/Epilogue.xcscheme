@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "015D10F12E318D5D002633FE"
-               BuildableName = "Epilogue.app"
-               BlueprintName = "Epilogue"
+               BuildableName = "ReadEpilogue.app"
+               BlueprintName = "ReadEpilogue"
                ReferencedContainer = "container:Epilogue.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "015D10F12E318D5D002633FE"
-            BuildableName = "Epilogue.app"
-            BlueprintName = "Epilogue"
+            BuildableName = "ReadEpilogue.app"
+            BlueprintName = "ReadEpilogue"
             ReferencedContainer = "container:Epilogue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "015D10F12E318D5D002633FE"
-            BuildableName = "Epilogue.app"
-            BlueprintName = "Epilogue"
+            BuildableName = "ReadEpilogue.app"
+            BlueprintName = "ReadEpilogue"
             ReferencedContainer = "container:Epilogue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
