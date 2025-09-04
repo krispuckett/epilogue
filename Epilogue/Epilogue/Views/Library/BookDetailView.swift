@@ -498,25 +498,36 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status dropdown - iOS 26
+                // Interactive reading status dropdown
                 Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
-                        Button(status.rawValue) {
-                            libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                            
-                            // Show completion sheet when marking as read
-                            if status == .read && book.readingStatus != .read {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    showingCompletionSheet = true
+                        Button {
+                            withAnimation(DesignSystem.Animation.springStandard) {
+                                libraryViewModel.updateReadingStatus(for: book.id, status: status)
+                                SensoryFeedback.light()
+                                
+                                // Show completion sheet when marking as read
+                                if status == .read && book.readingStatus != .read {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        showingCompletionSheet = true
+                                    }
                                 }
                             }
+                        } label: {
+                            Label {
+                                Text(status.rawValue)
+                            } icon: {
+                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
+                            }
                         }
+                        .tint(accentColor)
                     }
                 } label: {
                     StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                         .shadow(color: accentColor.opacity(0.3), radius: 8)
+                } primaryAction: {
+                    // No primary action - just open the menu
                 }
-                .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 // Page count and percentage removed per user request
                 
