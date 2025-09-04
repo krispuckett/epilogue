@@ -498,8 +498,16 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status dropdown
-                Menu {
+                // Interactive reading status with tap-to-open context menu
+                Button {
+                    // Trigger haptic feedback on tap
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                        .shadow(color: accentColor.opacity(0.3), radius: 8)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .contextMenu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
                         Button {
                             withAnimation(DesignSystem.Animation.springStandard) {
@@ -514,19 +522,12 @@ struct BookDetailView: View {
                                 }
                             }
                         } label: {
-                            Label {
-                                Text(status.rawValue)
-                            } icon: {
-                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                            }
+                            Label(
+                                status.rawValue,
+                                systemImage: status == book.readingStatus ? "checkmark.circle.fill" : "circle"
+                            )
                         }
-                        .tint(accentColor)
                     }
-                } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8)
-                } primaryAction: {
-                    // No primary action - just open the menu
                 }
                 
                 // Page count and percentage removed per user request

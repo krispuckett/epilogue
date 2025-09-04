@@ -225,7 +225,7 @@ struct OptimizedGridItem: View {
             ZStack {
                 if isLoaded {
                     BookCard(book: book)
-                        .environmentObject(viewModel)
+            .environmentObject(viewModel)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .opacity(imageLoaded ? 1 : 0)
                         .animation(.easeIn(duration: 0.3), value: imageLoaded)
