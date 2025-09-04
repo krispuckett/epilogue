@@ -67,10 +67,10 @@ struct SimpleQuoteCard: View {
                 ))
             }
             
-            // Large transparent opening quote
+            // Large transparent opening quote - subtle amber
             Text("\u{201C}")
                 .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 60 : 80))
-                .foregroundStyle(Color.white.opacity(0.15))
+                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.3))
                 .offset(x: -10, y: 20)
                 .frame(height: 0)
                 .accessibilityHidden(true)
@@ -110,7 +110,7 @@ struct SimpleQuoteCard: View {
                 .padding(.top, 28)
                 
                 // Attribution text - reordered: Author -> Source -> Page
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     if let author = note.author {
                         Text(author.uppercased())
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -123,13 +123,14 @@ struct SimpleQuoteCard: View {
                             .font(.system(size: 11, weight: .regular, design: .monospaced))
                             .kerning(1.2)
                             .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+                            .padding(.bottom, 2) // Add a bit more space before page number
                     }
                     
                     if let pageNumber = note.pageNumber {
                         Text("PAGE \(pageNumber)")
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
                             .kerning(1.0)
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
+                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.4))
                     }
                 }
             }

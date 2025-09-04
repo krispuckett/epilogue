@@ -51,7 +51,7 @@ struct AmbientReadingView: View {
                         .padding(.bottom, 100)
                 }
             }
-            .background(.systemBackground)
+            .background(Color(uiColor: .systemBackground))
             
             // Visual effects layer
             if let effect = visualEffect {

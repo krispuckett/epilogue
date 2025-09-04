@@ -66,6 +66,8 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var showingExport = false
     @State private var showingSettings = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showOnboarding = false
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -98,6 +100,17 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showingExport) {
             ExportDataView()
+        }
+        .onAppear {
+            if !hasCompletedOnboarding {
+                showOnboarding = true
+            }
+        }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            RefinedOnboardingView {
+                hasCompletedOnboarding = true
+                showOnboarding = false
+            }
         }
     }
 }

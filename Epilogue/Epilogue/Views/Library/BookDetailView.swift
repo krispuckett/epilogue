@@ -226,17 +226,15 @@ struct BookDetailView: View {
     
     var body: some View {
         ZStack {
-            // Use the Apple Music-style atmospheric gradient with dynamic opacity
+            // Use the Apple Music-style atmospheric gradient with simplified transitions
             BookAtmosphericGradientView(
                 colorPalette: colorPalette ?? generatePlaceholderPalette(),
                 intensity: gradientIntensity
             )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
-                .opacity(gradientOpacity * (hasAppeared ? 1 : 0)) // Fades on scroll and on appear
-                .blur(radius: hasAppeared ? 0 : 10)
-                .animation(enableAnimations ? .easeOut(duration: 0.8) : nil, value: hasAppeared)
-                .animation(enableAnimations ? .easeOut(duration: 0.2) : nil, value: gradientOpacity)
+                .opacity(gradientOpacity) // Only affected by scroll, not appear
+                .animation(.easeOut(duration: 0.3), value: gradientOpacity)
                 .id(book.id) // Force view recreation when book changes
             
             // Content - always visible but colors update
@@ -368,16 +366,14 @@ struct BookDetailView: View {
                 }
             }
             
-            // Enable animations after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                hasAppeared = true
-                
-                // Start cover animation if image is already loaded
-                if coverImage != nil {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        coverScale = 1.0
-                        coverOpacity = 1.0
-                    }
+            // Enable animations immediately for smoother transition
+            hasAppeared = true
+            
+            // Start cover animation if image is already loaded
+            if coverImage != nil {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    coverScale = 1.0
+                    coverOpacity = 1.0
                 }
             }
             
@@ -498,7 +494,7 @@ struct BookDetailView: View {
                 // Interactive reading status dropdown
                 Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
-                        Button {
+                        Button(action: {
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
                                 SensoryFeedback.light()
@@ -510,20 +506,15 @@ struct BookDetailView: View {
                                     }
                                 }
                             }
-                        } label: {
-                            Label {
-                                Text(status.rawValue)
-                            } icon: {
-                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                            }
+                        }) {
+                            Label(status.rawValue, systemImage: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
                         }
-                        .tint(accentColor)
                     }
                 } label: {
                     StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                         .shadow(color: accentColor.opacity(0.3), radius: 8)
                 }
-                .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
+                .menuStyle(.automatic)
                 
                 // Page count and percentage removed per user request
                 

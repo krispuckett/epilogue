@@ -156,58 +156,46 @@ public class BookColorPaletteCache {
     }
     
     private func loadFromDisk(bookID: String) async -> CachedPalette? {
-        return await withCheckedContinuation { continuation in
-            cacheQueue.async { [weak self] in
-                guard let url = self?.diskCacheURL(for: bookID),
-                      FileManager.default.fileExists(atPath: url.path) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                
-                do {
-                    let data = try Data(contentsOf: url)
-                    let cached = try JSONDecoder().decode(CachedPalette.self, from: data)
-                    
-                    // Check if expired (30 days)
-                    if cached.isExpired {
-                        try? FileManager.default.removeItem(at: url)
-                        continuation.resume(returning: nil)
-                    } else {
-                        continuation.resume(returning: cached)
-                    }
-                } catch {
-                    print("❌ Failed to load cached palette: \(error)")
-                    continuation.resume(returning: nil)
-                }
+        guard let url = diskCacheURL(for: bookID),
+              FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+        
+        do {
+            let data = try Data(contentsOf: url)
+            let cached = try JSONDecoder().decode(CachedPalette.self, from: data)
+            
+            // Check if expired (30 days)
+            if cached.isExpired {
+                try? FileManager.default.removeItem(at: url)
+                return nil
+            } else {
+                return cached
             }
+        } catch {
+            print("❌ Failed to load cached palette: \(error)")
+            return nil
         }
     }
     
     private func saveToDisk(_ cached: CachedPalette) async {
-        await withCheckedContinuation { continuation in
-            cacheQueue.async { [weak self] in
-                guard let url = self?.diskCacheURL(for: cached.bookID) else {
-                    continuation.resume()
-                    return
-                }
-                
-                do {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = .prettyPrinted
-                    let data = try encoder.encode(cached)
-                    try data.write(to: url)
-                } catch {
-                    print("❌ Failed to save palette to disk: \(error)")
-                }
-                
-                continuation.resume()
-            }
+        guard let url = diskCacheURL(for: cached.bookID) else {
+            return
+        }
+        
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(cached)
+            try data.write(to: url)
+        } catch {
+            print("❌ Failed to save palette to disk: \(error)")
         }
     }
     
     private func cleanExpiredCache() {
-        cacheQueue.async { [weak self] in
-            guard let cacheDir = self?.cacheDirectory else { return }
+        Task {
+            guard let cacheDir = cacheDirectory else { return }
             
             do {
                 let files = try FileManager.default.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: [.creationDateKey])

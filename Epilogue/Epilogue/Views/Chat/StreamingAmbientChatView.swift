@@ -230,7 +230,7 @@ struct StreamingAmbientChatView: View {
                         .font(.caption)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(message.content)
+                        FormattedAIResponseView(content: message.content)
                             .padding(12)
                             .background(Color.secondary.opacity(0.1))
                             .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
@@ -298,7 +298,7 @@ struct StreamingAmbientChatView: View {
                             .font(.caption)
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(message.content)
+                            FormattedAIResponseView(content: message.content)
                                 .padding(12)
                                 .background(Color.secondary.opacity(0.1))
                                 .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))

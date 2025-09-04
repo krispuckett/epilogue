@@ -122,8 +122,16 @@ struct OptimizedPerplexitySessionsView: View {
     @ViewBuilder
     private var mainContent: some View {
         ZStack {
-            DesignSystem.Colors.surfaceBackground
-                .ignoresSafeArea()
+            // Permanent ambient gradient background
+            AmbientChatGradientView()
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+            
+            // Subtle darkening overlay for better readability
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
             
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
@@ -157,6 +165,7 @@ struct OptimizedPerplexitySessionsView: View {
                 }
                 .padding(.bottom, 100)
             }
+            .coordinateSpace(name: "scroll")
             .scrollIndicators(.hidden)
         }
     }
@@ -227,7 +236,22 @@ struct OptimizedPerplexitySessionsView: View {
 struct OptimizedStickyHeader: View {
     let dateLabel: String
     let sessionCount: Int
-    @State private var isPinned = false
+    @State private var minY: CGFloat = 0
+    
+    private var isPinned: Bool {
+        minY < 150 && minY > -50  // Unpins when pushed up by next header
+    }
+    
+    private var opacity: Double {
+        // Fade out as it gets pushed up
+        if minY < -30 {
+            return 0.0
+        } else if minY < 0 {
+            return Double((minY + 30) / 30)
+        } else {
+            return 1.0
+        }
+    }
     
     var body: some View {
         HStack {
@@ -258,37 +282,38 @@ struct OptimizedStickyHeader: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
-            // Optimized background with single GeometryReader
-            GeometryReader { geo in
-                let minY = geo.frame(in: .global).minY
-                
-                Color.clear
-                    .onChange(of: minY) { _, newValue in
-                        // Only update if state actually changes to reduce updates
-                        let shouldPin = newValue <= 150
-                        if shouldPin != isPinned {
-                            withAnimation(DesignSystem.Animation.easeQuick) {
-                                isPinned = shouldPin
-                            }
-                        }
-                    }
-                    .onAppear {
-                        isPinned = geo.frame(in: .global).minY <= 150
-                    }
-            }
-            .frame(height: 0)
-            
             if isPinned {
-                // Beautiful amber tinted glass effect
+                // Beautiful amber tinted glass effect that fades when pushed
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10 * opacity))
                     .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .animation(DesignSystem.Animation.easeStandard, value: isPinned)
+                    .animation(DesignSystem.Animation.easeQuick, value: opacity)
             } else {
-                DesignSystem.Colors.surfaceBackground
+                Color.clear
             }
         }
+        .overlay(
+            GeometryReader { geometry in
+                Color.clear
+                    .preference(
+                        key: ChatHeaderScrollOffsetKey.self,
+                        value: geometry.frame(in: .named("scroll")).origin.y
+                    )
+            }
+        )
+        .onPreferenceChange(ChatHeaderScrollOffsetKey.self) { value in
+            minY = value
+        }
+    }
+}
+
+// MARK: - Preference Key for Chat Header Scroll Offset
+private struct ChatHeaderScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

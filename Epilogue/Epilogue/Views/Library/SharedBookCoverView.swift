@@ -195,15 +195,10 @@ struct SharedBookCoverView: View {
                     endPoint: .bottomTrailing
                 )
             } else if isLoading {
-                // Loading state - show shimmer effect without spinner
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.3, green: 0.3, blue: 0.35),
-                        Color(red: 0.25, green: 0.25, blue: 0.3)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                // Loading state - subtle solid color (no shimmer)
+                // Just slightly lighter than the base placeholder
+                Color(red: 0.28, green: 0.28, blue: 0.32)
+                    .opacity(0.9)
             }
         }
         .frame(width: width, height: height)

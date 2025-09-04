@@ -198,7 +198,7 @@ struct GoodreadsImportView: View {
                             .blur(radius: 20)
                         
                         Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 48, weight: .medium))
+                            .font(.system(size: 42, weight: .medium))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [
@@ -221,7 +221,7 @@ struct GoodreadsImportView: View {
                             .foregroundStyle(.white.opacity(0.6))
                     }
                 }
-                .padding(.top, 24)
+                .padding(.top, 8)
                 
                 // Streamlined instructions
                 VStack(spacing: 16) {
@@ -234,12 +234,26 @@ struct GoodreadsImportView: View {
                     }
                     
                     VStack(spacing: 0) {
-                        InstructionStep(number: 1, text: "Visit goodreads.com", isFirst: true)
+                        InstructionStep(number: 1, text: "Visit goodreads.com on desktop", isFirst: true)
                         InstructionStep(number: 2, text: "Go to My Books")
-                        InstructionStep(number: 3, text: "Find Import/Export")
-                        InstructionStep(number: 4, text: "Export Library")
-                        InstructionStep(number: 5, text: "Download CSV", isLast: true)
+                        InstructionStep(number: 3, text: "Find Import/Export (in Tools)")
+                        InstructionStep(number: 4, text: "Click Export Library")
+                        InstructionStep(number: 5, text: "Download CSV file", isLast: true)
                     }
+                    
+                    // Desktop requirement note
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.orange)
+                        
+                        Text("Export is only available on desktop. On Safari mobile, tap 'aA' → Request Desktop Website")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .multilineTextAlignment(.leading)
+                    }
+                    .padding(.top, 12)
+                    .padding(.horizontal, 4)
                 }
                 .padding(20)
                 .background(
@@ -1217,8 +1231,7 @@ struct ManualMatchView: View {
                     .foregroundColor(.orange)
                     .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 8)
-                    .glassEffect()
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
+                    .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.large))
             }
         }
         .padding()
@@ -1306,12 +1319,11 @@ struct ManualMatchView: View {
             }
         }
         .padding(DesignSystem.Spacing.inlinePadding)
-        .glassEffect()
+        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.card))
         .overlay(
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .stroke(Color.orange.opacity(0.2), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
     
     // MARK: - Search Bar
@@ -1669,8 +1681,7 @@ struct BookSearchRow: View {
                     .foregroundColor(DesignSystem.Colors.textQuaternary)
             }
             .padding(12)
-            .glassEffect()
-            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
         }
     }
 }
@@ -1696,30 +1707,24 @@ struct InstructionStep: View {
                 ZStack {
                     Circle()
                         .fill(Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.15))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                     
                     Text("\(number)")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(red: 1.0, green: 0.45, blue: 0.16))
                 }
                 
                 Text(text)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.9))
-                
-                Spacer()
-                
-                if !isLast {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
-                }
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, isFirst || isLast ? 0 : 8)
+            .padding(.vertical, 12)
             
             if !isLast {
                 Divider()
                     .background(.white.opacity(0.1))
+                    .padding(.leading, 44)
             }
         }
     }

@@ -559,8 +559,8 @@ public class TrueAmbientProcessor: ObservableObject {
                 
                 // Process the updated question
                 Task {
-                    // Longer delay for evolving questions to stabilize
-                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds - give more time for transcription to complete
+                    // Short delay for evolving questions to stabilize
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second - balanced for natural speech
                     
                     // Check if it's still the latest version
                     let stillLatest = await MainActor.run {
@@ -628,7 +628,7 @@ public class TrueAmbientProcessor: ObservableObject {
                 
                 // Process the question
                 Task {
-                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 second delay - allow transcription to complete
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay - balanced for natural speech
                     
                     // Double-check we're not already fetching this
                     let normalizedForCheck = correctedText.lowercased()

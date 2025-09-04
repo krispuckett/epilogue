@@ -13,27 +13,156 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         let averageRating: Double
     }
     
+    // Smart query parsing for natural language searches
+    struct ParsedQuery {
+        let title: String
+        let author: String?
+        let year: String?
+        let originalQuery: String
+        
+        init(from query: String) {
+            self.originalQuery = query
+            
+            // Parse "Title by Author" format
+            if query.contains(" by ") {
+                let parts = query.components(separatedBy: " by ")
+                self.title = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if parts.count > 1 {
+                    let authorPart = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    // Check if year is included (e.g., "Rob Bell 2011")
+                    let components = authorPart.split(separator: " ")
+                    if let lastComponent = components.last,
+                       let yearValue = Int(String(lastComponent)),
+                       yearValue > 1900 && yearValue < 2100 {
+                        self.year = String(lastComponent)
+                        self.author = components.dropLast().joined(separator: " ")
+                    } else {
+                        self.author = authorPart
+                        self.year = nil
+                    }
+                } else {
+                    self.author = nil
+                    self.year = nil
+                }
+            }
+            // Parse comma-separated format: "Title, Author"
+            else if query.contains(", ") {
+                let parts = query.components(separatedBy: ", ")
+                self.title = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                self.author = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespacesAndNewlines) : nil
+                self.year = nil
+            }
+            // No clear separation, use the whole query as title
+            else {
+                self.title = query
+                self.author = nil
+                self.year = nil
+            }
+        }
+        
+        // Generate optimized search queries for Google Books API
+        func generateSearchQueries() -> [String] {
+            var queries: [String] = []
+            
+            // Clean title - remove special characters that might break the API
+            let cleanTitle = title
+                .replacingOccurrences(of: ":", with: " ")
+                .replacingOccurrences(of: "\"", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if let author = author {
+                let cleanAuthor = author
+                    .replacingOccurrences(of: "\"", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Most specific: exact title and author
+                queries.append("intitle:\"\(cleanTitle)\" inauthor:\"\(cleanAuthor)\"")
+                
+                // Try without quotes for more results
+                queries.append("intitle:\(cleanTitle) inauthor:\(cleanAuthor)")
+                
+                // Try with just first word of title and full author (handles subtitle variations)
+                let firstWord = cleanTitle.split(separator: " ").first ?? ""
+                if !firstWord.isEmpty {
+                    queries.append("intitle:\(firstWord) inauthor:\"\(cleanAuthor)\"")
+                }
+                
+                // Try with author's last name only
+                let authorParts = cleanAuthor.split(separator: " ")
+                if let lastName = authorParts.last {
+                    queries.append("intitle:\"\(cleanTitle)\" inauthor:\(lastName)")
+                }
+            }
+            
+            // Fallback to just title
+            queries.append("intitle:\"\(cleanTitle)\"")
+            queries.append(cleanTitle)
+            
+            // If we have a year, add a query with year
+            if let year = year {
+                queries.append("\(cleanTitle) \(year)")
+            }
+            
+            // Finally, try the original query as-is
+            if !queries.contains(originalQuery) {
+                queries.append(originalQuery)
+            }
+            
+            return queries
+        }
+    }
+    
     // Override the search to add smart filtering and ranking
     func searchBooksWithRanking(query: String, preferISBN: String? = nil) async -> [Book] {
-        // First do the regular search
-        await searchBooks(query: query)
+        // Parse the query to extract title, author, etc.
+        let parsedQuery = ParsedQuery(from: query)
         
-        // If we have no results, try alternative searches
-        if searchResults.isEmpty && preferISBN != nil {
-            // Try ISBN search directly
-            if let book = await searchBookByISBN(preferISBN!) {
+        // If we have an ISBN, try that first
+        if let isbn = preferISBN, !isbn.isEmpty {
+            if let book = await searchBookByISBN(isbn) {
                 return [book]
             }
         }
         
-        // Get the raw Google Books results for scoring
-        let rawResults = await getRawSearchResults(query: query, maxResults: 40)
+        // Get all search queries to try
+        let searchQueries = parsedQuery.generateSearchQueries()
+        var allResults: [GoogleBookItem] = []
+        var triedQueries = Set<String>()
+        
+        // Try each query until we get good results
+        for searchQuery in searchQueries {
+            guard !triedQueries.contains(searchQuery) else { continue }
+            triedQueries.insert(searchQuery)
+            
+            let results = await getRawSearchResults(query: searchQuery, maxResults: 20)
+            allResults.append(contentsOf: results)
+            
+            // If we have enough good results, stop searching
+            let booksWithCovers = allResults.filter { item in
+                item.volumeInfo.imageLinks?.thumbnail != nil
+            }
+            
+            if booksWithCovers.count >= 5 {
+                break
+            }
+        }
+        
+        // Remove duplicates
+        var seen = Set<String>()
+        let uniqueResults = allResults.filter { item in
+            guard !seen.contains(item.id) else { return false }
+            seen.insert(item.id)
+            return true
+        }
         
         // Score and rank the results
         let scoredResults = rankBooks(
-            rawResults,
+            uniqueResults,
             originalQuery: query,
-            preferredISBN: preferISBN
+            preferredISBN: preferISBN,
+            parsedQuery: parsedQuery
         )
         
         // Return top results, prioritizing books with covers
@@ -134,7 +263,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     private func rankBooks(
         _ items: [GoogleBookItem],
         originalQuery: String,
-        preferredISBN: String?
+        preferredISBN: String?,
+        parsedQuery: ParsedQuery? = nil
     ) -> [ScoredBook] {
         let queryWords = originalQuery.lowercased().split(separator: " ")
         
@@ -163,23 +293,81 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             
             // Title match scoring
             let titleLower = volumeInfo.title.lowercased()
-            for word in queryWords {
-                if titleLower.contains(word) {
-                    score += 5
+            
+            // If we have a parsed query, use it for better matching
+            if let parsed = parsedQuery {
+                let targetTitle = parsed.title.lowercased()
+                
+                // Exact title match (huge boost)
+                if titleLower == targetTitle {
+                    score += 100
                 }
-            }
-            
-            // Exact title match
-            if titleLower == originalQuery.lowercased() {
-                score += 50
-            }
-            
-            // Author match (if provided)
-            if let authors = volumeInfo.authors {
-                let authorString = authors.joined(separator: " ").lowercased()
+                // Title starts with target (very good match)
+                else if titleLower.hasPrefix(targetTitle) {
+                    score += 70
+                }
+                // Target title is contained in full (good match)
+                else if titleLower.contains(targetTitle) {
+                    score += 50
+                }
+                // All words from target title are in book title
+                else {
+                    let targetWords = Set(targetTitle.split(separator: " ").map { String($0) })
+                    let bookWords = Set(titleLower.split(separator: " ").map { String($0) })
+                    let matchingWords = targetWords.intersection(bookWords)
+                    score += Double(matchingWords.count * 10)
+                }
+                
+                // Author match (if we parsed an author)
+                if let targetAuthor = parsed.author,
+                   let authors = volumeInfo.authors {
+                    let targetAuthorLower = targetAuthor.lowercased()
+                    let authorString = authors.joined(separator: " ").lowercased()
+                    
+                    // Exact author match
+                    if authorString == targetAuthorLower {
+                        score += 50
+                    }
+                    // Author contains target
+                    else if authorString.contains(targetAuthorLower) {
+                        score += 30
+                    }
+                    // Last name match (common for author searches)
+                    else {
+                        let targetLastName = targetAuthorLower.split(separator: " ").last ?? ""
+                        if !targetLastName.isEmpty && authorString.contains(targetLastName) {
+                            score += 20
+                        }
+                    }
+                }
+                
+                // Year match bonus
+                if let targetYear = parsed.year,
+                   let pubDate = volumeInfo.publishedDate {
+                    if pubDate.contains(targetYear) {
+                        score += 15
+                    }
+                }
+            } else {
+                // Fallback to original word-based matching
                 for word in queryWords {
-                    if authorString.contains(word) {
-                        score += 3
+                    if titleLower.contains(word) {
+                        score += 5
+                    }
+                }
+                
+                // Exact title match
+                if titleLower == originalQuery.lowercased() {
+                    score += 50
+                }
+                
+                // Author match (if provided)
+                if let authors = volumeInfo.authors {
+                    let authorString = authors.joined(separator: " ").lowercased()
+                    for word in queryWords {
+                        if authorString.contains(word) {
+                            score += 3
+                        }
                     }
                 }
             }

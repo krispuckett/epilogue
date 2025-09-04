@@ -834,18 +834,32 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 pendingTranscription = text
                 lastSpeechTime = Date()
                 
-                // Start or restart thought timer (4.5 seconds of silence = complete thought)
-                // Increased to 4.5 to ensure questions are FULLY complete before processing
-                thoughtTimer?.invalidate()
-                thoughtTimer = Timer.scheduledTimer(withTimeInterval: 4.5, repeats: false) { _ in
-                    // User has been silent - process the complete thought
-                    if !self.pendingTranscription.isEmpty {
-                        let completeThought = self.pendingTranscription
-                        self.pendingTranscription = ""
-                        
-                        Task {
-                            logger.info("💭 Processing complete thought after silence: \(completeThought)")
-                            await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
+                // Check if we have a complete sentence (ends with punctuation) and process immediately
+                if result.isFinal || (self.confidenceScore > 0.7 && (text.hasSuffix(".") || text.hasSuffix("?") || text.hasSuffix("!"))) {
+                    // Process immediately for complete sentences
+                    let completeThought = self.pendingTranscription
+                    self.pendingTranscription = ""
+                    thoughtTimer?.invalidate() // Cancel any pending timer
+                    
+                    Task {
+                        logger.info("💭 Processing complete sentence immediately: \(completeThought)")
+                        await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
+                    }
+                } else {
+                    // For incomplete sentences, wait for silence
+                    // Start or restart thought timer (1.5 seconds of silence = complete thought)
+                    // Reduced to 1.5 seconds for more responsive processing
+                    thoughtTimer?.invalidate()
+                    thoughtTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { _ in
+                        // User has been silent - process the complete thought
+                        if !self.pendingTranscription.isEmpty {
+                            let completeThought = self.pendingTranscription
+                            self.pendingTranscription = ""
+                            
+                            Task {
+                                logger.info("💭 Processing complete thought after silence: \(completeThought)")
+                                await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
+                            }
                         }
                     }
                 }

@@ -223,9 +223,16 @@ struct CleanNotesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Dark background matching library
-                DesignSystem.Colors.surfaceBackground
-                    .ignoresSafeArea()
+                // Permanent ambient gradient background
+                AmbientChatGradientView()
+                    .opacity(0.4)
+                    .ignoresSafeArea(.all)
+                    .allowsHitTesting(false)
+                
+                // Subtle darkening overlay for better readability
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea(.all)
+                    .allowsHitTesting(false)
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -240,9 +247,10 @@ struct CleanNotesView: View {
                         }
                     }
                 }
+                .coordinateSpace(name: "scroll")
             }
-            .navigationTitle("Notes")
-            .navigationBarTitleDisplayMode(.large)
+                .navigationTitle("Notes")
+                .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
@@ -396,7 +404,7 @@ struct CleanNotesView: View {
                 Section {
                     // Items in section with staggered animation (collapsible)
                     if !collapsedSections.contains(section) {
-                        VStack(spacing: 16) {
+                        VStack(spacing: 12) {
                             ForEach(items, id: \.date) { item in
                                 Group {
                                     if let note = item.note {
@@ -415,7 +423,7 @@ struct CleanNotesView: View {
                             }
                         }
                         .padding(.top, 8)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 16)
                     }
                 } header: {
                     NoteStickyHeader(
@@ -440,13 +448,9 @@ struct CleanNotesView: View {
                 }
             }
             
-            // Bottom padding with subtle gradient fade
-            LinearGradient(
-                colors: [Color.clear, DesignSystem.Colors.surfaceBackground],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 120)
+            // Bottom padding
+            Color.clear
+                .frame(height: 120)
         }
     }
     
@@ -799,7 +803,22 @@ private struct NoteStickyHeader: View {
     let scrollOffset: CGFloat
     let onToggle: () -> Void
     
-    @State private var isPinned = false
+    @State private var minY: CGFloat = 0
+    
+    private var isPinned: Bool {
+        minY < 150 && minY > -50  // Unpins when pushed up by next header
+    }
+    
+    private var opacity: Double {
+        // Fade out as it gets pushed up
+        if minY < -30 {
+            return 0.0
+        } else if minY < 0 {
+            return Double((minY + 30) / 30)
+        } else {
+            return 1.0
+        }
+    }
     
     var body: some View {
         HStack {
@@ -832,46 +851,41 @@ private struct NoteStickyHeader: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background {
-            // Optimized background with preference-based updates
-            GeometryReader { geo in
-                Color.clear
-                    .preference(key: HeaderPinnedPreferenceKey.self, value: geo.frame(in: .global).minY)
-                    .onAppear {
-                        isPinned = geo.frame(in: .global).minY <= 150
-                    }
-            }
-            .frame(height: 0)
-            
             if isPinned {
-                // Beautiful amber tinted glass effect
+                // Beautiful amber tinted glass effect that fades when pushed
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10))
+                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.10 * opacity))
                     .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .animation(DesignSystem.Animation.easeStandard, value: isPinned)
+                    .animation(DesignSystem.Animation.easeQuick, value: opacity)
             } else {
-                DesignSystem.Colors.surfaceBackground
+                Color.clear
             }
         }
-        .onPreferenceChange(HeaderPinnedPreferenceKey.self) { minY in
-            // Only update if state actually changes to reduce updates
-            let shouldPin = minY <= 150
-            if shouldPin != isPinned {
-                withAnimation(DesignSystem.Animation.easeQuick) {
-                    isPinned = shouldPin
-                }
+        .overlay(
+            GeometryReader { geometry in
+                Color.clear
+                    .preference(
+                        key: NoteScrollOffsetPreferenceKey.self,
+                        value: geometry.frame(in: .named("scroll")).origin.y
+                    )
             }
+        )
+        .onPreferenceChange(NoteScrollOffsetPreferenceKey.self) { value in
+            minY = value
         }
     }
 }
 
-// Preference key for header pinning
-private struct HeaderPinnedPreferenceKey: PreferenceKey {
+// MARK: - Preference Key for Scroll Offset
+private struct NoteScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
 }
+
 
 // MARK: - Note Card View with Date Toggle
 private struct NoteCardView: View {
@@ -929,7 +943,7 @@ private struct NoteCardView: View {
             .font(.system(size: 16, weight: .regular, design: .default))
             .foregroundStyle(.white.opacity(0.95))
             .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
+            .lineLimit(5)  // Limit to 5 lines max, expandable on tap
             .lineSpacing(6)
     }
     
@@ -955,7 +969,7 @@ private struct NoteCardView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // Show header when date is toggled on
             if showDate {
                 dateHeader

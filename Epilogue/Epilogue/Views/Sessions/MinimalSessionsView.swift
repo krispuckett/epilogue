@@ -36,9 +36,16 @@ struct MinimalSessionsView: View {
     
     var body: some View {
         ZStack {
-            // Clean dark background like LibraryView
-            DesignSystem.Colors.surfaceBackground
-                .ignoresSafeArea()
+            // Permanent ambient gradient background
+            AmbientChatGradientView()
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+            
+            // Subtle darkening overlay for better readability
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
             
             if sessions.isEmpty {
                 emptyState

@@ -51,6 +51,12 @@ struct UnifiedChatView: View {
     // THE SINGLE SOURCE PROCESSOR - replaces all competing systems
     @StateObject private var processor = TrueAmbientProcessor.shared
     
+    // New AI Features
+    @StateObject private var queueManager = OfflineQueueManager.shared
+    @StateObject private var summaryGenerator = SessionSummaryGenerator.shared
+    @State private var showingFollowUpSuggestions = false
+    @State private var followUpSuggestions: [String] = []
+    
     enum DetectionState {
         case idle
         case detectingQuote
@@ -270,10 +276,29 @@ struct UnifiedChatView: View {
             .statusBarHidden(isAmbientMode)
             .onAppear {
                 setupInitialState()
+                // Initialize queue manager with model context
+                queueManager.configure(with: modelContext)
                 // Debug overlay disabled for production
                 // #if DEBUG
                 // if isAmbientMode { showDebugOverlay = false }
                 // #endif
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("QueuedQuestionProcessed"))) { notification in
+                // Handle processed question notification
+                if let question = notification.object as? QueuedQuestion,
+                   let response = question.response {
+                    // Add the processed response to messages
+                    Task { @MainActor in
+                        let processedMessage = UnifiedChatMessage(
+                            content: "📱 Queued response: \(response)",
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: currentBookContext,
+                            messageType: .system
+                        )
+                        messages.append(processedMessage)
+                    }
+                }
             }
             .onChange(of: currentBookContext) { oldBook, newBook in
                 handleBookContextChange(oldBook: oldBook, newBook: newBook)
@@ -415,7 +440,7 @@ struct UnifiedChatView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UnifiedProcessorDetection"))) { notification in
                 guard isAmbientMode, let content = notification.object as? AmbientProcessedContent else { return }
                 Task {
-                    await processAmbientChunk(content.text)
+                    await handleProcessedResult(content)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UnifiedProcessorSaved"))) { notification in
@@ -429,48 +454,55 @@ struct UnifiedChatView: View {
     
     @ViewBuilder
     private var gradientBackground: some View {
-        if isRecording, let book = currentBookContext {
-            // Use the breathing gradient during recording with book context
-            let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-            BookAtmosphericGradientView(
-                colorPalette: palette, 
-                intensity: gradientIntensity * (0.9 + Double(audioLevel) * 0.3) // Audio-reactive intensity with user setting
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            .id("recording-\(book.localId)")
-        } else if isRecording {
-            // Recording without book context - use ambient gradient with audio reactivity
+        ZStack {
+            // Permanent ambient gradient background
             AmbientChatGradientView()
-                .opacity(0.8 + Double(audioLevel) * 0.4) // Audio-reactive opacity
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+            
+            // Subtle darkening overlay for better readability
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+            
+            if isRecording, let book = currentBookContext {
+                // Use the breathing gradient during recording with book context
+                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                BookAtmosphericGradientView(
+                    colorPalette: palette, 
+                    intensity: gradientIntensity * (0.9 + Double(audioLevel) * 0.3) // Audio-reactive intensity with user setting
+                )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
-                .transition(.opacity)
-                .id("recording-ambient")
-        } else if let book = currentBookContext {
-            // Use the same BookAtmosphericGradientView with extracted colors
-            let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-            BookAtmosphericGradientView(colorPalette: palette, intensity: gradientIntensity * 0.85)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .transition(.opacity)
-                .id(book.localId) // Simplify ID to just book ID
-                .onAppear {
-                    print("BookAtmosphericGradientView appeared for: \(book.title)")
-                    print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
-                    if let cp = colorPalette {
-                        print("Primary: \(cp.primary)")
-                        print("Secondary: \(cp.secondary)")
-                        print("Accent: \(cp.accent)")
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .id("recording-\(book.localId)")
+            } else if isRecording {
+                // Recording without book context - use ambient gradient with audio reactivity
+                AmbientChatGradientView()
+                    .opacity(0.8 + Double(audioLevel) * 0.4) // Audio-reactive opacity
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .id("recording-ambient")
+            } else if let book = currentBookContext {
+                // Use the same BookAtmosphericGradientView with extracted colors
+                let palette = colorPalette ?? generatePlaceholderPalette(for: book)
+                BookAtmosphericGradientView(colorPalette: palette, intensity: gradientIntensity * 0.85)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .id(book.localId) // Simplify ID to just book ID
+                    .onAppear {
+                        print("BookAtmosphericGradientView appeared for: \(book.title)")
+                        print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
+                        if let cp = colorPalette {
+                            print("Primary: \(cp.primary)")
+                            print("Secondary: \(cp.secondary)")
+                            print("Accent: \(cp.accent)")
+                        }
                     }
-                }
-        } else {
-            // Use existing ambient gradient for empty state
-            AmbientChatGradientView()
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .transition(.opacity)
+            }
         }
     }
     
@@ -553,20 +585,41 @@ struct UnifiedChatView: View {
     private var messagesListView: some View {
         if !filteredMessages.isEmpty {
             ForEach(filteredMessages) { message in
-                MessageWithQuickActions(
-                    message: message,
-                    currentBookContext: currentBookContext,
-                    colorPalette: colorPalette,
-                    onEdit: { editedText in
-                        handleContentEdit(message: message, newText: editedText)
-                    },
-                    onRefine: {
-                        refineQuestion(message: message)
-                    },
-                    onExpand: {
-                        expandNote(message: message)
+                VStack(alignment: .leading, spacing: 8) {
+                    MessageWithQuickActions(
+                        message: message,
+                        currentBookContext: currentBookContext,
+                        colorPalette: colorPalette,
+                        onEdit: { editedText in
+                            handleContentEdit(message: message, newText: editedText)
+                        },
+                        onRefine: {
+                            refineQuestion(message: message)
+                        },
+                        onExpand: {
+                            expandNote(message: message)
+                        }
+                    )
+                    
+                    // Show follow-up suggestions for AI responses
+                    if !message.isUser, case .text = message.messageType {
+                        if let index = filteredMessages.firstIndex(where: { $0.id == message.id }),
+                           index > 0,
+                           filteredMessages[index - 1].isUser {
+                            SmartFollowUpCapsules(
+                                originalQuestion: filteredMessages[index - 1].content,
+                                answer: message.content,
+                                book: currentBookContext,
+                                onSelectSuggestion: { suggestion in
+                                    // Handle follow-up question
+                                    messageText = suggestion
+                                    sendMessage()
+                                }
+                            )
+                            .padding(.horizontal)
+                        }
                     }
-                )
+                }
                 .id(message.id)
             }
         }
@@ -635,6 +688,13 @@ struct UnifiedChatView: View {
     @ViewBuilder
     private var bottomInputArea: some View {
         VStack(spacing: 0) {
+            // Offline Queue Indicator
+            if !queueManager.isOnline || queueManager.queueDepth > 0 {
+                OfflineQueueIndicator()
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            }
+            
             recordingIndicators
             
             UniversalInputBar(
@@ -1144,6 +1204,25 @@ struct UnifiedChatView: View {
     }
     
     private func getAIResponse(for userInput: String) async {
+        // Check if offline - queue the question
+        if !queueManager.isOnline {
+            await MainActor.run {
+                // Add question to queue
+                queueManager.addQuestion(userInput, book: currentBookContext)
+                
+                // Show offline message
+                let offlineMessage = UnifiedChatMessage(
+                    content: "📵 You're offline. Your question has been queued and will be answered when you're back online.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: currentBookContext,
+                    messageType: .system
+                )
+                messages.append(offlineMessage)
+            }
+            return
+        }
+        
         // Use AICompanionService for flexibility between providers
         let aiService = AICompanionService.shared
         
@@ -1272,6 +1351,24 @@ struct UnifiedChatView: View {
         // Remove transcription message immediately if present
         if let lastIndex = messages.lastIndex(where: { $0.content == "[Transcribing]" }) {
             messages.remove(at: lastIndex)
+        }
+        
+        // Generate smart session title if we have messages
+        if var session = ambientSession, !messages.isEmpty {
+            Task {
+                // Generate title in background
+                let title = await summaryGenerator.generateSessionTitle(
+                    from: messages,
+                    book: currentBookContext
+                )
+                
+                // Update session with generated title
+                await MainActor.run {
+                    session.title = title
+                    ambientSession = session  // Update the @State variable
+                    // Could save to SwiftData here if needed
+                }
+            }
         }
         
         // INSTANT dismiss - NO DELAYS, NO PROCESSING, NO WAITING
@@ -2647,12 +2744,15 @@ struct EditContentOverlay: View {
                     HStack(alignment: .bottom, spacing: 12) {
                         // Text input field with the content already loaded
                         TextField("", text: $editedText, axis: .vertical)
+                            .textFieldStyle(.plain)
                             .font(.system(size: 17, weight: .regular))
                             .foregroundStyle(.white)
-                            .tint(DesignSystem.Colors.primaryAccent)
+                            .accentColor(DesignSystem.Colors.primaryAccent)
                             .focused($isFocused)
                             .lineLimit(1...8) // Allow vertical expansion
-                            .textFieldStyle(.plain)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
                             .padding(.vertical, 12)
                             .padding(.leading, 16)
                         

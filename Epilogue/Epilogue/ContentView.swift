@@ -53,6 +53,8 @@ struct ContentView: View {
     @StateObject private var libraryViewModel = LibraryViewModel()
     @StateObject private var notesViewModel = NotesViewModel()
     @AppStorage("useNewAmbientMode") private var useNewAmbient = true // Set to false to use old implementation
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showOnboarding = false
     @State private var showCommandPalette = false
     @State private var showCommandInput = false
     @State private var commandText = ""
@@ -192,6 +194,18 @@ struct ContentView: View {
                 isShowing: $showGlassToast,
                 message: toastMessage
             )
+            .onAppear {
+                // Show onboarding for new users
+                if !hasCompletedOnboarding {
+                    showOnboarding = true
+                }
+            }
+            .fullScreenCover(isPresented: $showOnboarding) {
+                RefinedOnboardingView {
+                    hasCompletedOnboarding = true
+                    showOnboarding = false
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
                 if notification.object is Book {
                     selectedTab = 0  // Switch to library tab

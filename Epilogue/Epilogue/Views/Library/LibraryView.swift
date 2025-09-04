@@ -6,6 +6,7 @@ import Combine
 
 struct LibraryView: View {
     @EnvironmentObject var viewModel: LibraryViewModel
+    @StateObject private var appState = AppStateManager.shared
     // Removed searchText - no longer needed
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @Namespace private var viewModeAnimation
@@ -17,16 +18,13 @@ struct LibraryView: View {
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
     @State private var isScrolling = false
-    @State private var showingSettings = false
     @State private var settingsButtonPressed = false
     @State private var visibleBookIDs: Set<UUID> = []
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
-    @State private var showingBookSearch = false
-    @State private var showingEnhancedScanner = false
-    @State private var showingGoodreadsImport = false
     @Environment(\.modelContext) private var modelContext
     @StateObject private var googleBooksService = GoogleBooksService()
     @State private var isRefreshing = false
+    @Namespace private var settingsTransition
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -84,19 +82,19 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var emptyStateView: some View {
-        ModernEmptyStates.noBooks {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showingBookSearch = true
-        }
+        ModernEmptyStates.noBooks(
+            addAction: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                appState.showingBookSearch = true
+            },
+            importAction: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                appState.showingGoodreadsImport = true
+            }
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    @ViewBuilder
-    private var backgroundView: some View {
-        // Simple background for performance
-        DesignSystem.Colors.surfaceBackground
-            .ignoresSafeArea(.all)
-    }
     
     @ViewBuilder
     private var navigationLink: some View {
@@ -133,8 +131,22 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            // All buttons in a single glass container
-            HStack(spacing: 4) {
+            HStack(spacing: 12) {
+                // Reorder button (only show in grid mode)
+                if viewMode == .grid {
+                    Button {
+                        withAnimation(DesignSystem.Animation.springStandard) {
+                            viewModel.isReorderMode.toggle()
+                            SensoryFeedback.medium()
+                        }
+                    } label: {
+                        Image(systemName: viewModel.isReorderMode ? "checkmark.circle.fill" : "arrow.up.arrow.down")
+                            .font(.system(size: 18, weight: viewModel.isReorderMode ? .semibold : .regular))
+                            .foregroundStyle(viewModel.isReorderMode ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                }
+                
                 // Grid button
                 Button {
                     withAnimation(DesignSystem.Animation.springStandard) {
@@ -143,45 +155,36 @@ struct LibraryView: View {
                     }
                 } label: {
                     Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 16, weight: viewMode == .grid ? .semibold : .regular))
+                        .font(.system(size: 18, weight: viewMode == .grid ? .semibold : .regular))
                         .foregroundStyle(viewMode == .grid ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
-                        .frame(width: 34, height: 34)
+                        .contentTransition(.symbolEffect(.replace))
                 }
-                
-                Divider()
-                    .frame(height: 16)
-                    .overlay(Color.white.opacity(0.15))
                 
                 // List button
                 Button {
                     withAnimation(DesignSystem.Animation.springStandard) {
                         viewMode = .list
+                        viewModel.isReorderMode = false // Disable reorder when switching to list
                         SensoryFeedback.light()
                     }
                 } label: {
                     Image(systemName: "list.bullet")
-                        .font(.system(size: 16, weight: viewMode == .list ? .semibold : .regular))
+                        .font(.system(size: 18, weight: viewMode == .list ? .semibold : .regular))
                         .foregroundStyle(viewMode == .list ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
-                        .frame(width: 34, height: 34)
+                        .contentTransition(.symbolEffect(.replace))
                 }
-                
-                Divider()
-                    .frame(height: 16)
-                    .overlay(Color.white.opacity(0.15))
                 
                 // Settings button
                 Button {
-                    showingSettings = true
+                    appState.showingSettings = true
                     SensoryFeedback.light()
                 } label: {
                     Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16))
+                        .font(.system(size: 18))
                         .foregroundStyle(.white.opacity(0.8))
-                        .frame(width: 34, height: 34)
+                        .symbolRenderingMode(.hierarchical)
                 }
             }
-            .padding(.horizontal, 4)
-            .glassEffect(in: .capsule)
         }
     }
     
@@ -202,6 +205,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var settingsSheet: some View {
         SettingsView()
+            .matchedGeometryEffect(id: "settings-view", in: settingsTransition, isSource: false)
     }
     
     @ViewBuilder
@@ -210,7 +214,7 @@ struct LibraryView: View {
             searchQuery: "",
             onBookSelected: { book in
                 viewModel.addBook(book)
-                showingBookSearch = false
+                appState.showingBookSearch = false
             }
         )
     }
@@ -219,7 +223,7 @@ struct LibraryView: View {
     private var enhancedScannerSheet: some View {
         EnhancedBookScannerView { book in
             viewModel.addBook(book)
-            showingEnhancedScanner = false
+            appState.showingEnhancedScanner = false
             
             NotificationCenter.default.post(
                 name: Notification.Name("ShowGlassToast"),
@@ -275,8 +279,11 @@ struct LibraryView: View {
                     }
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
                 }
+                
+                // Add bottom padding to prevent content from scrolling under action buttons
+                Color.clear
+                    .frame(height: 45) // Space for action buttons above tab bar
             }
-            .ignoresSafeArea(edges: .bottom)
             .refreshable {
                 await refreshLibrary()
             }
@@ -297,10 +304,17 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Only show background when there are books
-                if !viewModel.books.isEmpty {
-                    backgroundView
-                }
+                // Permanent ambient gradient background
+                AmbientChatGradientView()
+                    .opacity(0.4)
+                    .ignoresSafeArea(.all)
+                    .allowsHitTesting(false)
+                
+                // Subtle darkening overlay for better readability
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea(.all)
+                    .allowsHitTesting(false)
+                
                 navigationLink
                 mainContent
             }
@@ -314,16 +328,16 @@ struct LibraryView: View {
         .sheet(isPresented: $showingCoverPicker) {
             coverPickerSheet
         }
-        .sheet(isPresented: $showingSettings) {
+        .sheet(isPresented: $appState.showingSettings) {
             settingsSheet
         }
-        .sheet(isPresented: $showingBookSearch) {
+        .sheet(isPresented: $appState.showingBookSearch) {
             bookSearchSheet
         }
-        .sheet(isPresented: $showingEnhancedScanner) {
+        .sheet(isPresented: $appState.showingEnhancedScanner) {
             enhancedScannerSheet
         }
-        .sheet(isPresented: $showingGoodreadsImport) {
+        .sheet(isPresented: $appState.showingGoodreadsImport) {
             goodreadsImportSheet
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
@@ -334,13 +348,13 @@ struct LibraryView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { _ in
-            showingBookSearch = true
+            appState.showingBookSearch = true
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowEnhancedBookScanner"))) { _ in
-            showingEnhancedScanner = true
+            appState.showingEnhancedScanner = true
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowGoodreadsImport"))) { _ in
-            showingGoodreadsImport = true
+            appState.showingGoodreadsImport = true
         }
         #if DEBUG
         .onAppear {
@@ -1247,10 +1261,12 @@ class LibraryViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var currentDetailBook: Book? = nil  // Track which book is being viewed in detail
+    @Published var isReorderMode = false  // Track if we're in reorder mode
     
     private let googleBooksService = GoogleBooksService()
     private let userDefaults = UserDefaults.standard
     private let booksKey = "com.epilogue.savedBooks"
+    private let bookOrderKey = "com.epilogue.bookOrder"
     
     init() {
         loadBooks()
@@ -1272,7 +1288,15 @@ class LibraryViewModel: ObservableObject {
         if let data = userDefaults.data(forKey: booksKey) {
             print("  📦 Found data in UserDefaults, size: \(data.count) bytes")
             do {
-                let decodedBooks = try JSONDecoder().decode([Book].self, from: data)
+                var decodedBooks = try JSONDecoder().decode([Book].self, from: data)
+                
+                // Apply custom sort order if exists
+                if let orderData = userDefaults.data(forKey: bookOrderKey),
+                   let bookOrder = try? JSONDecoder().decode([String].self, from: orderData) {
+                    print("  📋 Applying custom sort order")
+                    decodedBooks = sortBooksByCustomOrder(decodedBooks, order: bookOrder)
+                }
+                
                 self.books = decodedBooks
                 print("  ✅ Loaded \(decodedBooks.count) books from UserDefaults")
                 
@@ -1289,15 +1313,72 @@ class LibraryViewModel: ObservableObject {
         }
     }
     
+    private func sortBooksByCustomOrder(_ books: [Book], order: [String]) -> [Book] {
+        var sortedBooks: [Book] = []
+        var remainingBooks = books
+        
+        // First, add books in the specified order
+        for bookId in order {
+            if let index = remainingBooks.firstIndex(where: { $0.id == bookId }) {
+                sortedBooks.append(remainingBooks.remove(at: index))
+            }
+        }
+        
+        // Add any remaining books that weren't in the order (new books)
+        sortedBooks.append(contentsOf: remainingBooks)
+        
+        return sortedBooks
+    }
+    
+    func saveBookOrder() {
+        let bookIds = books.map { $0.id }
+        if let data = try? JSONEncoder().encode(bookIds) {
+            userDefaults.set(data, forKey: bookOrderKey)
+            userDefaults.synchronize()
+            print("  📋 Saved custom book order")
+        }
+    }
+    
+    func moveBook(from source: IndexSet, to destination: Int) {
+        books.move(fromOffsets: source, toOffset: destination)
+        saveBookOrder()
+        saveBooks()
+    }
+    
+    func moveBook(fromIndex: Int, toIndex: Int) {
+        guard fromIndex != toIndex,
+              fromIndex >= 0 && fromIndex < books.count,
+              toIndex >= 0 && toIndex <= books.count else { return }
+        
+        let book = books.remove(at: fromIndex)
+        let adjustedIndex = toIndex > fromIndex ? toIndex - 1 : toIndex
+        books.insert(book, at: adjustedIndex)
+        
+        saveBookOrder()
+        saveBooks()
+        objectWillChange.send()
+    }
+    
     private func saveBooks() {
         print("💾 Saving \(books.count) books to UserDefaults")
         do {
             let encoded = try JSONEncoder().encode(books)
             userDefaults.set(encoded, forKey: booksKey)
-            userDefaults.synchronize() // Force immediate save
+            
+            // Force immediate save and verify
+            let didSync = userDefaults.synchronize()
+            print("  📝 UserDefaults synchronize: \(didSync)")
+            
+            // Verify the save worked
+            if let verifyData = userDefaults.data(forKey: booksKey) {
+                let verifyBooks = try JSONDecoder().decode([Book].self, from: verifyData)
+                print("  ✅ Verified save: \(verifyBooks.count) books in storage")
+            }
+            
             print("  ✅ Successfully saved \(books.count) books")
         } catch {
             print("  ❌ Failed to save books: \(error)")
+            errorMessage = "Failed to save library changes"
         }
     }
     
@@ -1403,12 +1484,65 @@ class LibraryViewModel: ObservableObject {
     }
     
     func removeBook(_ book: Book) {
+        print("🗑️ Attempting to remove book: \(book.title) with ID: \(book.id)")
+        let countBefore = books.count
         books.removeAll { $0.id == book.id }
-        saveBooks()
+        let countAfter = books.count
+        print("  📊 Books before: \(countBefore), after: \(countAfter)")
+        
+        if countBefore != countAfter {
+            saveBooks()
+            // Force UI update
+            objectWillChange.send()
+            print("  ✅ Book removed successfully")
+        } else {
+            print("  ⚠️ Book not found in array")
+        }
     }
     
+    @MainActor
     func deleteBook(_ book: Book) {
-        removeBook(book)
+        print("🗑️ deleteBook called for: \(book.title)")
+        
+        // Find the index first to ensure we have the right book
+        guard let index = books.firstIndex(where: { $0.id == book.id }) else {
+            print("  ⚠️ Book not found in array by ID: \(book.id)")
+            // Try matching by localId as fallback
+            if let index = books.firstIndex(where: { $0.localId == book.localId }) {
+                print("  🔄 Found book by localId instead: \(book.localId)")
+                let bookToRemove = books[index]
+                books.remove(at: index)
+                saveBooks()
+                objectWillChange.send()
+                print("  ✅ Book removed successfully by localId")
+            } else {
+                print("  ❌ Book not found by either ID or localId")
+                // List all book IDs for debugging
+                print("  📚 Current book IDs in library:")
+                for (idx, b) in books.enumerated() {
+                    print("    [\(idx)] ID: \(b.id), LocalID: \(b.localId), Title: \(b.title)")
+                }
+            }
+            return
+        }
+        
+        // Remove the book
+        books.remove(at: index)
+        print("  📊 Removed book at index \(index), \(books.count) books remaining")
+        
+        // Save immediately
+        saveBooks()
+        
+        // Force UI update
+        objectWillChange.send()
+        
+        // Reload to ensure consistency
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.loadBooks()
+            print("  🔄 Reloaded library after deletion")
+        }
+        
+        print("  ✅ Book deleted and UI update triggered")
     }
     
     func toggleReadingStatus(for book: Book) {

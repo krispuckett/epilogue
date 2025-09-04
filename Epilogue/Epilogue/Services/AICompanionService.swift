@@ -163,22 +163,10 @@ class AICompanionService: ObservableObject {
     func isConfigured() -> Bool {
         switch currentProvider {
         case .smart, .perplexity:
-            // Check if API key is configured - try KeychainManager first, then Info.plist
-            let apiKey = KeychainManager.shared.getPerplexityAPIKey() ?? 
-                         Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") as? String
-            
-            let configured: Bool
-            if let apiKey = apiKey, !apiKey.isEmpty {
-                configured = apiKey != "your_actual_api_key_here" &&
-                            !apiKey.contains("$(") &&
-                            apiKey != "PLACEHOLDER_API_KEY"
-            } else {
-                configured = false
-            }
-            
-            print("🔑 AI Service configured: \(configured), has key: \(apiKey != nil)")
-            
-            return configured
+            // We now have a built-in API key in PerplexityService
+            // No need to check KeychainManager or Info.plist
+            print("🔑 AI Service configured: true (using built-in API key)")
+            return true
             
         case .appleIntelligence:
             return true // Foundation Models doesn't need API key

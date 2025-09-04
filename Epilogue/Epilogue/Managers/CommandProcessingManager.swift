@@ -57,11 +57,8 @@ class CommandProcessingManager: ObservableObject {
                 searchBooks(query: query)
                 
             case .addBook(let query):
-                // Open BookSearchSheet with the query
-                NotificationCenter.default.post(
-                    name: Notification.Name("ShowBookSearch"),
-                    object: query
-                )
+                // Open BookSearchSheet directly via AppStateManager
+                AppStateManager.shared.openBookSearch()
                 
             case .existingBook(let book):
                 // Navigate to book

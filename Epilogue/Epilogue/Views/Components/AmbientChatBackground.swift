@@ -137,8 +137,12 @@ struct RaycastInputBar: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
                         .foregroundStyle(.white)
+                        .accentColor(DesignSystem.Colors.primaryAccent)
                         .focused($isFocused)
-                        .lineLimit(isExpanded ? 4 : 1)
+                        .lineLimit(isExpanded ? 5 : 1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
                         .onSubmit {
                             if !text.isEmpty {
                                 onSubmit()

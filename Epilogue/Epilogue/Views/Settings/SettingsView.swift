@@ -104,27 +104,7 @@ struct SettingsView: View {
                     }
                     
                     if aiProvider == "perplexity" {
-                        Button {
-                            showingAPIKeySheet = true
-                        } label: {
-                            HStack {
-                                Label("API Configuration", systemImage: "key.fill")
-                                Spacer()
-                                if KeychainManager.shared.hasPerplexityAPIKey {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.caption)
-                                            .foregroundStyle(.green)
-                                        Text("Configured")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                } else {
-                                    Text("Required")
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                        }
-                        
+                        // API key is now built-in - no configuration needed
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Label("Model", systemImage: "cpu")
@@ -361,9 +341,7 @@ struct SettingsView: View {
             } message: {
                 Text("Your data has been exported successfully.")
             }
-            .sheet(isPresented: $showingAPIKeySheet) {
-                APIConfigurationView()
-            }
+            // API key sheet removed - API key is now built-in
             .sheet(isPresented: $showingSyncStatus) {
                 DetailedSyncStatusSheet(isPresented: $showingSyncStatus)
             }
@@ -542,11 +520,21 @@ struct SettingsView: View {
     
     private func deleteAllData() {
         // Delete all data from SwiftData
+        // Important: Delete in correct order to respect relationships
         do {
-            try modelContext.delete(model: BookModel.self)
+            // First delete parent entities that have relationships
+            try modelContext.delete(model: AmbientSession.self)
+            try modelContext.delete(model: QueuedQuestion.self)
+            
+            // Then delete related entities
+            try modelContext.delete(model: CapturedQuestion.self)
             try modelContext.delete(model: CapturedNote.self)
             try modelContext.delete(model: CapturedQuote.self)
-            try modelContext.delete(model: CapturedQuestion.self)
+            
+            // Finally delete books
+            try modelContext.delete(model: BookModel.self)
+            
+            // Save changes
             try modelContext.save()
             
             // Clear caches (if available)

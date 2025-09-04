@@ -117,6 +117,7 @@ struct OptimizedAmbientSession: Identifiable {
     let startTime: Date
     var endTime: Date?
     let bookContext: Book?
+    var title: String = "Reading Session"  // Added title property
     var clusters: [SessionCluster] = []
     var rawTranscriptions: [String] = []
     var allContent: [SessionContent] = []

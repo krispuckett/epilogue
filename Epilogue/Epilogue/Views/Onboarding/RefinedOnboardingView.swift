@@ -23,7 +23,7 @@ struct RefinedOnboardingView: View {
             ]
         ),
         OnboardingPageData(
-            icon: "circle-arrow-right",
+            icon: "glass-msgs",  // Using glass-msgs for ambient mode (chat/voice)
             title: "Ambient Mode",
             subtitle: "Listen while you read",
             description: "Place your phone nearby and Epilogue listens for your thoughts and questions. No interruption to your reading flow.",
@@ -33,7 +33,7 @@ struct RefinedOnboardingView: View {
             ]
         ),
         OnboardingPageData(
-            icon: "star-sparkle",
+            icon: "simple-book",  // Using simple-book for library
             title: "Smart Library",
             subtitle: "Organize beautifully",
             description: "Add books by scanning covers or searching. Your library adapts its colors to each book's cover art.",

@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UniformTypeIdentifiers
 
 // MARK: - Optimized Library Grid with Virtualization
 struct OptimizedLibraryGrid: View {
@@ -11,6 +12,10 @@ struct OptimizedLibraryGrid: View {
     @State private var visibleRange: Range<Int> = 0..<0
     @State private var loadedImages: Set<UUID> = []
     @State private var pendingLoads: Set<UUID> = []
+    @State private var draggedBook: Book?
+    @State private var dragOffset: CGSize = .zero
+    @State private var targetIndex: Int?
+    @State private var isLongPressing = false
     @Namespace private var gridAnimation
     
     // Performance settings
@@ -25,13 +30,55 @@ struct OptimizedLibraryGrid: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 32) {
                     ForEach(Array(books.enumerated()), id: \.element.localId) { index, book in
-                        OptimizedGridItem(
-                            book: book,
-                            isLoaded: loadedImages.contains(book.localId),
-                            viewModel: viewModel,
-                            highlightedBookId: highlightedBookId,
-                            onChangeCover: onChangeCover
-                        )
+                        ZStack {
+                            // Placeholder for dragged item
+                            if draggedBook?.id == book.id {
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                    .fill(Color.white.opacity(0.1))
+                                    .frame(height: 250)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                            .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.5), lineWidth: 2)
+                                    )
+                            } else {
+                                OptimizedGridItem(
+                                    book: book,
+                                    isLoaded: loadedImages.contains(book.localId),
+                                    viewModel: viewModel,
+                                    highlightedBookId: highlightedBookId,
+                                    onChangeCover: onChangeCover,
+                                    isDraggable: viewModel.isReorderMode,
+                                    isBeingDragged: draggedBook?.id == book.id
+                                )
+                                .opacity(draggedBook?.id == book.id ? 0.01 : 1)
+                                .scaleEffect(targetIndex == index && draggedBook != nil ? 1.05 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: targetIndex)
+                                .draggable(book) {
+                                    DragPreview(book: book, viewModel: viewModel)
+                                        .onAppear {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                draggedBook = book
+                                            }
+                                        }
+                                }
+                                .dropDestination(for: Book.self) { items, location in
+                                    guard let droppedBook = items.first,
+                                          let fromIndex = books.firstIndex(where: { $0.id == droppedBook.id }),
+                                          let toIndex = books.firstIndex(where: { $0.id == book.id }) else {
+                                        return false
+                                    }
+                                    
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex)
+                                    }
+                                    return true
+                                } isTargeted: { isTargeted in
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        targetIndex = isTargeted ? index : nil
+                                    }
+                                }
+                            }
+                        }
                         .id(book.localId)
                         .onAppear {
                             handleItemAppear(book: book, at: index)
@@ -52,6 +99,10 @@ struct OptimizedLibraryGrid: View {
         .onAppear {
             preloadInitialBatch()
         }
+        .onDrop(of: [.text], delegate: BookDropDelegate(
+            draggedBook: $draggedBook,
+            targetIndex: $targetIndex
+        ))
     }
     
     // MARK: - Visibility Management
@@ -119,6 +170,42 @@ struct OptimizedLibraryGrid: View {
     }
 }
 
+// MARK: - Drag Preview
+struct DragPreview: View {
+    let book: Book
+    let viewModel: LibraryViewModel
+    
+    var body: some View {
+        BookCard(book: book)
+            .environmentObject(viewModel)
+            .frame(width: 150, height: 225)
+            .scaleEffect(1.1)
+            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                    .strokeBorder(DesignSystem.Colors.primaryAccent, lineWidth: 2)
+            )
+    }
+}
+
+// MARK: - Drop Delegate
+struct BookDropDelegate: DropDelegate {
+    @Binding var draggedBook: Book?
+    @Binding var targetIndex: Int?
+    
+    func performDrop(info: DropInfo) -> Bool {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            draggedBook = nil
+            targetIndex = nil
+        }
+        return true
+    }
+    
+    func dropExited(info: DropInfo) {
+        targetIndex = nil
+    }
+}
+
 // MARK: - Optimized Grid Item
 struct OptimizedGridItem: View {
     let book: Book
@@ -126,9 +213,12 @@ struct OptimizedGridItem: View {
     let viewModel: LibraryViewModel
     let highlightedBookId: UUID?
     let onChangeCover: (Book) -> Void
+    var isDraggable: Bool = false
+    var isBeingDragged: Bool = false
     
     @State private var isPressed = false
     @State private var imageLoaded = false
+    @State private var isHoldingForReorder = false
     
     var body: some View {
         NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {

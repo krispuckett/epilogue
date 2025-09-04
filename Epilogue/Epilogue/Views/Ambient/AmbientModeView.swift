@@ -156,8 +156,10 @@ struct AmbientModeView: View {
     @State private var keyboardText = ""
     @State private var containerBlur: Double = 0
     @State private var submitBlurWave: Double = 0
+    @State private var textFieldHeight: CGFloat = 44  // Track dynamic height, starts compact at single line
     @State private var lastCharacterCount: Int = 0
     @State private var breathingTimer: Timer?
+    @Namespace private var morphingNamespace  // For smooth morphing animation
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
     
@@ -226,7 +228,7 @@ struct AmbientModeView: View {
                     HStack {
                         Spacer()
                         
-                        // Simple text that just appears
+                        // Simple text that appears with rectangular shape
                         Text(liveTranscription)
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white)
@@ -234,8 +236,7 @@ struct AmbientModeView: View {
                             .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.vertical, 16)
                             .frame(maxWidth: geometry.size.width - 100)
-                            .glassEffect()
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .glassEffect(.regular, in: .rect(cornerRadius: 20))
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         
                         Spacer()
@@ -299,7 +300,7 @@ struct AmbientModeView: View {
                 
                 // Input controls overlay on top of gradient
                 bottomInputArea
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .frame(maxWidth: .infinity, alignment: .bottom)  // Removed maxHeight to not fill entire space
             }
         }
         // Top navigation bar with BookView-style header
@@ -633,6 +634,44 @@ struct AmbientModeView: View {
                                             }
                                         )
                                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else if case .note(let capturedNote) = message.messageType {
+                                        // Display notes with special formatting
+                                        AmbientNoteView(
+                                            note: capturedNote,
+                                            index: index,
+                                            onEdit: { noteText in
+                                                // Prepopulate input with note text for editing
+                                                keyboardText = noteText
+                                                editingMessageId = message.id
+                                                editingMessageType = .note(capturedNote)
+                                                
+                                                // Switch to text input mode
+                                                withAnimation(DesignSystem.Animation.springStandard) {
+                                                    inputMode = .textInput
+                                                    isKeyboardFocused = true
+                                                }
+                                            }
+                                        )
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else if case .noteWithContext(let capturedNote, _) = message.messageType {
+                                        // Display notes with context using same view (context handled internally if needed)
+                                        AmbientNoteView(
+                                            note: capturedNote,
+                                            index: index,
+                                            onEdit: { noteText in
+                                                // Prepopulate input with note text for editing
+                                                keyboardText = noteText
+                                                editingMessageId = message.id
+                                                editingMessageType = .note(capturedNote)
+                                                
+                                                // Switch to text input mode
+                                                withAnimation(DesignSystem.Animation.springStandard) {
+                                                    inputMode = .textInput
+                                                    isKeyboardFocused = true
+                                                }
+                                            }
+                                        )
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                                     } else {
                                         AmbientMessageThreadView(
                                             message: message,
@@ -724,40 +763,11 @@ struct AmbientModeView: View {
     @ViewBuilder
     private var bottomInputArea: some View {
         ZStack {
-            // Invisible tap area to dismiss keyboard/input mode
-            if inputMode == .textInput {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        isKeyboardFocused = false
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
-                            keyboardText = ""
-                            inputMode = .listening
-                        }
-                        // Resume recording after animation
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            startRecording()
-                        }
-                        SensoryFeedback.light()
-                    }
-            }
+            // Removed invisible tap area that was blocking scrolling
+            // Dismissal will be handled by scrollDismissesKeyboard instead
             
             VStack(spacing: 16) { // ← Fixed spacing and order
-                Spacer() // Push everything to bottom
-                
-                // FIXED: Scrolling text positioned correctly above the buttons
-                // Show when processing in any mode (including text input)
-                if processor.isProcessing || pendingQuestion != nil {
-                    ScrollingBookMessages()
-                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                        .padding(.vertical, 12)
-                        .glassEffect()
-                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.9).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                }
+                // Removed Spacer that was expanding the VStack unnecessarily
                 
                 // Save indicator - positioned above everything else
                 if showSaveAnimation, let itemType = savedItemType {
@@ -794,8 +804,7 @@ struct AmbientModeView: View {
                             .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.vertical, 16)
                             .frame(maxWidth: 300) // Limit width
-                            .glassEffect()
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .glassEffect(.regular, in: .rect(cornerRadius: 20))
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         
                         Spacer()
@@ -805,39 +814,58 @@ struct AmbientModeView: View {
                 
                 // Removed book context pill - book context is shown elsewhere
                 
+                // Scrolling text animation - shows only when processing a question
+                // Positioned just above the input controls
+                if pendingQuestion != nil {
+                    ScrollingBookMessages()
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                        .padding(.vertical, 12)
+                        .glassEffect()
+                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                }
+                
                 // FIXED: Main input controls at the very bottom
                 GeometryReader { geometry in
                 HStack(spacing: 0) {
                     Spacer()
+                        .allowsHitTesting(false)  // Don't block touches
                     
                     // Single morphing container that expands/contracts
                     ZStack {
-                        // Morphing background with ambient blur
-                        RoundedRectangle(
-                            cornerRadius: inputMode == .textInput ? 22 : 32,
-                            style: .continuous
-                        )
-                        .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
-                        .frame(
-                            width: inputMode == .textInput ? min(geometry.size.width - 80, 320) : 64,  // Wider to fit camera, still leaves space for button
-                            height: inputMode == .textInput ? 48 : 64  // Match waveform orb height
-                        )
-                        .blur(radius: containerBlur) // Ambient container blur
-                        .glassEffect() // Glass effect on the morphing container only
-                        .onAppear {
-                            // Start subtle idle breathing animation
-                            startContainerBreathing()
-                        }
-                        .onChange(of: inputMode) { _, newMode in
-                            if newMode == .textInput {
-                                // Breathing to life animation when switching to text
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                    containerBlur = 3
-                                }
-                                withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
-                                    containerBlur = 0.5
-                                }
-                            }
+                        // Morphing background with smooth transition
+                        if inputMode == .textInput {
+                            // Rectangle with fixed corner radius for text input
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
+                                .frame(
+                                    width: min(geometry.size.width - 80, 320),
+                                    height: textFieldHeight  // Dynamic height
+                                )
+                                .blur(radius: containerBlur) // Ambient container blur
+                                .glassEffect(.regular, in: .rect(cornerRadius: 20)) // Fixed corner radius glass
+                                .matchedGeometryEffect(id: "inputContainer", in: morphingNamespace)
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                    removal: .scale(scale: 1.2).combined(with: .opacity)
+                                ))
+                                .allowsHitTesting(false)  // Glass background shouldn't block touches
+                        } else {
+                            // Circle for voice mode
+                            Circle()
+                                .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
+                                .frame(width: 64, height: 64)
+                                .blur(radius: containerBlur) // Ambient container blur
+                                .glassEffect() // Circle glass effect
+                                .matchedGeometryEffect(id: "inputContainer", in: morphingNamespace)
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 1.2).combined(with: .opacity),
+                                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                                ))
+                                .allowsHitTesting(false)  // Glass background shouldn't block touches
                         }
                         
                         // Content that transitions inside the morphing container
@@ -845,7 +873,7 @@ struct AmbientModeView: View {
                             // Voice mode content (stop/waveform icon)
                             if !inputMode.isTextInput {
                                 Button {
-                                    withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
+                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
                                         if inputMode == .listening && isRecording {
                                             handleMicrophoneTap()
                                         } else if inputMode == .paused {
@@ -897,6 +925,36 @@ struct AmbientModeView: View {
                                                 .font(.system(size: 16))
                                         }
                                         
+                                        // Hidden text to measure intrinsic height
+                                        Text(keyboardText.isEmpty ? " " : keyboardText)
+                                            .font(.system(size: 16))
+                                            .lineLimit(1...3)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .hidden()
+                                            .background(
+                                                GeometryReader { proxy in
+                                                    Color.clear
+                                                        .onAppear {
+                                                            // Set initial height on appear
+                                                            let measuredHeight = max(44, min(proxy.size.height + 16, 100))
+                                                            if abs(textFieldHeight - measuredHeight) > 1 {
+                                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                                    textFieldHeight = measuredHeight
+                                                                }
+                                                            }
+                                                        }
+                                                        .onChange(of: proxy.size) { _, newSize in
+                                                            // Update height when text changes
+                                                            let measuredHeight = max(44, min(newSize.height + 16, 100))
+                                                            if abs(textFieldHeight - measuredHeight) > 1 {
+                                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                                    textFieldHeight = measuredHeight
+                                                                }
+                                                            }
+                                                        }
+                                                }
+                                            )
+                                        
                                         TextField("", text: $keyboardText, axis: .vertical)
                                             .font(.system(size: 16))
                                             .foregroundStyle(.white)
@@ -921,11 +979,15 @@ struct AmbientModeView: View {
                                 }
                                 .padding(.leading, 12)  // Proper padding for camera icon
                                 .padding(.trailing, 12)
-                                .frame(height: 48)  // Match container height
+                                .padding(.vertical, 8)  // Dynamic vertical padding
                             }
                         }
                     }
-                    .animation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0), value: inputMode)
+                    .onAppear {
+                        // Start subtle idle breathing animation
+                        startContainerBreathing()
+                    }
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25), value: inputMode)
                     
                     // Morphing button - waveform when empty, submit when has text
                     if inputMode == .textInput {
@@ -937,8 +999,9 @@ struct AmbientModeView: View {
                             } else {
                                 // Return to voice mode
                                 isKeyboardFocused = false
-                                withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
                                     keyboardText = ""
+                                    textFieldHeight = 44  // Reset to compact height
                                     inputMode = .listening
                                 }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -961,16 +1024,19 @@ struct AmbientModeView: View {
                             insertion: .scale(scale: 0).combined(with: .opacity).combined(with: .move(edge: .leading)),
                             removal: .scale(scale: 0).combined(with: .opacity)
                         ))
-                        .animation(.spring(response: 0.45, dampingFraction: 0.75).delay(0.1), value: inputMode)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.85).delay(0.1), value: inputMode)
                         .padding(.leading, 12)
                     }
                     
                     Spacer()
+                        .allowsHitTesting(false)  // Don't block touches
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: geometry.size.height)
+                .allowsHitTesting(true)  // Only allow hit testing on actual interactive elements
             }
             .frame(height: 100)
+            .allowsHitTesting(true)  // Ensure only actual controls are interactive
         }
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)  // Back to original padding
         .padding(.bottom, inputMode == .textInput ? 18 : 36)  // Back to previous values
@@ -980,7 +1046,7 @@ struct AmbientModeView: View {
             if isRecording {
                 stopRecording()
             }
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.75, blendDuration: 0)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
                 inputMode = .textInput
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     isKeyboardFocused = true
@@ -988,9 +1054,9 @@ struct AmbientModeView: View {
             }
             SensoryFeedback.medium()
         }
+        .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
+        }
     }
-    .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
-}
     
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
     // Keeping for reference but no longer used
@@ -1645,9 +1711,10 @@ struct AmbientModeView: View {
         }
         
         // CRITICAL: Set the model context and session for the processor
-        processor.setModelContext(modelContext)
-        processor.setCurrentSession(session)
-        processor.startSession()
+        // These are now managed internally by TrueAmbientProcessor
+        // processor.setModelContext(modelContext)
+        // processor.setCurrentSession(session)
+        // processor.startSession()
         
         // Update library for book detection
         bookDetector.updateLibrary(libraryViewModel.books)
@@ -1676,7 +1743,7 @@ struct AmbientModeView: View {
         // Let new messages handle collapsing the previous ones
         pendingQuestion = nil
         
-        processor.startSession()
+        // processor.startSession() - managed internally
         voiceManager.startAmbientListeningMode()
         bookDetector.startDetection()
         SensoryFeedback.medium()
@@ -1791,7 +1858,9 @@ struct AmbientModeView: View {
                         bookTitle: oldContent.bookTitle,
                         bookAuthor: oldContent.bookAuthor
                     )
-                    processor.detectedContent[processorIndex] = newContent
+                    // Note: We can't directly modify published property
+                    // The processor should handle updates internally
+                    // processor.detectedContent[processorIndex] = newContent
                 }
                 
                 // If it's a question (user text message), regenerate the response
@@ -1854,10 +1923,14 @@ struct AmbientModeView: View {
                 bookTitle: currentBookContext?.title,
                 bookAuthor: currentBookContext?.author
             )
-            processor.detectedContent.append(content)
+            // Processor manages its own content array
+            // processor.detectedContent.append(content)
             
             // Save question to SwiftData immediately
             saveQuestionToSwiftData(content)
+            
+            // Set pendingQuestion to show scrolling text
+            pendingQuestion = messageText
             
             // For questions, add a thinking message immediately
             let thinkingMessage = UnifiedChatMessage(
@@ -1890,8 +1963,54 @@ struct AmbientModeView: View {
                 bookAuthor: currentBookContext?.author
             )
             
-            // Add to processor for saving
-            processor.detectedContent.append(content)
+            // Save to SwiftData based on type
+            if contentType == .quote {
+                // Save quote and get the CapturedQuote object
+                if let capturedQuote = saveQuoteToSwiftData(content) {
+                    // Add to messages for display
+                    let quoteMessage = UnifiedChatMessage(
+                        content: capturedQuote.text,
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .quote(capturedQuote)
+                    )
+                    messages.append(quoteMessage)
+                    
+                    // Add to session if available
+                    if let session = currentSession {
+                        session.capturedQuotes.append(capturedQuote)
+                        try? modelContext.save()
+                    }
+                    
+                    print("✅ Quote saved to SwiftData: \(capturedQuote.text)")
+                }
+            } else {
+                // Save note and get the CapturedNote object
+                if let capturedNote = saveNoteToSwiftData(content) {
+                    // Add to messages for display
+                    let noteMessage = UnifiedChatMessage(
+                        content: capturedNote.content,
+                        isUser: true,
+                        timestamp: Date(),
+                        bookContext: currentBookContext,
+                        messageType: .note(capturedNote)
+                    )
+                    messages.append(noteMessage)
+                    
+                    // Add to session if available
+                    if let session = currentSession {
+                        session.capturedNotes.append(capturedNote)
+                        try? modelContext.save()
+                    }
+                    
+                    print("✅ Note saved to SwiftData: \(capturedNote.content)")
+                }
+            }
+            
+            // Don't add to processor's content - it will try to save again
+            // Just track for session summary purposes only
+            // processor.detectedContent.append(content)
             
             // Show appropriate save animation
             savedItemsCount += 1
@@ -2168,17 +2287,37 @@ struct AmbientModeView: View {
     private func getAIResponseForAmbientQuestion(_ text: String) async {
         let aiService = AICompanionService.shared
         
+        // First update the thinking message to show it's processing
+        await MainActor.run {
+            if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
+                let processingMessage = UnifiedChatMessage(
+                    content: "**\(text)**",  // Just the question, no answer yet
+                    isUser: false,
+                    timestamp: messages[thinkingIndex].timestamp,
+                    messageType: .text
+                )
+                messages[thinkingIndex] = processingMessage
+                
+                // Auto-expand this message to show the scrolling text
+                expandedMessageIds.insert(processingMessage.id)
+            }
+        }
+        
+        // Small delay to show the animation
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
         guard aiService.isConfigured() else {
+            print("🔑 AI Service configured: false")
             await MainActor.run {
-                // Update thinking message to show error
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
-                    let updatedMessage = UnifiedChatMessage(
-                        content: "**\(text)**\n\nPlease configure your AI service in Settings.",
+                // Update thinking message to show error with better formatting
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") }) {
+                    let errorMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\n⚠️ **AI Service Not Configured**\n\nTo get AI responses, please add your Perplexity API key in Settings → AI Services.\n\n*Your question has been saved and will be available when you configure the service.*",
                         isUser: false,
                         timestamp: messages[thinkingIndex].timestamp,
                         messageType: .text
                     )
-                    messages[thinkingIndex] = updatedMessage
+                    messages[thinkingIndex] = errorMessage
                 }
                 pendingQuestion = nil
             }
@@ -2244,9 +2383,38 @@ struct AmbientModeView: View {
         } catch {
             await MainActor.run {
                 // Update thinking message to show error
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") }) {
+                    var errorContent: String
+                    
+                    // Check if it's a rate limit error
+                    if let perplexityError = error as? PerplexityError,
+                       case .rateLimitExceeded(let remaining, let resetTime) = perplexityError {
+                        // Show rate limit message with remaining questions
+                        let formatter = DateFormatter()
+                        formatter.timeStyle = .short
+                        let resetTimeStr = resetTime.map { formatter.string(from: $0) } ?? "midnight"
+                        
+                        errorContent = """
+                        **\(text)**
+                        
+                        📊 **Daily Question Limit Reached**
+                        
+                        You've used all 10 free questions for today. Your limit resets at \(resetTimeStr).
+                        
+                        *Your question has been saved and you can try again tomorrow.*
+                        
+                        💡 **Tip**: Questions are precious! Make them count by:
+                        • Combining related questions into one
+                        • Using quotes and notes (unlimited) to capture insights
+                        • Reflecting before asking
+                        """
+                    } else {
+                        // Generic error message
+                        errorContent = "**\(text)**\n\n⚠️ Sorry, I couldn't process your message. \(error.localizedDescription)"
+                    }
+                    
                     let updatedMessage = UnifiedChatMessage(
-                        content: "**\(text)**\n\nSorry, I couldn't process your message.",
+                        content: errorContent,
                         isUser: false,
                         timestamp: messages[thinkingIndex].timestamp,
                         messageType: .text
@@ -2254,7 +2422,7 @@ struct AmbientModeView: View {
                     messages[thinkingIndex] = updatedMessage
                 }
                 pendingQuestion = nil
-                print("❌ Failed to get AI response for ambient question: \(error)")
+                print("❌ Failed to get AI response: \(error)")
             }
         }
     }
@@ -2814,6 +2982,82 @@ struct AmbientQuoteView: View {
     }
 }
 
+// MARK: - Note View for Live Ambient Mode
+struct AmbientNoteView: View {
+    let note: CapturedNote
+    let index: Int
+    let onEdit: (String) -> Void
+    
+    @State private var noteOpacity: Double = 0.3
+    @State private var noteBlur: Double = 12
+    @State private var noteScale: CGFloat = 0.96
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 16) {
+                // Index number
+                Text(String(format: "%02d", index + 1))
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .frame(width: 24)
+                
+                // Note content with icon
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.yellow.opacity(0.8))
+                        
+                        Text("Note")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.yellow.opacity(0.8))
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                    }
+                    
+                    Text(note.content)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                SensoryFeedback.light()
+                onEdit(note.content)
+            }
+        }
+        .padding(.vertical, 16)
+        .opacity(noteOpacity)
+        .blur(radius: noteBlur)
+        .scaleEffect(noteScale)
+        .onAppear {
+            // Check for reduced motion preference
+            let reduceMotion = UIAccessibility.isReduceMotionEnabled
+            
+            if reduceMotion {
+                // Simple fade for accessibility
+                withAnimation(.easeOut(duration: 0.3)) {
+                    noteOpacity = 1.0
+                }
+            } else {
+                // Sophisticated blur revelation animation
+                withAnimation(
+                    .timingCurve(0.215, 0.61, 0.355, 1, duration: 0.8)
+                ) {
+                    noteOpacity = 1.0
+                    noteBlur = 0
+                    noteScale = 1.0
+                }
+            }
+        }
+    }
+}
+
 struct AmbientMessageThreadView: View {
     let message: UnifiedChatMessage
     let index: Int
@@ -2950,40 +3194,10 @@ struct AmbientMessageThreadView: View {
             if !message.isUser && isExpanded {
                 let content = extractContent(from: message.content)
                 
-                // If no answer yet, show scrolling text pill
+                // If no answer yet, don't show anything special
+                // The scrolling text is already shown above the input field
                 if content.answer.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.10))
-                            .frame(height: 0.5)
-                        
-                        // Scrolling text pill - centered like in session summary
-                        HStack {
-                            Spacer()
-                            
-                            HStack(spacing: 12) {
-                                ScrollingBookMessages()
-                                    .frame(maxWidth: 200)
-                            }
-                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                            .padding(.vertical, 12)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.05))
-                                    .overlay(
-                                        Capsule()
-                                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                                    )
-                            )
-                            
-                            Spacer()
-                        }
-                        .padding(.vertical, 20)
-                        
-                        Rectangle()
-                            .fill(Color.white.opacity(0.10))
-                            .frame(height: 0.5)
-                    }
+                    // Empty state - answer will appear here when ready
                 } else {
                     // Show answer when ready with staggered fade-in
                     VStack(alignment: .leading, spacing: 12) {

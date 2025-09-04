@@ -5,7 +5,6 @@ import UserNotifications
 @main
 struct EpilogueApp: App {
     @State private var modelContainer: ModelContainer?
-    @State private var showAPIKeySetup = false
     
     var body: some Scene {
         WindowGroup {
@@ -15,8 +14,7 @@ struct EpilogueApp: App {
                     .modelContainer(container)
                     .runSwiftDataMigrations()
                     .onAppear {
-                        // Initialize secure API key management
-                        initializeAPIKey()
+                        // API key is now built-in, no setup needed
                         
                         // Clear command history on app launch to prevent artifacts
                         Task { @MainActor in
@@ -25,9 +23,6 @@ struct EpilogueApp: App {
                         
                         // Request notification permissions
                         requestNotificationPermissions()
-                    }
-                    .sheet(isPresented: $showAPIKeySetup) {
-                        APIConfigurationView()
                     }
             } else {
                 // Minimal launch screen while loading
@@ -46,21 +41,7 @@ struct EpilogueApp: App {
         }
     }
     
-    private func initializeAPIKey() {
-        // Check if API key exists in Keychain
-        if let apiKey = KeychainManager.shared.getPerplexityAPIKey() {
-            // API key is available
-            print("✅ API key loaded from secure storage")
-        } else if KeychainManager.shared.needsAPIKeyConfiguration() {
-            // Show setup sheet on first launch or if key is missing
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                showAPIKeySetup = true
-            }
-        }
-        
-        // Clean up any legacy storage
-        KeychainManager.shared.removeLegacyAPIKeyStorage()
-    }
+    // Removed - API key is now built-in
     
     private func requestNotificationPermissions() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
@@ -90,7 +71,8 @@ struct EpilogueApp: App {
             CapturedNote.self,
             CapturedQuote.self,
             CapturedQuestion.self,
-            AmbientSession.self
+            AmbientSession.self,
+            QueuedQuestion.self  // New offline queue model
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         

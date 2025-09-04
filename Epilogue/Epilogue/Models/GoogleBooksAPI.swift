@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import UniformTypeIdentifiers
 
 // MARK: - Google Books API Models
 struct GoogleBooksResponse: Codable {
@@ -138,7 +139,11 @@ struct IndustryIdentifier: Codable {
 }
 
 // MARK: - Book Model
-struct Book: Identifiable, Codable, Equatable {
+struct Book: Identifiable, Codable, Equatable, Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .text)
+    }
+    
     let id: String  // Google Books ID
     let localId: UUID  // Local UUID for linking
     let title: String

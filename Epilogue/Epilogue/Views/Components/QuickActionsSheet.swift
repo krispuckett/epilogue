@@ -80,8 +80,8 @@ struct QuickActionsSheet: View {
         ),
         Command(
             icon: "magnifyingglass",
-            title: "Search",
-            description: "Search your library and notes",
+            title: "Search for Book",
+            description: "Find and add books to your library",
             action: .search
         )
     ]

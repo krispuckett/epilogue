@@ -93,16 +93,17 @@ final class SyncStatusManager: ObservableObject {
     // MARK: - Private Methods
     
     private func setupNetworkMonitoring() {
-        networkMonitor.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor in
-                let wasOnline = self?.isOnline ?? true
-                self?.isOnline = path.status == .satisfied
+        networkMonitor.pathUpdateHandler = { path in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let wasOnline = self.isOnline
+                self.isOnline = path.status == .satisfied
                 
-                if !wasOnline && self?.isOnline == true {
+                if !wasOnline && self.isOnline {
                     // Back online - trigger sync
-                    self?.startSync()
-                } else if self?.isOnline == false {
-                    self?.status = .offline
+                    self.startSync()
+                } else if !self.isOnline {
+                    self.status = .offline
                 }
             }
         }

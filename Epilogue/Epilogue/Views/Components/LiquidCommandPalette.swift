@@ -77,11 +77,19 @@ struct LiquidCommandPalette: View {
             commandText = "\""
             isFocused = true
         case "addBook":
-            commandText = ""
-            isFocused = true
+            // Open book search sheet directly
+            bookSearchQuery = ""
+            // Small delay to ensure state is updated before presenting sheet
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                showBookSearch = true
+            }
         case "search":
-            commandText = ""
-            isFocused = true
+            // Open book search sheet for searching
+            bookSearchQuery = ""
+            // Small delay to ensure state is updated before presenting sheet
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                showBookSearch = true
+            }
         default:
             break
         }
@@ -257,6 +265,9 @@ struct LiquidCommandPalette: View {
                     libraryViewModel.addBook(book)
                     HapticManager.shared.bookOpen()
                     
+                    // Dismiss the palette after book is added
+                    dismissPalette()
+                    
                     // Navigate to the newly added book
                     NotificationCenter.default.post(
                         name: Notification.Name("NavigateToBook"),
@@ -359,12 +370,14 @@ struct LiquidCommandPalette: View {
             createQuoteWithBookContext(text: text, book: book)
         case .addBook(let query):
             // Open BookSearchSheet with the query (the smart way!)
+            print("🔍 LiquidCommandPalette - .addBook case with query: '\(query)'")
             bookSearchQuery = query
-            showBookSearch = true
-            // Small delay before dismissing to ensure sheet binding is set
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                dismissPalette()
+            print("🔍 LiquidCommandPalette - Set bookSearchQuery to: '\(bookSearchQuery)'")
+            // Small delay to ensure state is updated before presenting sheet
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                showBookSearch = true
             }
+            // Don't dismiss palette - let the sheet completion handle it
         case .batchAddBooks(let titles):
             // Handle batch book additions
             for title in titles {
@@ -373,9 +386,7 @@ struct LiquidCommandPalette: View {
                 // Process one at a time for now
                 break
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                dismissPalette()
-            }
+            // Don't dismiss palette - let the sheet completion handle it
         case .multiStepCommand(let commands):
             // Process multi-step commands
             handleMultiStepCommands(commands)
@@ -410,16 +421,22 @@ struct LiquidCommandPalette: View {
             } else if trimmed.count < 50 && !trimmed.contains(" ") {
                 // Short single word might be a book title - open search sheet
                 bookSearchQuery = trimmed
-                showBookSearch = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    dismissPalette()
+                // Small delay to ensure state is updated before presenting sheet
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    showBookSearch = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        dismissPalette()
+                    }
                 }
             } else if trimmed.count < 100 {
                 // Medium length text could be book search - open search sheet
                 bookSearchQuery = trimmed
-                showBookSearch = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    dismissPalette()
+                // Small delay to ensure state is updated before presenting sheet
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    showBookSearch = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        dismissPalette()
+                    }
                 }
             } else {
                 // Long text defaults to note
@@ -430,11 +447,15 @@ struct LiquidCommandPalette: View {
     
     // MARK: - Book Search & Add
     private func searchAndAddBook(query: String) {
-        print("📚 Searching for book: \(query)")
+        print("📚 LiquidCommandPalette - Searching for book: '\(query)'")
         
         // Set the search query and show book search sheet
         bookSearchQuery = query
-        showBookSearch = true
+        print("📝 LiquidCommandPalette - Set bookSearchQuery to: '\(bookSearchQuery)'")
+        // Small delay to ensure state is updated before presenting sheet
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            showBookSearch = true
+        }
         
         SensoryFeedback.light()
     }

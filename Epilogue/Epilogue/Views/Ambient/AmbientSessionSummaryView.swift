@@ -19,6 +19,8 @@ struct AmbientSessionSummaryView: View {
     @State private var editingPage = false
     @State private var pageText = ""
     @FocusState private var isPageFocused: Bool
+    @State private var generatedInsight: String? = nil
+    @State private var isGeneratingInsight = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -111,6 +113,9 @@ struct AmbientSessionSummaryView: View {
                     }
                     hasInitializedExpanded = true
                 }
+                
+                // Generate AI insight for the session
+                generateAIInsight()
             }
         }
         .overlay {
@@ -329,9 +334,24 @@ struct AmbientSessionSummaryView: View {
                             .foregroundStyle(.white.opacity(0.4))
                     }
                     
-                    // Show a smart summary instead of just the question
-                    if let answer = question.answer {
-                        // Extract the first meaningful sentence from the answer as the insight
+                    // Show AI-generated insight or loading state
+                    if isGeneratingInsight {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                .scaleEffect(0.8)
+                            Text("Analyzing session...")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                    } else if let insight = generatedInsight {
+                        Text(insight)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(3)
+                    } else if let answer = question.answer {
+                        // Fallback to extracted insight
                         let insight = extractKeyInsight(from: answer, question: question.content)
                         Text(insight)
                             .font(.system(size: 18, weight: .semibold))
@@ -671,6 +691,105 @@ struct AmbientSessionSummaryView: View {
         }
         
         return score
+    }
+    
+    // MARK: - AI-Powered Insight Generation
+    
+    private func generateAIInsight() {
+        guard generatedInsight == nil && !isGeneratingInsight else { return }
+        
+        isGeneratingInsight = true
+        
+        Task {
+            do {
+                // Prepare session context
+                var context = "Reading session analysis:\n"
+                
+                // Add book context
+                if let book = session.book {
+                    context += "Book: \(book.title) by \(book.author)\n"
+                }
+                
+                // Add session metrics
+                let duration = Int(session.endTime.timeIntervalSince(session.startTime)) / 60
+                context += "Duration: \(duration) minutes\n"
+                context += "Questions asked: \(session.capturedQuestions.count)\n"
+                
+                // Add questions and answers
+                if !session.capturedQuestions.isEmpty {
+                    context += "\nKey questions discussed:\n"
+                    for (index, question) in session.capturedQuestions.prefix(3).enumerated() {
+                        context += "\(index + 1). \(question.content)\n"
+                        if let answer = question.answer {
+                            // Include first sentence of answer for context
+                            let firstSentence = answer.components(separatedBy: ". ").first ?? answer
+                            context += "   → \(firstSentence.prefix(100))...\n"
+                        }
+                    }
+                }
+                
+                // Add quotes if available
+                if !session.capturedQuotes.isEmpty {
+                    context += "\nQuotes captured: \(session.capturedQuotes.count)\n"
+                    if let firstQuote = session.capturedQuotes.first {
+                        context += "Sample: \"\(firstQuote.text.prefix(50))...\"\n"
+                    }
+                }
+                
+                // Add notes if available
+                if !session.capturedNotes.isEmpty {
+                    context += "Notes taken: \(session.capturedNotes.count)\n"
+                }
+                
+                // Generate insight prompt
+                let prompt = """
+                Based on this reading session, provide ONE profound, concise insight (maximum 20 words) that captures the essence of what was explored or learned.
+                
+                The insight should:
+                - Be thought-provoking and meaningful
+                - Reflect the themes or ideas discussed
+                - Not just repeat a question or fact
+                - Feel like a valuable takeaway
+                
+                Context:
+                \(context)
+                
+                Respond with ONLY the insight, no introduction or explanation.
+                """
+                
+                // Try Foundation Models first (free and fast)
+                if AICompanionService.shared.currentProvider == .appleIntelligence {
+                    let response = try await AICompanionService.shared.processMessage(
+                        prompt,
+                        bookContext: session.book,
+                        conversationHistory: []
+                    )
+                    
+                    await MainActor.run {
+                        self.generatedInsight = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        self.isGeneratingInsight = false
+                    }
+                } else {
+                    // Use Perplexity if available
+                    let response = try await PerplexityService.staticChat(
+                        message: prompt,
+                        bookContext: session.book
+                    )
+                    
+                    await MainActor.run {
+                        self.generatedInsight = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        self.isGeneratingInsight = false
+                    }
+                }
+            } catch {
+                // Fallback to extracted insight
+                await MainActor.run {
+                    self.isGeneratingInsight = false
+                    // Will use the fallback extractKeyInsight method
+                }
+                print("Failed to generate AI insight: \(error)")
+            }
+        }
     }
     
     private func extractKeyInsight(from answer: String, question: String) -> String {

@@ -5,11 +5,15 @@ import Combine
 class PerplexityService: ObservableObject {
     static let shared = PerplexityService()
     
-    private let apiKey: String
+    private var apiKey: String {
+        // Use secure API manager for production
+        SecureAPIManager.shared.getAPIKey()
+    }
     private let baseURL = "https://api.perplexity.ai/chat/completions"
     private let session: URLSession
     private var responseCache = [String: String]()  // Simple cache
     private var isGandalfEnabled = false
+    private let secureManager = SecureAPIManager.shared
     
     init() {
         // Configure URLSession for optimal performance
@@ -20,17 +24,7 @@ class PerplexityService: ObservableObject {
         config.urlCache = nil  // Disable caching for real-time responses
         self.session = URLSession(configuration: config)
         
-        // SECURE: Only use KeychainManager - no Info.plist fallback
-        if let apiKey = KeychainManager.shared.getPerplexityAPIKey(),
-           !apiKey.isEmpty,
-           KeychainManager.shared.isValidAPIKey(apiKey) {
-            self.apiKey = apiKey
-            print("✅ Perplexity Service initialized with API key from secure storage")
-        } else {
-            // No API key configured - service will prompt for configuration
-            self.apiKey = ""
-            print("⚠️ No API key configured. User will be prompted to configure in Settings.")
-        }
+        print("✅ Perplexity Service initialized with secure API management")
     }
     
     // MARK: - Gandalf Mode
@@ -47,12 +41,12 @@ class PerplexityService: ObservableObject {
     
     // Fast streaming chat for real-time responses
     func streamChat(message: String, bookContext: Book? = nil, model: String? = nil) async throws -> AsyncThrowingStream<String, Error> {
-        // Check if we have a valid API key
-        if apiKey.isEmpty || !KeychainManager.shared.hasPerplexityAPIKey {
-            print("Cannot make API request without configured API key")
-            return AsyncThrowingStream { continuation in
-                continuation.yield("Chat is currently unavailable. Please configure your Perplexity API key in Settings > AI & Intelligence.")
-                continuation.finish()
+        // Check rate limit first (unless unlimited)
+        if !secureManager.hasUnlimitedQuestions {
+            let (allowed, remaining, resetTime) = secureManager.canMakeAPICall()
+            
+            guard allowed else {
+                throw PerplexityError.rateLimitExceeded(remaining: remaining, resetTime: resetTime)
             }
         }
         
@@ -117,6 +111,7 @@ class PerplexityService: ObservableObject {
                         return
                     }
                     
+                    var hasRecordedCall = false
                     for try await line in bytes.lines {
                         if line.hasPrefix("data: "),
                            let data = line.dropFirst(6).data(using: .utf8),
@@ -125,6 +120,12 @@ class PerplexityService: ObservableObject {
                            let delta = choices.first?["delta"] as? [String: Any],
                            let content = delta["content"] as? String {
                             continuation.yield(content)
+                            
+                            // Record API call on first successful content
+                            if !hasRecordedCall && !secureManager.hasUnlimitedQuestions {
+                                secureManager.recordAPICall()
+                                hasRecordedCall = true
+                            }
                         }
                     }
                     continuation.finish()
@@ -137,10 +138,13 @@ class PerplexityService: ObservableObject {
     
     // Original non-streaming method
     func chat(with message: String, bookContext: Book? = nil, model: String? = nil) async throws -> String {
-        // Check if we have a valid API key
-        if apiKey == "PLACEHOLDER_API_KEY" {
-            print("Cannot make API request with placeholder key")
-            return "Chat is currently unavailable. Please configure your Perplexity API key in Info.plist."
+        // Check rate limit first (unless unlimited)
+        if !secureManager.hasUnlimitedQuestions {
+            let (allowed, remaining, resetTime) = secureManager.canMakeAPICall()
+            
+            guard allowed else {
+                throw PerplexityError.rateLimitExceeded(remaining: remaining, resetTime: resetTime)
+            }
         }
         
         guard let url = URL(string: baseURL),
@@ -220,6 +224,11 @@ class PerplexityService: ObservableObject {
             throw PerplexityError.invalidResponse
         }
         
+        // Record successful API call for rate limiting
+        if !secureManager.hasUnlimitedQuestions {
+            secureManager.recordAPICall()
+        }
+        
         return content
     }
 }
@@ -230,6 +239,7 @@ enum PerplexityError: LocalizedError {
     case invalidResponse
     case unauthorized
     case httpError(statusCode: Int)
+    case rateLimitExceeded(remaining: Int, resetTime: Date?)
     
     var errorDescription: String? {
         switch self {
@@ -241,6 +251,13 @@ enum PerplexityError: LocalizedError {
             return "Invalid API key - please check your configuration"
         case .httpError(let code):
             return "HTTP error: \(code)"
+        case .rateLimitExceeded(let remaining, let resetTime):
+            if let resetTime = resetTime {
+                let formatter = DateFormatter()
+                formatter.timeStyle = .short
+                return "Daily question limit reached. Resets at \(formatter.string(from: resetTime))"
+            }
+            return "Daily question limit reached"
         }
     }
 }

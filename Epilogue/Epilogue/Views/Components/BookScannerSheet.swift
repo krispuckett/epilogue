@@ -169,7 +169,7 @@ struct BookSearchResultsView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(books) { book in
-                        BookSearchResultCard(book: book) {
+                        BookScanResultCard(book: book) {
                             libraryViewModel.addBook(book)
                             SensoryFeedback.success()
                             
@@ -189,9 +189,9 @@ struct BookSearchResultsView: View {
     }
 }
 
-// MARK: - Book Search Result Card
+// MARK: - Book Scan Result Card
 
-struct BookSearchResultCard: View {
+struct BookScanResultCard: View {
     let book: Book
     let onAdd: () -> Void
     @State private var isAdded = false
@@ -249,7 +249,7 @@ struct BookSearchResultCard: View {
             .disabled(isAdded)
         }
         .padding()
-        .background(.secondarySystemBackground)
+        .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
 }

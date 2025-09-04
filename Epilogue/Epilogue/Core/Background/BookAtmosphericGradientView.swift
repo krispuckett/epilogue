@@ -37,6 +37,8 @@ struct BookAtmosphericGradientView: View {
                     )
                     .blur(radius: 40)
                     .ignoresSafeArea()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .animation(.easeInOut(duration: 0.3), value: palette.primary)
                 }
                 
                 // Subtle noise texture overlay
@@ -52,7 +54,9 @@ struct BookAtmosphericGradientView: View {
             startSubtleAnimation()
         }
         .onChange(of: colorPalette) { _, newPalette in
-            displayedPalette = processColors(newPalette)
+            withAnimation(.easeInOut(duration: 0.3)) {
+                displayedPalette = processColors(newPalette)
+            }
         }
     }
     

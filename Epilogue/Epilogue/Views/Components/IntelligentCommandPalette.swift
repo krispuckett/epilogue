@@ -158,8 +158,7 @@ struct IntelligentCommandPalette: View {
                     .padding(.bottom, 16)
             }
         }
-        .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
         .overlay {
             RoundedRectangle(cornerRadius: 24)
                 .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
@@ -229,21 +228,29 @@ struct IntelligentCommandPalette: View {
     private func executeCommand() {
         guard !commandText.isEmpty else { return }
         
-        // Process the command
-        let processor = CommandProcessingManager(
-            modelContext: modelContext,
-            libraryViewModel: libraryViewModel,
-            notesViewModel: notesViewModel
-        )
+        // Parse the command to determine intent
+        let intent = CommandParser.parse(commandText, books: libraryViewModel.books, notes: notesViewModel.notes)
         
-        processor.processInlineCommand(commandText)
+        // Save the command text before clearing
+        let savedCommand = commandText
         
         // Haptic feedback
         SensoryFeedback.success()
         
-        // Clear and dismiss
+        // Clear command text and dismiss FIRST
         commandText = ""
         dismissPalette()
+        
+        // Then process the command after a delay to ensure palette is fully dismissed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let processor = CommandProcessingManager(
+                modelContext: modelContext,
+                libraryViewModel: libraryViewModel,
+                notesViewModel: notesViewModel
+            )
+            
+            processor.processInlineCommand(savedCommand)
+        }
     }
     
     // MARK: - Generate Smart Suggestions

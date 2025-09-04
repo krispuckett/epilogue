@@ -1,8 +1,6 @@
 import Foundation
 import OSLog
 
-private let logger = Logger(subsystem: "com.epilogue", category: "ResponseCache")
-
 // MARK: - Cached Response Model
 struct CachedResponse: Codable {
     let response: String
@@ -36,6 +34,7 @@ actor ResponseCache {
     
     private let cacheKey = "com.epilogue.responseCache"
     private var cache: [String: CachedResponse] = [:]
+    private let logger = Logger(subsystem: "com.epilogue", category: "ResponseCache")
     
     private init() {
         Task {

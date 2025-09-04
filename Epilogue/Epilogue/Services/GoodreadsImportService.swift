@@ -114,6 +114,7 @@ class GoodreadsImportService: ObservableObject {
             case parsing
             case matching
             case saving
+            case fetchingCovers
             case complete
             case paused
             case failed(String)
@@ -121,12 +122,26 @@ class GoodreadsImportService: ObservableObject {
             var description: String {
                 switch self {
                 case .preparing: return "Preparing import..."
-                case .parsing: return "Parsing CSV file..."
-                case .matching: return "Matching books..."
-                case .saving: return "Saving to library..."
-                case .complete: return "Import complete"
+                case .parsing: return "Reading your Goodreads library..."
+                case .matching: return "Finding books in Google Books..."
+                case .saving: return "Adding books to your library..."
+                case .fetchingCovers: return "Loading book covers..."
+                case .complete: return "Import complete!"
                 case .paused: return "Import paused"
                 case .failed(let reason): return "Import failed: \(reason)"
+                }
+            }
+            
+            var icon: String {
+                switch self {
+                case .preparing: return "gear"
+                case .parsing: return "doc.text"
+                case .matching: return "magnifyingglass"
+                case .saving: return "square.and.arrow.down"
+                case .fetchingCovers: return "photo"
+                case .complete: return "checkmark.circle.fill"
+                case .paused: return "pause.circle"
+                case .failed: return "exclamationmark.triangle"
                 }
             }
         }
@@ -240,7 +255,8 @@ class GoodreadsImportService: ObservableObject {
     
     // MARK: - Public Methods
     
-    func importCSV(from url: URL, speed: ImportSpeed = .balanced) async throws -> ImportResult {
+    /// Import CSV with optional async cover fetching
+    func importCSV(from url: URL, speed: ImportSpeed = .balanced, fetchCoversAsync: Bool = true) async throws -> ImportResult {
         isImporting = true
         isPaused = false
         currentProgress = ImportProgress(
@@ -1021,11 +1037,12 @@ class GoodreadsImportService: ObservableObject {
             )
         }
         
-        // Search using the GoogleBooksService
-        await googleBooksService.searchBooks(query: "intitle:\(goodreadsBook.title) inauthor:\(goodreadsBook.author)")
+        // Use enhanced service with better query parsing
+        let searchQuery = "\(goodreadsBook.title) by \(goodreadsBook.author)"
+        let results = await enhancedService.searchBooksWithRanking(query: searchQuery)
         
         // Check the search results
-        if let book = googleBooksService.searchResults.first {
+        if let book = results.first {
             // Convert Book to GoogleBookItem
             let bookItem = GoogleBookItem(
                 id: book.id,
@@ -1123,7 +1140,7 @@ class GoodreadsImportService: ObservableObject {
             title: volumeInfo.title,
             author: volumeInfo.authors?.joined(separator: ", ") ?? goodreadsBook.author,
             publishedYear: volumeInfo.publishedDate,
-            coverImageURL: enhancedBook.coverImageURL,  // This uses the enhanced high-res URL
+            coverImageURL: enhancedBook.coverImageURL,  // Keep the URL but don't block on loading
             isbn: goodreadsBook.primaryISBN ?? volumeInfo.industryIdentifiers?.first { $0.type.contains("ISBN") }?.identifier,
             description: volumeInfo.description,
             pageCount: Int(goodreadsBook.numberOfPages) ?? volumeInfo.pageCount

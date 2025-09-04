@@ -614,12 +614,14 @@ struct CommandParser {
     
     static func cleanBookQuery(from input: String) -> String {
         var query = input
+        print("📚 cleanBookQuery - Input: '\(input)'")
         
         // Remove common prefixes
         let prefixes = ["add book ", "add the book ", "add the ", "add ", "reading ", "finished ", "book: ", "i'm reading ", "currently reading "]
         for prefix in prefixes {
             if query.lowercased().starts(with: prefix) {
                 query = String(query.dropFirst(prefix.count))
+                print("📚 cleanBookQuery - Removed prefix '\(prefix)', now: '\(query)'")
                 break
             }
         }
@@ -632,6 +634,7 @@ struct CommandParser {
             query = String(query.dropLast())
         }
         
+        print("📚 cleanBookQuery - Final output: '\(query)'")
         return query
     }
     
