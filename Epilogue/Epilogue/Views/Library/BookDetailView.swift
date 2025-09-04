@@ -498,71 +498,35 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status - iOS 26 style
-                Button(action: {
-                    showingStatusPicker = true
-                    SensoryFeedback.light()
-                }) {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8)
-                }
-                .sheet(isPresented: $showingStatusPicker) {
-                    // iOS 26 Liquid Glass context menu style sheet
-                    VStack(spacing: 0) {
-                        // Title
-                        Text("Reading Status")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 20)
-                            .padding(.bottom, 8)
-                        
-                        // Options
-                        ForEach(ReadingStatus.allCases, id: \.self) { status in
-                            Button(action: {
-                                withAnimation(DesignSystem.Animation.springStandard) {
-                                    libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                    SensoryFeedback.light()
-                                    showingStatusPicker = false
-                                    
-                                    // Show completion sheet when marking as read
-                                    if status == .read && book.readingStatus != .read {
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            showingCompletionSheet = true
-                                        }
+                // Interactive reading status dropdown
+                Menu {
+                    ForEach(ReadingStatus.allCases, id: \.self) { status in
+                        Button {
+                            withAnimation(DesignSystem.Animation.springStandard) {
+                                libraryViewModel.updateReadingStatus(for: book.id, status: status)
+                                SensoryFeedback.light()
+                                
+                                // Show completion sheet when marking as read
+                                if status == .read && book.readingStatus != .read {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        showingCompletionSheet = true
                                     }
                                 }
-                            }) {
-                                HStack {
-                                    Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(status == book.readingStatus ? accentColor : .secondary)
-                                        .font(.system(size: 22))
-                                        .frame(width: 30)
-                                    
-                                    Text(status.rawValue)
-                                        .foregroundStyle(.primary)
-                                        .font(.system(size: 17))
-                                    
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 14)
-                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                            
-                            if status != ReadingStatus.allCases.last {
-                                Divider()
-                                    .padding(.leading, 50)
+                        } label: {
+                            Label {
+                                Text(status.rawValue)
+                            } icon: {
+                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
                             }
                         }
-                        
-                        Spacer()
+                        .tint(accentColor)
                     }
-                    .presentationDetents([.height(CGFloat(70 + ReadingStatus.allCases.count * 55))])
-                    .presentationBackground(.regularMaterial)
-                    .presentationCornerRadius(16)
-                    .presentationDragIndicator(.visible)
+                } label: {
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                        .shadow(color: accentColor.opacity(0.3), radius: 8)
+                } primaryAction: {
+                    // No primary action - just open the menu
                 }
                 
                 // Page count and percentage removed per user request
