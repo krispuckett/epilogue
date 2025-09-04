@@ -323,17 +323,7 @@ struct BookDetailView: View {
             libraryViewModel.currentDetailBook = nil
         }
         .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                // Show Edit Progress button for currently reading books
-                if book.readingStatus == .currentlyReading {
-                    Button("Edit Progress") {
-                        showingProgressEditor = true
-                        SensoryFeedback.light()
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(accentColor)
-                }
-                
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Edit Book") {
                     editedTitle = book.title
                     showingBookSearch = true
@@ -505,11 +495,10 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status dropdown - FIXED for iOS 26
+                // Interactive reading status dropdown
                 Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
-                        Button {
-                            print("📚 Status change requested: \(status.rawValue)")
+                        Button(action: {
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
                                 SensoryFeedback.light()
@@ -521,23 +510,15 @@ struct BookDetailView: View {
                                     }
                                 }
                             }
-                        } label: {
-                            HStack {
-                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(status == book.readingStatus ? accentColor : .white.opacity(0.7))
-                                Text(status.rawValue)
-                                    .foregroundColor(.white)
-                            }
+                        }) {
+                            Label(status.rawValue, systemImage: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
                         }
-                        .buttonStyle(.plain)
                     }
                 } label: {
                     StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                         .shadow(color: accentColor.opacity(0.3), radius: 8)
-                        .contentShape(Rectangle()) // Ensure full tap area
                 }
                 .menuStyle(.automatic)
-                .sensoryFeedback(.selection, trigger: book.readingStatus)
                 
                 // Page count and percentage removed per user request
                 
