@@ -498,57 +498,35 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status - Using popover for iOS 26
-                Button(action: {
-                    showingStatusPicker.toggle()
-                    SensoryFeedback.light()
-                }) {
+                // Interactive reading status dropdown
+                Menu {
+                    ForEach(ReadingStatus.allCases, id: \.self) { status in
+                        Button {
+                            withAnimation(DesignSystem.Animation.springStandard) {
+                                libraryViewModel.updateReadingStatus(for: book.id, status: status)
+                                SensoryFeedback.light()
+                                
+                                // Show completion sheet when marking as read
+                                if status == .read && book.readingStatus != .read {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        showingCompletionSheet = true
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label {
+                                Text(status.rawValue)
+                            } icon: {
+                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
+                            }
+                        }
+                        .tint(accentColor)
+                    }
+                } label: {
                     StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                         .shadow(color: accentColor.opacity(0.3), radius: 8)
                 }
-                .popover(isPresented: $showingStatusPicker) {
-                    VStack(spacing: 0) {
-                        ForEach(ReadingStatus.allCases, id: \.self) { status in
-                            Button(action: {
-                                withAnimation(DesignSystem.Animation.springStandard) {
-                                    libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                    SensoryFeedback.light()
-                                    showingStatusPicker = false
-                                    
-                                    // Show completion sheet when marking as read
-                                    if status == .read && book.readingStatus != .read {
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            showingCompletionSheet = true
-                                        }
-                                    }
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(status == book.readingStatus ? accentColor : .white.opacity(0.6))
-                                        .frame(width: 20)
-                                    
-                                    Text(status.rawValue)
-                                        .foregroundStyle(.white)
-                                    
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            
-                            if status != ReadingStatus.allCases.last {
-                                Divider()
-                                    .background(.white.opacity(0.1))
-                            }
-                        }
-                    }
-                    .frame(width: 220)
-                    .presentationBackground(.regularMaterial)
-                    .presentationCompactAdaptation(.popover)
-                }
+                .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 // Page count and percentage removed per user request
                 
