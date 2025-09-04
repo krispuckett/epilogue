@@ -498,37 +498,24 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status - iOS 26 context menu
-                Button(action: {
-                    // Primary action triggers context menu
-                }) {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8)
-                }
-                .contextMenu {
+                // Interactive reading status dropdown - iOS 26
+                Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
-                        Button {
-                            withAnimation(DesignSystem.Animation.springStandard) {
-                                libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                SensoryFeedback.light()
-                                
-                                // Show completion sheet when marking as read
-                                if status == .read && book.readingStatus != .read {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        showingCompletionSheet = true
-                                    }
+                        Button(status.rawValue) {
+                            libraryViewModel.updateReadingStatus(for: book.id, status: status)
+                            
+                            // Show completion sheet when marking as read
+                            if status == .read && book.readingStatus != .read {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    showingCompletionSheet = true
                                 }
-                            }
-                        } label: {
-                            Label {
-                                Text(status.rawValue)
-                            } icon: {
-                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
                             }
                         }
                     }
+                } label: {
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                        .shadow(color: accentColor.opacity(0.3), radius: 8)
                 }
-                .menuIndicator(.visible)
                 .accessibilityLabel("Reading status: \(book.readingStatus.rawValue). Tap to change.")
                 
                 // Page count and percentage removed per user request
