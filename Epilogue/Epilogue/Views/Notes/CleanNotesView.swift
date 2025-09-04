@@ -18,7 +18,6 @@ struct CleanNotesView: View {
     @State private var showingDeleteAlert = false
     @State private var itemToDelete: Any?
     @State private var settingsButtonPressed = false
-    @State private var showingSettings = false
     @State private var showSearchBar = false
     @State private var showingSessionSummary = false
     @State private var selectedSessionNote: CapturedNote?
@@ -252,103 +251,91 @@ struct CleanNotesView: View {
                 .navigationTitle("Notes")
                 .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        // Selection mode button (only show when in selection mode)
-                        if isSelectionMode {
-                            Button {
+                // Push content to the right
+                ToolbarSpacer(.flexible)
+                
+                // Search button
+                ToolbarItem {
+                    Button {
+                        withAnimation(DesignSystem.Animation.springStandard) {
+                            showSearchBar.toggle()
+                            if !showSearchBar {
+                                searchText = ""
+                            }
+                        }
+                        SensoryFeedback.light()
+                    } label: {
+                        Image(systemName: showSearchBar ? "xmark.circle.fill" : "magnifyingglass")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(showSearchBar ? DesignSystem.Colors.primaryAccent : .white.opacity(0.8))
+                            .symbolRenderingMode(.hierarchical)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                }
+                
+                // Fixed spacer between search and layout menu
+                ToolbarSpacer(.fixed)
+                
+                // Layout/filter options menu
+                ToolbarItem {
+                    Menu {
+                        // Filter type picker
+                        Picker("View", selection: $selectedFilter.animation(DesignSystem.Animation.springStandard)) {
+                            ForEach(FilterType.allCases, id: \.self) { filter in
+                                Label(filter.description, systemImage: filter.icon)
+                                    .tag(filter)
+                            }
+                        }
+                        .pickerStyle(.inline)
+                        .onChange(of: selectedFilter) { _, _ in
+                            SensoryFeedback.light()
+                            // Exit selection mode when switching filters
+                            if isSelectionMode {
                                 withAnimation(DesignSystem.Animation.springStandard) {
                                     isSelectionMode = false
                                     selectedItems.removeAll()
                                 }
-                                SensoryFeedback.light()
+                            }
+                        }
+                        
+                        // Selection mode section
+                        Section {
+                            Button {
+                                withAnimation(DesignSystem.Animation.springStandard) {
+                                    isSelectionMode.toggle()
+                                    if !isSelectionMode {
+                                        selectedItems.removeAll()
+                                    }
+                                }
+                                SensoryFeedback.medium()
                             } label: {
-                                Text("Done")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                                Label(
+                                    isSelectionMode ? "Done Selecting" : "Select Items",
+                                    systemImage: isSelectionMode ? "checkmark.circle" : "checkmark.circle.badge.xmark"
+                                )
                             }
                             
-                            if !selectedItems.isEmpty {
-                                Button {
+                            // Delete selected button (only show when items are selected)
+                            if isSelectionMode && !selectedItems.isEmpty {
+                                Button(role: .destructive) {
                                     deleteSelectedItems()
                                 } label: {
-                                    Image(systemName: "trash")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundStyle(.red.opacity(0.8))
+                                    Label("Delete \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")", 
+                                          systemImage: "trash")
                                 }
                             }
                         }
-                        // Search button - simple
-                        Button {
-                            withAnimation(DesignSystem.Animation.springStandard) {
-                                showSearchBar.toggle()
-                                if !showSearchBar {
-                                    searchText = ""
-                                }
-                            }
-                            SensoryFeedback.light()
-                        } label: {
-                            if showSearchBar {
-                                // Liquid glass close button with amber tint
-                                ZStack {
-                                    Circle()
-                                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
-                                        .frame(width: 28, height: 28)
-                                        .glassEffect()
-                                    
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                }
-                            } else {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 16, weight: .regular))
-                                    .foregroundStyle(DesignSystem.Colors.textSecondary)
-                            }
-                        }
-                        
-                        // Filter selector - simple
-                        Menu {
-                            ForEach(FilterType.allCases, id: \.self) { filter in
-                                Button {
-                                    withAnimation(DesignSystem.Animation.springStandard) {
-                                        selectedFilter = filter
-                                    }
-                                    SensoryFeedback.light()
-                                } label: {
-                                    Label {
-                                        HStack {
-                                            Text(filter.description)
-                                            Spacer()
-                                            if selectedFilter == filter {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 12, weight: .semibold))
-                                            }
-                                        }
-                                    } icon: {
-                                        Image(systemName: filter.icon)
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: selectedFilter.icon)
-                                    .font(.system(size: 12, weight: .medium))
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: selectedFilter.icon)
+                                .font(.system(size: 18, weight: .medium))
+                            if allItems.count > 0 {
                                 Text("\(allItems.count)")
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                             }
-                            .foregroundStyle(.white.opacity(0.8))
                         }
-                        
-                        // Settings button - simple
-                        Button {
-                            showingSettings = true
-                            SensoryFeedback.light()
-                        } label: {
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .symbolRenderingMode(.hierarchical)
                     }
                 }
             }
@@ -367,9 +354,6 @@ struct CleanNotesView: View {
             if !newValue {
                 notesViewModel.isEditingNote = false
             }
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsView()
         }
         .alert("Delete Item", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -462,21 +446,32 @@ struct CleanNotesView: View {
             .overlay(alignment: .topLeading) {
                 // Selection checkbox when in selection mode
                 if isSelectionMode {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(isSelected ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
-                        .padding(12)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(DesignSystem.Animation.springQuick) {
-                                if isSelected {
-                                    selectedItems.remove(note.id)
-                                } else {
-                                    selectedItems.insert(note.id)
-                                }
-                            }
-                            SensoryFeedback.light()
+                    ZStack {
+                        // Liquid glass background
+                        Circle()
+                            .fill(isSelected ? DesignSystem.Colors.primaryAccent.opacity(0.15) : Color.white.opacity(0.001))
+                            .frame(width: 28, height: 28)
+                            .glassEffect(.regular, in: .circle)
+                        
+                        // Checkmark icon
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         }
+                    }
+                    .padding(12)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        withAnimation(DesignSystem.Animation.springQuick) {
+                            if isSelected {
+                                selectedItems.remove(note.id)
+                            } else {
+                                selectedItems.insert(note.id)
+                            }
+                        }
+                        SensoryFeedback.light()
+                    }
                 }
             }
             .scaleEffect(isSelected ? 0.98 : 1.0)
@@ -551,21 +546,32 @@ struct CleanNotesView: View {
             .overlay(alignment: .topLeading) {
                 // Selection checkbox when in selection mode
                 if isSelectionMode {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(isSelected ? DesignSystem.Colors.primaryAccent : DesignSystem.Colors.textQuaternary)
-                        .padding(12)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(DesignSystem.Animation.springQuick) {
-                                if isSelected {
-                                    selectedItems.remove(quote.id)
-                                } else {
-                                    selectedItems.insert(quote.id)
-                                }
-                            }
-                            SensoryFeedback.light()
+                    ZStack {
+                        // Liquid glass background
+                        Circle()
+                            .fill(isSelected ? DesignSystem.Colors.primaryAccent.opacity(0.15) : Color.white.opacity(0.001))
+                            .frame(width: 28, height: 28)
+                            .glassEffect(.regular, in: .circle)
+                        
+                        // Checkmark icon
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         }
+                    }
+                    .padding(12)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        withAnimation(DesignSystem.Animation.springQuick) {
+                            if isSelected {
+                                selectedItems.remove(quote.id)
+                            } else {
+                                selectedItems.insert(quote.id)
+                            }
+                        }
+                        SensoryFeedback.light()
+                    }
                 }
             }
             .scaleEffect(isSelected ? 0.98 : 1.0)

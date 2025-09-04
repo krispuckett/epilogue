@@ -192,57 +192,99 @@ public class SharedBookCoverManager: ObservableObject {
             return await existingTask.value
         }
         
-        // Create loading task
+        // Create loading task with retry logic
         let task = Task<UIImage?, Never> {
             guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else {
                 print("❌ Invalid or unsafe URL")
                 return nil
             }
             
-            do {
-                print("📥 Loading book cover from: \(url.absoluteString.suffix(100))")
-                let (data, response) = try await URLSession.shared.data(from: url)
-                
-                // Check HTTP status
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("📊 HTTP Status: \(httpResponse.statusCode)")
-                    if httpResponse.statusCode == 404 {
-                        print("⚠️ Cover image not found (404), will need fallback")
-                        return nil
+            // Try up to 3 times with exponential backoff
+            for attempt in 1...3 {
+                do {
+                    print("📥 Loading book cover from: \(url.absoluteString.suffix(100)) (attempt \(attempt))")
+                    
+                    // Create request with timeout
+                    var request = URLRequest(url: url)
+                    request.timeoutInterval = 10.0 // 10 second timeout
+                    
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    
+                    // Check HTTP status
+                    if let httpResponse = response as? HTTPURLResponse {
+                        print("📊 HTTP Status: \(httpResponse.statusCode)")
+                        
+                        if httpResponse.statusCode == 404 {
+                            print("⚠️ Cover image not found (404)")
+                            // Don't retry 404s - they won't magically appear
+                            break
+                        }
+                        
+                        // Retry on server errors
+                        if httpResponse.statusCode >= 500 {
+                            print("⚠️ Server error \(httpResponse.statusCode), will retry...")
+                            if attempt < 3 {
+                                // Exponential backoff: 1s, 2s, 4s
+                                let delay = pow(2.0, Double(attempt - 1))
+                                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                                continue
+                            }
+                        }
+                        
+                        // Rate limiting
+                        if httpResponse.statusCode == 429 {
+                            print("⚠️ Rate limited, waiting longer...")
+                            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                            continue
+                        }
+                    }
+                    
+                    guard let originalImage = UIImage(data: data) else { 
+                        print("❌ Failed to decode image data")
+                        if attempt < 3 {
+                            try? await Task.sleep(nanoseconds: 1_000_000_000)
+                            continue
+                        }
+                        return nil 
+                    }
+                    
+                    print("✅ Successfully decoded image: \(originalImage.size)")
+                    
+                    // Resize if needed
+                    let processedImage: UIImage
+                    if let targetSize = targetSize {
+                        processedImage = resizeImage(originalImage, targetSize: targetSize) ?? originalImage
+                    } else {
+                        processedImage = originalImage
+                    }
+                    
+                    // Cache in memory
+                    let cost = processedImage.jpegData(compressionQuality: 0.8)?.count ?? 0
+                    if isThumbnail {
+                        Self.thumbnailCache.setObject(processedImage, forKey: cacheKey as NSString, cost: cost)
+                    } else {
+                        Self.imageCache.setObject(processedImage, forKey: cacheKey as NSString, cost: cost)
+                    }
+                    
+                    // Save to disk
+                    saveToDisk(image: processedImage, key: cacheKey)
+                    
+                    print("✅ Loaded and cached image (\(cacheKey)): \(processedImage.size)")
+                    return processedImage
+                    
+                } catch let error as URLError where error.code == .timedOut {
+                    print("⏱️ Request timed out, attempt \(attempt)")
+                    if attempt < 3 {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay
+                        continue
+                    }
+                } catch {
+                    print("❌ Failed to load image (attempt \(attempt)): \(error.localizedDescription)")
+                    if attempt < 3 {
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        continue
                     }
                 }
-                
-                guard let originalImage = UIImage(data: data) else { 
-                    print("❌ Failed to decode image data")
-                    return nil 
-                }
-                
-                print("✅ Successfully decoded image: \(originalImage.size)")
-                
-                // Resize if needed
-                let processedImage: UIImage
-                if let targetSize = targetSize {
-                    processedImage = resizeImage(originalImage, targetSize: targetSize) ?? originalImage
-                } else {
-                    processedImage = originalImage
-                }
-                
-                // Cache in memory
-                let cost = processedImage.jpegData(compressionQuality: 0.8)?.count ?? 0
-                if isThumbnail {
-                    Self.thumbnailCache.setObject(processedImage, forKey: cacheKey as NSString, cost: cost)
-                } else {
-                    Self.imageCache.setObject(processedImage, forKey: cacheKey as NSString, cost: cost)
-                }
-                
-                // Save to disk
-                saveToDisk(image: processedImage, key: cacheKey)
-                
-                print("✅ Loaded and cached image (\(cacheKey)): \(processedImage.size)")
-                return processedImage
-                
-            } catch {
-                print("❌ Failed to load image from \(url.absoluteString.suffix(100)): \(error.localizedDescription)")
             }
             
             return nil
@@ -439,6 +481,27 @@ public class SharedBookCoverManager: ObservableObject {
         }
         
         print("✅ Cleared all caches")
+    }
+    
+    /// Batch preload covers for better performance
+    public func preloadCovers(_ urls: [String]) {
+        Task {
+            // Limit concurrent loads to prevent overwhelming the server
+            let maxConcurrent = 3
+            
+            await withTaskGroup(of: Void.self) { group in
+                for (index, url) in urls.enumerated() {
+                    // Throttle the requests
+                    if index % maxConcurrent == 0 && index > 0 {
+                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay every 3 requests
+                    }
+                    
+                    group.addTask {
+                        _ = await self.loadThumbnail(from: url, targetSize: CGSize(width: 200, height: 300))
+                    }
+                }
+            }
+        }
     }
     
     /// Force refresh a cover image (useful for broken URLs)

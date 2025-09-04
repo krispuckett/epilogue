@@ -306,9 +306,8 @@ struct BookDetailView: View {
                             ))
                             .scrollTransition { content, phase in
                                 content
-                                    .opacity(phase.isIdentity ? 1 : 0.6)
-                                    .scaleEffect(phase.isIdentity ? 1 : 0.96)
-                                    .blur(radius: phase.isIdentity ? 0 : 1)
+                                    .opacity(phase.isIdentity ? 1 : 0.8)
+                                    .scaleEffect(phase.isIdentity ? 1 : 0.98)
                             }
                     }
                     }
@@ -498,16 +497,8 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status with tap-to-open context menu
-                Button {
-                    // Trigger haptic feedback on tap
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .contextMenu {
+                // Interactive reading status with dropdown menu
+                Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
                         Button {
                             withAnimation(DesignSystem.Animation.springStandard) {
@@ -528,6 +519,23 @@ struct BookDetailView: View {
                             )
                         }
                     }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(book.readingStatus.rawValue)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    }
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(accentColor.opacity(0.3), lineWidth: 1)
+                    }
+                    .shadow(color: accentColor.opacity(0.3), radius: 8)
                 }
                 
                 // Page count and percentage removed per user request
@@ -833,14 +841,29 @@ struct BookDetailView: View {
     
     @ViewBuilder
     private var startReadingSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Image(systemName: "book.pages")
-                .font(.system(size: 48))
-                .foregroundStyle(accentColor.opacity(0.8))
+                .font(.system(size: 44))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [accentColor, accentColor.opacity(0.7)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .symbolRenderingMode(.hierarchical)
             
-            Text("Ready to start reading?")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
+            VStack(spacing: 8) {
+                Text("Ready to start reading?")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                if let pageCount = book.pageCount {
+                    Text("\(pageCount) pages await")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
             
             Button {
                 SensoryFeedback.medium()
@@ -853,18 +876,44 @@ struct BookDetailView: View {
                     SensoryFeedback.success()
                 }
             } label: {
-                Text("Start Reading")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                    .padding(.vertical, 12)
-                    .background(accentColor)
-                    .clipShape(Capsule())
+                HStack(spacing: 8) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Start Reading")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background {
+                    Capsule()
+                        .fill(accentColor.opacity(0.2))
+                }
+                .glassEffect(in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(accentColor.opacity(0.4), lineWidth: 1)
+                }
             }
+            .buttonStyle(PlainButtonStyle())
         }
         .frame(maxWidth: .infinity)
-        .padding(32)
+        .padding(28)
         .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            accentColor.opacity(0.3),
+                            accentColor.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        }
     }
     
     @ViewBuilder

@@ -80,6 +80,20 @@ struct LibraryView: View {
         }
     }
     
+    private func preloadAllBookCovers() async {
+        // Collect all cover URLs
+        let coverURLs = viewModel.books.compactMap { $0.coverImageURL }
+        
+        guard !coverURLs.isEmpty else { return }
+        
+        print("📚 Preloading \(coverURLs.count) book covers...")
+        
+        // Use the batch preload method with throttling
+        await SharedBookCoverManager.shared.preloadCovers(coverURLs)
+        
+        print("✅ Finished preloading covers")
+    }
+    
     @ViewBuilder
     private var emptyStateView: some View {
         ModernEmptyStates.noBooks(
@@ -130,60 +144,65 @@ struct LibraryView: View {
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            HStack(spacing: 12) {
-                // Reorder button (only show in grid mode)
-                if viewMode == .grid {
-                    Button {
-                        withAnimation(DesignSystem.Animation.springStandard) {
-                            viewModel.isReorderMode.toggle()
-                            SensoryFeedback.medium()
-                        }
-                    } label: {
-                        Image(systemName: viewModel.isReorderMode ? "checkmark.circle.fill" : "arrow.up.arrow.down")
-                            .font(.system(size: 18, weight: viewModel.isReorderMode ? .semibold : .regular))
-                            .foregroundStyle(viewModel.isReorderMode ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
-                            .contentTransition(.symbolEffect(.replace))
-                    }
+        // Push content to the right
+        ToolbarSpacer(.flexible)
+        
+        // Layout options menu
+        ToolbarItem {
+            Menu {
+                // View mode section with picker style
+                Picker("View Mode", selection: $viewMode.animation(DesignSystem.Animation.springStandard)) {
+                    Label("Grid View", systemImage: "square.grid.2x2")
+                        .tag(ViewMode.grid)
+                    Label("List View", systemImage: "list.bullet")
+                        .tag(ViewMode.list)
                 }
-                
-                // Grid button
-                Button {
-                    withAnimation(DesignSystem.Animation.springStandard) {
-                        viewMode = .grid
-                        SensoryFeedback.light()
-                    }
-                } label: {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 18, weight: viewMode == .grid ? .semibold : .regular))
-                        .foregroundStyle(viewMode == .grid ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                
-                // List button
-                Button {
-                    withAnimation(DesignSystem.Animation.springStandard) {
-                        viewMode = .list
-                        viewModel.isReorderMode = false // Disable reorder when switching to list
-                        SensoryFeedback.light()
-                    }
-                } label: {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 18, weight: viewMode == .list ? .semibold : .regular))
-                        .foregroundStyle(viewMode == .list ? DesignSystem.Colors.primaryAccent : .white.opacity(0.7))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                
-                // Settings button
-                Button {
-                    appState.showingSettings = true
+                .pickerStyle(.inline)
+                .onChange(of: viewMode) { _, newMode in
                     SensoryFeedback.light()
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .symbolRenderingMode(.hierarchical)
+                    if newMode == .list {
+                        // Disable reorder mode when switching to list
+                        viewModel.isReorderMode = false
+                    }
                 }
+                
+                // Reorder option (only in grid mode) - separate section
+                if viewMode == .grid {
+                    Section {
+                        Button {
+                            withAnimation(DesignSystem.Animation.springStandard) {
+                                viewModel.isReorderMode.toggle()
+                                SensoryFeedback.medium()
+                            }
+                        } label: {
+                            Label(
+                                viewModel.isReorderMode ? "Done Reordering" : "Reorder Books",
+                                systemImage: viewModel.isReorderMode ? "checkmark.circle" : "arrow.up.arrow.down"
+                            )
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: viewMode == .grid ? "square.grid.2x2" : "list.bullet")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .symbolRenderingMode(.hierarchical)
+            }
+        }
+        
+        // Fixed spacer between menu and settings
+        ToolbarSpacer(.fixed)
+        
+        // Settings button
+        ToolbarItem {
+            Button {
+                appState.showingSettings = true
+                SensoryFeedback.light()
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .symbolRenderingMode(.hierarchical)
             }
         }
     }
@@ -364,6 +383,10 @@ struct LibraryView: View {
             stopPerformanceMonitoring()
         }
         #endif
+        .task {
+            // Preload all book covers when the library loads
+            await preloadAllBookCovers()
+        }
     }
 }
 
@@ -537,6 +560,15 @@ struct LibraryBookCard: View {
     @State private var tilt: Double = 0
     @State private var isHovered = false
     
+    // Normalize author spacing to be consistent (J.R.R. instead of J. R. R.)
+    private func normalizeAuthorSpacing(_ author: String) -> String {
+        // Replace multiple spaces with single space first
+        let singleSpaced = author.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        // Remove spaces between single initials (e.g., "J. R. R." becomes "J.R.R.")
+        let normalized = singleSpaced.replacingOccurrences(of: "\\b([A-Z])\\.\\s+(?=[A-Z]\\.)", with: "$1.", options: .regularExpression)
+        return normalized
+    }
+    
     private func shareBook() {
         let text = "Check out \"\(book.title)\" by \(book.author)"
         let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
@@ -586,9 +618,9 @@ struct LibraryBookCard: View {
                     .truncationMode(.tail)
                     .frame(minHeight: 40) // Ensure minimum height for 2 lines
                 
-                Text(book.author)
+                Text(normalizeAuthorSpacing(book.author))
                     .font(.system(size: 13, weight: .regular, design: .monospaced))
-                    .kerning(1.2) // Letter spacing for author names
+                    .kerning(0.8) // Consistent kerning with normalized spacing
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)

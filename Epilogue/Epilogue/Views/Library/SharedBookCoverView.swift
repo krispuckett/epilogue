@@ -195,16 +195,27 @@ struct SharedBookCoverView: View {
                     endPoint: .bottomTrailing
                 )
             } else if isLoading {
-                // Loading state - subtle solid color (no shimmer)
-                // Just slightly lighter than the base placeholder
-                Color(red: 0.28, green: 0.28, blue: 0.32)
-                    .opacity(0.9)
+                // Loading state - show a clean loading indicator
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.25, green: 0.25, blue: 0.3),
+                            Color(red: 0.2, green: 0.2, blue: 0.25)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    // Simple progress indicator
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.3)))
+                        .scaleEffect(0.8)
+                }
             }
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-        .drawingGroup() // Cache the shadow rendering
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
     }
 }
 

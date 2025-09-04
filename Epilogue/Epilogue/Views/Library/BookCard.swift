@@ -6,6 +6,15 @@ struct BookCard: View {
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.sizeCategory) var sizeCategory
     
+    // Normalize author spacing to be consistent (J.R.R. instead of J. R. R.)
+    private func normalizeAuthorSpacing(_ author: String) -> String {
+        // Replace multiple spaces with single space first
+        let singleSpaced = author.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        // Remove spaces between single initials (e.g., "J. R. R." becomes "J.R.R.")
+        let normalized = singleSpaced.replacingOccurrences(of: "\\b([A-Z])\\.\\s+(?=[A-Z]\\.)", with: "$1.", options: .regularExpression)
+        return normalized
+    }
+    
     private var accessibilityLabel: String {
         let pages = book.pageCount ?? 0
         let currentPage = book.currentPage
@@ -36,9 +45,9 @@ struct BookCard: View {
                     .frame(minHeight: sizeCategory.isAccessibilitySize ? 60 : 40)
                     .fixedSize(horizontal: false, vertical: true)
                 
-                Text(book.author)
+                Text(normalizeAuthorSpacing(book.author))
                     .font(.system(size: sizeCategory.isAccessibilitySize ? 16 : 13, weight: .regular, design: .monospaced))
-                    .kerning(1.2)
+                    .kerning(0.8)  // Reduced kerning since we're normalizing spaces
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
                     .lineLimit(sizeCategory.isAccessibilitySize ? 2 : 1)
                     .truncationMode(.tail)
