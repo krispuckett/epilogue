@@ -497,7 +497,7 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status with dropdown menu
+                // Interactive reading status pill with Menu
                 Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
                         Button {
@@ -520,22 +520,8 @@ struct BookDetailView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Text(book.readingStatus.rawValue)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background {
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                    }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(accentColor.opacity(0.3), lineWidth: 1)
-                    }
-                    .shadow(color: accentColor.opacity(0.3), radius: 8)
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
+                        .shadow(color: accentColor.opacity(0.3), radius: 8)
                 }
                 
                 // Page count and percentage removed per user request
