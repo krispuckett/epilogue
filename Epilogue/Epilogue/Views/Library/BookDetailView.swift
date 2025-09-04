@@ -177,6 +177,10 @@ struct BookDetailView: View {
     @State private var showingBookSearch = false
     @State private var editedTitle = ""
     @State private var isEditingTitle = false
+    
+    // Progress editing states
+    @State private var showingProgressSheet = false
+    @State private var editingCurrentPage = ""
     @State private var showingProgressEditor = false
     @State private var showingCompletionSheet = false
     
@@ -319,7 +323,17 @@ struct BookDetailView: View {
             libraryViewModel.currentDetailBook = nil
         }
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                // Show Edit Progress button for currently reading books
+                if book.readingStatus == .currentlyReading {
+                    Button("Edit Progress") {
+                        showingProgressEditor = true
+                        SensoryFeedback.light()
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(accentColor)
+                }
+                
                 Button("Edit Book") {
                     editedTitle = book.title
                     showingBookSearch = true
@@ -491,10 +505,11 @@ struct BookDetailView: View {
             
             // Status and page info
             HStack(spacing: 16) {
-                // Interactive reading status dropdown
+                // Interactive reading status dropdown - FIXED for iOS 26
                 Menu {
                     ForEach(ReadingStatus.allCases, id: \.self) { status in
-                        Button(action: {
+                        Button {
+                            print("📚 Status change requested: \(status.rawValue)")
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
                                 SensoryFeedback.light()
@@ -506,15 +521,23 @@ struct BookDetailView: View {
                                     }
                                 }
                             }
-                        }) {
-                            Label(status.rawValue, systemImage: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
+                        } label: {
+                            HStack {
+                                Image(systemName: status == book.readingStatus ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(status == book.readingStatus ? accentColor : .white.opacity(0.7))
+                                Text(status.rawValue)
+                                    .foregroundColor(.white)
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
                 } label: {
                     StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                         .shadow(color: accentColor.opacity(0.3), radius: 8)
+                        .contentShape(Rectangle()) // Ensure full tap area
                 }
                 .menuStyle(.automatic)
+                .sensoryFeedback(.selection, trigger: book.readingStatus)
                 
                 // Page count and percentage removed per user request
                 
