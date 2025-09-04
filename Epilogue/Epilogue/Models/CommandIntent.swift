@@ -270,8 +270,12 @@ struct CommandParser {
         // Phase 5: Smart Book Title Detection - Check for "by" pattern first
         if trimmed.lowercased().contains(" by ") {
             let query = cleanBookQuery(from: input)
-            print("CommandParser: Detected 'by' pattern for book, query: '\(query)'")
-            return .addBook(query: query)
+            print("CommandParser: Detected 'by' pattern for book")
+            print("CommandParser: Input was: '\(input)'")
+            print("CommandParser: Query after cleanBookQuery: '\(query)'")
+            let result = CommandIntent.addBook(query: query)
+            print("CommandParser: Returning CommandIntent: \(result)")
+            return result
         }
         
         // Phase 6: Advanced Book Title Detection with ML-like scoring
