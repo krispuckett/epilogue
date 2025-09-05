@@ -12,7 +12,7 @@ struct ModernSessionsView: View {
     
     private var groupedSessions: [(String, [AmbientSession])] {
         let grouped = Dictionary(grouping: sessions) { session in
-            dateGroupKey(for: session.startTime)
+            dateGroupKey(for: session.startTime ?? Date())
         }
         
         return grouped.sorted { first, second in
@@ -252,12 +252,12 @@ struct SessionRow: View {
     }
     
     private var sessionSummary: String {
-        if let firstQuestion = session.capturedQuestions.first {
-            return firstQuestion.content
-        } else if let firstQuote = session.capturedQuotes.first {
-            return firstQuote.text
-        } else if let firstNote = session.capturedNotes.first {
-            return firstNote.content
+        if let firstQuestion = (session.capturedQuestions ?? []).first {
+            return firstQuestion.content ?? ""
+        } else if let firstQuote = (session.capturedQuotes ?? []).first {
+            return firstQuote.text ?? ""
+        } else if let firstNote = (session.capturedNotes ?? []).first {
+            return firstNote.content ?? ""
         } else if let book = session.book {
             return "Started exploring \(book.title)"
         } else {
@@ -271,15 +271,15 @@ struct SessionRow: View {
                 HStack(alignment: .top, spacing: 16) {
                     // Time column
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(timeFormatter.string(from: session.startTime))
+                        Text(timeFormatter.string(from: session.startTime ?? Date()))
                             .font(.system(size: 15, weight: .medium, design: .monospaced))
                             .foregroundStyle(DesignSystem.Colors.textTertiary)
                         
                         // Show "Just started" for very recent sessions
-                        if abs(session.startTime.timeIntervalSinceNow) < 300 &&
-                           session.capturedQuotes.isEmpty &&
-                           session.capturedQuestions.isEmpty &&
-                           session.capturedNotes.isEmpty {
+                        if abs((session.startTime ?? Date()).timeIntervalSinceNow) < 300 &&
+                           (session.capturedQuotes ?? []).isEmpty &&
+                           (session.capturedQuestions ?? []).isEmpty &&
+                           (session.capturedNotes ?? []).isEmpty {
                             Text("Just")
                                 .font(.system(size: 13))
                                 .foregroundStyle(DesignSystem.Colors.textQuaternary)
@@ -309,31 +309,31 @@ struct SessionRow: View {
                         
                         // Item badges
                         HStack(spacing: 16) {
-                            if session.capturedQuotes.count > 0 {
+                            if (session.capturedQuotes ?? []).count > 0 {
                                 HStack(spacing: 6) {
                                     Image(systemName: "quote.bubble.fill")
                                         .font(.system(size: 14))
-                                    Text("\(session.capturedQuotes.count)")
+                                    Text("\((session.capturedQuotes ?? []).count)")
                                         .font(.system(size: 14, weight: .medium))
                                 }
                                 .foregroundStyle(.purple)
                             }
                             
-                            if session.capturedQuestions.count > 0 {
+                            if (session.capturedQuestions ?? []).count > 0 {
                                 HStack(spacing: 6) {
                                     Image(systemName: "questionmark.circle.fill")
                                         .font(.system(size: 14))
-                                    Text("\(session.capturedQuestions.count)")
+                                    Text("\((session.capturedQuestions ?? []).count)")
                                         .font(.system(size: 14, weight: .medium))
                                 }
                                 .foregroundStyle(.blue)
                             }
                             
-                            if session.capturedNotes.count > 0 {
+                            if (session.capturedNotes ?? []).count > 0 {
                                 HStack(spacing: 6) {
                                     Image(systemName: "note.text")
                                         .font(.system(size: 14))
-                                    Text("\(session.capturedNotes.count)")
+                                    Text("\((session.capturedNotes ?? []).count)")
                                         .font(.system(size: 14, weight: .medium))
                                 }
                                 .foregroundStyle(.green)
@@ -373,115 +373,132 @@ struct AmbientSessionDetailView: View {
     let session: AmbientSession
     @Environment(\.dismiss) private var dismiss
     
+    // Extract complex header into computed property
+    @ViewBuilder
+    private var sessionInfoHeader: some View {
+        if let book = session.book {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(book.title)
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                    
+                    if !book.author.isEmpty {
+                        Text(book.author)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    
+                    // Session time
+                    Text(session.startTime ?? Date(), style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                
+                Spacer()
+                
+                if let coverURL = book.coverImageURL {
+                    SharedBookCoverView(
+                        coverURL: coverURL,
+                        width: 60,
+                        height: 90
+                    )
+                    .cornerRadius(8)
+                    .shadow(radius: 10)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top)
+        }
+    }
+    
+    // Extract questions section
+    @ViewBuilder
+    private var questionsSection: some View {
+        if !(session.capturedQuestions ?? []).isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Questions")
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal)
+                
+                ForEach(Array(session.capturedQuestions ?? [])) { question in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(question.content ?? "")
+                            .font(.body)
+                            .foregroundStyle(.white)
+                        
+                        if let answer = question.answer {
+                            Text(answer)
+                                .font(.callout)
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    // Extract quotes section
+    @ViewBuilder
+    private var quotesSection: some View {
+        if !(session.capturedQuotes ?? []).isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Quotes")
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal)
+                
+                ForEach(Array(session.capturedQuotes ?? [])) { quote in
+                    Text(quote.text ?? "")
+                        .font(.custom("Georgia", size: 17))
+                        .foregroundStyle(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
+    // Extract notes section
+    @ViewBuilder
+    private var notesSection: some View {
+        if !(session.capturedNotes ?? []).isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Notes")
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal)
+                
+                ForEach(Array(session.capturedNotes ?? [])) { note in
+                    Text(note.content ?? "")
+                        .font(.body)
+                        .foregroundStyle(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                }
+            }
+        }
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                // Session info header
-                if let book = session.book {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(book.title)
-                                .font(.title2.bold())
-                                .foregroundStyle(.white)
-                            
-                            if !book.author.isEmpty {
-                                Text(book.author)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.white.opacity(0.6))
-                            }
-                            
-                            // Session time
-                            Text(session.startTime, style: .date)
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.4))
-                        }
-                        
-                        Spacer()
-                        
-                        if let coverURL = book.coverImageURL {
-                            SharedBookCoverView(
-                                coverURL: coverURL,
-                                width: 60,
-                                height: 90
-                            )
-                            .cornerRadius(8)
-                            .shadow(radius: 10)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top)
-                }
-                
-                // Questions section
-                if !session.capturedQuestions.isEmpty {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Questions")
-                            .font(.headline)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal)
-                        
-                        ForEach(session.capturedQuestions) { question in
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(question.content)
-                                    .font(.body)
-                                    .foregroundStyle(.white)
-                                
-                                if let answer = question.answer {
-                                    Text(answer)
-                                        .font(.callout)
-                                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-                                }
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.white.opacity(0.05))
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                        }
-                    }
-                }
-                
-                // Quotes section
-                if !session.capturedQuotes.isEmpty {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Quotes")
-                            .font(.headline)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal)
-                        
-                        ForEach(session.capturedQuotes) { quote in
-                            Text(quote.text)
-                                .font(.custom("Georgia", size: 17))
-                                .foregroundStyle(.white)
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(12)
-                                .padding(.horizontal)
-                        }
-                    }
-                }
-                
-                // Notes section
-                if !session.capturedNotes.isEmpty {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Notes")
-                            .font(.headline)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal)
-                        
-                        ForEach(session.capturedNotes) { note in
-                            Text(note.content)
-                                .font(.body)
-                                .foregroundStyle(.white)
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(12)
-                                .padding(.horizontal)
-                        }
-                    }
-                }
+                sessionInfoHeader
+                questionsSection
+                quotesSection
+                notesSection
             }
             .padding(.bottom, 50)
         }

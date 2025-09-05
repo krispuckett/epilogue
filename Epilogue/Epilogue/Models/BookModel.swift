@@ -6,10 +6,10 @@ import SwiftUI
 
 @Model
 final class BookModel {
-    var id: String  // Google Books ID
-    var localId: String  // Local UUID for linking
-    var title: String
-    var author: String
+    var id: String = ""  // Google Books ID - Default for CloudKit
+    var localId: String = UUID().uuidString  // Local UUID - Default for CloudKit
+    var title: String = ""  // Default for CloudKit
+    var author: String = ""  // Default for CloudKit
     var publishedYear: String?
     var coverImageURL: String?
     var isbn: String?
@@ -17,12 +17,12 @@ final class BookModel {
     var pageCount: Int?
     
     // Reading status
-    var isInLibrary: Bool
-    var readingStatus: String // Store as string for SwiftData
-    var currentPage: Int
+    var isInLibrary: Bool = false  // Default for CloudKit
+    var readingStatus: String = ReadingStatus.wantToRead.rawValue // Store as string for SwiftData
+    var currentPage: Int = 0  // Default for CloudKit
     var userRating: Int?
     var userNotes: String?
-    var dateAdded: Date
+    var dateAdded: Date = Date()  // Default for CloudKit
     
     // Relationships
     @Relationship(deleteRule: .cascade, inverse: \CapturedNote.book)
@@ -33,6 +33,9 @@ final class BookModel {
     
     @Relationship(deleteRule: .cascade, inverse: \CapturedQuestion.book)
     var questions: [CapturedQuestion]?
+    
+    @Relationship(deleteRule: .cascade, inverse: \AmbientSession.bookModel)
+    var sessions: [AmbientSession]?
     
     init(
         id: String,
@@ -50,7 +53,7 @@ final class BookModel {
         self.title = title
         self.author = author
         self.publishedYear = publishedYear
-        self.coverImageURL = coverImageURL
+        self.coverImageURL = coverImageURL  // Explicitly set the URL
         self.isbn = isbn
         self.desc = description
         self.pageCount = pageCount
@@ -58,6 +61,13 @@ final class BookModel {
         self.readingStatus = ReadingStatus.wantToRead.rawValue
         self.currentPage = 0
         self.dateAdded = Date()
+        
+        // Debug logging
+        if coverImageURL != nil && !coverImageURL!.isEmpty {
+            print("✅ BookModel initialized with cover URL: \(coverImageURL!)")
+        } else {
+            print("⚠️ BookModel initialized WITHOUT cover URL for: \(title)")
+        }
     }
     
     // Convert from the existing Book struct
@@ -83,6 +93,14 @@ final class BookModel {
     
     // Convert to the existing Book struct for compatibility
     var asBook: Book {
+        // Debug logging
+        if coverImageURL == nil || coverImageURL!.isEmpty {
+            print("⚠️⚠️⚠️ asBook conversion: BookModel has NO cover URL for: \(title)")
+            print("   BookModel.coverImageURL = \(coverImageURL ?? "nil")")
+        } else {
+            print("✅ asBook conversion: BookModel has cover URL: \(coverImageURL!)")
+        }
+        
         var book = Book(
             id: id,
             title: title,
@@ -100,6 +118,14 @@ final class BookModel {
         book.userRating = userRating
         book.userNotes = userNotes
         book.dateAdded = dateAdded
+        
+        // Final verification
+        if book.coverImageURL != coverImageURL {
+            print("❌❌❌ CRITICAL: Cover URL changed during conversion!")
+            print("   BookModel.coverImageURL: \(coverImageURL ?? "nil")")
+            print("   Book.coverImageURL: \(book.coverImageURL ?? "nil")")
+        }
+        
         return book
     }
 }

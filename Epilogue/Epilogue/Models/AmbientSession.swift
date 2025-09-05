@@ -5,9 +5,9 @@ import SwiftData
 // MARK: - Ambient Session Model
 @Model
 final class AmbientSession {
-    @Attribute(.unique) var id: UUID = UUID()
-    var startTime: Date
-    var endTime: Date
+    var id: UUID? = UUID()
+    var startTime: Date? = Date()
+    var endTime: Date? = Date()
     var bookModel: BookModel?
     var currentChapter: Int?
     var currentPage: Int?
@@ -18,30 +18,31 @@ final class AmbientSession {
         return nil
     }
     
-    // Raw content
-    var transcriptSegments: [TranscriptSegment] = []
-    var processedContent: [ProcessedContent] = []
+    // Raw content - Store as Data for CloudKit
+    @Transient var transcriptSegments: [TranscriptSegment] = []
+    @Transient var processedContent: [ProcessedContent] = []
     
     // Captured items (relationships to SwiftData models)
-    var capturedQuotes: [CapturedQuote] = []
-    var capturedNotes: [CapturedNote] = []
-    var capturedQuestions: [CapturedQuestion] = []
+    var capturedQuotes: [CapturedQuote]? = []
+    var capturedNotes: [CapturedNote]? = []
+    var capturedQuestions: [CapturedQuestion]? = []
     
     // Computed properties
     var duration: TimeInterval {
-        endTime.timeIntervalSince(startTime)
+        guard let startTime = startTime, let endTime = endTime else { return 0 }
+        return endTime.timeIntervalSince(startTime)
     }
     
     var questions: [CapturedQuestion] {
-        capturedQuestions
+        capturedQuestions ?? []
     }
     
     var quotes: [CapturedQuote] {
-        capturedQuotes
+        capturedQuotes ?? []
     }
     
     var notes: [CapturedNote] {
-        capturedNotes
+        capturedNotes ?? []
     }
     
     var keyTopics: [String] {
@@ -61,8 +62,8 @@ final class AmbientSession {
     
     var capturedContent: [any CapturedContent] {
         var content: [any CapturedContent] = []
-        content.append(contentsOf: capturedQuotes)
-        content.append(contentsOf: capturedNotes)
+        content.append(contentsOf: capturedQuotes ?? [])
+        content.append(contentsOf: capturedNotes ?? [])
         return content
     }
     
@@ -85,13 +86,15 @@ final class AmbientSession {
         var topics: [String: Int] = [:]
         
         // Analyze questions for topics
-        for question in capturedQuestions {
-            let words = question.content.split(separator: " ")
-            for word in words {
-                let key = String(word).lowercased()
-                // Filter for meaningful words (not common words)
-                if key.count > 4 && !commonWords.contains(key) {
-                    topics[key, default: 0] += 1
+        for question in capturedQuestions ?? [] {
+            if let content = question.content {
+                let words = content.split(separator: " ")
+                for word in words {
+                    let key = String(word).lowercased()
+                    // Filter for meaningful words (not common words)
+                    if key.count > 4 && !commonWords.contains(key) {
+                        topics[key, default: 0] += 1
+                    }
                 }
             }
         }
@@ -106,16 +109,16 @@ final class AmbientSession {
         var threads: [ConversationThread] = []
         
         // Group questions with their responses
-        for (index, question) in capturedQuestions.enumerated() {
+        for (index, question) in (capturedQuestions ?? []).enumerated() {
             let thread = ConversationThread(
-                id: question.id.uuidString,
+                id: question.id?.uuidString ?? UUID().uuidString,
                 index: index,
-                title: question.content,
+                title: question.content ?? "",
                 icon: "questionmark.circle",
                 iconColor: .blue,
-                messages: [question.content],
+                messages: [question.content ?? ""],
                 aiResponse: question.answer,
-                timestamp: question.timestamp,
+                timestamp: question.timestamp ?? Date(),
                 suggestedFollowUps: generateFollowUps(for: question)
             )
             threads.append(thread)
@@ -128,7 +131,7 @@ final class AmbientSession {
         // Generate contextual follow-up questions
         var followUps: [String] = []
         
-        let content = question.content.lowercased()
+        let content = (question.content ?? "").lowercased()
         
         // Character questions
         if content.contains("who") || content.contains("character") {
@@ -155,11 +158,11 @@ final class AmbientSession {
         var suggestions: [String] = []
         
         // Based on recent topics
-        if let lastQuestion = capturedQuestions.last {
-            if lastQuestion.content.contains("character") {
+        if let lastQuestion = capturedQuestions?.last {
+            if let content = lastQuestion.content, content.contains("character") {
                 suggestions.append("Explore character relationships")
             }
-            if lastQuestion.content.contains("theme") {
+            if let content = lastQuestion.content, content.contains("theme") {
                 suggestions.append("Discuss symbolism")
             }
         }
@@ -226,8 +229,8 @@ struct ProcessedContent: Codable {
 
 // MARK: - Captured Content Protocol
 protocol CapturedContent {
-    var id: UUID { get }
-    var timestamp: Date { get }
+    var id: UUID? { get }
+    var timestamp: Date? { get }
 }
 
 // Make existing models conform to protocol
