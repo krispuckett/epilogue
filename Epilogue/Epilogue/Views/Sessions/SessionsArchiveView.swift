@@ -40,9 +40,10 @@ struct SessionsArchiveView: View {
             }
             
             if !searchText.isEmpty {
-                let searchContent = session.capturedQuestions.map(\.content).joined(separator: " ") +
-                                  session.capturedQuotes.map(\.text).joined(separator: " ") +
-                                  session.capturedNotes.map(\.content).joined(separator: " ")
+                let questions = (session.capturedQuestions ?? []).compactMap { $0.content }
+                let quotes = (session.capturedQuotes ?? []).compactMap { $0.text }
+                let notes = (session.capturedNotes ?? []).compactMap { $0.content }
+                let searchContent = (questions + quotes + notes).joined(separator: " ")
                 guard searchContent.localizedCaseInsensitiveContains(searchText) else { return false }
             }
             
@@ -98,7 +99,7 @@ struct SessionsArchiveView: View {
         .sheet(item: $showingSessionDetail) { session in
             AmbientSessionSummaryView(
                 session: session,
-                colorPalette: colorPalettes[session.id]
+                colorPalette: colorPalettes[session.id ?? UUID()]
             )
         }
         .fullScreenCover(item: $continuingSession) { session in
@@ -165,7 +166,7 @@ struct SessionsArchiveView: View {
                     ForEach(dayGroup.sessions) { session in
                         SessionTimelineCard(
                             session: session,
-                            colorPalette: colorPalettes[session.id],
+                            colorPalette: colorPalettes[session.id ?? UUID()],
                             isExpanded: expandedSessionId == session.id,
                             onTap: {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -226,7 +227,7 @@ struct SessionsArchiveView: View {
                             ForEach(bookGroup.sessions) { session in
                                 SessionBookCard(
                                     session: session,
-                                    colorPalette: colorPalettes[session.id],
+                                    colorPalette: colorPalettes[session.id ?? UUID()],
                                     onContinue: {
                                         continuingSession = session
                                     },
@@ -266,7 +267,7 @@ struct SessionsArchiveView: View {
     private func groupSessionsByDate() -> [DayGroup] {
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: filteredSessions) { session in
-            calendar.startOfDay(for: session.startTime)
+            calendar.startOfDay(for: session.startTime ?? Date())
         }
         
         return grouped.map { DayGroup(date: $0.key, sessions: $0.value) }
@@ -278,10 +279,10 @@ struct SessionsArchiveView: View {
             session.bookModel?.id ?? ""
         }
         
-        return grouped.compactMap { bookId, sessions in
+        return grouped.compactMap { (bookId, sessions) -> BookGroup? in
             guard let bookModel = sessions.first?.bookModel,
                   let book = convertBookModelToBook(bookModel) else { return nil }
-            return BookGroup(book: book, sessions: sessions.sorted { $0.startTime > $1.startTime })
+            return BookGroup(book: book, sessions: sessions.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) })
         }
         .sorted { $0.book.title < $1.book.title }
     }
@@ -290,8 +291,8 @@ struct SessionsArchiveView: View {
         var companions: [String: [AmbientSession]] = [:]
         
         for session in sessions {
-            for question in session.capturedQuestions {
-                let characters = extractCharacterNames(from: question.content)
+            for question in session.capturedQuestions ?? [] {
+                let characters = extractCharacterNames(from: question.content ?? "")
                 for character in characters {
                     companions[character, default: []].append(session)
                 }
@@ -326,7 +327,7 @@ struct SessionsArchiveView: View {
                         let extractor = OKLABColorExtractor()
                         if let palette = try? await extractor.extractPalette(from: uiImage) {
                             await MainActor.run {
-                                colorPalettes[session.id] = palette
+                                colorPalettes[session.id ?? UUID()] = palette
                             }
                         }
                     }

@@ -201,11 +201,11 @@ extension UnifiedChatMessage {
     func isDeleted(using syncManager: NotesSyncManager = .shared) -> Bool {
         switch messageType {
         case .note(let capturedNote):
-            return syncManager.isNoteDeleted(capturedNote.id)
+            return syncManager.isNoteDeleted(capturedNote.id ?? UUID())
         case .noteWithContext(let capturedNote, _):
-            return syncManager.isNoteDeleted(capturedNote.id)
+            return syncManager.isNoteDeleted(capturedNote.id ?? UUID())
         case .quote(let capturedQuote):
-            return syncManager.isNoteDeleted(capturedQuote.id)
+            return syncManager.isNoteDeleted(capturedQuote.id ?? UUID())
         default:
             return false
         }

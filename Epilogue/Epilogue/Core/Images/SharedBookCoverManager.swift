@@ -179,6 +179,45 @@ public class SharedBookCoverManager: ObservableObject {
         }
     }
     
+    /// Get cached image if available (checks both thumbnail and full caches)
+    public func getCachedImage(for coverURL: String?) -> UIImage? {
+        guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
+        
+        let cleanedURL = cleanURL(coverURL)
+        
+        // Check full image cache first
+        let fullCacheKey = "\(cleanedURL)_full" as NSString
+        if let cached = Self.imageCache.object(forKey: fullCacheKey) {
+            print("✅ Found full image in cache for: \(cleanedURL.suffix(50))")
+            return cached
+        }
+        
+        // Check thumbnail cache
+        let thumbCacheKey = "\(cleanedURL)_thumb" as NSString
+        if let cached = Self.thumbnailCache.object(forKey: thumbCacheKey) {
+            print("✅ Found thumbnail in cache for: \(cleanedURL.suffix(50))")
+            return cached
+        }
+        
+        // Check disk cache for full image
+        if let diskCached = loadFromDisk(key: fullCacheKey as String) {
+            // Store back in memory cache for quick access
+            Self.imageCache.setObject(diskCached, forKey: fullCacheKey, cost: diskCached.jpegData(compressionQuality: 0.8)?.count ?? 0)
+            print("✅ Found full image on disk for: \(cleanedURL.suffix(50))")
+            return diskCached
+        }
+        
+        // Check disk cache for thumbnail
+        if let diskCached = loadFromDisk(key: thumbCacheKey as String) {
+            // Store back in memory cache for quick access
+            Self.thumbnailCache.setObject(diskCached, forKey: thumbCacheKey, cost: diskCached.jpegData(compressionQuality: 0.8)?.count ?? 0)
+            print("✅ Found thumbnail on disk for: \(cleanedURL.suffix(50))")
+            return diskCached
+        }
+        
+        return nil
+    }
+    
     // MARK: - Private Methods
     
     private func loadAndCacheImage(
@@ -441,9 +480,10 @@ public class SharedBookCoverManager: ObservableObject {
         
         // Remove all zoom parameters
         let zoomPatterns = [
-            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1",
-            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1",
-            "zoom=5", "zoom=4", "zoom=3", "zoom=2", "zoom=1"
+            "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
+            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
+            "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
+            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
         ]
         
         for pattern in zoomPatterns {

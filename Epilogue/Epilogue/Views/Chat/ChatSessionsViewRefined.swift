@@ -57,9 +57,9 @@ struct ChatSessionsViewRefined: View {
         // Apply search
         if !searchText.isEmpty {
             filtered = filtered.filter { session in
-                let content = (session.capturedQuestions.map(\.content) +
-                              session.capturedQuotes.map(\.text) +
-                              session.capturedNotes.map(\.content)).joined(separator: " ")
+                let content = ((session.capturedQuestions ?? []).map { $0.content ?? "" } +
+                              (session.capturedQuotes ?? []).map { $0.text ?? "" } +
+                              (session.capturedNotes ?? []).map { $0.content ?? "" }).joined(separator: " ")
                 let bookTitle = session.bookModel?.title ?? ""
                 
                 return content.localizedCaseInsensitiveContains(searchText) ||
@@ -72,11 +72,11 @@ struct ChatSessionsViewRefined: View {
         case .all:
             break
         case .questions:
-            filtered = filtered.filter { !$0.capturedQuestions.isEmpty }
+            filtered = filtered.filter { !($0.capturedQuestions ?? []).isEmpty }
         case .quotes:
-            filtered = filtered.filter { !$0.capturedQuotes.isEmpty }
+            filtered = filtered.filter { !($0.capturedQuotes ?? []).isEmpty }
         case .notes:
-            filtered = filtered.filter { !$0.capturedNotes.isEmpty }
+            filtered = filtered.filter { !($0.capturedNotes ?? []).isEmpty }
         }
         
         return filtered
@@ -358,18 +358,18 @@ struct ChatSessionsViewRefined: View {
                     IntelligentSessionCard(
                         session: session,
                         colorPalette: colorPalettes[session.bookModel?.id ?? ""],
-                        isExpanded: expandedSessions.contains(session.id),
+                        isExpanded: expandedSessions.contains(session.id ?? UUID()),
                         isSelectionMode: isSelectionMode,
-                        isSelected: selectedSessionIds.contains(session.id),
+                        isSelected: selectedSessionIds.contains(session.id ?? UUID()),
                         onTap: {
                             if isSelectionMode {
                                 toggleSessionSelection(session)
                             } else {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    if expandedSessions.contains(session.id) {
-                                        expandedSessions.remove(session.id)
+                                    if expandedSessions.contains(session.id ?? UUID()) {
+                                        expandedSessions.remove(session.id ?? UUID())
                                     } else {
-                                        expandedSessions.insert(session.id)
+                                        expandedSessions.insert(session.id ?? UUID())
                                     }
                                 }
                             }
@@ -394,10 +394,10 @@ struct ChatSessionsViewRefined: View {
     // MARK: - Helper Functions
     private func toggleSessionSelection(_ session: AmbientSession) {
         withAnimation(DesignSystem.Animation.springQuick) {
-            if selectedSessionIds.contains(session.id) {
-                selectedSessionIds.remove(session.id)
+            if selectedSessionIds.contains(session.id ?? UUID()) {
+                selectedSessionIds.remove(session.id ?? UUID())
             } else {
-                selectedSessionIds.insert(session.id)
+                selectedSessionIds.insert(session.id ?? UUID())
             }
         }
         SensoryFeedback.light()
@@ -405,7 +405,7 @@ struct ChatSessionsViewRefined: View {
     
     private func deleteSelectedSessions() {
         for sessionId in selectedSessionIds {
-            if let session = sessions.first(where: { $0.id == sessionId }) {
+            if let session = sessions.first(where: { ($0.id ?? UUID()) == sessionId }) {
                 modelContext.delete(session)
             }
         }
@@ -427,7 +427,7 @@ struct ChatSessionsViewRefined: View {
             session.bookModel?.id ?? ""
         }
         
-        return grouped.compactMap { bookId, sessions in
+        return grouped.compactMap { (bookId, sessions) -> (book: Book, sessions: [AmbientSession])? in
             guard let bookModel = sessions.first?.bookModel else { return nil }
             
             // Convert HTTP to HTTPS for cover URLs
@@ -444,12 +444,13 @@ struct ChatSessionsViewRefined: View {
                 coverImageURL: secureCoverURL,
                 isbn: bookModel.isbn,
                 description: bookModel.desc,
-                pageCount: bookModel.pageCount
+                pageCount: bookModel.pageCount,
+                localId: UUID(uuidString: bookModel.localId) ?? UUID()
             )
             
-            return (book: book, sessions: sessions.sorted { $0.startTime > $1.startTime })
+            return (book: book, sessions: sessions.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) })
         }
-        .sorted { $0.sessions.first?.startTime ?? Date() > $1.sessions.first?.startTime ?? Date() }
+        .sorted { ($0.sessions.first?.startTime ?? Date()) > ($1.sessions.first?.startTime ?? Date()) }
     }
     
     
@@ -604,18 +605,18 @@ struct BookSessionGroupWithSelection: View {
                         IntelligentSessionCard(
                             session: session,
                             colorPalette: colorPalette,
-                            isExpanded: expandedSessions.contains(session.id),
+                            isExpanded: expandedSessions.contains(session.id ?? UUID()),
                             isSelectionMode: isSelectionMode,
-                            isSelected: selectedSessionIds.contains(session.id),
+                            isSelected: selectedSessionIds.contains(session.id ?? UUID()),
                             onTap: {
                                 if isSelectionMode {
                                     onSelectSession(session)
                                 } else {
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        if expandedSessions.contains(session.id) {
-                                            expandedSessions.remove(session.id)
+                                        if expandedSessions.contains(session.id ?? UUID()) {
+                                            expandedSessions.remove(session.id ?? UUID())
                                         } else {
-                                            expandedSessions.insert(session.id)
+                                            expandedSessions.insert(session.id ?? UUID())
                                         }
                                     }
                                 }
@@ -665,9 +666,9 @@ struct IntelligentSessionCard: View {
     
     private var sessionSummary: String {
         // Create an intelligent summary based on the session content
-        let questions = session.capturedQuestions
-        let quotes = session.capturedQuotes
-        let notes = session.capturedNotes
+        let questions = session.capturedQuestions ?? []
+        let quotes = session.capturedQuotes ?? []
+        let notes = session.capturedNotes ?? []
         
         // Priority 1: Look for the most impactful question
         if !questions.isEmpty {
@@ -678,30 +679,30 @@ struct IntelligentSessionCard: View {
                 }
                 return false
             }) {
-                return "\(answeredQuestion.content)"
+                return "\(answeredQuestion.content ?? "")"
             }
             if let firstQuestion = questions.first {
-                return "\(firstQuestion.content)"
+                return "\(firstQuestion.content ?? "")"
             }
         }
         
         // Priority 2: Look for meaningful quotes
         if !quotes.isEmpty {
-            if let longestQuote = quotes.max(by: { $0.text.count < $1.text.count }) {
-                let preview = String(longestQuote.text.prefix(120))
-                return "\"\(preview)\(longestQuote.text.count > 120 ? "..." : "\"")"
+            if let longestQuote = quotes.max(by: { ($0.text ?? "").count < ($1.text ?? "").count }) {
+                let preview = String((longestQuote.text ?? "").prefix(120))
+                return "\"\(preview)\((longestQuote.text ?? "").count > 120 ? "..." : "\"")"
             }
         }
         
         // Priority 3: Look for notes with substance
         if !notes.isEmpty {
-            if let longestNote = notes.max(by: { $0.content.count < $1.content.count }) {
-                return "\(longestNote.content)"
+            if let longestNote = notes.max(by: { ($0.content ?? "").count < ($1.content ?? "").count }) {
+                return "\(longestNote.content ?? "")"
             }
         }
         
         // Fallback to a generic summary based on content counts
-        let totalItems = questions.count + quotes.count + notes.count
+        let totalItems = (session.capturedQuestions ?? []).count + (session.capturedQuotes ?? []).count + (session.capturedNotes ?? []).count
         if totalItems > 0 {
             return "\(totalItems) captured insights from this session"
         }
@@ -711,14 +712,14 @@ struct IntelligentSessionCard: View {
     
     private var metrics: [String] {
         var items: [String] = []
-        if session.capturedQuestions.count > 0 {
-            items.append("\(session.capturedQuestions.count) QUESTIONS")
+        if (session.capturedQuestions ?? []).count > 0 {
+            items.append("\((session.capturedQuestions ?? []).count) QUESTIONS")
         }
-        if session.capturedQuotes.count > 0 {
-            items.append("\(session.capturedQuotes.count) QUOTES")
+        if (session.capturedQuotes ?? []).count > 0 {
+            items.append("\((session.capturedQuotes ?? []).count) QUOTES")
         }
-        if session.capturedNotes.count > 0 {
-            items.append("\(session.capturedNotes.count) NOTES")
+        if (session.capturedNotes ?? []).count > 0 {
+            items.append("\((session.capturedNotes ?? []).count) NOTES")
         }
         return items
     }
@@ -726,20 +727,20 @@ struct IntelligentSessionCard: View {
     private var timeDisplay: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, h:mm a"
-        let dateStr = formatter.string(from: session.startTime)
+        let dateStr = formatter.string(from: session.startTime ?? Date())
         
-        let duration = session.endTime.timeIntervalSince(session.startTime)
+        let duration = (session.endTime ?? Date()).timeIntervalSince(session.startTime ?? Date())
         let minutes = Int(duration / 60)
         let durationStr = minutes < 60 ? "\(minutes)m" : "\(minutes/60)h \(minutes%60)m"
         
         var components: [String] = [dateStr, durationStr]
         
         // Add content counts
-        if session.capturedQuotes.count > 0 {
-            components.append("\(session.capturedQuotes.count) quotes")
+        if (session.capturedQuotes ?? []).count > 0 {
+            components.append("\((session.capturedQuotes ?? []).count) quotes")
         }
-        if session.capturedNotes.count > 0 {
-            components.append("\(session.capturedNotes.count) notes")
+        if (session.capturedNotes ?? []).count > 0 {
+            components.append("\((session.capturedNotes ?? []).count) notes")
         }
         
         return components.joined(separator: " · ")

@@ -213,6 +213,15 @@ struct LibraryView: View {
             BookSearchSheet(
                 searchQuery: book.title,
                 onBookSelected: { newBook in
+                    print("📖 Cover change: Selected book '\(newBook.title)'")
+                    print("  🖼️ New cover URL: \(newBook.coverImageURL ?? "NO URL")")
+                    print("  📚 Original book: '\(book.title)'")
+                    print("  🔄 Updating cover...")
+                    
+                    if newBook.coverImageURL == nil {
+                        print("  ⚠️ WARNING: Selected book has no cover URL!")
+                    }
+                    
                     viewModel.updateBookCover(book, newCoverURL: newBook.coverImageURL)
                     showingCoverPicker = false
                     selectedBookForEdit = nil
@@ -589,6 +598,12 @@ struct LibraryBookCard: View {
                 loadFullImage: false,
                 isLibraryView: true
             )
+                .onAppear {
+                    if book.coverImageURL == nil {
+                        print("⚠️⚠️ LibraryBookCard displaying book with NO cover URL: \(book.title)")
+                        print("   Book.id: \(book.id)")
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     if isPressed {
                         Image(systemName: "ellipsis.circle.fill")
@@ -1335,6 +1350,7 @@ class LibraryViewModel: ObservableObject {
                 // Log first few books for debugging
                 for (index, book) in decodedBooks.prefix(3).enumerated() {
                     print("    Book \(index + 1): \(book.title) by \(book.author)")
+                    print("      Cover URL: \(book.coverImageURL ?? "NO COVER")")
                 }
             } catch {
                 print("  ❌ Failed to decode books: \(error)")
@@ -1393,6 +1409,13 @@ class LibraryViewModel: ObservableObject {
     
     private func saveBooks() {
         print("💾 Saving \(books.count) books to UserDefaults")
+        
+        // Debug: Check URLs before encoding
+        for (index, book) in books.prefix(3).enumerated() {
+            print("  Book \(index + 1) before save: \(book.title)")
+            print("    Cover URL: \(book.coverImageURL ?? "NO URL")")
+        }
+        
         do {
             let encoded = try JSONEncoder().encode(books)
             userDefaults.set(encoded, forKey: booksKey)
@@ -1466,7 +1489,13 @@ class LibraryViewModel: ObservableObject {
     }
     
     func addBook(_ book: Book, overwriteIfExists: Bool = false) {
-        print("📖 LibraryViewModel.addBook called for: \(book.title)")
+        print("\n📖📖📖 LibraryViewModel.addBook called 📖📖📖")
+        print("  Title: \(book.title)")
+        print("  ID: \(book.id)")
+        print("  🖼️ Cover URL: \(book.coverImageURL ?? "NO COVER URL")")
+        if book.coverImageURL == nil {
+            print("  ⚠️⚠️⚠️ WARNING: Book being added with NO cover URL!")
+        }
         print("  📊 Book data - Rating: \(book.userRating ?? 0), Status: \(book.readingStatus.rawValue)")
         print("  📝 Notes: \(book.userNotes?.prefix(50) ?? "None")")
         
@@ -1512,6 +1541,10 @@ class LibraryViewModel: ObservableObject {
         // Verify the saved book has the correct data
         if let savedBook = books.first(where: { $0.id == book.id }) {
             print("  🔍 Verified saved book - Rating: \(savedBook.userRating ?? 0), Status: \(savedBook.readingStatus.rawValue)")
+            print("  🔍 Verified saved book - Cover URL: \(savedBook.coverImageURL ?? "NO COVER URL")")
+            if savedBook.coverImageURL == nil {
+                print("  ❌❌❌ ERROR: Saved book lost its cover URL!")
+            }
         }
     }
     
@@ -1605,8 +1638,18 @@ class LibraryViewModel: ObservableObject {
     }
     
     func updateBookCover(_ book: Book, newCoverURL: String?) {
+        print("🔄 updateBookCover called")
+        print("  📖 Book: \(book.title)")
+        print("  🆔 Book ID: \(book.id)")
+        print("  🖼️ Old cover URL: \(book.coverImageURL ?? "NO OLD URL")")
+        print("  🖼️ New cover URL: \(newCoverURL ?? "NO NEW URL")")
+        
         if let index = books.firstIndex(where: { $0.id == book.id }) {
+            print("  ✅ Found book at index \(index)")
+            let oldURL = books[index].coverImageURL
             books[index].coverImageURL = newCoverURL
+            print("  🔄 Updated coverImageURL from '\(oldURL ?? "nil")' to '\(newCoverURL ?? "nil")'")
+            
             saveBooks()
             
             // Post notification so other views can update
@@ -1615,6 +1658,9 @@ class LibraryViewModel: ObservableObject {
                 object: nil,
                 userInfo: ["bookId": book.id, "coverURL": newCoverURL as Any]
             )
+            print("  ✅ Cover update complete, notification posted")
+        } else {
+            print("  ❌ ERROR: Could not find book with ID \(book.id) in library")
         }
     }
     

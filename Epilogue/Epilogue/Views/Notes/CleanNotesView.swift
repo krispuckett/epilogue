@@ -59,11 +59,11 @@ struct CleanNotesView: View {
         
         // Add notes
         items += capturedNotes.map { capturedNote in
-            (date: capturedNote.timestamp, note: capturedNote.toNote(), quote: nil)
+            (date: capturedNote.timestamp ?? Date(), note: capturedNote.toNote(), quote: nil)
         }
         
         // Add quotes
-        items += capturedQuotes.map { (date: $0.timestamp, note: nil, quote: $0) }
+        items += capturedQuotes.map { (date: $0.timestamp ?? Date(), note: nil, quote: $0) }
         
         // Sort by date
         items.sort { $0.date > $1.date }
@@ -94,7 +94,7 @@ struct CleanNotesView: View {
                            (note.bookTitle?.lowercased().contains(query) ?? false) ||
                            (note.author?.lowercased().contains(query) ?? false)
                 } else if let quote = item.quote {
-                    return quote.text.lowercased().contains(query) ||
+                    return (quote.text ?? "").lowercased().contains(query) ||
                            (quote.book?.title.lowercased().contains(query) ?? false) ||
                            (quote.author?.lowercased().contains(query) ?? false)
                 }
@@ -531,16 +531,16 @@ struct CleanNotesView: View {
         // Convert CapturedQuote to Note for SimpleQuoteCard
         let note = Note(
             type: .quote,
-            content: quote.text,
+            content: quote.text ?? "",
             bookId: nil,
             bookTitle: quote.book?.title,
             author: quote.author,
             pageNumber: quote.pageNumber,
-            dateCreated: quote.timestamp,
-            id: quote.id
+            dateCreated: quote.timestamp ?? Date(),
+            id: quote.id ?? UUID()
         )
         
-        let isSelected = selectedItems.contains(quote.id)
+        let isSelected = selectedItems.contains(quote.id ?? UUID())
         
         return SimpleQuoteCard(note: note, capturedQuote: quote)
             .overlay(alignment: .topLeading) {
@@ -565,9 +565,9 @@ struct CleanNotesView: View {
                     .onTapGesture {
                         withAnimation(DesignSystem.Animation.springQuick) {
                             if isSelected {
-                                selectedItems.remove(quote.id)
+                                selectedItems.remove(quote.id ?? UUID())
                             } else {
-                                selectedItems.insert(quote.id)
+                                selectedItems.insert(quote.id ?? UUID())
                             }
                         }
                         SensoryFeedback.light()
@@ -581,9 +581,9 @@ struct CleanNotesView: View {
                 if isSelectionMode {
                     withAnimation(DesignSystem.Animation.springQuick) {
                         if isSelected {
-                            selectedItems.remove(quote.id)
+                            selectedItems.remove(quote.id ?? UUID())
                         } else {
-                            selectedItems.insert(quote.id)
+                            selectedItems.insert(quote.id ?? UUID())
                         }
                     }
                     SensoryFeedback.light()
@@ -593,14 +593,14 @@ struct CleanNotesView: View {
                 if !isSelectionMode {
                     withAnimation(DesignSystem.Animation.springStandard) {
                         isSelectionMode = true
-                        selectedItems.insert(quote.id)
+                        selectedItems.insert(quote.id ?? UUID())
                     }
                     SensoryFeedback.medium()
                 }
             }
             .onTapGesture(count: 2) {
                 // Double tap to show session summary for ambient quotes
-                if quote.source == .ambient {
+                if (quote.source as? String) == "ambient" {
                     selectedSessionQuote = quote
                     showingSessionSummary = true
                     SensoryFeedback.medium()
@@ -666,7 +666,7 @@ struct CleanNotesView: View {
     private func startEdit(note: CapturedNote) {
         editingNote = note
         editingQuote = nil
-        editedText = note.content
+        editedText = note.content ?? ""
         notesViewModel.isEditingNote = true
         showEditSheet = true
         SensoryFeedback.light()
@@ -675,7 +675,7 @@ struct CleanNotesView: View {
     private func startEdit(quote: CapturedQuote) {
         editingQuote = quote
         editingNote = nil
-        editedText = quote.text
+        editedText = quote.text ?? ""
         notesViewModel.isEditingNote = true
         showEditSheet = true
         SensoryFeedback.light()
@@ -905,7 +905,7 @@ private struct NoteCardView: View {
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .kerning(1.2)
                 .foregroundStyle(
-                    capturedNote?.source == .ambient 
+                    (capturedNote?.source as? String) == "ambient" 
                         ? DesignSystem.Colors.primaryAccent.opacity(0.6)
                         : .white.opacity(0.4)
                 )
@@ -913,7 +913,7 @@ private struct NoteCardView: View {
             Spacer()
             
             // Session pill for ambient notes - shows with date on tap
-            if let session = capturedNote?.ambientSession, capturedNote?.source == .ambient {
+            if let session = capturedNote?.ambientSession, (capturedNote?.source as? String) == "ambient" {
                 NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
                     HStack(spacing: 6) {
                         Text("SESSION")

@@ -35,7 +35,9 @@ struct SimpleQuoteCard: View {
                     Spacer()
                     
                     // Session pill for ambient quotes
-                    if let session = capturedQuote?.ambientSession, capturedQuote?.source == .ambient {
+                    if let session = capturedQuote?.ambientSession, 
+                       let source = capturedQuote?.source as? String,
+                       source == "ambient" {
                         NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
                             HStack(spacing: 6) {
                                 Text("SESSION")

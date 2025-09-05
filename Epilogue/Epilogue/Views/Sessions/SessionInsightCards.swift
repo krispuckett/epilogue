@@ -63,7 +63,7 @@ struct TemporalInsightsCard: View {
         
         // Most active time
         let hourCounts = Dictionary(grouping: sessions) { session in
-            Calendar.current.component(.hour, from: session.startTime)
+            Calendar.current.component(.hour, from: session.startTime ?? Date())
         }
         if let mostActiveHour = hourCounts.max(by: { $0.value.count < $1.value.count }) {
             let timeString = formatHour(mostActiveHour.key)
@@ -109,13 +109,13 @@ struct TemporalInsightsCard: View {
     
     private func calculateReadingStreak() -> Int {
         let calendar = Calendar.current
-        let sortedSessions = sessions.sorted { $0.startTime > $1.startTime }
+        let sortedSessions = sessions.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }
         
         var streak = 0
         var currentDate = Date()
         
         for session in sortedSessions {
-            let sessionDate = calendar.startOfDay(for: session.startTime)
+            let sessionDate = calendar.startOfDay(for: session.startTime ?? Date())
             let checkDate = calendar.startOfDay(for: currentDate)
             
             if sessionDate == checkDate {
@@ -136,7 +136,7 @@ struct TemporalInsightsCard: View {
         let yearAgoEnd = calendar.date(byAdding: .day, value: 1, to: yearAgoStart) ?? yearAgo
         
         return sessions.first { session in
-            session.startTime >= yearAgoStart && session.startTime < yearAgoEnd
+            (session.startTime ?? Date()) >= yearAgoStart && (session.startTime ?? Date()) < yearAgoEnd
         }
     }
 }
@@ -250,8 +250,8 @@ struct ThemeConnectionsCard: View {
         ]
         
         for session in sessions {
-            let allContent = session.capturedQuestions.map(\.content).joined(separator: " ") +
-                           session.capturedNotes.map(\.content).joined(separator: " ")
+            let allContent = (session.capturedQuestions ?? []).compactMap { $0.content }.joined(separator: " ") +
+                           (session.capturedNotes ?? []).compactMap { $0.content }.joined(separator: " ")
             
             let lowercased = allContent.lowercased()
             

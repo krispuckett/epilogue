@@ -41,9 +41,10 @@ struct ChatSessionsView: View {
         }
         
         return sessions.filter { session in
-            let content = (session.capturedQuestions.map(\.content) +
-                          session.capturedQuotes.map(\.text) +
-                          session.capturedNotes.map(\.content)).joined(separator: " ")
+            let questions = (session.capturedQuestions ?? []).compactMap { $0.content }
+            let quotes = (session.capturedQuotes ?? []).compactMap { $0.text }
+            let notes = (session.capturedNotes ?? []).compactMap { $0.content }
+            let content = (questions + quotes + notes).joined(separator: " ")
             let bookTitle = session.bookModel?.title ?? ""
             
             return content.localizedCaseInsensitiveContains(searchText) ||
@@ -185,13 +186,13 @@ struct ChatSessionsView: View {
                         AmbientSessionCard(
                             session: session,
                             colorPalette: colorPalettes[session.bookModel?.id ?? ""],
-                            isExpanded: expandedSessions.contains(session.id),
+                            isExpanded: expandedSessions.contains(session.id ?? UUID()),
                             onTap: {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    if expandedSessions.contains(session.id) {
-                                        expandedSessions.remove(session.id)
+                                    if expandedSessions.contains(session.id ?? UUID()) {
+                                        expandedSessions.remove(session.id ?? UUID())
                                     } else {
-                                        expandedSessions.insert(session.id)
+                                        expandedSessions.insert(session.id ?? UUID())
                                     }
                                 }
                             },
@@ -254,7 +255,7 @@ struct ChatSessionsView: View {
             session.bookModel?.id ?? ""
         }
         
-        return grouped.compactMap { bookId, sessions in
+        return grouped.compactMap { (bookId, sessions) -> (book: Book, sessions: [AmbientSession])? in
             guard let bookModel = sessions.first?.bookModel else { return nil }
             
             let book = Book(
@@ -268,32 +269,32 @@ struct ChatSessionsView: View {
                 pageCount: bookModel.pageCount
             )
             
-            return (book: book, sessions: sessions.sorted { $0.startTime > $1.startTime })
+            return (book: book, sessions: sessions.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) })
         }
         .sorted { $0.sessions.first?.startTime ?? Date() > $1.sessions.first?.startTime ?? Date() }
     }
     
     private func groupSessionsByDate() -> [(date: Date, sessions: [AmbientSession])] {
         Dictionary(grouping: filteredSessions) { session in
-            Calendar.current.startOfDay(for: session.startTime)
+            Calendar.current.startOfDay(for: session.startTime ?? Date())
         }
-        .map { (date: $0.key, sessions: $0.value.sorted { $0.startTime > $1.startTime }) }
+        .map { (date: $0.key, sessions: $0.value.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }) }
         .sorted { $0.date > $1.date }
     }
     
     private var questionsGroup: [AmbientSession] {
-        filteredSessions.filter { !$0.capturedQuestions.isEmpty }
-            .sorted { $0.capturedQuestions.count > $1.capturedQuestions.count }
+        filteredSessions.filter { !($0.capturedQuestions ?? []).isEmpty }
+            .sorted { ($0.capturedQuestions ?? []).count > ($1.capturedQuestions ?? []).count }
     }
     
     private var quotesGroup: [AmbientSession] {
-        filteredSessions.filter { !$0.capturedQuotes.isEmpty }
-            .sorted { $0.capturedQuotes.count > $1.capturedQuotes.count }
+        filteredSessions.filter { !($0.capturedQuotes ?? []).isEmpty }
+            .sorted { ($0.capturedQuotes ?? []).count > ($1.capturedQuotes ?? []).count }
     }
     
     private var reflectionsGroup: [AmbientSession] {
-        filteredSessions.filter { !$0.capturedNotes.isEmpty }
-            .sorted { $0.capturedNotes.count > $1.capturedNotes.count }
+        filteredSessions.filter { !($0.capturedNotes ?? []).isEmpty }
+            .sorted { ($0.capturedNotes ?? []).count > ($1.capturedNotes ?? []).count }
     }
     
     private func formatDateHeader(_ date: Date) -> String {
@@ -382,26 +383,26 @@ struct AmbientSessionCard: View {
     }
     
     private var keyInsight: String {
-        if let firstQuestion = session.capturedQuestions.first {
-            return firstQuestion.content
-        } else if let firstQuote = session.capturedQuotes.first {
-            return "\"\(firstQuote.text)\""
-        } else if let firstNote = session.capturedNotes.first {
-            return firstNote.content
+        if let firstQuestion = (session.capturedQuestions ?? []).first {
+            return firstQuestion.content ?? ""
+        } else if let firstQuote = (session.capturedQuotes ?? []).first {
+            return "\"\(firstQuote.text ?? "")\""
+        } else if let firstNote = (session.capturedNotes ?? []).first {
+            return firstNote.content ?? ""
         }
         return "Session"
     }
     
     private var metrics: [String] {
         var items: [String] = []
-        if session.capturedQuestions.count > 0 {
-            items.append("\(session.capturedQuestions.count) QUESTIONS")
+        if (session.capturedQuestions ?? []).count > 0 {
+            items.append("\((session.capturedQuestions ?? []).count) QUESTIONS")
         }
-        if session.capturedQuotes.count > 0 {
-            items.append("\(session.capturedQuotes.count) QUOTES")
+        if (session.capturedQuotes ?? []).count > 0 {
+            items.append("\((session.capturedQuotes ?? []).count) QUOTES")
         }
-        if session.capturedNotes.count > 0 {
-            items.append("\(session.capturedNotes.count) NOTES")
+        if (session.capturedNotes ?? []).count > 0 {
+            items.append("\((session.capturedNotes ?? []).count) NOTES")
         }
         return items
     }
@@ -409,9 +410,9 @@ struct AmbientSessionCard: View {
     private var timeDisplay: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        let timeAgo = formatter.localizedString(for: session.startTime, relativeTo: Date())
+        let timeAgo = formatter.localizedString(for: session.startTime ?? Date(), relativeTo: Date())
         
-        let duration = session.endTime.timeIntervalSince(session.startTime)
+        let duration = (session.endTime ?? Date()).timeIntervalSince(session.startTime ?? Date())
         let minutes = Int(duration / 60)
         let durationStr = minutes < 60 ? "\(minutes)m" : "\(minutes/60)h \(minutes%60)m"
         
@@ -572,13 +573,13 @@ struct BookSessionGroup: View {
                         AmbientSessionCard(
                             session: session,
                             colorPalette: colorPalette,
-                            isExpanded: expandedSessions.contains(session.id),
+                            isExpanded: expandedSessions.contains(session.id ?? UUID()),
                             onTap: {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    if expandedSessions.contains(session.id) {
-                                        expandedSessions.remove(session.id)
+                                    if expandedSessions.contains(session.id ?? UUID()) {
+                                        expandedSessions.remove(session.id ?? UUID())
                                     } else {
-                                        expandedSessions.insert(session.id)
+                                        expandedSessions.insert(session.id ?? UUID())
                                     }
                                 }
                             },
@@ -649,13 +650,13 @@ struct InsightGroup: View {
                         AmbientSessionCard(
                             session: session,
                             colorPalette: colorPalettes[session.bookModel?.id ?? ""],
-                            isExpanded: expandedSessions.contains(session.id),
+                            isExpanded: expandedSessions.contains(session.id ?? UUID()),
                             onTap: {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    if expandedSessions.contains(session.id) {
-                                        expandedSessions.remove(session.id)
+                                    if expandedSessions.contains(session.id ?? UUID()) {
+                                        expandedSessions.remove(session.id ?? UUID())
                                     } else {
-                                        expandedSessions.insert(session.id)
+                                        expandedSessions.insert(session.id ?? UUID())
                                     }
                                 }
                             },

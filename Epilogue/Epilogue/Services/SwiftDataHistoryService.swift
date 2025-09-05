@@ -117,7 +117,7 @@ final class SwiftDataHistoryService {
         let changes = capturedNoteToJSON(note)
         createHistoryEntry(
             entityType: "Note",
-            entityId: note.id.uuidString,
+            entityId: note.id?.uuidString ?? "unknown",
             changeType: "created",
             changes: changes
         )
@@ -130,7 +130,7 @@ final class SwiftDataHistoryService {
             let changes = "{\"oldContent\":\"\(oldContent)\",\"newContent\":\"\(note.content)\"}"
             createHistoryEntry(
                 entityType: "Note",
-                entityId: note.id.uuidString,
+                entityId: note.id?.uuidString ?? "unknown",
                 changeType: "updated",
                 changes: changes
             )
@@ -278,11 +278,11 @@ final class SwiftDataHistoryService {
     
     private func capturedNoteToJSON(_ note: CapturedNote) -> String {
         let dict: [String: Any] = [
-            "id": note.id.uuidString,
+            "id": note.id?.uuidString ?? "unknown",
             "content": note.content,
             "bookLocalId": note.bookLocalId ?? "",
-            "timestamp": note.timestamp.timeIntervalSince1970,
-            "source": note.source.rawValue,
+            "timestamp": note.timestamp?.timeIntervalSince1970 ?? 0,
+            "source": (note.source as? String) ?? "unknown",
             "pageNumber": note.pageNumber ?? 0
         ]
         

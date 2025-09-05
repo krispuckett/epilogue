@@ -3,13 +3,13 @@ import SwiftData
 
 @Model
 final class QueuedQuestion {
-    var id: UUID
-    var question: String
+    var id: UUID? = UUID()
+    var question: String? = ""
     var bookTitle: String?
     var bookAuthor: String?
-    var timestamp: Date
-    var priority: Int
-    var processed: Bool
+    var timestamp: Date? = Date()
+    var priority: Int? = 0
+    var processed: Bool? = false
     var processingError: String?
     var response: String?
     var sessionContext: String?
@@ -57,20 +57,24 @@ final class QueuedQuestion {
     var timeAgo: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: timestamp, relativeTo: Date())
+        return formatter.localizedString(for: timestamp ?? Date(), relativeTo: Date())
     }
     
     var isStale: Bool {
-        Date().timeIntervalSince(timestamp) > 86400 * 7 // 7 days
+        Date().timeIntervalSince(timestamp ?? Date()) > 86400 * 7 // 7 days
     }
 }
 
 extension QueuedQuestion: Comparable {
     static func < (lhs: QueuedQuestion, rhs: QueuedQuestion) -> Bool {
-        if lhs.priority != rhs.priority {
-            return lhs.priority > rhs.priority
+        let lhsPriority = lhs.priority ?? 0
+        let rhsPriority = rhs.priority ?? 0
+        if lhsPriority != rhsPriority {
+            return lhsPriority > rhsPriority
         }
-        return lhs.timestamp < rhs.timestamp
+        let lhsTime = lhs.timestamp ?? Date()
+        let rhsTime = rhs.timestamp ?? Date()
+        return lhsTime < rhsTime
     }
     
     static func == (lhs: QueuedQuestion, rhs: QueuedQuestion) -> Bool {

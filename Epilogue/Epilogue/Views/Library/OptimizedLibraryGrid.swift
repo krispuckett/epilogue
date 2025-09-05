@@ -9,17 +9,12 @@ struct OptimizedLibraryGrid: View {
     let highlightedBookId: UUID?
     let onChangeCover: (Book) -> Void
     
-    @State private var visibleRange: Range<Int> = 0..<0
-    @State private var loadedImages: Set<UUID> = []
-    @State private var pendingLoads: Set<UUID> = []
     @State private var draggedBook: Book?
     @State private var dragOffset: CGSize = .zero
     @State private var targetIndex: Int?
     @State private var isLongPressing = false
     @Namespace private var gridAnimation
     
-    // Performance settings
-    private let preloadBuffer = 4 // Number of items to preload
     private let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)
@@ -43,7 +38,6 @@ struct OptimizedLibraryGrid: View {
                             } else {
                                 OptimizedGridItem(
                                     book: book,
-                                    isLoaded: loadedImages.contains(book.localId),
                                     viewModel: viewModel,
                                     highlightedBookId: highlightedBookId,
                                     onChangeCover: onChangeCover,
@@ -80,12 +74,6 @@ struct OptimizedLibraryGrid: View {
                             }
                         }
                         .id(book.localId)
-                        .onAppear {
-                            handleItemAppear(book: book, at: index)
-                        }
-                        .onDisappear {
-                            handleItemDisappear(book: book)
-                        }
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.95)),
                             removal: .opacity
@@ -96,77 +84,10 @@ struct OptimizedLibraryGrid: View {
                 .padding(.bottom, 100)
             }
         }
-        .onAppear {
-            preloadInitialBatch()
-        }
         .onDrop(of: [.text], delegate: BookDropDelegate(
             draggedBook: $draggedBook,
             targetIndex: $targetIndex
         ))
-    }
-    
-    // MARK: - Visibility Management
-    
-    private func handleItemAppear(book: Book, at index: Int) {
-        // Update visible range
-        let newRange = max(0, index - preloadBuffer)..<min(books.count, index + preloadBuffer + 1)
-        visibleRange = newRange
-        
-        // Mark as loaded
-        withAnimation(.easeIn(duration: 0.2)) {
-            loadedImages.insert(book.localId)
-        }
-        
-        // Preload nearby items
-        preloadNearbyItems(around: index)
-    }
-    
-    private func handleItemDisappear(book: Book) {
-        // Keep in memory for a bit to prevent reload on quick scroll
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            if !isBookVisible(book) {
-                loadedImages.remove(book.localId)
-            }
-        }
-    }
-    
-    private func isBookVisible(_ book: Book) -> Bool {
-        guard let index = books.firstIndex(where: { $0.id == book.id }) else { return false }
-        return visibleRange.contains(index)
-    }
-    
-    // MARK: - Preloading
-    
-    private func preloadInitialBatch() {
-        // Preload first 6 items immediately
-        let initialCount = min(6, books.count)
-        for i in 0..<initialCount {
-            loadedImages.insert(books[i].localId)
-            preloadBookCover(books[i])
-        }
-    }
-    
-    private func preloadNearbyItems(around index: Int) {
-        let preloadRange = max(0, index - preloadBuffer)..<min(books.count, index + preloadBuffer + 1)
-        
-        for i in preloadRange {
-            let book = books[i]
-            if !pendingLoads.contains(book.localId) {
-                pendingLoads.insert(book.localId)
-                preloadBookCover(book)
-            }
-        }
-    }
-    
-    private func preloadBookCover(_ book: Book) {
-        Task(priority: .background) {
-            if let coverURL = book.coverImageURL {
-                _ = await SharedBookCoverManager.shared.loadLibraryThumbnail(from: coverURL)
-            }
-            await MainActor.run {
-                pendingLoads.remove(book.localId)
-            }
-        }
     }
 }
 
@@ -209,7 +130,6 @@ struct BookDropDelegate: DropDelegate {
 // MARK: - Optimized Grid Item
 struct OptimizedGridItem: View {
     let book: Book
-    let isLoaded: Bool
     let viewModel: LibraryViewModel
     let highlightedBookId: UUID?
     let onChangeCover: (Book) -> Void
@@ -223,21 +143,10 @@ struct OptimizedGridItem: View {
     var body: some View {
         NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
             ZStack {
-                if isLoaded {
-                    BookCard(book: book)
-            .environmentObject(viewModel)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .opacity(imageLoaded ? 1 : 0)
-                        .animation(.easeIn(duration: 0.3), value: imageLoaded)
-                        .onAppear {
-                            withAnimation(.easeIn(duration: 0.2)) {
-                                imageLoaded = true
-                            }
-                        }
-                } else {
-                    // Skeleton placeholder
-                    OptimizedBookCardSkeleton()
-                }
+                // Always show BookCard - no skeleton loading
+                BookCard(book: book)
+                    .environmentObject(viewModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
                 // Highlight overlay
                 if highlightedBookId == book.localId {

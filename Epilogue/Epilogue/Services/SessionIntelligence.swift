@@ -57,16 +57,16 @@ class SessionIntelligence: ObservableObject {
         
         for session in sessions {
             // Extract character mentions from questions and notes
-            let content = session.capturedQuestions.map(\.content) + 
-                         session.capturedNotes.map(\.content)
+            let content = (session.capturedQuestions ?? []).compactMap { $0.content } + 
+                         (session.capturedNotes ?? []).compactMap { $0.content }
             
             for text in content {
                 let characters = extractCharacterNames(from: text)
                 for character in characters {
                     let sentiment = analyzeSentiment(for: text)
                     let mention = CharacterMention(
-                        sessionId: session.id,
-                        timestamp: session.startTime,
+                        sessionId: session.id ?? UUID(),
+                        timestamp: session.startTime ?? Date(),
                         context: text,
                         sentiment: sentiment,
                         bookTitle: session.bookModel?.title
@@ -136,11 +136,11 @@ class SessionIntelligence: ObservableObject {
     
     // MARK: - Reading Evolution
     func measureReadingEvolution(sessions: [AmbientSession]) async -> ReadingEvolution {
-        let sortedSessions = sessions.sorted { $0.startTime < $1.startTime }
+        let sortedSessions = sessions.sorted { ($0.startTime ?? Date()) < ($1.startTime ?? Date()) }
         
         // Measure question complexity over time
         let complexityScores = sortedSessions.map { session in
-            measureQuestionComplexity(session.capturedQuestions)
+            measureQuestionComplexity(session.capturedQuestions ?? [])
         }
         
         // Measure engagement depth
@@ -190,7 +190,7 @@ class SessionIntelligence: ObservableObject {
     private func analyzeQuestionEvolution(_ sessions: [AmbientSession]) -> [SessionPattern] {
         var patterns: [SessionPattern] = []
         
-        let allQuestions = sessions.flatMap { $0.capturedQuestions }
+        let allQuestions = sessions.flatMap { $0.capturedQuestions ?? [] }
         
         // Group questions by similarity
         let questionClusters = clusterQuestions(allQuestions)
@@ -200,11 +200,11 @@ class SessionIntelligence: ObservableObject {
                 patterns.append(SessionPattern(
                     id: UUID(),
                     type: .questionEvolution,
-                    description: "Recurring interest in: \(cluster.first?.content.prefix(50) ?? "")",
+                    description: "Recurring interest in: \((cluster.first?.content ?? "").prefix(50))",
                     occurrences: cluster.count,
                     confidence: Float(cluster.count) / Float(allQuestions.count),
                     sessions: sessions.filter { session in
-                        session.capturedQuestions.contains { q in
+                        (session.capturedQuestions ?? []).contains { q in
                             cluster.contains { $0.id == q.id }
                         }
                     }
@@ -273,12 +273,12 @@ class SessionIntelligence: ObservableObject {
     private func analyzeEmotionalJourney(_ sessions: [AmbientSession]) -> [SessionPattern] {
         var patterns: [SessionPattern] = []
         
-        let sortedSessions = sessions.sorted { $0.startTime < $1.startTime }
+        let sortedSessions = sessions.sorted { ($0.startTime ?? Date()) < ($1.startTime ?? Date()) }
         var emotionalScores: [Float] = []
         
         for session in sortedSessions {
-            let content = session.capturedQuestions.map(\.content).joined(separator: " ") +
-                         session.capturedNotes.map(\.content).joined(separator: " ")
+            let content = (session.capturedQuestions ?? []).compactMap { $0.content }.joined(separator: " ") +
+                         (session.capturedNotes ?? []).compactMap { $0.content }.joined(separator: " ")
             let sentiment = analyzeSentiment(for: content)
             emotionalScores.append(sentiment)
         }
@@ -336,10 +336,10 @@ class SessionIntelligence: ObservableObject {
     
     private func calculateSemanticSimilarity(_ session1: AmbientSession, _ session2: AmbientSession) -> Float {
         // Simplified similarity calculation
-        let content1 = (session1.capturedQuestions.map(\.content) + 
-                       session1.capturedNotes.map(\.content)).joined(separator: " ")
-        let content2 = (session2.capturedQuestions.map(\.content) + 
-                       session2.capturedNotes.map(\.content)).joined(separator: " ")
+        let content1 = ((session1.capturedQuestions ?? []).compactMap { $0.content } + 
+                       (session1.capturedNotes ?? []).compactMap { $0.content }).joined(separator: " ")
+        let content2 = ((session2.capturedQuestions ?? []).compactMap { $0.content } + 
+                       (session2.capturedNotes ?? []).compactMap { $0.content }).joined(separator: " ")
         
         let words1 = Set(content1.lowercased().split(separator: " "))
         let words2 = Set(content2.lowercased().split(separator: " "))
@@ -358,8 +358,8 @@ class SessionIntelligence: ObservableObject {
     
     private func extractThemes(from session: AmbientSession) -> [String] {
         // Simple theme extraction
-        let content = (session.capturedQuestions.map(\.content) + 
-                      session.capturedNotes.map(\.content)).joined(separator: " ").lowercased()
+        let content = ((session.capturedQuestions ?? []).compactMap { $0.content } + 
+                      (session.capturedNotes ?? []).compactMap { $0.content }).joined(separator: " ").lowercased()
         
         var themes: [String] = []
         let themeKeywords = ["identity", "love", "death", "power", "freedom", "time", "nature", "family", "truth", "beauty"]
@@ -386,10 +386,11 @@ class SessionIntelligence: ObservableObject {
         var totalComplexity: Float = 0
         
         for question in questions {
-            let wordCount = question.content.split(separator: " ").count
-            let hasWhy = question.content.lowercased().contains("why")
-            let hasHow = question.content.lowercased().contains("how")
-            let hasCompare = question.content.lowercased().contains("compare") || question.content.lowercased().contains("contrast")
+            let content = question.content ?? ""
+            let wordCount = content.split(separator: " ").count
+            let hasWhy = content.lowercased().contains("why")
+            let hasHow = content.lowercased().contains("how")
+            let hasCompare = content.lowercased().contains("compare") || content.lowercased().contains("contrast")
             
             var complexity: Float = Float(wordCount) / 10
             if hasWhy { complexity += 0.3 }
@@ -403,9 +404,9 @@ class SessionIntelligence: ObservableObject {
     }
     
     private func measureEngagementDepth(_ session: AmbientSession) -> Float {
-        let questionScore = Float(session.capturedQuestions.count) * 0.3
-        let quoteScore = Float(session.capturedQuotes.count) * 0.2
-        let noteScore = Float(session.capturedNotes.count) * 0.2
+        let questionScore = Float(session.capturedQuestions?.count ?? 0) * 0.3
+        let quoteScore = Float(session.capturedQuotes?.count ?? 0) * 0.2
+        let noteScore = Float(session.capturedNotes?.count ?? 0) * 0.2
         let durationScore = min(Float(session.duration / 3600), 1.0) * 0.3
         
         return min(questionScore + quoteScore + noteScore + durationScore, 1.0)
@@ -433,21 +434,21 @@ class SessionIntelligence: ObservableObject {
         var milestones: [ReadingMilestone] = []
         
         // First deep question
-        if let firstDeepQuestion = sessions.first(where: { !$0.capturedQuestions.isEmpty }) {
+        if let firstDeepQuestion = sessions.first(where: { !($0.capturedQuestions?.isEmpty ?? true) }) {
             milestones.append(ReadingMilestone(
-                date: firstDeepQuestion.startTime,
+                date: firstDeepQuestion.startTime ?? Date(),
                 description: "First thoughtful question",
-                sessionId: firstDeepQuestion.id
+                sessionId: firstDeepQuestion.id ?? UUID()
             ))
         }
         
         // Most quotes captured
-        if let mostQuotes = sessions.max(by: { $0.capturedQuotes.count < $1.capturedQuotes.count }),
-           mostQuotes.capturedQuotes.count > 3 {
+        if let mostQuotes = sessions.max(by: { ($0.capturedQuotes?.count ?? 0) < ($1.capturedQuotes?.count ?? 0) }),
+           (mostQuotes.capturedQuotes?.count ?? 0) > 3 {
             milestones.append(ReadingMilestone(
-                date: mostQuotes.startTime,
+                date: mostQuotes.startTime ?? Date(),
                 description: "Deep engagement with text",
-                sessionId: mostQuotes.id
+                sessionId: mostQuotes.id ?? UUID()
             ))
         }
         
@@ -469,15 +470,16 @@ class SessionIntelligence: ObservableObject {
         var processed = Set<UUID>()
         
         for question in questions {
-            if processed.contains(question.id) { continue }
+            guard let questionId = question.id else { continue }
+            if processed.contains(questionId) { continue }
             
             var cluster = [question]
-            processed.insert(question.id)
+            processed.insert(questionId)
             
             for other in questions {
-                if !processed.contains(other.id) && areQuestionsSimilar(question, other) {
+                if let otherId = other.id, !processed.contains(otherId) && areQuestionsSimilar(question, other) {
                     cluster.append(other)
-                    processed.insert(other.id)
+                    processed.insert(otherId)
                 }
             }
             
@@ -490,8 +492,8 @@ class SessionIntelligence: ObservableObject {
     }
     
     private func areQuestionsSimilar(_ q1: CapturedQuestion, _ q2: CapturedQuestion) -> Bool {
-        let words1 = Set(q1.content.lowercased().split(separator: " "))
-        let words2 = Set(q2.content.lowercased().split(separator: " "))
+        let words1 = Set((q1.content ?? "").lowercased().split(separator: " "))
+        let words2 = Set((q2.content ?? "").lowercased().split(separator: " "))
         
         let intersection = words1.intersection(words2)
         let smaller = min(words1.count, words2.count)
@@ -509,7 +511,7 @@ class SessionIntelligence: ObservableObject {
     
     private func analyzeTimePattern(_ sessions: [AmbientSession]) -> (optimalTime: String, pattern: String) {
         let hourCounts = Dictionary(grouping: sessions) { session in
-            Calendar.current.component(.hour, from: session.startTime)
+            Calendar.current.component(.hour, from: session.startTime ?? Date())
         }
         
         if let mostFrequent = hourCounts.max(by: { $0.value.count < $1.value.count }) {

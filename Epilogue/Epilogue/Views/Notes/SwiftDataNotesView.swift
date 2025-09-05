@@ -732,13 +732,13 @@ struct CapturedQuestionCard: View {
                 
                 Spacer()
                 
-                Text(question.timestamp, style: .time)
+                Text(question.timestamp ?? Date(), style: .time)
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.4))
             }
             
             // Content
-            Text(question.content)
+            Text(question.content ?? "")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.9))
                 .multilineTextAlignment(.leading)
@@ -763,7 +763,7 @@ struct CapturedQuestionCard: View {
                 }
             }
             
-            if question.isAnswered {
+            if question.isAnswered ?? false {
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 12))

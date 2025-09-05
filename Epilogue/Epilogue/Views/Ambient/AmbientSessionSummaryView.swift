@@ -51,13 +51,13 @@ struct AmbientSessionSummaryView: View {
                         }
                         
                         // Clean conversation threads
-                        if !session.capturedQuestions.isEmpty {
+                        if !(session.capturedQuestions ?? []).isEmpty {
                             conversationSection
                                 .padding(.bottom, 32)
                         }
                         
                         // Captured content grid
-                        if !session.capturedQuotes.isEmpty || !session.capturedNotes.isEmpty {
+                        if !(session.capturedQuotes ?? []).isEmpty || !(session.capturedNotes ?? []).isEmpty {
                             capturedContentGrid
                                 .padding(.bottom, 32)
                         }
@@ -75,7 +75,7 @@ struct AmbientSessionSummaryView: View {
                                     // Start numbering after existing questions
                                     // Only show AI messages (which contain both Q&A)
                                     let aiMessages = additionalMessages.filter { !$0.isUser }
-                                    let startIndex = session.capturedQuestions.count
+                                    let startIndex = (session.capturedQuestions ?? []).count
                                     ForEach(Array(aiMessages.enumerated()), id: \.element.id) { index, message in
                                         MinimalMessageView(
                                             message: message,
@@ -108,8 +108,8 @@ struct AmbientSessionSummaryView: View {
             .onAppear {
                 // Auto-expand all questions on first load
                 if !hasInitializedExpanded {
-                    for question in session.capturedQuestions {
-                        expandedQuestions.insert(question.id.uuidString)
+                    for question in session.capturedQuestions ?? [] {
+                        expandedQuestions.insert((question.id ?? UUID()).uuidString)
                     }
                     hasInitializedExpanded = true
                 }
@@ -280,14 +280,14 @@ struct AmbientSessionSummaryView: View {
                 .buttonStyle(.plain)
             }
             
-            if session.capturedQuestions.count > 0 {
-                metricItem(value: "\(session.capturedQuestions.count)", label: "QUESTIONS")
+            if (session.capturedQuestions ?? []).count > 0 {
+                metricItem(value: "\((session.capturedQuestions ?? []).count)", label: "QUESTIONS")
             }
-            if session.capturedQuotes.count > 0 {
-                metricItem(value: "\(session.capturedQuotes.count)", label: "QUOTES")
+            if (session.capturedQuotes ?? []).count > 0 {
+                metricItem(value: "\((session.capturedQuotes ?? []).count)", label: "QUOTES")
             }
-            if session.capturedNotes.count > 0 {
-                metricItem(value: "\(session.capturedNotes.count)", label: "NOTES")
+            if (session.capturedNotes ?? []).count > 0 {
+                metricItem(value: "\((session.capturedNotes ?? []).count)", label: "NOTES")
             }
         }
         .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
@@ -352,7 +352,7 @@ struct AmbientSessionSummaryView: View {
                             .lineLimit(3)
                     } else if let answer = question.answer {
                         // Fallback to extracted insight
-                        let insight = extractKeyInsight(from: answer, question: question.content)
+                        let insight = extractKeyInsight(from: answer, question: question.content ?? "")
                         Text(insight)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
@@ -360,7 +360,7 @@ struct AmbientSessionSummaryView: View {
                             .lineLimit(2)
                     } else {
                         // Fallback to question if no answer
-                        Text(question.content)
+                        Text(question.content ?? "")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
                             .multilineTextAlignment(.leading)
@@ -411,17 +411,17 @@ struct AmbientSessionSummaryView: View {
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             
             VStack(spacing: 1) {
-                ForEach(Array(session.capturedQuestions.enumerated()), id: \.element.id) { index, question in
+                ForEach(Array((session.capturedQuestions ?? []).enumerated()), id: \.element.id) { index, question in
                     MinimalThreadView(
                         question: question,
                         index: index,
-                        isExpanded: expandedQuestions.contains(question.id.uuidString),
+                        isExpanded: expandedQuestions.contains((question.id ?? UUID()).uuidString),
                         onToggle: {
                             withAnimation(DesignSystem.Animation.easeQuick) {
-                                if expandedQuestions.contains(question.id.uuidString) {
-                                    expandedQuestions.remove(question.id.uuidString)
+                                if expandedQuestions.contains((question.id ?? UUID()).uuidString) {
+                                    expandedQuestions.remove((question.id ?? UUID()).uuidString)
                                 } else {
-                                    expandedQuestions.insert(question.id.uuidString)
+                                    expandedQuestions.insert((question.id ?? UUID()).uuidString)
                                 }
                             }
                         }
@@ -442,18 +442,18 @@ struct AmbientSessionSummaryView: View {
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             
             VStack(spacing: 12) {
-                ForEach(session.capturedQuotes) { quote in
+                ForEach(session.capturedQuotes ?? []) { quote in
                     MinimalThreadedCard(
                         type: "QUOTE",
-                        content: quote.text,
+                        content: quote.text ?? "",
                         author: quote.author
                     )
                 }
                 
-                ForEach(session.capturedNotes) { note in
+                ForEach(session.capturedNotes ?? []) { note in
                     MinimalThreadedCard(
                         type: "NOTE",
-                        content: note.content,
+                        content: note.content ?? "",
                         author: nil
                     )
                 }
@@ -604,13 +604,18 @@ struct AmbientSessionSummaryView: View {
                     capturedQuestion.ambientSession = session
                     
                     // Add to session and save
-                    session.capturedQuestions.append(capturedQuestion)
+                    if var questions = session.capturedQuestions {
+                        questions.append(capturedQuestion)
+                        session.capturedQuestions = questions
+                    } else {
+                        session.capturedQuestions = [capturedQuestion]
+                    }
                     modelContext.insert(capturedQuestion)
                     
                     do {
                         try modelContext.save()
                         print("✅ Follow-up question saved to session: \(questionText.prefix(50))...")
-                        print("   Session now has \(session.capturedQuestions.count) questions")
+                        print("   Session now has \((session.capturedQuestions ?? []).count) questions")
                     } catch {
                         print("❌ Failed to save follow-up question: \(error)")
                     }
@@ -641,14 +646,14 @@ struct AmbientSessionSummaryView: View {
     // MARK: - Helper Functions
     
     private func findMostRelevantQuestion() -> CapturedQuestion? {
-        guard !session.capturedQuestions.isEmpty else { return nil }
+        guard !(session.capturedQuestions ?? []).isEmpty else { return nil }
         
         // Strategy: Find the question with the longest, most substantive answer
         // This is likely to be the most interesting/insightful one
-        let questionsWithAnswers = session.capturedQuestions.filter { $0.answer != nil }
+        let questionsWithAnswers = (session.capturedQuestions ?? []).filter { $0.answer != nil }
         
         if questionsWithAnswers.isEmpty {
-            return session.capturedQuestions.last // Return most recent if no answers
+            return (session.capturedQuestions ?? []).last // Return most recent if no answers
         }
         
         // Sort by answer length and quality
@@ -663,7 +668,7 @@ struct AmbientSessionSummaryView: View {
             return score1 > score2
         }
         
-        return sorted.first ?? session.capturedQuestions.last
+        return sorted.first ?? (session.capturedQuestions ?? []).last
     }
     
     private func calculateAnswerQuality(_ answer: String) -> Int {
@@ -711,14 +716,14 @@ struct AmbientSessionSummaryView: View {
                 }
                 
                 // Add session metrics
-                let duration = Int(session.endTime.timeIntervalSince(session.startTime)) / 60
+                let duration = Int((session.endTime ?? Date()).timeIntervalSince(session.startTime ?? Date())) / 60
                 context += "Duration: \(duration) minutes\n"
-                context += "Questions asked: \(session.capturedQuestions.count)\n"
+                context += "Questions asked: \((session.capturedQuestions ?? []).count)\n"
                 
                 // Add questions and answers
-                if !session.capturedQuestions.isEmpty {
+                if !(session.capturedQuestions ?? []).isEmpty {
                     context += "\nKey questions discussed:\n"
-                    for (index, question) in session.capturedQuestions.prefix(3).enumerated() {
+                    for (index, question) in (session.capturedQuestions ?? []).prefix(3).enumerated() {
                         context += "\(index + 1). \(question.content)\n"
                         if let answer = question.answer {
                             // Include first sentence of answer for context
@@ -729,16 +734,16 @@ struct AmbientSessionSummaryView: View {
                 }
                 
                 // Add quotes if available
-                if !session.capturedQuotes.isEmpty {
-                    context += "\nQuotes captured: \(session.capturedQuotes.count)\n"
-                    if let firstQuote = session.capturedQuotes.first {
-                        context += "Sample: \"\(firstQuote.text.prefix(50))...\"\n"
+                if !(session.capturedQuotes ?? []).isEmpty {
+                    context += "\nQuotes captured: \((session.capturedQuotes ?? []).count)\n"
+                    if let firstQuote = (session.capturedQuotes ?? []).first {
+                        context += "Sample: \"\((firstQuote.text ?? "").prefix(50))...\"\n"
                     }
                 }
                 
                 // Add notes if available
-                if !session.capturedNotes.isEmpty {
-                    context += "Notes taken: \(session.capturedNotes.count)\n"
+                if !(session.capturedNotes ?? []).isEmpty {
+                    context += "Notes taken: \((session.capturedNotes ?? []).count)\n"
                 }
                 
                 // Generate insight prompt
@@ -867,7 +872,7 @@ struct MinimalThreadView: View {
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .frame(width: 24)
                 
-                Text(question.content)
+                Text(question.content ?? "")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
                     .frame(maxWidth: .infinity, alignment: .leading)

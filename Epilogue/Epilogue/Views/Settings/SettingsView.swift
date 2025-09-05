@@ -458,9 +458,9 @@ struct SettingsView: View {
         
         let exportNotes = notes.map { note in
             ExportNote(
-                id: note.id.uuidString,
-                content: note.content,
-                timestamp: note.timestamp,
+                id: note.id?.uuidString ?? UUID().uuidString,
+                content: note.content ?? "",
+                timestamp: note.timestamp ?? Date(),
                 pageNumber: note.pageNumber,
                 bookTitle: note.book?.title
             )
@@ -468,10 +468,10 @@ struct SettingsView: View {
         
         let exportQuotes = quotes.map { quote in
             ExportQuote(
-                id: quote.id.uuidString,
-                text: quote.text,
+                id: quote.id?.uuidString ?? UUID().uuidString,
+                text: quote.text ?? "",
                 author: quote.author,
-                timestamp: quote.timestamp,
+                timestamp: quote.timestamp ?? Date(),
                 pageNumber: quote.pageNumber,
                 bookTitle: quote.book?.title,
                 notes: quote.notes
@@ -480,12 +480,12 @@ struct SettingsView: View {
         
         let exportQuestions = questions.map { question in
             ExportQuestion(
-                id: question.id.uuidString,
-                content: question.content,
-                timestamp: question.timestamp,
+                id: question.id?.uuidString ?? UUID().uuidString,
+                content: question.content ?? "",
+                timestamp: question.timestamp ?? Date(),
                 pageNumber: question.pageNumber,
                 bookTitle: question.book?.title,
-                isAnswered: question.isAnswered,
+                isAnswered: question.isAnswered ?? false,
                 answer: question.answer
             )
         }

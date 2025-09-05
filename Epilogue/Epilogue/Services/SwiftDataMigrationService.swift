@@ -211,12 +211,12 @@ final class SwiftDataMigrationService {
     
     private func findBookForSession(_ session: AmbientSession, modelContext: ModelContext) async -> BookModel? {
         // Try to find book based on captured items in the session
-        if let firstQuote = session.capturedQuotes.first,
+        if let firstQuote = session.capturedQuotes?.first,
            let book = firstQuote.book {
             return book
         }
         
-        if let firstNote = session.capturedNotes.first,
+        if let firstNote = session.capturedNotes?.first,
            let book = firstNote.book {
             return book
         }

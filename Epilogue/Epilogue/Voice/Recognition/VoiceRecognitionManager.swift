@@ -1057,6 +1057,15 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             }
         }
         
+        // Add safety limit - prevent excessive buffer accumulation (max ~20 seconds of audio at 100ms per buffer)
+        let maxBuffers = 200
+        if audioBufferForWhisper.count >= maxBuffers {
+            logger.warning("Buffer limit reached (\(maxBuffers)), clearing oldest buffers")
+            // Keep only the most recent buffers
+            let keepCount = maxBuffers / 2
+            audioBufferForWhisper = Array(audioBufferForWhisper.suffix(keepCount))
+        }
+        
         audioBufferForWhisper.append(bufferCopy)
         // Log only every 10th buffer to reduce spam
         if audioBufferForWhisper.count % 10 == 0 {
@@ -1086,6 +1095,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // Combine all buffers into one
         guard let combinedBuffer = combineAudioBuffers(audioBufferForWhisper) else { 
             logger.error("Failed to combine audio buffers")
+            // Don't clear buffers on combine failure - might be temporary
             return 
         }
         
@@ -1095,12 +1105,10 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         let duration = Double(combinedBuffer.frameLength) / combinedBuffer.format.sampleRate
         logger.info("Audio duration: \(String(format: "%.2f", duration)) seconds")
         
-        // Clear the buffer
-        audioBufferForWhisper.removeAll()
-        
         // Check if we have enough audio (at least 0.5 seconds)
         guard duration >= 0.5 else {
             logger.info("Not enough audio for WhisperKit (need at least 0.5 seconds, got \(String(format: "%.2f", duration))s)")
+            // Don't clear buffers if not enough audio - wait for more
             isProcessingWhisper = false
             return
         }
@@ -1108,9 +1116,13 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // Check if Whisper model is loaded
         guard self.whisperProcessor.isModelLoaded else {
             logger.warning("Whisper model not loaded yet")
+            // Don't clear buffers if model not loaded - wait for it to load
             isProcessingWhisper = false
             return
         }
+        
+        // Clear the buffer only after all checks pass
+        audioBufferForWhisper.removeAll()
         
         // Process with Whisper
         isProcessingWhisper = true

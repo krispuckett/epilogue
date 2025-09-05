@@ -63,6 +63,9 @@ struct EpilogueApp: App {
         // Clear image caches on app launch (temporary for debugging)
         DisplayedImageStore.clearAllCaches()
         
+        // Create Application Support directory if it doesn't exist to prevent CoreData warnings
+        createApplicationSupportDirectoryIfNeeded()
+        
         let schema = Schema([
             // ChatThread.self,  // Removed - old chat system
             // ThreadedChatMessage.self,  // Removed - old chat system
@@ -74,7 +77,11 @@ struct EpilogueApp: App {
             AmbientSession.self,
             QueuedQuestion.self  // New offline queue model
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema, 
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .automatic  // Enable CloudKit sync
+        )
         
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -82,6 +89,25 @@ struct EpilogueApp: App {
             print("Failed to create ModelContainer: \(error)")
             // Create a basic container as fallback
             modelContainer = try? ModelContainer(for: schema)
+        }
+    }
+    
+    private func createApplicationSupportDirectoryIfNeeded() {
+        let fileManager = FileManager.default
+        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, 
+                                                   in: .userDomainMask).first else { return }
+        
+        // Check if directory exists
+        if !fileManager.fileExists(atPath: appSupportURL.path) {
+            do {
+                // Create the directory
+                try fileManager.createDirectory(at: appSupportURL, 
+                                              withIntermediateDirectories: true, 
+                                              attributes: nil)
+                print("✅ Created Application Support directory")
+            } catch {
+                print("⚠️ Could not create Application Support directory: \(error)")
+            }
         }
     }
 }

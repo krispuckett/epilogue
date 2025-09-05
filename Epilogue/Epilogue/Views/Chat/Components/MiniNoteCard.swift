@@ -21,13 +21,13 @@ struct MiniNoteCard: View {
                     
                     Spacer()
                     
-                    Text(note.timestamp, style: .time)
+                    Text(note.timestamp ?? Date(), style: .time)
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.4))
                 }
                 
                 // Content
-                Text(note.content)
+                Text(note.content ?? "")
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.leading)
@@ -85,7 +85,7 @@ struct MiniQuoteCard: View {
                     .offset(y: 8)
                 
                 // Quote text - mini version of original
-                Text(quote.text)
+                Text(quote.text ?? "")
                     .font(.custom("Georgia", size: 14))
                     .italic()
                     .foregroundStyle(.white.opacity(0.9))

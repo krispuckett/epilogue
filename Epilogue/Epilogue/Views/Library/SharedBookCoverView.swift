@@ -46,9 +46,9 @@ struct SharedBookCoverView: View {
     
     @State private var thumbnailImage: UIImage?
     @State private var fullImage: UIImage?
-    @State private var isLoadingStarted = false
-    @State private var isLoading = true
+    @State private var isLoading = false
     @State private var loadFailed = false
+    @State private var currentLoadingURL: String?
     
     // Simple in-memory cache to avoid state recreation
     private static let quickImageCache: NSCache<NSString, UIImage> = {
@@ -70,6 +70,7 @@ struct SharedBookCoverView: View {
         isLibraryView: Bool = false,
         onImageLoaded: ((UIImage) -> Void)? = nil
     ) {
+        // Removed debug logging that was flooding console
         self.coverURL = coverURL
         self.width = width
         self.height = height
@@ -78,24 +79,85 @@ struct SharedBookCoverView: View {
         self.onImageLoaded = onImageLoaded
     }
     
+    // Clean URL to match SharedBookCoverManager's cache key format
+    private func cleanURL(_ urlString: String) -> String {
+        var cleaned = urlString
+            .replacingOccurrences(of: "http://", with: "https://")
+        
+        // Remove all zoom parameters to normalize cache keys
+        let zoomPatterns = [
+            "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
+            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
+            "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
+            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
+        ]
+        
+        for pattern in zoomPatterns {
+            cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
+        }
+        
+        // Clean up any double & or trailing &
+        cleaned = cleaned.replacingOccurrences(of: "&&", with: "&")
+        if cleaned.hasSuffix("&") {
+            cleaned = String(cleaned.dropLast())
+        }
+        if cleaned.hasSuffix("?") {
+            cleaned = String(cleaned.dropLast())
+        }
+        
+        return cleaned
+    }
+    
     private func loadImage() {
-        guard !isLoadingStarted, let urlString = coverURL else { return }
+        guard let urlString = coverURL else { 
+            // No URL provided, mark as failed
+            loadFailed = true
+            return 
+        }
+        
+        // If we're already loading this exact URL, don't start another load
+        if currentLoadingURL == urlString && isLoading {
+            print("⏭️ Already loading: \(urlString)")
+            return
+        }
+        
+        // Clean URL to match SharedBookCoverManager's cache key format
+        let cleanedURL = cleanURL(urlString)
         
         // Check quick cache first for immediate display
-        let cacheKey = "\(urlString)_\(loadFullImage ? "full" : "thumb")" as NSString
+        let cacheKey = "\(cleanedURL)_\(loadFullImage ? "full" : "thumb")" as NSString
         if let cachedImage = Self.quickImageCache.object(forKey: cacheKey) {
-            print("📚 Using quick cached image for: \(urlString.suffix(50))")
+            print("📚 Using quick cached image for: \(cleanedURL)")
             if loadFullImage {
                 self.fullImage = cachedImage
             } else {
                 self.thumbnailImage = cachedImage
             }
             self.isLoading = false
+            self.currentLoadingURL = nil
             self.onImageLoaded?(cachedImage)
             return
         }
         
-        isLoadingStarted = true
+        // Check SharedBookCoverManager's cache
+        if let cachedImage = SharedBookCoverManager.shared.getCachedImage(for: urlString) {
+            print("📚 Found image in SharedBookCoverManager cache for: \(cleanedURL)")
+            if loadFullImage {
+                self.fullImage = cachedImage
+            } else {
+                self.thumbnailImage = cachedImage
+            }
+            // Store in quick cache for next time
+            Self.quickImageCache.setObject(cachedImage, forKey: cacheKey)
+            self.isLoading = false
+            self.currentLoadingURL = nil
+            self.onImageLoaded?(cachedImage)
+            return
+        }
+        
+        isLoading = true
+        loadFailed = false
+        currentLoadingURL = urlString
         
         if loadFullImage {
             // For detail views, skip thumbnail and load full quality directly
@@ -104,20 +166,26 @@ struct SharedBookCoverView: View {
                 if let fullImage = await SharedBookCoverManager.shared.loadFullImage(from: urlString) {
                     print("🖼️ BookDetailView full image loaded: \(fullImage.size)")
                     await MainActor.run {
-                        withAnimation(DesignSystem.Animation.easeStandard) {
+                        // Only update if we're still expecting this URL
+                        if self.currentLoadingURL == urlString {
                             self.fullImage = fullImage
                             self.isLoading = false
+                            self.currentLoadingURL = nil
+                            self.onImageLoaded?(fullImage)
+                            DisplayedImageStore.shared.store(image: fullImage, for: urlString)
+                            // Store in quick cache
+                            let cleanedURL = cleanURL(urlString)
+                            Self.quickImageCache.setObject(fullImage, forKey: "\(cleanedURL)_full" as NSString)
                         }
-                        self.onImageLoaded?(fullImage)
-                        DisplayedImageStore.shared.store(image: fullImage, for: urlString)
-                        // Store in quick cache
-                        Self.quickImageCache.setObject(fullImage, forKey: "\(urlString)_full" as NSString)
                     }
                 } else {
                     print("❌ Failed to load full image")
                     await MainActor.run {
-                        self.isLoading = false
-                        self.loadFailed = true
+                        if self.currentLoadingURL == urlString {
+                            self.isLoading = false
+                            self.loadFailed = true
+                            self.currentLoadingURL = nil
+                        }
                     }
                 }
             }
@@ -134,28 +202,64 @@ struct SharedBookCoverView: View {
                 }
                 
                 await MainActor.run {
-                    if let thumbnail = thumbnail {
-                        withAnimation(DesignSystem.Animation.easeStandard) {
+                    // Only update if we're still expecting this URL
+                    if self.currentLoadingURL == urlString {
+                        if let thumbnail = thumbnail {
                             self.thumbnailImage = thumbnail
                             self.isLoading = false
+                            self.currentLoadingURL = nil
+                            self.onImageLoaded?(thumbnail)
+                            // Store in quick cache
+                            let cleanedURL = cleanURL(urlString)
+                            let cacheKey = "\(cleanedURL)_\(loadFullImage ? "full" : "thumb")" as NSString
+                            Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
+                        } else {
+                            // Image failed to load
+                            self.isLoading = false
+                            self.loadFailed = true
+                            self.currentLoadingURL = nil
+                            print("❌ Failed to load image from: \(urlString)")
                         }
-                        self.onImageLoaded?(thumbnail)
-                        // Store in quick cache
-                        Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
-                    } else {
-                        // Image failed to load - don't mark as failed yet
-                        // Just set loading to false, will show placeholder
-                        self.isLoading = false
-                        print("❌ Failed to load image from: \(urlString)")
-                        
-                        // Note: We could try fallback sources here but that would require
-                        // passing the full Book object, not just the URL
-                        // For now, the placeholder will show
-                        self.loadFailed = true
                     }
                 }
             }
         }
+    }
+    
+    // Add a static method to clear cache for a specific URL
+    static func clearCacheForURL(_ urlString: String?) {
+        guard let urlString = urlString else { return }
+        
+        // Clean the URL first
+        var cleaned = urlString
+            .replacingOccurrences(of: "http://", with: "https://")
+        
+        let zoomPatterns = [
+            "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
+            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
+            "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
+            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
+        ]
+        
+        for pattern in zoomPatterns {
+            cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
+        }
+        
+        cleaned = cleaned.replacingOccurrences(of: "&&", with: "&")
+        if cleaned.hasSuffix("&") {
+            cleaned = String(cleaned.dropLast())
+        }
+        if cleaned.hasSuffix("?") {
+            cleaned = String(cleaned.dropLast())
+        }
+        
+        // Clear from quick cache
+        let thumbKey = "\(cleaned)_thumb" as NSString
+        let fullKey = "\(cleaned)_full" as NSString
+        quickImageCache.removeObject(forKey: thumbKey)
+        quickImageCache.removeObject(forKey: fullKey)
+        
+        print("🧹 Cleared cache for URL: \(urlString)")
     }
     
     var body: some View {
@@ -164,15 +268,37 @@ struct SharedBookCoverView: View {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
                 .onAppear {
+                    print("🎨 SharedBookCoverView.onAppear - URL: \(coverURL ?? "nil")")
+                    if coverURL == nil {
+                        print("   ⚠️ WARNING: SharedBookCoverView received nil URL!")
+                    }
                     loadImage()
                 }
-                .onChange(of: coverURL) { _, _ in
-                    // Reset state and reload when URL changes
-                    thumbnailImage = nil
-                    fullImage = nil
-                    isLoadingStarted = false
-                    isLoading = true
-                    loadImage()
+                .onChange(of: coverURL) { oldURL, newURL in
+                    print("🔄 SharedBookCoverView URL changed from: \(oldURL ?? "nil") to: \(newURL ?? "nil")")
+                    // Only reload if URL actually changed
+                    if newURL != oldURL {
+                        // Clear old cache entries if URL changed
+                        if let oldURL = oldURL {
+                            SharedBookCoverView.clearCacheForURL(oldURL)
+                        }
+                        
+                        // Cancel any in-progress load
+                        if currentLoadingURL == oldURL {
+                            currentLoadingURL = nil
+                        }
+                        
+                        // Reset state completely
+                        thumbnailImage = nil
+                        fullImage = nil
+                        isLoading = false
+                        loadFailed = false
+                        
+                        // Load new image if URL is not nil
+                        if newURL != nil {
+                            loadImage()
+                        }
+                    }
                 }
             
             // Display the best available image
@@ -183,34 +309,6 @@ struct SharedBookCoverView: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(width: width, height: height)
                     .clipped()
-                    .transition(.opacity)
-            } else if loadFailed || (coverURL == nil) {
-                // Failed to load or no URL - just show gradient background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.25, green: 0.25, blue: 0.3),
-                        Color(red: 0.2, green: 0.2, blue: 0.25)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            } else if isLoading {
-                // Loading state - show a clean loading indicator
-                ZStack {
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.25, green: 0.25, blue: 0.3),
-                            Color(red: 0.2, green: 0.2, blue: 0.25)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    
-                    // Simple progress indicator
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.3)))
-                        .scaleEffect(0.8)
-                }
             }
         }
         .frame(width: width, height: height)

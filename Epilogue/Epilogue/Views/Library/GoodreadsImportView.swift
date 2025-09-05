@@ -94,6 +94,32 @@ struct GoodreadsImportView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if importState == .results {
                         Button("Done") {
+                            // Add all successfully imported books to the library
+                            if let result = importResult, let libraryViewModel = libraryViewModel {
+                                print("\n📚📚📚 IMPORT DONE BUTTON CLICKED 📚📚📚")
+                                print("Processing \(result.successful.count) successfully imported books")
+                                
+                                for (index, processedBook) in result.successful.enumerated() {
+                                    print("\n[\(index + 1)/\(result.successful.count)] Processing: \(processedBook.bookModel.title)")
+                                    print("   BookModel.id: \(processedBook.bookModel.id)")
+                                    print("   BookModel.coverImageURL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                                    
+                                    // Convert BookModel to Book and add to library
+                                    let book = processedBook.bookModel.asBook
+                                    print("   Converted Book.id: \(book.id)")
+                                    print("   Converted Book.coverImageURL: \(book.coverImageURL ?? "nil")")
+                                    
+                                    if book.coverImageURL == nil {
+                                        print("   ❌❌❌ CRITICAL: Book lost URL during asBook conversion!")
+                                        print("   BookModel had URL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                                    }
+                                    
+                                    libraryViewModel.addBook(book, overwriteIfExists: overwriteDuplicates)
+                                }
+                                print("\n✅ Added \(result.successful.count) books to library")
+                                print("📚📚📚 IMPORT COMPLETE 📚📚📚\n")
+                            }
+                            
                             // Post notification to refresh library
                             NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
                             dismiss()
@@ -706,6 +732,10 @@ struct GoodreadsImportView: View {
                         
                         // Add each successfully imported book to the LibraryViewModel
                         for (index, processedBook) in result.successful.enumerated() {
+                            print("🔄 Converting BookModel to Book for: \(processedBook.bookModel.title)")
+                            print("   BookModel.id: \(processedBook.bookModel.id)")
+                            print("   BookModel.coverImageURL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                            
                             var book = Book(
                                 id: processedBook.bookModel.id,
                                 title: processedBook.bookModel.title,
@@ -717,6 +747,9 @@ struct GoodreadsImportView: View {
                                 pageCount: processedBook.bookModel.pageCount,
                                 localId: UUID(uuidString: processedBook.bookModel.localId) ?? UUID()
                             )
+                            
+                            print("   Resulting Book.id: \(book.id)")
+                            print("   Resulting Book.coverImageURL: \(book.coverImageURL ?? "nil")")
                             
                             // Set additional properties from the imported book
                             book.isInLibrary = true
@@ -1021,7 +1054,9 @@ struct ImportedBookRow: View {
                 currentCoverURL: selectedCoverURL ?? book.bookModel.coverImageURL,
                 onCoverSelected: { newCoverURL in
                     selectedCoverURL = newCoverURL
+                    // Since ProcessedBook is now a class, this will update the actual bookModel
                     book.bookModel.coverImageURL = newCoverURL
+                    print("📸 Updated cover URL for \(book.bookModel.title): \(newCoverURL ?? "nil")")
                     Task {
                         await loadCover()
                     }

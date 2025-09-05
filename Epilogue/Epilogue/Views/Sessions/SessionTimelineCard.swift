@@ -17,12 +17,12 @@ struct SessionTimelineCard: View {
     
     private var keyInsight: String {
         // Generate a key insight from the session
-        if let firstQuestion = session.capturedQuestions.first {
-            return firstQuestion.content
-        } else if let firstQuote = session.capturedQuotes.first {
-            return "\"\(firstQuote.text)\""
-        } else if let firstNote = session.capturedNotes.first {
-            return firstNote.content
+        if let firstQuestion = (session.capturedQuestions ?? []).first {
+            return firstQuestion.content ?? ""
+        } else if let firstQuote = (session.capturedQuotes ?? []).first {
+            return "\"\(firstQuote.text ?? "")\""
+        } else if let firstNote = (session.capturedNotes ?? []).first {
+            return firstNote.content ?? ""
         }
         return "Reading session"
     }
@@ -40,9 +40,9 @@ struct SessionTimelineCard: View {
         
         return (
             duration: durationString,
-            questions: session.capturedQuestions.count,
-            quotes: session.capturedQuotes.count,
-            notes: session.capturedNotes.count
+            questions: (session.capturedQuestions ?? []).count,
+            quotes: (session.capturedQuotes ?? []).count,
+            notes: (session.capturedNotes ?? []).count
         )
     }
     
@@ -57,7 +57,7 @@ struct SessionTimelineCard: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                         
-                        Text(session.startTime.formatted(date: .omitted, time: .shortened))
+                        Text((session.startTime ?? Date()).formatted(date: .omitted, time: .shortened))
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.6))
                     }

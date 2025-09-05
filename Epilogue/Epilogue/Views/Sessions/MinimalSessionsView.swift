@@ -19,16 +19,17 @@ struct MinimalSessionsView: View {
         }
         
         return sessions.filter { session in
-            let searchContent = (session.capturedQuestions.map(\.content) +
-                               session.capturedQuotes.map(\.text) +
-                               session.capturedNotes.map(\.content)).joined(separator: " ")
+            let questions = (session.capturedQuestions ?? []).compactMap { $0.content }
+            let quotes = (session.capturedQuotes ?? []).compactMap { $0.text }
+            let notes = (session.capturedNotes ?? []).compactMap { $0.content }
+            let searchContent = (questions + quotes + notes).joined(separator: " ")
             return searchContent.localizedCaseInsensitiveContains(searchText)
         }
     }
     
     private var groupedSessions: [(date: Date, sessions: [AmbientSession])] {
         Dictionary(grouping: filteredSessions) { session in
-            Calendar.current.startOfDay(for: session.startTime)
+            Calendar.current.startOfDay(for: session.startTime ?? Date())
         }
         .map { (date: $0.key, sessions: $0.value) }
         .sorted { $0.date > $1.date }
@@ -151,21 +152,21 @@ struct MinimalSessionCard: View {
     }
     
     private var keyInsight: String {
-        if let firstQuestion = session.capturedQuestions.first {
-            return firstQuestion.content
-        } else if let firstQuote = session.capturedQuotes.first {
-            return "\"\(firstQuote.text)\""
-        } else if let firstNote = session.capturedNotes.first {
-            return firstNote.content
+        if let firstQuestion = (session.capturedQuestions ?? []).first {
+            return firstQuestion.content ?? ""
+        } else if let firstQuote = (session.capturedQuotes ?? []).first {
+            return "\"\(firstQuote.text ?? "")\""
+        } else if let firstNote = (session.capturedNotes ?? []).first {
+            return firstNote.content ?? ""
         }
         return "Reading session"
     }
     
     private var sessionMetrics: String {
         let items = [
-            session.capturedQuestions.isEmpty ? nil : "\(session.capturedQuestions.count) questions",
-            session.capturedQuotes.isEmpty ? nil : "\(session.capturedQuotes.count) quotes",
-            session.capturedNotes.isEmpty ? nil : "\(session.capturedNotes.count) notes"
+            (session.capturedQuestions ?? []).isEmpty ? nil : "\((session.capturedQuestions ?? []).count) questions",
+            (session.capturedQuotes ?? []).isEmpty ? nil : "\((session.capturedQuotes ?? []).count) quotes",
+            (session.capturedNotes ?? []).isEmpty ? nil : "\((session.capturedNotes ?? []).count) notes"
         ].compactMap { $0 }
         
         return items.isEmpty ? "Empty session" : items.joined(separator: " · ")
@@ -174,7 +175,7 @@ struct MinimalSessionCard: View {
     private var timeAgo: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: session.startTime, relativeTo: Date())
+        return formatter.localizedString(for: session.startTime ?? Date(), relativeTo: Date())
     }
     
     var body: some View {

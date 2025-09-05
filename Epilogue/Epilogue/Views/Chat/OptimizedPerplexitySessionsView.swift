@@ -187,13 +187,13 @@ struct OptimizedPerplexitySessionsView: View {
                 }
                 
                 // Quick check in first items only to avoid iterating all
-                if let firstQuestion = session.capturedQuestions.first,
-                   firstQuestion.content.lowercased().contains(searchLower) {
+                if let firstQuestion = (session.capturedQuestions ?? []).first,
+                   (firstQuestion.content ?? "").lowercased().contains(searchLower) {
                     return true
                 }
                 
-                if let firstNote = session.capturedNotes.first,
-                   firstNote.content.lowercased().contains(searchLower) {
+                if let firstNote = (session.capturedNotes ?? []).first,
+                   (firstNote.content ?? "").lowercased().contains(searchLower) {
                     return true
                 }
                 
@@ -212,7 +212,7 @@ struct OptimizedPerplexitySessionsView: View {
         
         let grouped = Dictionary(grouping: sessions) { session in
             let startOfToday = calendar.startOfDay(for: now)
-            let startOfSession = calendar.startOfDay(for: session.startTime)
+            let startOfSession = calendar.startOfDay(for: session.startTime ?? Date())
             let daysAgo = calendar.dateComponents([.day], from: startOfSession, to: startOfToday).day ?? 0
             
             if daysAgo == 0 {
@@ -222,13 +222,13 @@ struct OptimizedPerplexitySessionsView: View {
             } else {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "M.dd.yy"
-                return formatter.string(from: session.startTime)
+                return formatter.string(from: session.startTime ?? Date())
             }
         }
         
         cachedGroupedSessions = grouped
-            .sorted { $0.value.first?.startTime ?? Date() > $1.value.first?.startTime ?? Date() }
-            .map { (date: $0.key, sessions: $0.value.sorted { $0.startTime > $1.startTime }) }
+            .sorted { ($0.value.first?.startTime ?? Date()) > ($1.value.first?.startTime ?? Date()) }
+            .map { (date: $0.key, sessions: $0.value.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }) }
     }
 }
 
@@ -398,20 +398,20 @@ struct SessionDisplayData {
         // Pre-compute time display
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
-        self.timeDisplay = formatter.string(from: session.startTime).uppercased()
+        self.timeDisplay = formatter.string(from: session.startTime ?? Date()).uppercased()
         
         // Check if just started
-        let minutesAgo = Int(Date().timeIntervalSince(session.startTime) / 60)
-        self.isJustStarted = Calendar.current.isDateInToday(session.startTime) && minutesAgo < 60
+        let minutesAgo = Int(Date().timeIntervalSince(session.startTime ?? Date()) / 60)
+        self.isJustStarted = Calendar.current.isDateInToday(session.startTime ?? Date()) && minutesAgo < 60
         
         // Book title
         self.bookTitle = session.bookModel?.title.uppercased()
         
         // Session title
-        if let firstQuestion = session.capturedQuestions.first {
-            self.title = firstQuestion.content
-        } else if let firstNote = session.capturedNotes.first {
-            self.title = String(firstNote.content.prefix(100))
+        if let firstQuestion = (session.capturedQuestions ?? []).first {
+            self.title = firstQuestion.content ?? ""
+        } else if let firstNote = (session.capturedNotes ?? []).first {
+            self.title = String((firstNote.content ?? "").prefix(100))
         } else if let bookModel = session.bookModel {
             self.title = "Started exploring \(bookModel.title)"
         } else {
@@ -419,16 +419,16 @@ struct SessionDisplayData {
         }
         
         // Content metrics
-        self.hasQuestions = !session.capturedQuestions.isEmpty
-        self.contentCount = session.capturedQuestions.count + 
-                           session.capturedNotes.count + 
-                           session.capturedQuotes.count
+        self.hasQuestions = !(session.capturedQuestions ?? []).isEmpty
+        self.contentCount = (session.capturedQuestions ?? []).count + 
+                           (session.capturedNotes ?? []).count + 
+                           (session.capturedQuotes ?? []).count
         
         // Content icon and color
-        if !session.capturedQuestions.isEmpty {
+        if !(session.capturedQuestions ?? []).isEmpty {
             self.contentIcon = "questionmark.circle.fill"
             self.contentColor = Color(red: 0.4, green: 0.6, blue: 1.0)
-        } else if !session.capturedNotes.isEmpty {
+        } else if !(session.capturedNotes ?? []).isEmpty {
             self.contentIcon = "square.and.pencil"
             self.contentColor = Color(red: 0.8, green: 0.4, blue: 1.0)
         } else {

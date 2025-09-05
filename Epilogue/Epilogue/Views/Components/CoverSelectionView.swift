@@ -81,22 +81,39 @@ struct CoverSelectionView: View {
         isLoading = true
         
         Task {
-            // Search for the book to get multiple results with different covers
-            let searchTerm = "\(bookTitle) \(bookAuthor)"
-            await googleBooksService.searchBooks(query: searchTerm)
+            var allCovers: [String] = []
             
-            // Extract unique cover URLs
-            let covers = googleBooksService.searchResults
-                .compactMap { $0.coverImageURL }
+            // Try multiple search strategies to get more cover options
+            // 1. Search with full title and author
+            let fullSearchTerm = "\(bookTitle) \(bookAuthor)"
+            await googleBooksService.searchBooks(query: fullSearchTerm)
+            allCovers.append(contentsOf: googleBooksService.searchResults.compactMap { $0.coverImageURL })
+            
+            // 2. Search with just the title (might get different editions)
+            await googleBooksService.searchBooks(query: bookTitle)
+            allCovers.append(contentsOf: googleBooksService.searchResults.compactMap { $0.coverImageURL })
+            
+            // 3. If author has multiple names, try last name only
+            let authorParts = bookAuthor.split(separator: " ")
+            if authorParts.count > 1, let lastName = authorParts.last {
+                let lastNameSearch = "\(bookTitle) \(lastName)"
+                await googleBooksService.searchBooks(query: lastNameSearch)
+                allCovers.append(contentsOf: googleBooksService.searchResults.compactMap { $0.coverImageURL })
+            }
+            
+            // Remove duplicates and empty URLs
+            let uniqueCovers = allCovers
                 .filter { !$0.isEmpty }
                 .removingDuplicates()
             
             await MainActor.run {
-                self.availableCovers = covers
-                if !covers.isEmpty && selectedCoverURL == nil {
-                    selectedCoverURL = covers.first
+                self.availableCovers = uniqueCovers
+                if !uniqueCovers.isEmpty && selectedCoverURL == nil {
+                    selectedCoverURL = uniqueCovers.first
                 }
                 isLoading = false
+                
+                print("📚 Found \(uniqueCovers.count) unique covers for \(bookTitle)")
             }
         }
     }

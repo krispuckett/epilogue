@@ -1366,7 +1366,10 @@ public class TrueAmbientProcessor: ObservableObject {
         
         // Add to the session's capturedQuotes array
         if let session = currentAmbientSession {
-            session.capturedQuotes.append(quote)
+            if session.capturedQuotes == nil {
+                session.capturedQuotes = []
+            }
+            session.capturedQuotes?.append(quote)
         }
         
         modelContext.insert(quote)
@@ -1424,7 +1427,10 @@ public class TrueAmbientProcessor: ObservableObject {
         
         // Add to the session's capturedNotes array
         if let session = currentAmbientSession {
-            session.capturedNotes.append(note)
+            if session.capturedNotes == nil {
+                session.capturedNotes = []
+            }
+            session.capturedNotes?.append(note)
         }
         
         modelContext.insert(note)
@@ -2040,7 +2046,10 @@ extension TrueAmbientProcessor {
                 
                 // Add to the session's capturedQuestions array
                 if let session = self.currentAmbientSession {
-                    session.capturedQuestions.append(question)
+                    if session.capturedQuestions == nil {
+                        session.capturedQuestions = []
+                    }
+                    session.capturedQuestions?.append(question)
                 }
                 
                 modelContext.insert(question)

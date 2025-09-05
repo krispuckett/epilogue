@@ -17,27 +17,27 @@ class SessionContinuationService: ObservableObject {
         continuingSession = session
         
         // Build context from session
-        let questions: [SessionMessage] = session.capturedQuestions.map { question in
+        let questions: [SessionMessage] = (session.capturedQuestions ?? []).map { question in
             SessionMessage(
                 role: .user,
-                content: question.content,
-                timestamp: question.timestamp
+                content: question.content ?? "",
+                timestamp: question.timestamp ?? Date()
             )
         }
         
-        let quotes: [SessionMessage] = session.capturedQuotes.map { quote in
+        let quotes: [SessionMessage] = (session.capturedQuotes ?? []).map { quote in
             SessionMessage(
                 role: .system,
-                content: "Quote captured: \"\(quote.text)\"",
-                timestamp: quote.timestamp
+                content: "Quote captured: \"\(quote.text ?? "")\"",
+                timestamp: quote.timestamp ?? Date()
             )
         }
         
-        let notes: [SessionMessage] = session.capturedNotes.map { note in
+        let notes: [SessionMessage] = (session.capturedNotes ?? []).map { note in
             SessionMessage(
                 role: .system,
-                content: "Note: \(note.content)",
-                timestamp: note.timestamp
+                content: "Note: \(note.content ?? "")",
+                timestamp: note.timestamp ?? Date()
             )
         }
         
@@ -57,14 +57,14 @@ class SessionContinuationService: ObservableObject {
     
     // MARK: - Merge Sessions
     func mergeSessions(_ sessions: [AmbientSession]) -> FusedSession {
-        let allQuestions: [CapturedQuestion] = sessions.flatMap { $0.capturedQuestions }
-            .sorted { $0.timestamp < $1.timestamp }
+        let allQuestions: [CapturedQuestion] = sessions.flatMap { $0.capturedQuestions ?? [] }
+            .sorted { ($0.timestamp ?? Date()) < ($1.timestamp ?? Date()) }
         
-        let allQuotes: [CapturedQuote] = sessions.flatMap { $0.capturedQuotes }
-            .sorted { $0.timestamp < $1.timestamp }
+        let allQuotes: [CapturedQuote] = sessions.flatMap { $0.capturedQuotes ?? [] }
+            .sorted { ($0.timestamp ?? Date()) < ($1.timestamp ?? Date()) }
         
-        let allNotes: [CapturedNote] = sessions.flatMap { $0.capturedNotes }
-            .sorted { $0.timestamp < $1.timestamp }
+        let allNotes: [CapturedNote] = sessions.flatMap { $0.capturedNotes ?? [] }
+            .sorted { ($0.timestamp ?? Date()) < ($1.timestamp ?? Date()) }
         
         // Extract common themes
         let themes = extractCommonThemes(from: sessions)
@@ -93,17 +93,17 @@ class SessionContinuationService: ObservableObject {
     private func generateSessionSummary(_ session: AmbientSession) -> String {
         var summary = "Previous session with \(session.bookModel?.title ?? "unknown book")"
         
-        if !session.capturedQuestions.isEmpty {
+        if !(session.capturedQuestions ?? []).isEmpty {
             summary += "\n\nKey questions explored:"
-            for question in session.capturedQuestions.prefix(3) {
-                summary += "\n• \(question.content)"
+            for question in (session.capturedQuestions ?? []).prefix(3) {
+                summary += "\n• \(question.content ?? "")"
             }
         }
         
-        if !session.capturedQuotes.isEmpty {
+        if !(session.capturedQuotes ?? []).isEmpty {
             summary += "\n\nQuotes captured:"
-            for quote in session.capturedQuotes.prefix(2) {
-                summary += "\n• \"\(quote.text)\""
+            for quote in (session.capturedQuotes ?? []).prefix(2) {
+                summary += "\n• \"\(quote.text ?? "")\""
             }
         }
         
@@ -115,8 +115,8 @@ class SessionContinuationService: ObservableObject {
         
         // Analyze all content
         for session in sessions {
-            let questionContent: String = session.capturedQuestions.map(\.content).joined(separator: " ")
-            let noteContent: String = session.capturedNotes.map(\.content).joined(separator: " ")
+            let questionContent: String = (session.capturedQuestions ?? []).compactMap { $0.content }.joined(separator: " ")
+            let noteContent: String = (session.capturedNotes ?? []).compactMap { $0.content }.joined(separator: " ")
             let content: String = questionContent + " " + noteContent
             
             // Simple theme extraction (would use NLP in production)

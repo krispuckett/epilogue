@@ -99,7 +99,7 @@ class OfflineQueueManager: ObservableObject {
         guard let modelContext = self.modelContext else { return }
         
         let descriptor = FetchDescriptor<QueuedQuestion>(
-            predicate: #Predicate { !$0.processed },
+            predicate: #Predicate { !($0.processed ?? false) },
             sortBy: [
                 SortDescriptor(\.priority, order: .reverse),
                 SortDescriptor(\.timestamp, order: .forward)
@@ -149,7 +149,7 @@ class OfflineQueueManager: ObservableObject {
             // For now, pass nil to avoid type conflicts
             // TODO: Figure out the proper Book type conversion
             let response = try await PerplexityService.staticChat(
-                message: question.question,
+                message: question.question ?? "",
                 bookContext: nil
             )
             
@@ -159,7 +159,7 @@ class OfflineQueueManager: ObservableObject {
             
             try modelContext?.save()
             
-            logger.info("✅ Processed question: \(question.question)")
+            logger.info("✅ Processed question: \(question.question ?? "")")
             
             // Post notification for UI update
             NotificationCenter.default.post(
@@ -177,7 +177,7 @@ class OfflineQueueManager: ObservableObject {
         guard let modelContext = modelContext else { return }
         
         let descriptor = FetchDescriptor<QueuedQuestion>(
-            predicate: #Predicate { $0.processed }
+            predicate: #Predicate { $0.processed ?? false }
         )
         
         do {
@@ -210,7 +210,7 @@ class OfflineQueueManager: ObservableObject {
         guard let modelContext = modelContext else { return [] }
         
         let descriptor = FetchDescriptor<QueuedQuestion>(
-            predicate: #Predicate { $0.processed && $0.response != nil },
+            predicate: #Predicate { ($0.processed ?? false) && $0.response != nil },
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         
@@ -218,7 +218,7 @@ class OfflineQueueManager: ObservableObject {
             let processed = try modelContext.fetch(descriptor)
             return processed.compactMap { q in
                 guard let response = q.response else { return nil }
-                return (q.question, response, q.timestamp)
+                return (q.question ?? "", response, q.timestamp ?? Date())
             }
         } catch {
             logger.error("Failed to fetch processed responses: \(error)")

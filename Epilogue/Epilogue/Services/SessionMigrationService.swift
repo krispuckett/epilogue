@@ -38,19 +38,19 @@ class SessionMigrationService {
                 session.bookModel = bookModel
                 
                 // Also update any captured content with the book
-                for quote in session.capturedQuotes {
+                for quote in session.capturedQuotes ?? [] {
                     if quote.book == nil {
                         quote.book = bookModel
                     }
                 }
                 
-                for note in session.capturedNotes {
+                for note in session.capturedNotes ?? [] {
                     if note.book == nil {
                         note.book = bookModel
                     }
                 }
                 
-                for question in session.capturedQuestions {
+                for question in session.capturedQuestions ?? [] {
                     if question.book == nil {
                         question.book = bookModel
                     }
@@ -73,7 +73,7 @@ class SessionMigrationService {
     /// Find the most likely book for a session based on its content
     private func findBookForSession(_ session: AmbientSession, books: [Book]) -> Book? {
         // Strategy 1: Check questions for book/character names
-        let bookMatches = analyzeQuestionsForBookReferences(session.capturedQuestions, books: books)
+        let bookMatches = analyzeQuestionsForBookReferences(session.capturedQuestions ?? [], books: books)
         if let bestMatchID = bookMatches.max(by: { $0.value < $1.value }) {
             if bestMatchID.value >= 2 { // At least 2 mentions
                 return books.first { $0.id == bestMatchID.key }
@@ -81,7 +81,7 @@ class SessionMigrationService {
         }
         
         // Strategy 2: Check quotes for distinctive phrases
-        let quoteMatches = analyzeQuotesForBookContent(session.capturedQuotes, books: books)
+        let quoteMatches = analyzeQuotesForBookContent(session.capturedQuotes ?? [], books: books)
         if let bestMatchID = quoteMatches.max(by: { $0.value < $1.value }) {
             if bestMatchID.value >= 1 { // At least 1 strong match
                 return books.first { $0.id == bestMatchID.key }
@@ -90,7 +90,7 @@ class SessionMigrationService {
         
         // Strategy 3: Check session timing against library activity
         // If session was created around the same time a book was being read
-        if let recentBook = findRecentlyActiveBook(at: session.startTime, books: books) {
+        if let recentBook = findRecentlyActiveBook(at: session.startTime ?? Date(), books: books) {
             return recentBook
         }
         
@@ -117,7 +117,7 @@ class SessionMigrationService {
         ]
         
         for question in questions {
-            let lowerContent = question.content.lowercased()
+            let lowerContent = (question.content ?? "").lowercased()
             let lowerAnswer = (question.answer ?? "").lowercased()
             let combinedText = lowerContent + " " + lowerAnswer
             
@@ -163,7 +163,7 @@ class SessionMigrationService {
         ]
         
         for quote in quotes {
-            let lowerText = quote.text.lowercased()
+            let lowerText = (quote.text ?? "").lowercased()
             
             for book in books {
                 if let phrases = bookPhrases[book.title] {

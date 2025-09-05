@@ -10,18 +10,18 @@ struct SessionBookCard: View {
     @State private var isPressed = false
     
     private var sessionDate: String {
-        session.startTime.formatted(date: .abbreviated, time: .omitted)
+        (session.startTime ?? Date()).formatted(date: .abbreviated, time: .omitted)
     }
     
     private var sessionTime: String {
-        session.startTime.formatted(date: .omitted, time: .shortened)
+        (session.startTime ?? Date()).formatted(date: .omitted, time: .shortened)
     }
     
     private var contentSummary: String {
         let counts = [
-            session.capturedQuestions.count > 0 ? "\(session.capturedQuestions.count) questions" : nil,
-            session.capturedQuotes.count > 0 ? "\(session.capturedQuotes.count) quotes" : nil,
-            session.capturedNotes.count > 0 ? "\(session.capturedNotes.count) notes" : nil
+            (session.capturedQuestions ?? []).count > 0 ? "\((session.capturedQuestions ?? []).count) questions" : nil,
+            (session.capturedQuotes ?? []).count > 0 ? "\((session.capturedQuotes ?? []).count) quotes" : nil,
+            (session.capturedNotes ?? []).count > 0 ? "\((session.capturedNotes ?? []).count) notes" : nil
         ].compactMap { $0 }
         
         return counts.isEmpty ? "Empty session" : counts.joined(separator: " · ")
@@ -29,9 +29,9 @@ struct SessionBookCard: View {
     
     private var keyTopic: String? {
         // Extract the most interesting question or quote
-        if let question = session.capturedQuestions.first {
+        if let question = (session.capturedQuestions ?? []).first {
             return question.content
-        } else if let quote = session.capturedQuotes.first {
+        } else if let quote = (session.capturedQuotes ?? []).first {
             return "\"\(quote.text)\""
         }
         return nil

@@ -77,7 +77,7 @@ struct BookSessionHistoryCard: View {
             session.bookModel?.id == book.id || 
             session.bookModel?.isbn == book.isbn ||
             session.bookModel?.title == book.title
-        }.sorted { $0.startTime > $1.startTime }
+        }.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }
     }
     
     var body: some View {
@@ -441,7 +441,7 @@ struct AmbientSessionRow: View {
     private var formattedDate: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: session.startTime, relativeTo: Date())
+        return formatter.localizedString(for: session.startTime ?? Date(), relativeTo: Date())
     }
     
     private var durationText: String {
@@ -457,12 +457,12 @@ struct AmbientSessionRow: View {
     
     private var sessionSummary: String {
         // Generate a smart summary based on content
-        if !session.capturedQuestions.isEmpty {
-            return session.capturedQuestions.first?.content ?? "Discussion session"
-        } else if !session.capturedQuotes.isEmpty {
-            return "Captured \(session.capturedQuotes.count) quotes"
-        } else if !session.capturedNotes.isEmpty {
-            return session.capturedNotes.first?.content ?? "Reading session"
+        if !(session.capturedQuestions?.isEmpty ?? true) {
+            return session.capturedQuestions?.first?.content ?? "Discussion session"
+        } else if !(session.capturedQuotes?.isEmpty ?? true) {
+            return "Captured \(session.capturedQuotes?.count ?? 0) quotes"
+        } else if !(session.capturedNotes?.isEmpty ?? true) {
+            return session.capturedNotes?.first?.content ?? "Reading session"
         } else {
             return "Reading session"
         }
@@ -501,31 +501,31 @@ struct AmbientSessionRow: View {
                 
                 // Content indicators
                 HStack(spacing: 16) {
-                    if session.capturedQuestions.count > 0 {
+                    if (session.capturedQuestions?.count ?? 0) > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "questionmark.circle")
                                 .font(.system(size: 11))
-                            Text("\(session.capturedQuestions.count)")
+                            Text("\(session.capturedQuestions?.count ?? 0)")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.blue.opacity(0.8))
                     }
                     
-                    if session.capturedQuotes.count > 0 {
+                    if (session.capturedQuotes?.count ?? 0) > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "quote.bubble")
                                 .font(.system(size: 11))
-                            Text("\(session.capturedQuotes.count)")
+                            Text("\(session.capturedQuotes?.count ?? 0)")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.purple.opacity(0.8))
                     }
                     
-                    if session.capturedNotes.count > 0 {
+                    if (session.capturedNotes?.count ?? 0) > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "note.text")
                                 .font(.system(size: 11))
-                            Text("\(session.capturedNotes.count)")
+                            Text("\(session.capturedNotes?.count ?? 0)")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.green.opacity(0.8))

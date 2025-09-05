@@ -792,7 +792,24 @@ struct AmbientModeView: View {
                     .animation(DesignSystem.Animation.springStandard, value: showSaveAnimation)
                 }
                 
-                // Live transcription bubble
+                // Spacer to push content to bottom
+                Spacer()
+                
+                // Scrolling text animation - shows only when processing a question
+                // Positioned above the live transcription when both are visible
+                if pendingQuestion != nil {
+                    ScrollingBookMessages()
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                        .padding(.vertical, 12)
+                        .glassEffect()
+                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                }
+                
+                // Live transcription bubble - positioned below ScrollingBookMessages
                 if isRecording && !liveTranscription.isEmpty && showLiveTranscriptionBubble {
                     HStack {
                         Spacer()
@@ -810,22 +827,6 @@ struct AmbientModeView: View {
                         Spacer()
                     }
                     .animation(DesignSystem.Animation.easeStandard, value: liveTranscription)
-                }
-                
-                // Removed book context pill - book context is shown elsewhere
-                
-                // Scrolling text animation - shows only when processing a question
-                // Positioned just above the input controls
-                if pendingQuestion != nil {
-                    ScrollingBookMessages()
-                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                        .padding(.vertical, 12)
-                        .glassEffect()
-                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large, style: .continuous))
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.9).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
                 }
                 
                 // FIXED: Main input controls at the very bottom
@@ -1244,7 +1245,7 @@ struct AmbientModeView: View {
                     
                     // Add formatted quote to messages for display using the CapturedQuote
                     let quoteMessage = UnifiedChatMessage(
-                        content: capturedQuote.text,
+                        content: capturedQuote.text ?? "",
                         isUser: true,
                         timestamp: Date(),
                         bookContext: currentBookContext,
@@ -1280,7 +1281,7 @@ struct AmbientModeView: View {
                     
                     // Add formatted note/thought to messages for display
                     let noteMessage = UnifiedChatMessage(
-                        content: capturedNote.content,
+                        content: capturedNote.content ?? "",
                         isUser: true,
                         timestamp: Date(),
                         bookContext: currentBookContext,
@@ -1445,11 +1446,11 @@ struct AmbientModeView: View {
             
             // Still link to session if not already linked
             if let session = currentSession, let existingQuote = existingQuotes.first {
-                if existingQuote.ambientSession == nil || !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
+                if existingQuote.ambientSession == nil || !(session.capturedQuotes ?? []).contains(where: { $0.id == existingQuote.id }) {
                     existingQuote.ambientSession = session
                     // Check if quote is already in session's captured quotes before adding
-                    if !session.capturedQuotes.contains(where: { $0.id == existingQuote.id }) {
-                        session.capturedQuotes.append(existingQuote)
+                    if !(session.capturedQuotes ?? []).contains(where: { $0.id == existingQuote.id }) {
+                        session.capturedQuotes = (session.capturedQuotes ?? []) + [existingQuote]
                     }
                     try? modelContext.save()
                     print("✅ Linked existing quote to current session")
@@ -1488,8 +1489,8 @@ struct AmbientModeView: View {
         if let session = currentSession {
             capturedQuote.ambientSession = session
             // Check for duplicates before adding (defensive programming)
-            if !session.capturedQuotes.contains(where: { $0.text == capturedQuote.text }) {
-                session.capturedQuotes.append(capturedQuote)
+            if !(session.capturedQuotes ?? []).contains(where: { $0.text == capturedQuote.text }) {
+                session.capturedQuotes = (session.capturedQuotes ?? []) + [capturedQuote]
             }
         }
         
@@ -1547,7 +1548,7 @@ struct AmbientModeView: View {
         // CRITICAL: Set the session relationship immediately
         if let session = currentSession {
             capturedNote.ambientSession = session
-            session.capturedNotes.append(capturedNote)
+            session.capturedNotes = (session.capturedNotes ?? []) + [capturedNote]
         }
         
         modelContext.insert(capturedNote)
@@ -1571,7 +1572,7 @@ struct AmbientModeView: View {
         guard let session = currentSession else { return }
         
         // Check if question already exists in this session
-        let isDuplicate = session.capturedQuestions.contains { question in
+        let isDuplicate = (session.capturedQuestions ?? []).contains { question in
             question.content == questionText
         }
         
@@ -1593,8 +1594,8 @@ struct AmbientModeView: View {
                 if existingQuestion.ambientSession == nil {
                     existingQuestion.ambientSession = session
                     // Check if question is already in session before adding
-                    if !session.capturedQuestions.contains(where: { $0.id == existingQuestion.id }) {
-                        session.capturedQuestions.append(existingQuestion)
+                    if !(session.capturedQuestions ?? []).contains(where: { $0.id == existingQuestion.id }) {
+                        session.capturedQuestions = (session.capturedQuestions ?? []) + [existingQuestion]
                     }
                     print("📎 Linked existing question to session: \(questionText.prefix(30))...")
                 }
@@ -1609,7 +1610,7 @@ struct AmbientModeView: View {
             do {
                 try modelContext.save()
                 print("✅ Updated existing question: \(questionText.prefix(30))...")
-                print("   Session now has \(currentSession?.capturedQuestions.count ?? 0) questions")
+                print("   Session now has \((currentSession?.capturedQuestions ?? []).count) questions")
             } catch {
                 print("❌ Failed to update question: \(error)")
             }
@@ -1649,8 +1650,8 @@ struct AmbientModeView: View {
         if let session = currentSession {
             capturedQuestion.ambientSession = session
             // Check for duplicates before adding (defensive programming)
-            if !session.capturedQuestions.contains(where: { $0.content == capturedQuestion.content }) {
-                session.capturedQuestions.append(capturedQuestion)
+            if !(session.capturedQuestions ?? []).contains(where: { $0.content == capturedQuestion.content }) {
+                session.capturedQuestions = (session.capturedQuestions ?? []) + [capturedQuestion]
             }
         }
         
@@ -1659,7 +1660,7 @@ struct AmbientModeView: View {
         do {
             try modelContext.save()
             print("✅ Question saved to SwiftData with session: \(questionText.prefix(50))...")
-            print("   Session now has \(currentSession?.capturedQuestions.count ?? 0) questions")
+            print("   Session now has \((currentSession?.capturedQuestions ?? []).count) questions")
         } catch {
             print("❌ Failed to save question: \(error)")
         }
@@ -1890,8 +1891,10 @@ struct AmbientModeView: View {
                 if case .quote(let capturedQuote) = updatedMessage.messageType {
                     // Find and update the quote in the session
                     if let session = currentSession,
-                       let quoteIndex = session.capturedQuotes.firstIndex(where: { $0.id == capturedQuote.id }) {
-                        session.capturedQuotes[quoteIndex].text = messageText
+                       let quoteIndex = (session.capturedQuotes ?? []).firstIndex(where: { $0.id == capturedQuote.id }) {
+                        var quotes = session.capturedQuotes ?? []
+                        quotes[quoteIndex].text = messageText
+                        session.capturedQuotes = quotes
                         try? modelContext.save()
                     }
                 }
@@ -1969,7 +1972,7 @@ struct AmbientModeView: View {
                 if let capturedQuote = saveQuoteToSwiftData(content) {
                     // Add to messages for display
                     let quoteMessage = UnifiedChatMessage(
-                        content: capturedQuote.text,
+                        content: capturedQuote.text ?? "",
                         isUser: true,
                         timestamp: Date(),
                         bookContext: currentBookContext,
@@ -1979,7 +1982,7 @@ struct AmbientModeView: View {
                     
                     // Add to session if available
                     if let session = currentSession {
-                        session.capturedQuotes.append(capturedQuote)
+                        session.capturedQuotes = (session.capturedQuotes ?? []) + [capturedQuote]
                         try? modelContext.save()
                     }
                     
@@ -1990,7 +1993,7 @@ struct AmbientModeView: View {
                 if let capturedNote = saveNoteToSwiftData(content) {
                     // Add to messages for display
                     let noteMessage = UnifiedChatMessage(
-                        content: capturedNote.content,
+                        content: capturedNote.content ?? "",
                         isUser: true,
                         timestamp: Date(),
                         bookContext: currentBookContext,
@@ -2000,7 +2003,7 @@ struct AmbientModeView: View {
                     
                     // Add to session if available
                     if let session = currentSession {
-                        session.capturedNotes.append(capturedNote)
+                        session.capturedNotes = (session.capturedNotes ?? []) + [capturedNote]
                         try? modelContext.save()
                     }
                     
@@ -2249,7 +2252,7 @@ struct AmbientModeView: View {
                     // CRITICAL: Update the saved question in SwiftData with the answer
                     if let session = currentSession {
                         // Find the question in the current session's questions
-                        if let question = session.capturedQuestions.first(where: { $0.content == pendingQ }) {
+                        if let question = (session.capturedQuestions ?? []).first(where: { $0.content == pendingQ }) {
                             question.answer = response
                             question.isAnswered = true
                             try? modelContext.save()
@@ -2369,12 +2372,12 @@ struct AmbientModeView: View {
                 // CRITICAL: Update the saved question in SwiftData with the answer
                 if let session = currentSession {
                     // Find the question in the current session's questions
-                    if let question = session.capturedQuestions.first(where: { $0.content == text }) {
+                    if let question = (session.capturedQuestions ?? []).first(where: { $0.content == text }) {
                         question.answer = response
                         question.isAnswered = true
                         try? modelContext.save()
                         print("✅ Updated SwiftData question with answer for summary view")
-                        print("   Session has \(session.capturedQuestions.count) questions")
+                        print("   Session has \((session.capturedQuestions ?? []).count) questions")
                     }
                 }
                 
@@ -2644,31 +2647,31 @@ struct AmbientModeView: View {
             // Force save to ensure all relationships are persisted
             do {
                 try modelContext.save()
-                print("✅ Session saved with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
+                print("✅ Session saved with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
             } catch {
                 print("❌ Failed to save session: \(error)")
             }
             
             // Debug: Log what we're saving
             print("📊 Session Summary Debug:")
-            print("   Questions: \(session.capturedQuestions.count)")
-            for (i, q) in session.capturedQuestions.enumerated() {
-                print("     \(i+1). \(q.content.prefix(50))... Answer: \(q.isAnswered ? "Yes" : "No")")
+            print("   Questions: \((session.capturedQuestions ?? []).count)")
+            for (i, q) in (session.capturedQuestions ?? []).enumerated() {
+                print("     \(i+1). \((q.content ?? "").prefix(50))... Answer: \(q.isAnswered ?? false ? "Yes" : "No")")
             }
-            print("   Quotes: \(session.capturedQuotes.count)")
-            for (i, quote) in session.capturedQuotes.enumerated() {
-                print("     \(i+1). \(quote.text.prefix(50))...")
+            print("   Quotes: \((session.capturedQuotes ?? []).count)")
+            for (i, quote) in (session.capturedQuotes ?? []).enumerated() {
+                print("     \(i+1). \((quote.text ?? "").prefix(50))...")
             }
-            print("   Notes: \(session.capturedNotes.count)")
-            for (i, note) in session.capturedNotes.enumerated() {
-                print("     \(i+1). \(note.content.prefix(50))...")
+            print("   Notes: \((session.capturedNotes ?? []).count)")
+            for (i, note) in (session.capturedNotes ?? []).enumerated() {
+                print("     \(i+1). \((note.content ?? "").prefix(50))...")
             }
             
             // Show summary if there's meaningful content
-            if session.capturedQuestions.count > 0 || session.capturedQuotes.count > 0 || session.capturedNotes.count > 0 {
+            if (session.capturedQuestions ?? []).count > 0 || (session.capturedQuotes ?? []).count > 0 || (session.capturedNotes ?? []).count > 0 {
                 // Present the session summary sheet
                 showingSessionSummary = true
-                logger.info("📊 Showing session summary with \(session.capturedQuestions.count) questions, \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes")
+                logger.info("📊 Showing session summary with \((session.capturedQuestions ?? []).count) questions, \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes")
             } else {
                 // No meaningful content - just dismiss
                 logger.info("📊 No meaningful content in session, dismissing directly")
@@ -2691,7 +2694,7 @@ struct AmbientModeView: View {
         // Just set the end time
         session.endTime = Date()
         
-        print("📊 Finalizing session with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
+        print("📊 Finalizing session with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
         
         // Save final state
         do {
@@ -2746,7 +2749,7 @@ struct AmbientModeView: View {
         // Ensure all content is saved to the current book
         do {
             try modelContext.save()
-            print("✅ Saved session for \(currentBookContext?.title ?? "unknown book") with \(session.capturedQuotes.count) quotes, \(session.capturedNotes.count) notes, \(session.capturedQuestions.count) questions")
+            print("✅ Saved session for \(currentBookContext?.title ?? "unknown book") with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
         } catch {
             print("❌ Failed to save session before book switch: \(error)")
         }
@@ -2935,7 +2938,7 @@ struct AmbientQuoteView: View {
                 }
                 
                 // Quote text with elegant typography - TAPPABLE FOR EDITING
-                Text(quote.text)
+                Text(quote.text ?? "")
                     .font(.custom("Georgia", size: 16))
                     .italic()
                     .foregroundStyle(.white.opacity(0.9))
@@ -2944,7 +2947,7 @@ struct AmbientQuoteView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         SensoryFeedback.light()
-                        onEdit(quote.text)
+                        onEdit(quote.text ?? "")
                     }
                 
                 // Author attribution if available
@@ -3015,7 +3018,7 @@ struct AmbientNoteView: View {
                             .tracking(0.5)
                     }
                     
-                    Text(note.content)
+                    Text(note.content ?? "")
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(.white.opacity(0.95))
                         .multilineTextAlignment(.leading)
@@ -3028,7 +3031,7 @@ struct AmbientNoteView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 SensoryFeedback.light()
-                onEdit(note.content)
+                onEdit(note.content ?? "")
             }
         }
         .padding(.vertical, 16)

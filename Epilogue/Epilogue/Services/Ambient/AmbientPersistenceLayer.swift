@@ -37,7 +37,7 @@ public class AmbientPersistenceLayer {
     func configure(modelContext: ModelContext, session: AmbientSession) {
         self.modelContext = modelContext
         self.currentSession = session
-        logger.info("Persistence layer configured for session: \(session.id)")
+        logger.info("Persistence layer configured for session: \(session.id?.uuidString ?? "unknown")")
     }
     
     /// Save content with guaranteed single write path
@@ -168,7 +168,10 @@ public class AmbientPersistenceLayer {
             // Link to session if not already linked
             if existing.ambientSession == nil {
                 existing.ambientSession = session
-                session.capturedQuotes.append(existing)
+                if session.capturedQuotes == nil {
+                    session.capturedQuotes = []
+                }
+                session.capturedQuotes?.append(existing)
             }
             return
         }
@@ -187,7 +190,10 @@ public class AmbientPersistenceLayer {
         
         quote.ambientSession = session
         context.insert(quote)
-        session.capturedQuotes.append(quote)
+        if session.capturedQuotes == nil {
+            session.capturedQuotes = []
+        }
+        session.capturedQuotes?.append(quote)
     }
     
     private func saveNote(_ content: AmbientProcessedContent, to session: AmbientSession, using context: ModelContext) async throws {
@@ -202,7 +208,10 @@ public class AmbientPersistenceLayer {
         if let existing = try? context.fetch(descriptor).first {
             if existing.ambientSession == nil {
                 existing.ambientSession = session
-                session.capturedNotes.append(existing)
+                if session.capturedNotes == nil {
+                    session.capturedNotes = []
+                }
+                session.capturedNotes?.append(existing)
             }
             return
         }
@@ -220,7 +229,10 @@ public class AmbientPersistenceLayer {
         
         note.ambientSession = session
         context.insert(note)
-        session.capturedNotes.append(note)
+        if session.capturedNotes == nil {
+            session.capturedNotes = []
+        }
+        session.capturedNotes?.append(note)
     }
     
     private func saveQuestion(_ content: AmbientProcessedContent, to session: AmbientSession, using context: ModelContext) async throws {
@@ -241,7 +253,10 @@ public class AmbientPersistenceLayer {
             
             if existing.ambientSession == nil {
                 existing.ambientSession = session
-                session.capturedQuestions.append(existing)
+                if session.capturedQuestions == nil {
+                    session.capturedQuestions = []
+                }
+                session.capturedQuestions?.append(existing)
             }
             return
         }
@@ -263,7 +278,10 @@ public class AmbientPersistenceLayer {
         
         question.ambientSession = session
         context.insert(question)
-        session.capturedQuestions.append(question)
+        if session.capturedQuestions == nil {
+            session.capturedQuestions = []
+        }
+        session.capturedQuestions?.append(question)
     }
     
     private func findOrCreateBookModel(content: AmbientProcessedContent, using context: ModelContext) async -> BookModel? {

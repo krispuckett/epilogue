@@ -105,7 +105,7 @@ struct AIEnhancedNotesView: View {
                                 .background(Color.blue.opacity(0.1))
                                 .cornerRadius(8)
                         } else if let note = selectedNote {
-                            Text(note.content)
+                            Text(note.content ?? "")
                                 .padding()
                                 .background(Color.orange.opacity(0.1))
                                 .cornerRadius(8)
@@ -157,7 +157,7 @@ struct AIEnhancedNotesView: View {
         Task {
             // Pass the BookModel directly if available
             let bookModel = quote.book
-            aiResponse = await ai.analyzeQuote(quote.text, from: bookModel)
+            aiResponse = await ai.analyzeQuote(quote.text ?? "", from: bookModel)
             isAnalyzing = false
         }
     }
@@ -168,7 +168,7 @@ struct AIEnhancedNotesView: View {
         showingAISheet = true
         
         Task {
-            aiResponse = await ai.enhanceNote(note.content)
+            aiResponse = await ai.enhanceNote(note.content ?? "")
             isAnalyzing = false
         }
     }
@@ -183,7 +183,7 @@ struct QuoteCardWithAI: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Quote text
-            Text("\"\(String(quote.text.prefix(100)))...\"")
+            Text("\"\(String((quote.text ?? "").prefix(100)))...\"")
                 .font(.system(.callout, design: .serif))
                 .italic()
                 .lineLimit(3)
@@ -228,7 +228,7 @@ struct NoteCardWithAI: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 // Note content
-                Text(note.content)
+                Text(note.content ?? "")
                     .font(.callout)
                     .lineLimit(3)
                 
@@ -242,7 +242,7 @@ struct NoteCardWithAI: View {
                     
                     Spacer()
                     
-                    Text(note.timestamp, style: .relative)
+                    Text(note.timestamp ?? Date(), style: .relative)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

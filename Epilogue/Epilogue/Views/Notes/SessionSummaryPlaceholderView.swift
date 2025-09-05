@@ -10,8 +10,8 @@ struct SessionSummaryPlaceholderView: View {
     private var matchingSession: AmbientSession? {
         // Debug logging
         print("🔍 Looking for session:")
-        print("  - Note: \(note?.content.prefix(30) ?? "nil")")
-        print("  - Quote: \(quote?.text.prefix(30) ?? "nil")")
+        print("  - Note: \((note?.content ?? "").prefix(30))")
+        print("  - Quote: \((quote?.text ?? "").prefix(30))")
         print("  - Note has session: \(note?.ambientSession != nil)")
         print("  - Quote has session: \(quote?.ambientSession != nil)")
         if let noteSession = note?.ambientSession {
@@ -46,7 +46,7 @@ struct SessionSummaryPlaceholderView: View {
             let sessionEnd = session.endTime
             
             // Check if the note/quote was created during this session
-            let matches = targetDate >= sessionStart && targetDate <= sessionEnd.addingTimeInterval(300) // 5 minute buffer
+            let matches = targetDate >= (sessionStart ?? Date()) && targetDate <= (sessionEnd ?? sessionStart ?? Date()).addingTimeInterval(300) // 5 minute buffer
             if matches {
                 print("✅ Found session by timestamp match")
             }
@@ -86,13 +86,13 @@ struct SessionSummaryPlaceholderView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(DesignSystem.Colors.textTertiary)
                         
-                        Text(note.content)
+                        Text(note.content ?? "")
                             .font(.system(size: 17))
                             .foregroundStyle(.white.opacity(0.9))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                         
-                        Text(formatDate(note.timestamp))
+                        Text(formatDate(note.timestamp ?? Date()))
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.4))
                     }
@@ -114,7 +114,7 @@ struct SessionSummaryPlaceholderView: View {
                                 .foregroundStyle(.white.opacity(0.6))
                         }
                         
-                        Text(formatDate(quote.timestamp))
+                        Text(formatDate(quote.timestamp ?? Date()))
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.4))
                     }

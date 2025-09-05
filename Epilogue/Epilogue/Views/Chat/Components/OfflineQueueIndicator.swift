@@ -149,7 +149,7 @@ struct QueuedQuestionRow: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(question.question)
+            Text(question.question ?? "")
                 .font(.body)
                 .lineLimit(2)
             

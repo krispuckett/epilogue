@@ -63,14 +63,14 @@ class ReadingContextManager: ObservableObject {
             if !recentQuotes.isEmpty {
                 prompt += "\nRecent quotes the reader found interesting:\n"
                 for (index, quote) in recentQuotes.prefix(3).enumerated() {
-                    prompt += "\(index + 1). \"\(quote.text.prefix(100))...\"\n"
+                    prompt += "\(index + 1). \"\((quote.text ?? "").prefix(100))...\"\n"
                 }
             }
             
             if !recentNotes.isEmpty {
                 prompt += "\nReader's recent notes:\n"
                 for (index, note) in recentNotes.prefix(3).enumerated() {
-                    prompt += "\(index + 1). \(note.content.prefix(100))...\n"
+                    prompt += "\(index + 1). \((note.content ?? "").prefix(100))...\n"
                 }
             }
             
@@ -561,7 +561,7 @@ class ReadingContextManager: ObservableObject {
         }
         
         // Update emotional state based on quote
-        updateEmotionalState(basedOn: quote.text)
+        updateEmotionalState(basedOn: quote.text ?? "")
     }
     
     func addNote(_ note: CapturedNote) {
@@ -571,7 +571,7 @@ class ReadingContextManager: ObservableObject {
         }
         
         // Update emotional state based on note
-        updateEmotionalState(basedOn: note.content)
+        updateEmotionalState(basedOn: note.content ?? "")
     }
     
     func addAIResponse(_ question: String, response: String, confidence: Float = 0.9) {
@@ -664,7 +664,7 @@ class ReadingContextManager: ObservableObject {
         let questionWords = Set(question.lowercased().split(separator: " ").map(String.init))
         
         return recentQuotes.filter { quote in
-            let quoteWords = Set(quote.text.lowercased().split(separator: " ").map(String.init))
+            let quoteWords = Set((quote.text ?? "").lowercased().split(separator: " ").map(String.init))
             let overlap = questionWords.intersection(quoteWords)
             return overlap.count >= 2
         }
@@ -675,7 +675,7 @@ class ReadingContextManager: ObservableObject {
         let questionWords = Set(question.lowercased().split(separator: " ").map(String.init))
         
         return recentNotes.filter { note in
-            let noteWords = Set(note.content.lowercased().split(separator: " ").map(String.init))
+            let noteWords = Set((note.content ?? "").lowercased().split(separator: " ").map(String.init))
             let overlap = questionWords.intersection(noteWords)
             return overlap.count >= 2
         }

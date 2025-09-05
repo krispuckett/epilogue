@@ -5,13 +5,13 @@ import SwiftData
 
 @Model
 final class CapturedNote {
-    var id: UUID
-    var content: String
-    var timestamp: Date
+    var id: UUID? = UUID()
+    var content: String? = ""
+    var timestamp: Date? = Date()
     var pageNumber: Int?
     var bookLocalId: String?
-    var source: CaptureSource
-    var tags: [String]
+    var source: String? = CaptureSource.manual.rawValue  // Store as String for CloudKit
+    var tags: [String]? = []
     
     // Relationships
     @Relationship(deleteRule: .nullify)
@@ -19,6 +19,11 @@ final class CapturedNote {
     
     @Relationship(inverse: \AmbientSession.capturedNotes)
     var ambientSession: AmbientSession?
+    
+    // Computed property for CaptureSource
+    var captureSource: CaptureSource {
+        CaptureSource(rawValue: source ?? CaptureSource.manual.rawValue) ?? .manual
+    }
     
     init(
         content: String,
@@ -34,7 +39,7 @@ final class CapturedNote {
         self.bookLocalId = book?.localId
         self.pageNumber = pageNumber
         self.timestamp = timestamp
-        self.source = source
+        self.source = source.rawValue  // Store as String
         self.tags = tags
     }
 }
@@ -43,13 +48,13 @@ final class CapturedNote {
 
 @Model
 final class CapturedQuote {
-    var id: UUID
-    var text: String
+    var id: UUID? = UUID()
+    var text: String? = ""
     var author: String?
-    var timestamp: Date
+    var timestamp: Date? = Date()
     var pageNumber: Int?
     var bookLocalId: String?
-    var source: CaptureSource
+    var source: String? = CaptureSource.manual.rawValue  // Store as String for CloudKit
     var notes: String? // User's notes about the quote
     
     // Relationships
@@ -58,6 +63,11 @@ final class CapturedQuote {
     
     @Relationship(inverse: \AmbientSession.capturedQuotes)
     var ambientSession: AmbientSession?
+    
+    // Computed property for CaptureSource
+    var captureSource: CaptureSource {
+        CaptureSource(rawValue: source ?? CaptureSource.manual.rawValue) ?? .manual
+    }
     
     init(
         text: String,
@@ -75,7 +85,7 @@ final class CapturedQuote {
         self.author = author ?? book?.author
         self.pageNumber = pageNumber
         self.timestamp = timestamp
-        self.source = source
+        self.source = source.rawValue  // Store as String
         self.notes = notes
     }
 }
@@ -84,13 +94,13 @@ final class CapturedQuote {
 
 @Model
 final class CapturedQuestion {
-    var id: UUID
-    var content: String
-    var timestamp: Date
+    var id: UUID? = UUID()
+    var content: String? = ""
+    var timestamp: Date? = Date()
     var pageNumber: Int?
     var bookLocalId: String?
-    var source: CaptureSource
-    var isAnswered: Bool
+    var source: String? = CaptureSource.manual.rawValue  // Store as String for CloudKit
+    var isAnswered: Bool? = false
     var answer: String?
     
     // Relationships
@@ -99,6 +109,11 @@ final class CapturedQuestion {
     
     @Relationship(inverse: \AmbientSession.capturedQuestions)
     var ambientSession: AmbientSession?
+    
+    // Computed property for CaptureSource
+    var captureSource: CaptureSource {
+        CaptureSource(rawValue: source ?? CaptureSource.manual.rawValue) ?? .manual
+    }
     
     init(
         content: String,
@@ -113,7 +128,7 @@ final class CapturedQuestion {
         self.bookLocalId = book?.localId
         self.pageNumber = pageNumber
         self.timestamp = timestamp
-        self.source = source
+        self.source = source.rawValue  // Store as String
         self.isAnswered = false
         self.answer = nil
     }

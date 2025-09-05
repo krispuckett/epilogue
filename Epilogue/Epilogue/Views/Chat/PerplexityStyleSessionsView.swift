@@ -60,7 +60,7 @@ struct PerplexityStyleSessionsView: View {
         
         let grouped = Dictionary(grouping: sessions) { session in
             let startOfToday = calendar.startOfDay(for: now)
-            let startOfSession = calendar.startOfDay(for: session.startTime)
+            let startOfSession = calendar.startOfDay(for: session.startTime ?? Date())
             let daysAgo = calendar.dateComponents([.day], from: startOfSession, to: startOfToday).day ?? 0
             
             if daysAgo == 0 {
@@ -71,7 +71,7 @@ struct PerplexityStyleSessionsView: View {
                 // Use numeric date for everything older than yesterday
                 let formatter = DateFormatter()
                 formatter.dateFormat = "M.dd.yy"
-                return formatter.string(from: session.startTime)
+                return formatter.string(from: session.startTime ?? Date())
             }
         }
         
@@ -84,7 +84,7 @@ struct PerplexityStyleSessionsView: View {
             return date1 > date2
         }
         
-        return sortedGroups.map { (date: $0.key, sessions: $0.value.sorted { $0.startTime > $1.startTime }) }
+        return sortedGroups.map { (date: $0.key, sessions: $0.value.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }) }
     }
     
     private var filteredGroupedSessions: [(date: String, sessions: [AmbientSession])] {
@@ -101,17 +101,17 @@ struct PerplexityStyleSessionsView: View {
                 }
                 
                 // Search in questions
-                if session.capturedQuestions.contains(where: { $0.content.localizedCaseInsensitiveContains(searchText) }) {
+                if (session.capturedQuestions ?? []).contains(where: { ($0.content ?? "").localizedCaseInsensitiveContains(searchText) }) {
                     return true
                 }
                 
                 // Search in notes
-                if session.capturedNotes.contains(where: { $0.content.localizedCaseInsensitiveContains(searchText) }) {
+                if (session.capturedNotes ?? []).contains(where: { ($0.content ?? "").localizedCaseInsensitiveContains(searchText) }) {
                     return true
                 }
                 
                 // Search in quotes
-                if session.capturedQuotes.contains(where: { $0.text.localizedCaseInsensitiveContains(searchText) }) {
+                if (session.capturedQuotes ?? []).contains(where: { ($0.text ?? "").localizedCaseInsensitiveContains(searchText) }) {
                     return true
                 }
                 
@@ -316,36 +316,36 @@ struct PerplexitySessionRow: View {
         let now = Date()
         
         // Check if it's from today
-        if calendar.isDateInToday(session.startTime) {
+        if calendar.isDateInToday(session.startTime ?? Date()) {
             // Check if it's very recent (within last hour)
-            let minutesAgo = Int(now.timeIntervalSince(session.startTime) / 60)
+            let minutesAgo = Int(now.timeIntervalSince(session.startTime ?? Date()) / 60)
             if minutesAgo < 60 {
                 return "Just started"
             } else {
                 formatter.dateFormat = "h:mm a"
-                return formatter.string(from: session.startTime)
+                return formatter.string(from: session.startTime ?? Date())
             }
-        } else if calendar.isDateInYesterday(session.startTime) {
+        } else if calendar.isDateInYesterday(session.startTime ?? Date()) {
             return "Yesterday"
         } else {
             // For older dates, show the numeric date
             formatter.dateFormat = "M.dd.yy"
-            return formatter.string(from: session.startTime)
+            return formatter.string(from: session.startTime ?? Date())
         }
     }
     
     private var primaryTimeDisplay: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
-        return formatter.string(from: session.startTime).uppercased()
+        return formatter.string(from: session.startTime ?? Date()).uppercased()
     }
     
     private var secondaryTimeDisplay: String? {
         let calendar = Calendar.current
         let now = Date()
-        let minutesAgo = Int(now.timeIntervalSince(session.startTime) / 60)
+        let minutesAgo = Int(now.timeIntervalSince(session.startTime ?? Date()) / 60)
         
-        if calendar.isDateInToday(session.startTime) && minutesAgo < 60 {
+        if calendar.isDateInToday(session.startTime ?? Date()) && minutesAgo < 60 {
             return "Just\nstarted"
         }
         return nil
@@ -358,16 +358,16 @@ struct PerplexitySessionRow: View {
         }
         
         // Check for specific content to make title more contextual
-        if let firstQuestion = session.capturedQuestions.first {
-            return firstQuestion.content
+        if let firstQuestion = session.capturedQuestions?.first {
+            return firstQuestion.content ?? ""
         }
         
-        if let firstNote = session.capturedNotes.first {
-            let preview = String(firstNote.content.prefix(100))
+        if let firstNote = session.capturedNotes?.first {
+            let preview = String((firstNote.content ?? "").prefix(100))
             return preview
         }
         
-        if session.capturedQuotes.count > 0 {
+        if (session.capturedQuotes?.count ?? 0) > 0 {
             return "Started exploring \(bookModel.title)"
         }
         
@@ -379,26 +379,26 @@ struct PerplexitySessionRow: View {
     }
     
     private var hasContent: Bool {
-        !session.capturedQuestions.isEmpty || 
-        !session.capturedNotes.isEmpty || 
-        !session.capturedQuotes.isEmpty
+        !(session.capturedQuestions ?? []).isEmpty || 
+        !(session.capturedNotes ?? []).isEmpty || 
+        !(session.capturedQuotes ?? []).isEmpty
     }
     
     private var contentIcon: (name: String, color: Color)? {
-        if !session.capturedQuestions.isEmpty {
+        if !(session.capturedQuestions ?? []).isEmpty {
             return ("questionmark.circle.fill", Color(red: 0.4, green: 0.6, blue: 1.0))
-        } else if !session.capturedNotes.isEmpty {
+        } else if !(session.capturedNotes ?? []).isEmpty {
             return ("square.and.pencil", Color(red: 0.8, green: 0.4, blue: 1.0))
-        } else if !session.capturedQuotes.isEmpty {
+        } else if !(session.capturedQuotes ?? []).isEmpty {
             return ("quote.bubble.fill", DesignSystem.Colors.primaryAccent)
         }
         return nil
     }
     
     private var contentCount: Int {
-        session.capturedQuestions.count + 
-        session.capturedNotes.count + 
-        session.capturedQuotes.count
+        (session.capturedQuestions?.count ?? 0) + 
+        (session.capturedNotes?.count ?? 0) + 
+        (session.capturedQuotes?.count ?? 0)
     }
     
     var body: some View {

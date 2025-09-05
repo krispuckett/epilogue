@@ -67,10 +67,16 @@ class GoodreadsImportService: ObservableObject {
         }
     }
     
-    struct ProcessedBook {
+    class ProcessedBook {
         let goodreadsBook: GoodreadsBook
-        let bookModel: BookModel
+        var bookModel: BookModel
         let matchMethod: MatchMethod
+        
+        init(goodreadsBook: GoodreadsBook, bookModel: BookModel, matchMethod: MatchMethod) {
+            self.goodreadsBook = goodreadsBook
+            self.bookModel = bookModel
+            self.matchMethod = matchMethod
+        }
         
         enum MatchMethod {
             case isbn
@@ -1039,7 +1045,9 @@ class GoodreadsImportService: ObservableObject {
         
         // Use enhanced service with better query parsing
         let searchQuery = "\(goodreadsBook.title) by \(goodreadsBook.author)"
+        print("🔍 Searching Google Books for: \(searchQuery)")
         let results = await enhancedService.searchBooksWithRanking(query: searchQuery)
+        print("   Found \(results.count) results")
         
         // Check the search results
         if let book = results.first {
@@ -1132,15 +1140,58 @@ class GoodreadsImportService: ObservableObject {
     private func createBookModel(from googleBook: GoogleBookItem, goodreadsBook: GoodreadsBook) -> BookModel {
         let volumeInfo = googleBook.volumeInfo
         
-        // Use the enhanced Book object from GoogleBookItem which has high-res cover URLs
-        let enhancedBook = googleBook.book
+        // Get the cover URL from imageLinks with preference for higher quality
+        // IMPORTANT: Prefer thumbnail first as it's most reliable from Google Books API
+        var coverURL: String?
+        if let thumbnail = volumeInfo.imageLinks?.thumbnail {
+            // Thumbnail is the most reliable and always present
+            coverURL = thumbnail
+            print("   ✅ Using thumbnail URL: \(thumbnail)")
+        } else if let small = volumeInfo.imageLinks?.small {
+            coverURL = small
+            print("   ✅ Using small URL: \(small)")
+        } else if let medium = volumeInfo.imageLinks?.medium {
+            coverURL = medium
+            print("   ✅ Using medium URL: \(medium)")
+        } else if let large = volumeInfo.imageLinks?.large {
+            coverURL = large
+            print("   ✅ Using large URL: \(large)")
+        } else if let extraLarge = volumeInfo.imageLinks?.extraLarge {
+            coverURL = extraLarge
+            print("   ✅ Using extraLarge URL: \(extraLarge)")
+        } else {
+            print("   ⚠️ No image URLs found in volumeInfo.imageLinks")
+        }
+        
+        // Ensure HTTPS for all URLs
+        if let url = coverURL, url.starts(with: "http://") {
+            coverURL = url.replacingOccurrences(of: "http://", with: "https://")
+            print("   🔒 Converted to HTTPS: \(coverURL!)")
+        }
+        
+        // Debug log
+        print("📚 Creating BookModel for: \(volumeInfo.title)")
+        print("   Google Books ID: \(googleBook.id)")
+        print("   ImageLinks: \(volumeInfo.imageLinks != nil ? "Present" : "Nil")")
+        if let links = volumeInfo.imageLinks {
+            print("   - thumbnail: \(links.thumbnail ?? "nil")")
+            print("   - small: \(links.small ?? "nil")")
+            print("   - medium: \(links.medium ?? "nil")")
+            print("   - large: \(links.large ?? "nil")")
+            print("   - extraLarge: \(links.extraLarge ?? "nil")")
+        }
+        print("   Final coverURL: \(coverURL ?? "nil")")
+        
+        // Verify the BookModel will be created correctly
+        print("   BookModel.id will be set to: \(googleBook.id)")
+        print("   BookModel.coverImageURL will be set to: \(coverURL ?? "nil")")
         
         let book = BookModel(
             id: googleBook.id,
             title: volumeInfo.title,
             author: volumeInfo.authors?.joined(separator: ", ") ?? goodreadsBook.author,
             publishedYear: volumeInfo.publishedDate,
-            coverImageURL: enhancedBook.coverImageURL,  // Keep the URL but don't block on loading
+            coverImageURL: coverURL,  // Use the cover URL we found
             isbn: goodreadsBook.primaryISBN ?? volumeInfo.industryIdentifiers?.first { $0.type.contains("ISBN") }?.identifier,
             description: volumeInfo.description,
             pageCount: Int(goodreadsBook.numberOfPages) ?? volumeInfo.pageCount

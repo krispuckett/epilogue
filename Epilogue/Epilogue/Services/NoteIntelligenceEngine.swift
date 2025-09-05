@@ -290,13 +290,13 @@ class NoteIntelligenceEngine: ObservableObject {
             let questionNotes = questions.map { q in
                 Note(
                     type: .note,  // Changed from .insight which doesn't exist
-                    content: q.content,
+                    content: q.content ?? "",
                     bookId: nil,
                     bookTitle: q.book?.title,
                     author: q.book?.author,
                     pageNumber: q.pageNumber,
-                    dateCreated: q.timestamp,
-                    id: q.id
+                    dateCreated: q.timestamp ?? Date(),
+                    id: q.id ?? UUID()
                 )
             }
             sections.append(SmartSection(
