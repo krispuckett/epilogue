@@ -108,10 +108,10 @@ public class SharedBookCoverManager: ObservableObject {
             return diskCached
         }
         
-        // Load from network with proper zoom for quality
-        let qualityURL = appendZoomParameter(to: cleanedURL, zoom: 10)  // zoom=10 for maximum quality thumbnails
+        // Load from network with appropriate zoom for thumbnails
+        let thumbnailURL = appendZoomParameter(to: cleanedURL, zoom: 3)  // zoom=3 for thumbnails
         return await loadAndCacheImage(
-            from: qualityURL,
+            from: thumbnailURL,
             cacheKey: cacheKey as String,
             targetSize: targetSize,
             isThumbnail: true
@@ -123,7 +123,7 @@ public class SharedBookCoverManager: ObservableObject {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
         let cleanedURL = cleanURL(coverURL)
-        // Use zoom=10 for maximum quality images - required for proper gradient extraction
+        // Use zoom=10 for maximum quality from Google Books
         let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 10)
         let cacheKey = "\(cleanedURL)_full" as NSString
         
@@ -235,12 +235,7 @@ public class SharedBookCoverManager: ObservableObject {
         // Create loading task with retry logic
         let task = Task<UIImage?, Never> {
             guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else {
-                print("❌ Invalid or unsafe URL: \(urlString)")
-                print("   URLValidator.isValidURL: \(URLValidator.isValidURL(urlString))")
-                if let testURL = URL(string: urlString) {
-                    print("   URL host: \(testURL.host ?? "nil")")
-                    print("   URL scheme: \(testURL.scheme ?? "nil")")
-                }
+                print("❌ Invalid or unsafe URL")
                 return nil
             }
             
@@ -484,20 +479,16 @@ public class SharedBookCoverManager: ObservableObject {
         var cleaned = urlString
             .replacingOccurrences(of: "http://", with: "https://")
         
-        // IMPORTANT: Don't remove zoom parameters from Google Books URLs
-        // Google Books requires zoom parameter to function properly
-        if !cleaned.contains("books.google.com") && !cleaned.contains("googleapis.com") {
-            // Only remove zoom parameters from non-Google URLs
-            let zoomPatterns = [
-                "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
-                "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
-                "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
-                "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
-            ]
-            
-            for pattern in zoomPatterns {
-                cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
-            }
+        // Remove all zoom parameters
+        let zoomPatterns = [
+            "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
+            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
+            "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
+            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
+        ]
+        
+        for pattern in zoomPatterns {
+            cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
         }
         
         // Clean up any double & or trailing &
@@ -513,12 +504,32 @@ public class SharedBookCoverManager: ObservableObject {
     }
     
     private func appendZoomParameter(to urlString: String, zoom: Int) -> String {
-        // Don't add zoom if it already exists
-        if urlString.contains("zoom=") {
-            return urlString
+        // Remove any existing zoom parameter first
+        var cleaned = urlString
+        let zoomPatterns = [
+            "&zoom=\\d+", "\\?zoom=\\d+"
+        ]
+        
+        for pattern in zoomPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+                let range = NSRange(location: 0, length: cleaned.utf16.count)
+                cleaned = regex.stringByReplacingMatches(in: cleaned, options: [], range: range, withTemplate: "")
+            }
         }
-        let separator = urlString.contains("?") ? "&" : "?"
-        return "\(urlString)\(separator)zoom=\(zoom)"
+        
+        // Clean up any double & or ? that might result
+        cleaned = cleaned.replacingOccurrences(of: "&&", with: "&")
+        cleaned = cleaned.replacingOccurrences(of: "?&", with: "?")
+        if cleaned.hasSuffix("&") {
+            cleaned = String(cleaned.dropLast())
+        }
+        if cleaned.hasSuffix("?") {
+            cleaned = String(cleaned.dropLast())
+        }
+        
+        // Now append the new zoom parameter
+        let separator = cleaned.contains("?") ? "&" : "?"
+        return "\(cleaned)\(separator)zoom=\(zoom)"
     }
     
     // MARK: - Public Utilities

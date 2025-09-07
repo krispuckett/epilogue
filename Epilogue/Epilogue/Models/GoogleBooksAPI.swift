@@ -66,7 +66,7 @@ struct GoogleBookItem: Codable, Identifiable {
                     if index + 1 < components.count {
                         let potentialId = components[index + 1].components(separatedBy: "?").first ?? ""
                         if !potentialId.isEmpty {
-                            enhanced = "https://books.google.com/books/content?id=\(potentialId)&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+                            enhanced = "https://books.google.com/books/content?id=\(potentialId)&printsec=frontcover&img=1&source=gbs_api"
                             print("📚 Converted to content API from edition/publisher URL: \(potentialId)")
                             return enhanced
                         }
@@ -87,9 +87,8 @@ struct GoogleBookItem: Codable, Identifiable {
             if !enhanced.contains("img=") {
                 enhanced += "&img=1"
             }
-            if !enhanced.contains("zoom=") {
-                enhanced += "&zoom=1"  // zoom=1 is most reliable
-            }
+            // Don't add zoom parameter here - let SharedBookCoverManager handle it
+            // based on whether it's loading a thumbnail or full image
             if !enhanced.contains("source=") {
                 enhanced += "&source=gbs_api"
             }
@@ -97,7 +96,7 @@ struct GoogleBookItem: Codable, Identifiable {
                 enhanced += "&printsec=frontcover"
             }
         } else {
-            enhanced += "?img=1&zoom=1&printsec=frontcover&source=gbs_api"
+            enhanced += "?img=1&printsec=frontcover&source=gbs_api"
         }
         
         // Remove edge curl which can cause loading issues
