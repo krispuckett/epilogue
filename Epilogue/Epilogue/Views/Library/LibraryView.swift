@@ -92,6 +92,19 @@ struct LibraryView: View {
         await SharedBookCoverManager.shared.preloadCovers(coverURLs)
         
         print("✅ Finished preloading covers")
+        
+        // Also ensure high-quality images are loaded for visible books
+        let visibleBooks = Array(viewModel.books.prefix(20))
+        for book in visibleBooks {
+            if let coverURL = book.coverImageURL {
+                // Load full image to ensure high quality in library view
+                _ = await SharedBookCoverManager.shared.loadFullImage(from: coverURL)
+            }
+        }
+        print("✅ Loaded high-quality covers for visible books")
+        
+        // Don't pre-warm color cache - let BookDetailView handle color extraction
+        // This ensures all books use the same color extraction path from displayed images
     }
     
     @ViewBuilder
@@ -262,12 +275,8 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var goodreadsImportSheet: some View {
-        GoodreadsImportView(
-            modelContext: modelContext,
-            googleBooksService: googleBooksService,
-            libraryViewModel: viewModel
-        )
-        .environmentObject(googleBooksService)
+        CleanGoodreadsImportView()
+            .environmentObject(viewModel)
     }
     
     @ViewBuilder
@@ -591,6 +600,7 @@ struct LibraryBookCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Book cover with 3D effect
+            // TEMPORARY TEST: Just use SharedBookCoverView as before
             SharedBookCoverView(
                 coverURL: book.coverImageURL,
                 width: 170,
@@ -602,6 +612,25 @@ struct LibraryBookCard: View {
                     if book.coverImageURL == nil {
                         print("⚠️⚠️ LibraryBookCard displaying book with NO cover URL: \(book.title)")
                         print("   Book.id: \(book.id)")
+                    } else {
+                        print("📚 LibraryBookCard showing: \(book.title)")
+                        print("   Cover URL: \(book.coverImageURL!)")
+                        
+                        // TEST: Try loading this URL directly
+                        Task {
+                            if let url = URL(string: book.coverImageURL!) {
+                                do {
+                                    let (data, response) = try await URLSession.shared.data(from: url)
+                                    if let httpResponse = response as? HTTPURLResponse {
+                                        print("   ✅ Direct load test: Status \(httpResponse.statusCode), \(data.count) bytes")
+                                    }
+                                } catch {
+                                    print("   ❌ Direct load test FAILED: \(error)")
+                                }
+                            } else {
+                                print("   ❌ Invalid URL - can't create URL object")
+                            }
+                        }
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -1327,11 +1356,14 @@ class LibraryViewModel: ObservableObject {
         ) { _ in
             print("🔄 RefreshLibrary notification received")
             self.loadBooks()
+            // CRITICAL: Also update URLs after import to remove zoom parameters
+            self.updateBookCoverURLsToHigherQuality()
         }
     }
     
     private func loadBooks() {
         print("📚 Loading books from UserDefaults")
+        print("🔍 DEBUG: loadBooks() called from: \(Thread.callStackSymbols[2...5].joined(separator: "\n"))")
         if let data = userDefaults.data(forKey: booksKey) {
             print("  📦 Found data in UserDefaults, size: \(data.count) bytes")
             do {
@@ -1450,7 +1482,9 @@ class LibraryViewModel: ObservableObject {
                     hasUpdates = true
                 }
                 
-                // REMOVE all zoom parameters to get full covers
+                // DON'T remove zoom parameters - Google Books requires them!
+                // Commenting this out was the fix for the import bug
+                /*
                 if updatedURL.contains("zoom=") {
                     // Remove any existing zoom parameter
                     if let regex = try? NSRegularExpression(pattern: "&zoom=\\d", options: []) {
@@ -1468,6 +1502,7 @@ class LibraryViewModel: ObservableObject {
                     hasUpdates = true
                     print("📚 Removed zoom parameter from '\(books[index].title)' for full cover")
                 }
+                */
                 
                 // Remove edge=curl if present  
                 if updatedURL.contains("&edge=curl") {
@@ -1493,6 +1528,12 @@ class LibraryViewModel: ObservableObject {
         print("  Title: \(book.title)")
         print("  ID: \(book.id)")
         print("  🖼️ Cover URL: \(book.coverImageURL ?? "NO COVER URL")")
+        if let url = book.coverImageURL {
+            print("  🔍 URL Analysis:")
+            print("    - Contains zoom? \(url.contains("zoom="))")
+            print("    - Contains http? \(url.starts(with: "http://"))")
+            print("    - Full URL: \(url)")
+        }
         if book.coverImageURL == nil {
             print("  ⚠️⚠️⚠️ WARNING: Book being added with NO cover URL!")
         }
@@ -1511,7 +1552,8 @@ class LibraryViewModel: ObservableObject {
                 }
                 books[existingIndex] = updatedBook
                 saveBooks()
-                loadBooks()
+                // Don't reload during import - causes race conditions
+                // loadBooks()
                 print("  ✅ Book updated with new data")
                 return
             } else {

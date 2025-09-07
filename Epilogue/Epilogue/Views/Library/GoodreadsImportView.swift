@@ -105,9 +105,29 @@ struct GoodreadsImportView: View {
                                     print("   BookModel.coverImageURL: \(processedBook.bookModel.coverImageURL ?? "nil")")
                                     
                                     // Convert BookModel to Book and add to library
-                                    let book = processedBook.bookModel.asBook
+                                    var book = processedBook.bookModel.asBook
+                                    
+                                    // CRITICAL FIX: Preserve Goodreads data that might be lost in conversion
+                                    if let goodreadsRating = Int(processedBook.goodreadsBook.myRating), goodreadsRating > 0 {
+                                        book.userRating = goodreadsRating
+                                    }
+                                    if !processedBook.goodreadsBook.privateNotes.isEmpty {
+                                        book.userNotes = processedBook.goodreadsBook.privateNotes
+                                    }
+                                    
+                                    // Set reading status based on Goodreads exclusive shelf
+                                    switch processedBook.goodreadsBook.exclusiveShelf.lowercased() {
+                                    case "read":
+                                        book.readingStatus = .read
+                                    case "currently-reading":
+                                        book.readingStatus = .currentlyReading
+                                    default:
+                                        book.readingStatus = .wantToRead
+                                    }
+                                    
                                     print("   Converted Book.id: \(book.id)")
                                     print("   Converted Book.coverImageURL: \(book.coverImageURL ?? "nil")")
+                                    print("   Book rating: \(book.userRating ?? 0), status: \(book.readingStatus.rawValue)")
                                     
                                     if book.coverImageURL == nil {
                                         print("   ❌❌❌ CRITICAL: Book lost URL during asBook conversion!")

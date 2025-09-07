@@ -101,7 +101,7 @@ struct BookDetailView: View {
     private var gradientOpacity: Double {
         // Fixed calculation - no more crazy values
         let opacity = 1.0 - (min(scrollOffset, 200) / 200)
-        return max(0.2, opacity)
+        return max(0.4, opacity)  // Increased minimum from 0.2 to 0.4
     }
     
     // Color extraction
@@ -1512,16 +1512,16 @@ struct BookDetailView: View {
             )
         }
         
-        // Use a subtle, neutral warm gradient as placeholder
-        // This won't be jarring when it transitions to the real colors
+        // Use a subtle warm gradient as placeholder that works well with any book
+        // This creates a pleasant default that transitions smoothly to extracted colors
         return ColorPalette(
-            primary: Color(white: 0.3),      // Dark gray
-            secondary: Color(white: 0.25),   // Slightly darker gray
-            accent: Color.warmAmber.opacity(0.3), // Very subtle amber accent
-            background: Color(white: 0.1),   // Very dark gray
+            primary: Color(red: 0.4, green: 0.3, blue: 0.25),    // Warm brown
+            secondary: Color(red: 0.3, green: 0.2, blue: 0.15),  // Darker warm brown
+            accent: Color(red: 0.6, green: 0.4, blue: 0.3),      // Light warm brown
+            background: Color(red: 0.15, green: 0.1, blue: 0.08), // Very dark warm brown
             textColor: .white,
             luminance: 0.3,
-            isMonochromatic: true,
+            isMonochromatic: false,  // Not monochromatic so it gets full processing
             extractionQuality: 0.1 // Low quality to indicate placeholder
         )
     }

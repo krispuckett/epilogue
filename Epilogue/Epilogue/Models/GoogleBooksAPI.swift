@@ -176,6 +176,24 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         self.isbn = isbn
         self.description = description
         self.pageCount = pageCount
+        
+        // Debug logging for initialization
+        print("🆕 DEBUG: Creating new Book instance...")
+        print("  📖 Title: \(title)")
+        print("  ✍️ Author: \(author)")
+        print("  📚 ID: \(id)")
+        print("  🆔 LocalID: \(localId)")
+        if let url = coverImageURL {
+            print("  🖼️ Cover URL: \(url)")
+            print("  ✅ Book initialized WITH cover URL")
+        } else {
+            print("  ⚠️ Cover URL: nil")
+            print("  ❌ WARNING: Book '\(title)' initialized WITHOUT cover URL!")
+        }
+        print("  📗 ISBN: \(isbn ?? "nil")")
+        print("  📅 Published Year: \(publishedYear ?? "nil")")
+        print("  📄 Page Count: \(pageCount?.description ?? "nil")")
+        print("================================================")
     }
     
     // Custom decoding to handle migration from old model without localId
@@ -187,44 +205,123 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
+        // Debug logging header
+        print("🔍 DEBUG: Decoding Book...")
+        
         id = try container.decode(String.self, forKey: .id)
+        print("  📚 ID: \(id)")
+        
         // If localId doesn't exist in saved data, generate a new one
         localId = try container.decodeIfPresent(UUID.self, forKey: .localId) ?? UUID()
+        print("  🆔 LocalID: \(localId)")
+        
         title = try container.decode(String.self, forKey: .title)
+        print("  📖 Title: \(title)")
+        
         author = try container.decode(String.self, forKey: .author)
+        print("  ✍️ Author: \(author)")
+        
         publishedYear = try container.decodeIfPresent(String.self, forKey: .publishedYear)
+        print("  📅 Published Year: \(publishedYear ?? "nil")")
+        
         coverImageURL = try container.decodeIfPresent(String.self, forKey: .coverImageURL)
+        if let url = coverImageURL {
+            print("  🖼️ Cover URL: \(url)")
+            print("  ✅ Cover URL exists and is not nil")
+        } else {
+            print("  ⚠️ Cover URL: nil")
+            print("  ❌ WARNING: Book '\(title)' has NO cover URL during decoding!")
+        }
+        
         isbn = try container.decodeIfPresent(String.self, forKey: .isbn)
+        print("  📗 ISBN: \(isbn ?? "nil")")
+        
         description = try container.decodeIfPresent(String.self, forKey: .description)
+        print("  📝 Description: \(description != nil ? "Present (\(description!.prefix(50))...)" : "nil")")
+        
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount)
+        print("  📄 Page Count: \(pageCount?.description ?? "nil")")
         
         isInLibrary = try container.decodeIfPresent(Bool.self, forKey: .isInLibrary) ?? false
+        print("  📚 In Library: \(isInLibrary)")
+        
         readingStatus = try container.decodeIfPresent(ReadingStatus.self, forKey: .readingStatus) ?? .wantToRead
+        print("  📊 Reading Status: \(readingStatus.rawValue)")
+        
         currentPage = try container.decodeIfPresent(Int.self, forKey: .currentPage) ?? 0
+        print("  📍 Current Page: \(currentPage)")
+        
         userRating = try container.decodeIfPresent(Int.self, forKey: .userRating)
+        print("  ⭐ User Rating: \(userRating?.description ?? "nil")")
+        
         userNotes = try container.decodeIfPresent(String.self, forKey: .userNotes)
+        print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")")
+        
         dateAdded = try container.decodeIfPresent(Date.self, forKey: .dateAdded) ?? Date()
+        print("  📆 Date Added: \(dateAdded)")
+        
+        print("✅ Book decoded successfully: '\(title)' by \(author)")
+        print("================================================")
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
+        // Debug logging header
+        print("📤 DEBUG: Encoding Book...")
+        print("  📖 Title: \(title)")
+        print("  ✍️ Author: \(author)")
+        
         try container.encode(id, forKey: .id)
+        print("  📚 ID: \(id)")
+        
         try container.encode(localId, forKey: .localId)
+        print("  🆔 LocalID: \(localId)")
+        
         try container.encode(title, forKey: .title)
         try container.encode(author, forKey: .author)
+        
         try container.encodeIfPresent(publishedYear, forKey: .publishedYear)
+        print("  📅 Published Year: \(publishedYear ?? "nil")")
+        
         try container.encodeIfPresent(coverImageURL, forKey: .coverImageURL)
+        if let url = coverImageURL {
+            print("  🖼️ Cover URL: \(url)")
+            print("  ✅ Cover URL being encoded successfully")
+        } else {
+            print("  ⚠️ Cover URL: nil")
+            print("  ❌ WARNING: Encoding book '\(title)' with NO cover URL!")
+        }
+        
         try container.encodeIfPresent(isbn, forKey: .isbn)
+        print("  📗 ISBN: \(isbn ?? "nil")")
+        
         try container.encodeIfPresent(description, forKey: .description)
+        print("  📝 Description: \(description != nil ? "Present" : "nil")")
+        
         try container.encodeIfPresent(pageCount, forKey: .pageCount)
+        print("  📄 Page Count: \(pageCount?.description ?? "nil")")
         
         try container.encode(isInLibrary, forKey: .isInLibrary)
+        print("  📚 In Library: \(isInLibrary)")
+        
         try container.encode(readingStatus, forKey: .readingStatus)
+        print("  📊 Reading Status: \(readingStatus.rawValue)")
+        
         try container.encode(currentPage, forKey: .currentPage)
+        print("  📍 Current Page: \(currentPage)")
+        
         try container.encodeIfPresent(userRating, forKey: .userRating)
+        print("  ⭐ User Rating: \(userRating?.description ?? "nil")")
+        
         try container.encodeIfPresent(userNotes, forKey: .userNotes)
+        print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")")
+        
         try container.encode(dateAdded, forKey: .dateAdded)
+        print("  📆 Date Added: \(dateAdded)")
+        
+        print("✅ Book encoded successfully: '\(title)' by \(author)")
+        print("================================================")
     }
 }
 

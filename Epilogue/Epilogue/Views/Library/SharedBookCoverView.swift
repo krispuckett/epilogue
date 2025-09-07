@@ -70,7 +70,17 @@ struct SharedBookCoverView: View {
         isLibraryView: Bool = false,
         onImageLoaded: ((UIImage) -> Void)? = nil
     ) {
-        // Removed debug logging that was flooding console
+        // Debug logging for import issue
+        if let url = coverURL {
+            print("🖼️ SharedBookCoverView init:")
+            print("   Original URL: \(url)")
+            print("   Contains zoom? \(url.contains("zoom="))")
+            print("   URL is empty string? \(url.isEmpty)")
+            print("   URL length: \(url.count)")
+        } else {
+            print("🖼️ SharedBookCoverView init with NIL URL")
+            print("   ⚠️ This will result in no cover image!")
+        }
         self.coverURL = coverURL
         self.width = width
         self.height = height
@@ -84,16 +94,20 @@ struct SharedBookCoverView: View {
         var cleaned = urlString
             .replacingOccurrences(of: "http://", with: "https://")
         
-        // Remove all zoom parameters to normalize cache keys
-        let zoomPatterns = [
-            "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
-            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
-            "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
-            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
-        ]
-        
-        for pattern in zoomPatterns {
-            cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
+        // IMPORTANT: Don't remove zoom parameters from Google Books URLs
+        // Google Books requires zoom parameter to function properly
+        if !cleaned.contains("books.google.com") && !cleaned.contains("googleapis.com") {
+            // Only remove zoom parameters from non-Google URLs
+            let zoomPatterns = [
+                "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
+                "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
+                "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
+                "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
+            ]
+            
+            for pattern in zoomPatterns {
+                cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
+            }
         }
         
         // Clean up any double & or trailing &
@@ -121,8 +135,33 @@ struct SharedBookCoverView: View {
             return
         }
         
+        print("\n🔍 SharedBookCoverView.loadImage() called:")
+        print("   Raw URL: \(urlString)")
+        print("   Contains zoom? \(urlString.contains("zoom="))")
+        print("   Starts with http? \(urlString.starts(with: "http://"))")
+        print("   isLibraryView: \(isLibraryView)")
+        print("   loadFullImage: \(loadFullImage)")
+        
+        // EXTREME DEBUG: Check if this URL actually works
+        Task {
+            do {
+                let testURL = URL(string: urlString)!
+                let (data, response) = try await URLSession.shared.data(from: testURL)
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("   🧪 URL TEST: Status \(httpResponse.statusCode), \(data.count) bytes")
+                    if httpResponse.statusCode != 200 {
+                        print("   ❌ URL returned non-200 status!")
+                    }
+                }
+            } catch {
+                print("   ❌ URL TEST FAILED: \(error)")
+            }
+        }
+        
         // Clean URL to match SharedBookCoverManager's cache key format
         let cleanedURL = cleanURL(urlString)
+        print("   Cleaned URL: \(cleanedURL)")
+        print("   URL changed? \(urlString != cleanedURL)")
         
         // Check quick cache first for immediate display
         let cacheKey = "\(cleanedURL)_\(loadFullImage ? "full" : "thumb")" as NSString
@@ -234,15 +273,18 @@ struct SharedBookCoverView: View {
         var cleaned = urlString
             .replacingOccurrences(of: "http://", with: "https://")
         
-        let zoomPatterns = [
-            "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
-            "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
-            "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
-            "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
-        ]
-        
-        for pattern in zoomPatterns {
-            cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
+        // IMPORTANT: Don't remove zoom parameters from Google Books URLs
+        if !cleaned.contains("books.google.com") && !cleaned.contains("googleapis.com") {
+            let zoomPatterns = [
+                "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
+                "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",
+                "?zoom=10", "?zoom=9", "?zoom=8", "?zoom=7", "?zoom=6",
+                "?zoom=5", "?zoom=4", "?zoom=3", "?zoom=2", "?zoom=1", "?zoom=0"
+            ]
+            
+            for pattern in zoomPatterns {
+                cleaned = cleaned.replacingOccurrences(of: pattern, with: "")
+            }
         }
         
         cleaned = cleaned.replacingOccurrences(of: "&&", with: "&")

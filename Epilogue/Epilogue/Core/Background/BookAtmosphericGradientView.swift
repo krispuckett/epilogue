@@ -24,18 +24,26 @@ struct BookAtmosphericGradientView: View {
                 
                 // Single direction gradient - no mirroring, with intensity control
                 if let palette = displayedPalette {
+                    // Debug what colors we're actually showing
+                    let _ = {
+                        print("🎨 Rendering gradient with intensity: \(intensity)")
+                        print("   Primary: \(colorDescription(ColorPalette(primary: palette.primary, secondary: .clear, accent: .clear, background: .clear, textColor: .clear, luminance: 0, isMonochromatic: false, extractionQuality: 0)))")
+                        print("   Opacity applied: \(0.8 * intensity)")
+                    }()
+                    
+                    // More vibrant gradient like ambient chat
                     LinearGradient(
                         stops: [
-                            .init(color: palette.primary.opacity(intensity), location: 0.0),
-                            .init(color: palette.secondary.opacity(intensity * 0.8), location: 0.2),
-                            .init(color: palette.accent.opacity(intensity * 0.5), location: 0.35),
-                            .init(color: palette.background.opacity(intensity * 0.3), location: 0.5),
+                            .init(color: palette.primary.opacity(0.8 * intensity), location: 0.0),
+                            .init(color: palette.secondary.opacity(0.6 * intensity), location: 0.15),
+                            .init(color: palette.accent.opacity(0.4 * intensity), location: 0.3),
+                            .init(color: palette.background.opacity(0.2 * intensity), location: 0.45),
                             .init(color: Color.clear, location: 0.6)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .blur(radius: 40)
+                    .blur(radius: 30) // Slightly less blur for more definition
                     .ignoresSafeArea()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     .animation(.easeInOut(duration: 0.3), value: palette.primary)
@@ -50,12 +58,19 @@ struct BookAtmosphericGradientView: View {
             }
         }
         .onAppear {
+            print("🌈 BookAtmosphericGradientView.onAppear")
+            print("   Initial palette: \(colorDescription(colorPalette))")
             displayedPalette = processColors(colorPalette)
+            print("   Processed palette: \(colorDescription(displayedPalette ?? colorPalette))")
             startSubtleAnimation()
         }
-        .onChange(of: colorPalette) { _, newPalette in
+        .onChange(of: colorPalette) { oldPalette, newPalette in
+            print("🌈 BookAtmosphericGradientView palette changed")
+            print("   Old: \(colorDescription(oldPalette))")
+            print("   New: \(colorDescription(newPalette))")
             withAnimation(.easeInOut(duration: 0.3)) {
                 displayedPalette = processColors(newPalette)
+                print("   Processed: \(colorDescription(displayedPalette ?? newPalette))")
             }
         }
     }
@@ -188,6 +203,17 @@ struct BookAtmosphericGradientView: View {
         withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
             gradientOffset = 0.1 // Subtle movement
         }
+    }
+    
+    /// Debug helper
+    private func colorDescription(_ palette: ColorPalette) -> String {
+        func rgbString(_ color: Color) -> String {
+            let uiColor = UIColor(color)
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return "RGB(\(Int(r*255)),\(Int(g*255)),\(Int(b*255)))"
+        }
+        return "P:\(rgbString(palette.primary)) S:\(rgbString(palette.secondary)) A:\(rgbString(palette.accent)) B:\(rgbString(palette.background)) mono:\(palette.isMonochromatic)"
     }
 }
 

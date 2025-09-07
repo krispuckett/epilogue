@@ -26,14 +26,26 @@ struct BookCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Book cover - using thumbnail for grid view with library flag
-            SharedBookCoverView(
-                coverURL: book.coverImageURL,
-                width: 170,
-                height: 255,
-                loadFullImage: false,
-                isLibraryView: true
-            )
-            .accessibilityHidden(true) // Hide decorative image from VoiceOver
+            Group {
+                // DEBUG: Log the book details
+                let _ = print("🎴 BookCard rendering book:")
+                let _ = print("   Title: \(book.title)")
+                let _ = print("   Author: \(book.author)")
+                let _ = print("   ID: \(book.id)")
+                let _ = print("   LocalID: \(book.localId)")
+                let _ = print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                let _ = print("   Cover URL is nil? \(book.coverImageURL == nil)")
+                let _ = print("   Cover URL is empty? \(book.coverImageURL?.isEmpty ?? true)")
+                
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 170,
+                    height: 255,
+                    loadFullImage: false,
+                    isLibraryView: true
+                )
+                .accessibilityHidden(true) // Hide decorative image from VoiceOver
+            }
             
             // Title and author
             VStack(alignment: .leading, spacing: 4) {
