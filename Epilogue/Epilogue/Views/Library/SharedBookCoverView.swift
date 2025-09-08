@@ -38,6 +38,7 @@ class DisplayedImageStore {
 }
 
 struct SharedBookCoverView: View {
+    private let LOG_COVER_DEBUG = false
     let coverURL: String?
     let width: CGFloat
     let height: CGFloat
@@ -71,15 +72,17 @@ struct SharedBookCoverView: View {
         onImageLoaded: ((UIImage) -> Void)? = nil
     ) {
         // Debug logging for import issue
-        if let url = coverURL {
-            print("🖼️ SharedBookCoverView init:")
-            print("   Original URL: \(url)")
-            print("   Contains zoom? \(url.contains("zoom="))")
-            print("   URL is empty string? \(url.isEmpty)")
-            print("   URL length: \(url.count)")
-        } else {
-            print("🖼️ SharedBookCoverView init with NIL URL")
-            print("   ⚠️ This will result in no cover image!")
+        if LOG_COVER_DEBUG {
+            if let url = coverURL {
+                print("🖼️ SharedBookCoverView init:")
+                print("   Original URL: \(url)")
+                print("   Contains zoom? \(url.contains("zoom="))")
+                print("   URL is empty string? \(url.isEmpty)")
+                print("   URL length: \(url.count)")
+            } else {
+                print("🖼️ SharedBookCoverView init with NIL URL")
+                print("   ⚠️ This will result in no cover image!")
+            }
         }
         self.coverURL = coverURL
         self.width = width
@@ -142,31 +145,19 @@ struct SharedBookCoverView: View {
         print("   isLibraryView: \(isLibraryView)")
         print("   loadFullImage: \(loadFullImage)")
         
-        // EXTREME DEBUG: Check if this URL actually works
-        Task {
-            do {
-                let testURL = URL(string: urlString)!
-                let (data, response) = try await URLSession.shared.data(from: testURL)
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("   🧪 URL TEST: Status \(httpResponse.statusCode), \(data.count) bytes")
-                    if httpResponse.statusCode != 200 {
-                        print("   ❌ URL returned non-200 status!")
-                    }
-                }
-            } catch {
-                print("   ❌ URL TEST FAILED: \(error)")
-            }
-        }
+        // Optional debug URL test removed for performance
         
         // Clean URL to match SharedBookCoverManager's cache key format
         let cleanedURL = cleanURL(urlString)
-        print("   Cleaned URL: \(cleanedURL)")
-        print("   URL changed? \(urlString != cleanedURL)")
+        if LOG_COVER_DEBUG {
+            print("   Cleaned URL: \(cleanedURL)")
+            print("   URL changed? \(urlString != cleanedURL)")
+        }
         
         // Check quick cache first for immediate display
         let cacheKey = "\(cleanedURL)_\(loadFullImage ? "full" : "thumb")" as NSString
         if let cachedImage = Self.quickImageCache.object(forKey: cacheKey) {
-            print("📚 Using quick cached image for: \(cleanedURL)")
+            if LOG_COVER_DEBUG { print("📚 Using quick cached image for: \(cleanedURL)") }
             if loadFullImage {
                 self.fullImage = cachedImage
             } else {
@@ -180,7 +171,7 @@ struct SharedBookCoverView: View {
         
         // Check SharedBookCoverManager's cache
         if let cachedImage = SharedBookCoverManager.shared.getCachedImage(for: urlString) {
-            print("📚 Found image in SharedBookCoverManager cache for: \(cleanedURL)")
+            if LOG_COVER_DEBUG { print("📚 Found image in SharedBookCoverManager cache for: \(cleanedURL)") }
             if loadFullImage {
                 self.fullImage = cachedImage
             } else {
@@ -201,9 +192,9 @@ struct SharedBookCoverView: View {
         if loadFullImage {
             // For detail views, skip thumbnail and load full quality directly
             Task {
-                print("🎯 BookDetailView: Loading FULL quality image directly")
+                if LOG_COVER_DEBUG { print("🎯 BookDetailView: Loading FULL quality image directly") }
                 if let fullImage = await SharedBookCoverManager.shared.loadFullImage(from: urlString) {
-                    print("🖼️ BookDetailView full image loaded: \(fullImage.size)")
+                    if LOG_COVER_DEBUG { print("🖼️ BookDetailView full image loaded: \(fullImage.size)") }
                     await MainActor.run {
                         // Only update if we're still expecting this URL
                         if self.currentLoadingURL == urlString {
@@ -218,7 +209,7 @@ struct SharedBookCoverView: View {
                         }
                     }
                 } else {
-                    print("❌ Failed to load full image")
+                    if LOG_COVER_DEBUG { print("❌ Failed to load full image") }
                     await MainActor.run {
                         if self.currentLoadingURL == urlString {
                             self.isLoading = false
@@ -257,7 +248,7 @@ struct SharedBookCoverView: View {
                             self.isLoading = false
                             self.loadFailed = true
                             self.currentLoadingURL = nil
-                            print("❌ Failed to load image from: \(urlString)")
+                            if LOG_COVER_DEBUG { print("❌ Failed to load image from: \(urlString)") }
                         }
                     }
                 }

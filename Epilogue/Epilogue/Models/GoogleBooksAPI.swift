@@ -3,6 +3,9 @@ import SwiftUI
 import Combine
 import UniformTypeIdentifiers
 
+// Toggle verbose console logging for Google Books plumbing
+private let GOOGLE_API_VERBOSE = false
+
 // MARK: - Google Books API Models
 struct GoogleBooksResponse: Codable {
     let items: [GoogleBookItem]?
@@ -53,7 +56,7 @@ struct GoogleBookItem: Codable, Identifiable {
             
             // Use the content API which is most reliable
             enhanced = "https://books.google.com/books/content?id=\(bookId)&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-            print("📚 Using reliable content API for book ID: \(bookId)")
+            if GOOGLE_API_VERBOSE { print("📚 Using reliable content API for book ID: \(bookId)") }
             return enhanced
         }
         
@@ -67,7 +70,7 @@ struct GoogleBookItem: Codable, Identifiable {
                         let potentialId = components[index + 1].components(separatedBy: "?").first ?? ""
                         if !potentialId.isEmpty {
                             enhanced = "https://books.google.com/books/content?id=\(potentialId)&printsec=frontcover&img=1&source=gbs_api"
-                            print("📚 Converted to content API from edition/publisher URL: \(potentialId)")
+                            if GOOGLE_API_VERBOSE { print("📚 Converted to content API from edition/publisher URL: \(potentialId)") }
                             return enhanced
                         }
                     }
@@ -115,6 +118,10 @@ struct VolumeInfo: Codable {
     let pageCount: Int?
     let imageLinks: ImageLinks?
     let industryIdentifiers: [IndustryIdentifier]?
+    let publisher: String? = nil
+    let language: String? = nil
+    let averageRating: Double? = nil
+    let ratingsCount: Int? = nil
     
     var publishedYear: String? {
         guard let publishedDate = publishedDate else { return nil }
@@ -176,23 +183,24 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         self.description = description
         self.pageCount = pageCount
         
-        // Debug logging for initialization
-        print("🆕 DEBUG: Creating new Book instance...")
-        print("  📖 Title: \(title)")
-        print("  ✍️ Author: \(author)")
-        print("  📚 ID: \(id)")
-        print("  🆔 LocalID: \(localId)")
-        if let url = coverImageURL {
-            print("  🖼️ Cover URL: \(url)")
-            print("  ✅ Book initialized WITH cover URL")
-        } else {
-            print("  ⚠️ Cover URL: nil")
-            print("  ❌ WARNING: Book '\(title)' initialized WITHOUT cover URL!")
+        if GOOGLE_API_VERBOSE {
+            print("🆕 DEBUG: Creating new Book instance...")
+            print("  📖 Title: \(title)")
+            print("  ✍️ Author: \(author)")
+            print("  📚 ID: \(id)")
+            print("  🆔 LocalID: \(localId)")
+            if let url = coverImageURL {
+                print("  🖼️ Cover URL: \(url)")
+                print("  ✅ Book initialized WITH cover URL")
+            } else {
+                print("  ⚠️ Cover URL: nil")
+                print("  ❌ WARNING: Book '\(title)' initialized WITHOUT cover URL!")
+            }
+            print("  📗 ISBN: \(isbn ?? "nil")")
+            print("  📅 Published Year: \(publishedYear ?? "nil")")
+            print("  📄 Page Count: \(pageCount?.description ?? "nil")")
+            print("================================================")
         }
-        print("  📗 ISBN: \(isbn ?? "nil")")
-        print("  📅 Published Year: \(publishedYear ?? "nil")")
-        print("  📄 Page Count: \(pageCount?.description ?? "nil")")
-        print("================================================")
     }
     
     // Custom decoding to handle migration from old model without localId
@@ -204,18 +212,17 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        // Debug logging header
-        print("🔍 DEBUG: Decoding Book...")
+        if GOOGLE_API_VERBOSE { print("🔍 DEBUG: Decoding Book...") }
         
         id = try container.decode(String.self, forKey: .id)
-        print("  📚 ID: \(id)")
+        if GOOGLE_API_VERBOSE { print("  📚 ID: \(id)") }
         
         // If localId doesn't exist in saved data, generate a new one
         localId = try container.decodeIfPresent(UUID.self, forKey: .localId) ?? UUID()
-        print("  🆔 LocalID: \(localId)")
+        if GOOGLE_API_VERBOSE { print("  🆔 LocalID: \(localId)") }
         
         title = try container.decode(String.self, forKey: .title)
-        print("  📖 Title: \(title)")
+        if GOOGLE_API_VERBOSE { print("  📖 Title: \(title)") }
         
         author = try container.decode(String.self, forKey: .author)
         print("  ✍️ Author: \(author)")
@@ -239,22 +246,22 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         print("  📝 Description: \(description != nil ? "Present (\(description!.prefix(50))...)" : "nil")")
         
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount)
-        print("  📄 Page Count: \(pageCount?.description ?? "nil")")
+        if GOOGLE_API_VERBOSE { print("  📄 Page Count: \(pageCount?.description ?? "nil")") }
         
         isInLibrary = try container.decodeIfPresent(Bool.self, forKey: .isInLibrary) ?? false
-        print("  📚 In Library: \(isInLibrary)")
+        if GOOGLE_API_VERBOSE { print("  📚 In Library: \(isInLibrary)") }
         
         readingStatus = try container.decodeIfPresent(ReadingStatus.self, forKey: .readingStatus) ?? .wantToRead
-        print("  📊 Reading Status: \(readingStatus.rawValue)")
+        if GOOGLE_API_VERBOSE { print("  📊 Reading Status: \(readingStatus.rawValue)") }
         
         currentPage = try container.decodeIfPresent(Int.self, forKey: .currentPage) ?? 0
-        print("  📍 Current Page: \(currentPage)")
+        if GOOGLE_API_VERBOSE { print("  📍 Current Page: \(currentPage)") }
         
         userRating = try container.decodeIfPresent(Int.self, forKey: .userRating)
-        print("  ⭐ User Rating: \(userRating?.description ?? "nil")")
+        if GOOGLE_API_VERBOSE { print("  ⭐ User Rating: \(userRating?.description ?? "nil")") }
         
         userNotes = try container.decodeIfPresent(String.self, forKey: .userNotes)
-        print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")")
+        if GOOGLE_API_VERBOSE { print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")") }
         
         dateAdded = try container.decodeIfPresent(Date.self, forKey: .dateAdded) ?? Date()
         print("  📆 Date Added: \(dateAdded)")
@@ -317,10 +324,11 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")")
         
         try container.encode(dateAdded, forKey: .dateAdded)
-        print("  📆 Date Added: \(dateAdded)")
-        
-        print("✅ Book encoded successfully: '\(title)' by \(author)")
-        print("================================================")
+        if GOOGLE_API_VERBOSE {
+            print("  📆 Date Added: \(dateAdded)")
+            print("✅ Book encoded successfully: '\(title)' by \(author)")
+            print("================================================")
+        }
     }
 }
 
@@ -378,7 +386,7 @@ class GoogleBooksService: ObservableObject {
             return 
         }
         
-        print("GoogleBooksAPI: Starting search for: '\(query)'")
+        if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Starting search for: '\(query)'") }
         
         await MainActor.run {
             isLoading = true
@@ -388,14 +396,14 @@ class GoogleBooksService: ObservableObject {
         
         do {
             let books = try await performSearch(query: query)
-            print("GoogleBooksAPI: Found \(books.count) books")
+            if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Found \(books.count) books") }
             
             await MainActor.run {
                 searchResults = books
                 isLoading = false
             }
         } catch {
-            print("GoogleBooksAPI: Search failed with error: \(error)")
+            if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Search failed with error: \(error)") }
             
             await MainActor.run {
                 errorMessage = error.localizedDescription
@@ -471,7 +479,7 @@ class GoogleBooksService: ObservableObject {
         ]
         
         guard let url = components.url else {
-            print("GoogleBooksAPI: Invalid URL")
+            if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Invalid URL") }
             throw APIError.invalidURL
         }
         
@@ -481,14 +489,14 @@ class GoogleBooksService: ObservableObject {
             throw APIError.invalidURL
         }
         
-        print("GoogleBooksAPI: Making search request to URL: \(url)")
+        if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Making search request to URL: \(url)") }
         
         // Perform the request with error handling
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await session.data(from: url)
         } catch {
-            print("GoogleBooksAPI: Network request failed: \(error)")
+            if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Network request failed: \(error)") }
             throw APIError.invalidResponse
         }
         

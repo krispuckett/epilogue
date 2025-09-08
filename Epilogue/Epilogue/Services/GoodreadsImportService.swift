@@ -1,10 +1,13 @@
 import Foundation
 import SwiftData
 import Combine
+import UIKit
 
 // Service for importing Goodreads CSV exports
 @MainActor
 class GoodreadsImportService: ObservableObject {
+    // Reduce console noise unless explicitly enabled
+    private let verboseLogging = false
     
     // MARK: - Data Structures
     
@@ -250,6 +253,14 @@ class GoodreadsImportService: ObservableObject {
     private var isbnCache: [String: GoogleBookItem] = [:]
     private var titleAuthorCache: [String: GoogleBookItem] = [:]
     private var existingBooksCache: Set<String> = []
+
+    // Cover selection stats for a run
+    struct ImportCoverStats {
+        var selectedGoogleColorful: Int = 0
+        var grayscaleGoogleSkipped: Int = 0
+        var openLibraryFallback: Int = 0
+    }
+    private var coverStats = ImportCoverStats()
     
     // MARK: - Initialization
     
@@ -263,6 +274,8 @@ class GoodreadsImportService: ObservableObject {
     
     /// Import CSV with optional async cover fetching
     func importCSV(from url: URL, speed: ImportSpeed = .balanced, fetchCoversAsync: Bool = true) async throws -> ImportResult {
+        // Reset stats per run
+        coverStats = ImportCoverStats()
         isImporting = true
         isPaused = false
         currentProgress = ImportProgress(
@@ -333,6 +346,10 @@ class GoodreadsImportService: ObservableObject {
                 totalBatches: totalBatches
             )
             isImporting = false
+            print("\n📊 Cover Selection Stats:")
+            print("  🎯 Google colorful: \(coverStats.selectedGoogleColorful)")
+            print("  🚫 Google grayscale skipped: \(coverStats.grayscaleGoogleSkipped)")
+            print("  🔄 Open Library fallback used: \(coverStats.openLibraryFallback)")
             
             return result
             
@@ -986,7 +1003,7 @@ class GoodreadsImportService: ObservableObject {
         // Try ISBN match first (most reliable)
         if let isbn = goodreadsBook.primaryISBN {
             if let cachedBook = isbnCache[isbn] {
-                let bookModel = createBookModel(from: cachedBook, goodreadsBook: goodreadsBook)
+                let bookModel = await createBookModel(from: cachedBook, goodreadsBook: goodreadsBook)
                 return ProcessedBook(
                     goodreadsBook: goodreadsBook,
                     bookModel: bookModel,
@@ -995,12 +1012,38 @@ class GoodreadsImportService: ObservableObject {
             }
             
             // Use enhanced service for better matching with cover priority
-            if let book = await enhancedService.findBestMatch(
+            if let initialBook = await enhancedService.findBestMatch(
                 title: goodreadsBook.title,
                 author: goodreadsBook.author,
                 isbn: isbn,
                 publishedYear: String(goodreadsBook.yearPublished)
             ) {
+                // Color gate: if initial pick is grayscale, try alternates via ranked search
+                let book: Book
+                if await isBookCoverGrayscale(initialBook) {
+                    coverStats.grayscaleGoogleSkipped += 1
+                    let alternates = await enhancedService.searchBooksWithRanking(
+                        query: "\(goodreadsBook.title) by \(goodreadsBook.author)",
+                        preferISBN: isbn
+                    )
+                    if let nonGray = await pickBestNonGrayscale(from: alternates) {
+                        coverStats.selectedGoogleColorful += 1
+                        book = nonGray
+                    } else {
+                        // Try Open Library cover fallback before giving up
+                        if let fallbackURL = await BookCoverFallbackService.shared.getFallbackCoverURL(for: initialBook) {
+                            var patched = initialBook
+                            patched.coverImageURL = fallbackURL
+                            coverStats.openLibraryFallback += 1
+                            book = patched
+                        } else {
+                            book = initialBook
+                        }
+                    }
+                } else {
+                    coverStats.selectedGoogleColorful += 1
+                    book = initialBook
+                }
                 // Convert Book to GoogleBookItem structure  
                 let bookItem = GoogleBookItem(
                     id: book.id,
@@ -1022,7 +1065,7 @@ class GoodreadsImportService: ObservableObject {
                 )
                 
                 isbnCache[isbn] = bookItem
-                let bookModel = createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
+                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
                 return ProcessedBook(
                     goodreadsBook: goodreadsBook,
                     bookModel: bookModel,
@@ -1035,7 +1078,7 @@ class GoodreadsImportService: ObservableObject {
         let searchKey = "\(goodreadsBook.title) \(goodreadsBook.author)"
         
         if let cachedBook = titleAuthorCache[searchKey] {
-            let bookModel = createBookModel(from: cachedBook, goodreadsBook: goodreadsBook)
+            let bookModel = await createBookModel(from: cachedBook, goodreadsBook: goodreadsBook)
             return ProcessedBook(
                 goodreadsBook: goodreadsBook,
                 bookModel: bookModel,
@@ -1049,8 +1092,13 @@ class GoodreadsImportService: ObservableObject {
         let results = await enhancedService.searchBooksWithRanking(query: searchQuery)
         print("   Found \(results.count) results")
         
-        // Check the search results
-        if let book = results.first {
+        // Pick the first non-grayscale cover among top results
+        if let book = await pickBestNonGrayscale(from: results) ?? results.first {
+            if await isBookCoverGrayscale(book) {
+                // If first is grayscale but pickBestNonGrayscale returned nil, count skip implicitly later
+            } else {
+                coverStats.selectedGoogleColorful += 1
+            }
             // Convert Book to GoogleBookItem
             let bookItem = GoogleBookItem(
                 id: book.id,
@@ -1074,7 +1122,7 @@ class GoodreadsImportService: ObservableObject {
             // Verify it's a good match
             if isGoodMatch(googleBook: bookItem, goodreadsBook: goodreadsBook) {
                 titleAuthorCache[searchKey] = bookItem
-                let bookModel = createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
+                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
                 return ProcessedBook(
                     goodreadsBook: goodreadsBook,
                     bookModel: bookModel,
@@ -1083,6 +1131,71 @@ class GoodreadsImportService: ObservableObject {
             }
         }
         
+        // As a last resort, try Open Library for a cover if we have at least a basic Book
+        if let isbn = goodreadsBook.primaryISBN {
+            // Use minimal book stub for fallback cover
+            let stub = Book(id: UUID().uuidString,
+                            title: goodreadsBook.title,
+                            author: goodreadsBook.author,
+                            publishedYear: goodreadsBook.yearPublished.isEmpty ? nil : goodreadsBook.yearPublished,
+                            coverImageURL: nil,
+                            isbn: isbn,
+                            description: nil,
+                            pageCount: nil)
+            if let fallbackURL = await BookCoverFallbackService.shared.getFallbackCoverURL(for: stub) {
+                coverStats.openLibraryFallback += 1
+                let bookItem = GoogleBookItem(
+                    id: stub.id,
+                    volumeInfo: VolumeInfo(
+                        title: stub.title,
+                        authors: [stub.author],
+                        publishedDate: stub.publishedYear,
+                        description: nil,
+                        pageCount: nil,
+                        imageLinks: ImageLinks(
+                            thumbnail: fallbackURL,
+                            small: nil,
+                            medium: nil,
+                            large: nil,
+                            extraLarge: nil
+                        ),
+                        industryIdentifiers: [IndustryIdentifier(type: "ISBN", identifier: isbn)]
+                    )
+                )
+                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
+                return ProcessedBook(
+                    goodreadsBook: goodreadsBook,
+                    bookModel: bookModel,
+                    matchMethod: .titleAuthor
+                )
+            }
+        }
+        
+        return nil
+    }
+
+    // MARK: - Color Gate Helpers
+    private func isBookCoverGrayscale(_ book: Book) async -> Bool {
+        guard let url = book.coverImageURL,
+              let image = await SharedBookCoverManager.shared.loadThumbnail(from: url) else {
+            return false
+        }
+        return ImageQualityEvaluator.isLikelyGrayscale(image)
+    }
+
+    private func pickBestNonGrayscale(from books: [Book], maxCheck: Int = 5) async -> Book? {
+        for (idx, candidate) in books.prefix(maxCheck).enumerated() {
+            if candidate.coverImageURL == nil { continue }
+            if let url = candidate.coverImageURL,
+               let image = await SharedBookCoverManager.shared.loadThumbnail(from: url) {
+                if !ImageQualityEvaluator.isLikelyGrayscale(image) {
+                    print("✅ Using result #\(idx + 1) with colorful cover: \(candidate.id)")
+                    return candidate
+                } else {
+                    print("⚠️ Result #\(idx + 1) appears grayscale, trying next…")
+                }
+            }
+        }
         return nil
     }
     
@@ -1137,7 +1250,7 @@ class GoodreadsImportService: ObservableObject {
         return matrix[s1Array.count][s2Array.count]
     }
     
-    private func createBookModel(from googleBook: GoogleBookItem, goodreadsBook: GoodreadsBook) -> BookModel {
+    private func createBookModel(from googleBook: GoogleBookItem, goodreadsBook: GoodreadsBook) async -> BookModel {
         let volumeInfo = googleBook.volumeInfo
         
         // Get the cover URL from imageLinks with preference for higher quality
@@ -1169,29 +1282,35 @@ class GoodreadsImportService: ObservableObject {
             print("   🔒 Converted to HTTPS: \(coverURL!)")
         }
         
-        // Debug log
-        print("📚 Creating BookModel for: \(volumeInfo.title)")
-        print("   Google Books ID: \(googleBook.id)")
-        print("   ImageLinks: \(volumeInfo.imageLinks != nil ? "Present" : "Nil")")
-        if let links = volumeInfo.imageLinks {
-            print("   - thumbnail: \(links.thumbnail ?? "nil")")
-            print("   - small: \(links.small ?? "nil")")
-            print("   - medium: \(links.medium ?? "nil")")
-            print("   - large: \(links.large ?? "nil")")
-            print("   - extraLarge: \(links.extraLarge ?? "nil")")
+        if verboseLogging {
+            print("📚 Creating BookModel for: \(volumeInfo.title)")
+            print("   Google Books ID: \(googleBook.id)")
+            print("   ImageLinks: \(volumeInfo.imageLinks != nil ? "Present" : "Nil")")
+            if let links = volumeInfo.imageLinks {
+                print("   - thumbnail: \(links.thumbnail ?? "nil")")
+                print("   - small: \(links.small ?? "nil")")
+                print("   - medium: \(links.medium ?? "nil")")
+                print("   - large: \(links.large ?? "nil")")
+                print("   - extraLarge: \(links.extraLarge ?? "nil")")
+            }
+            print("   Final coverURL: \(coverURL ?? "nil")")
+            print("   BookModel.id will be set to: \(googleBook.id)")
+            print("   BookModel.coverImageURL will be set to: \(coverURL ?? "nil")")
         }
-        print("   Final coverURL: \(coverURL ?? "nil")")
         
-        // Verify the BookModel will be created correctly
-        print("   BookModel.id will be set to: \(googleBook.id)")
-        print("   BookModel.coverImageURL will be set to: \(coverURL ?? "nil")")
-        
+        // Resolve canonical display URL before creating the model
+        let resolved = await DisplayCoverURLResolver.resolveDisplayURL(
+            googleID: googleBook.id,
+            isbn: goodreadsBook.primaryISBN,
+            thumbnailURL: coverURL
+        )
+
         let book = BookModel(
             id: googleBook.id,
             title: volumeInfo.title,
             author: volumeInfo.authors?.joined(separator: ", ") ?? goodreadsBook.author,
             publishedYear: volumeInfo.publishedDate,
-            coverImageURL: coverURL,  // Use the cover URL we found
+            coverImageURL: resolved ?? coverURL,  // Use resolved URL if available
             isbn: goodreadsBook.primaryISBN ?? volumeInfo.industryIdentifiers?.first { $0.type.contains("ISBN") }?.identifier,
             description: volumeInfo.description,
             pageCount: Int(goodreadsBook.numberOfPages) ?? volumeInfo.pageCount
@@ -1425,7 +1544,7 @@ class GoodreadsImportService: ObservableObject {
         }
         
         // Check cache first
-        if let cachedResult = checkCache(for: goodreadsBook) {
+        if let cachedResult = await checkCache(for: goodreadsBook) {
             return (cachedResult, true)
         }
         
@@ -1439,11 +1558,11 @@ class GoodreadsImportService: ObservableObject {
         return (nil, false)
     }
     
-    private func checkCache(for book: GoodreadsBook) -> ProcessedBook? {
+    private func checkCache(for book: GoodreadsBook) async -> ProcessedBook? {
         // Check ISBN cache first
         if let isbn = book.primaryISBN,
            let cachedBook = isbnCache[isbn] {
-            let bookModel = createBookModel(from: cachedBook, goodreadsBook: book)
+            let bookModel = await createBookModel(from: cachedBook, goodreadsBook: book)
             return ProcessedBook(
                 goodreadsBook: book,
                 bookModel: bookModel,
@@ -1454,7 +1573,7 @@ class GoodreadsImportService: ObservableObject {
         // Check title/author cache
         let searchKey = "\(book.title.lowercased())_\(book.author.lowercased())"
         if let cachedBook = titleAuthorCache[searchKey] {
-            let bookModel = createBookModel(from: cachedBook, goodreadsBook: book)
+            let bookModel = await createBookModel(from: cachedBook, goodreadsBook: book)
             return ProcessedBook(
                 goodreadsBook: book,
                 bookModel: bookModel,
@@ -1539,7 +1658,7 @@ class GoodreadsImportService: ObservableObject {
                     )
                 )
                 
-                let bookModel = createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
+                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
                 return ProcessedBook(
                     goodreadsBook: goodreadsBook,
                     bookModel: bookModel,
@@ -1575,7 +1694,7 @@ class GoodreadsImportService: ObservableObject {
             )
             
             if isGoodMatch(googleBook: bookItem, goodreadsBook: goodreadsBook) {
-                let bookModel = createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
+                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
                 return ProcessedBook(
                     goodreadsBook: goodreadsBook,
                     bookModel: bookModel,

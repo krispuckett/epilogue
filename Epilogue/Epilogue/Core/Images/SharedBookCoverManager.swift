@@ -47,7 +47,7 @@ public class SharedBookCoverManager: ObservableObject {
         Self.thumbnailCache.countLimit = 200
         Self.thumbnailCache.name = "ThumbnailCache"
         
-        print("✅ Configured caches with memory limits")
+        // print("✅ Configured caches with memory limits")
     }
     
     private func setupDiskCache() {
@@ -74,7 +74,7 @@ public class SharedBookCoverManager: ObservableObject {
     }
     
     @objc private func handleMemoryWarning() {
-        print("⚠️ Memory warning received - clearing image caches")
+        // print("⚠️ Memory warning received - clearing image caches")
         Self.imageCache.removeAllObjects()
         Self.thumbnailCache.removeAllObjects()
         // Also clean up active tasks
@@ -109,7 +109,8 @@ public class SharedBookCoverManager: ObservableObject {
         }
         
         // Load from network with appropriate zoom for thumbnails
-        let thumbnailURL = appendZoomParameter(to: cleanedURL, zoom: 3)  // zoom=3 for thumbnails
+        // Use a conservative zoom to avoid Google placeholder/gray returns
+        let thumbnailURL = appendZoomParameter(to: cleanedURL, zoom: 2)
         return await loadAndCacheImage(
             from: thumbnailURL,
             cacheKey: cacheKey as String,
@@ -123,11 +124,11 @@ public class SharedBookCoverManager: ObservableObject {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
         let cleanedURL = cleanURL(coverURL)
-        // Use zoom=10 for maximum quality from Google Books
-        let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 10)
+        // Use a conservative zoom to avoid placeholder responses
+        let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 4)
         let cacheKey = "\(cleanedURL)_full" as NSString
         
-        print("📱 Loading full image from: \(highQualityURL.suffix(100))")
+        // print("📱 Loading full image from: \(highQualityURL.suffix(100))")
         
         // Check memory cache
         if let cached = Self.imageCache.object(forKey: cacheKey) {
@@ -189,14 +190,14 @@ public class SharedBookCoverManager: ObservableObject {
         // Check full image cache first
         let fullCacheKey = "\(cleanedURL)_full" as NSString
         if let cached = Self.imageCache.object(forKey: fullCacheKey) {
-            print("✅ Found full image in cache for: \(cleanedURL.suffix(50))")
+            // print("✅ Found full image in cache for: \(cleanedURL.suffix(50))")
             return cached
         }
         
         // Check thumbnail cache
         let thumbCacheKey = "\(cleanedURL)_thumb" as NSString
         if let cached = Self.thumbnailCache.object(forKey: thumbCacheKey) {
-            print("✅ Found thumbnail in cache for: \(cleanedURL.suffix(50))")
+            // print("✅ Found thumbnail in cache for: \(cleanedURL.suffix(50))")
             return cached
         }
         
@@ -204,7 +205,7 @@ public class SharedBookCoverManager: ObservableObject {
         if let diskCached = loadFromDisk(key: fullCacheKey as String) {
             // Store back in memory cache for quick access
             Self.imageCache.setObject(diskCached, forKey: fullCacheKey, cost: diskCached.jpegData(compressionQuality: 0.8)?.count ?? 0)
-            print("✅ Found full image on disk for: \(cleanedURL.suffix(50))")
+            // print("✅ Found full image on disk for: \(cleanedURL.suffix(50))")
             return diskCached
         }
         
@@ -212,7 +213,7 @@ public class SharedBookCoverManager: ObservableObject {
         if let diskCached = loadFromDisk(key: thumbCacheKey as String) {
             // Store back in memory cache for quick access
             Self.thumbnailCache.setObject(diskCached, forKey: thumbCacheKey, cost: diskCached.jpegData(compressionQuality: 0.8)?.count ?? 0)
-            print("✅ Found thumbnail on disk for: \(cleanedURL.suffix(50))")
+            // print("✅ Found thumbnail on disk for: \(cleanedURL.suffix(50))")
             return diskCached
         }
         
@@ -252,17 +253,17 @@ public class SharedBookCoverManager: ObservableObject {
                     
                     // Check HTTP status
                     if let httpResponse = response as? HTTPURLResponse {
-                        print("📊 HTTP Status: \(httpResponse.statusCode)")
+                        // print("📊 HTTP Status: \(httpResponse.statusCode)")
                         
                         if httpResponse.statusCode == 404 {
-                            print("⚠️ Cover image not found (404)")
+                            // print("⚠️ Cover image not found (404)")
                             // Don't retry 404s - they won't magically appear
                             break
                         }
                         
                         // Retry on server errors
                         if httpResponse.statusCode >= 500 {
-                            print("⚠️ Server error \(httpResponse.statusCode), will retry...")
+                            // print("⚠️ Server error \(httpResponse.statusCode), will retry...")
                             if attempt < 3 {
                                 // Exponential backoff: 1s, 2s, 4s
                                 let delay = pow(2.0, Double(attempt - 1))
@@ -273,7 +274,7 @@ public class SharedBookCoverManager: ObservableObject {
                         
                         // Rate limiting
                         if httpResponse.statusCode == 429 {
-                            print("⚠️ Rate limited, waiting longer...")
+                            // print("⚠️ Rate limited, waiting longer...")
                             try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
                             continue
                         }
@@ -288,7 +289,7 @@ public class SharedBookCoverManager: ObservableObject {
                         return nil 
                     }
                     
-                    print("✅ Successfully decoded image: \(originalImage.size)")
+                    // print("✅ Successfully decoded image: \(originalImage.size)")
                     
                     // Resize if needed
                     let processedImage: UIImage
@@ -309,17 +310,17 @@ public class SharedBookCoverManager: ObservableObject {
                     // Save to disk
                     saveToDisk(image: processedImage, key: cacheKey)
                     
-                    print("✅ Loaded and cached image (\(cacheKey)): \(processedImage.size)")
+                    // print("✅ Loaded and cached image (\(cacheKey)): \(processedImage.size)")
                     return processedImage
                     
                 } catch let error as URLError where error.code == .timedOut {
-                    print("⏱️ Request timed out, attempt \(attempt)")
+                    // print("⏱️ Request timed out, attempt \(attempt)")
                     if attempt < 3 {
                         try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay
                         continue
                     }
                 } catch {
-                    print("❌ Failed to load image (attempt \(attempt)): \(error.localizedDescription)")
+                    // print("❌ Failed to load image (attempt \(attempt)): \(error.localizedDescription)")
                     if attempt < 3 {
                         try? await Task.sleep(nanoseconds: 1_000_000_000)
                         continue
@@ -504,6 +505,10 @@ public class SharedBookCoverManager: ObservableObject {
     }
     
     private func appendZoomParameter(to urlString: String, zoom: Int) -> String {
+        // Do not append zoom for publisher fife URLs or googleusercontent thumbnails
+        if urlString.contains("fife=") || urlString.contains("googleusercontent.com") {
+            return urlString
+        }
         // Remove any existing zoom parameter first
         var cleaned = urlString
         let zoomPatterns = [
@@ -545,7 +550,7 @@ public class SharedBookCoverManager: ObservableObject {
             setupDiskCache()
         }
         
-        print("✅ Cleared all caches")
+        // print("✅ Cleared all caches")
     }
     
     /// Batch preload covers for better performance
@@ -589,7 +594,7 @@ public class SharedBookCoverManager: ObservableObject {
             try? FileManager.default.removeItem(at: fullPath)
         }
         
-        print("🔄 Refreshing cover: \(urlString.suffix(50))")
+        // print("🔄 Refreshing cover: \(urlString.suffix(50))")
         
         // Re-download
         return await loadFullImage(from: urlString)

@@ -78,7 +78,11 @@ public class BookColorPaletteCache {
     public func getCachedPalette(for bookID: String) async -> ColorPalette? {
         // Check memory cache first
         if let cached = memoryCache.object(forKey: bookID as NSString) {
-            print("🎨 Memory cache hit for \(bookID)")
+            #if DEBUG
+            // Toggle if you need cache hit/miss logs
+            let LOG_PALETTE_CACHE = false
+            if LOG_PALETTE_CACHE { print("🎨 Memory cache hit for \(bookID)") }
+            #endif
             return cached.palette
         }
         
@@ -86,11 +90,16 @@ public class BookColorPaletteCache {
         if let diskPalette = await loadFromDisk(bookID: bookID) {
             // Add to memory cache
             memoryCache.setObject(diskPalette, forKey: bookID as NSString)
-            print("💾 Disk cache hit for \(bookID)")
+            #if DEBUG
+            let LOG_PALETTE_CACHE = false
+            if LOG_PALETTE_CACHE { print("💾 Disk cache hit for \(bookID)") }
+            #endif
             return diskPalette.palette
         }
-        
-        print("❌ Cache miss for \(bookID)")
+        #if DEBUG
+        let LOG_PALETTE_CACHE = false
+        if LOG_PALETTE_CACHE { print("❌ Cache miss for \(bookID)") }
+        #endif
         return nil
     }
     
@@ -112,7 +121,10 @@ public class BookColorPaletteCache {
         // Save to disk in background
         await saveToDisk(cached)
         
-        print("✅ Cached palette for \(bookID)")
+        #if DEBUG
+        let LOG_PALETTE_CACHE = false
+        if LOG_PALETTE_CACHE { print("✅ Cached palette for \(bookID)") }
+        #endif
     }
     
     /// Clear all caches
@@ -127,7 +139,27 @@ public class BookColorPaletteCache {
             try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         }
         
+        #if DEBUG
         print("🧹 Cleared all color palette caches")
+        #endif
+    }
+
+    /// Invalidate palette for a specific book (memory + disk + gradient)
+    public func invalidatePalette(for bookID: String) async {
+        memoryCache.removeObject(forKey: bookID as NSString)
+        gradientCache.removeObject(forKey: bookID as NSString)
+        if let url = diskCacheURL(for: bookID) {
+            try? FileManager.default.removeItem(at: url)
+        }
+        #if DEBUG
+        print("🗑️ Invalidated palette cache for \(bookID)")
+        #endif
+    }
+
+    /// Refresh palette for given book by re-extracting from the supplied cover URL
+    public func refreshPalette(for bookID: String, coverURL: String) async {
+        await invalidatePalette(for: bookID)
+        await extractAndCachePalette(bookID: bookID, coverURL: coverURL)
     }
     
     // MARK: - Gradient Cache Operations
@@ -246,7 +278,7 @@ public class BookColorPaletteCache {
         isWarming = false
     }
     
-    private func extractAndCachePalette(bookID: String, coverURL: String) async {
+    public func extractAndCachePalette(bookID: String, coverURL: String) async {
         // Load full image using SharedBookCoverManager
         guard let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURL) else {
             return

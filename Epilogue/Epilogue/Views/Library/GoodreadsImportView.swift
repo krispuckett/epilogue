@@ -1073,11 +1073,29 @@ struct ImportedBookRow: View {
                 bookAuthor: book.goodreadsBook.author,
                 currentCoverURL: selectedCoverURL ?? book.bookModel.coverImageURL,
                 onCoverSelected: { newCoverURL in
-                    selectedCoverURL = newCoverURL
-                    // Since ProcessedBook is now a class, this will update the actual bookModel
-                    book.bookModel.coverImageURL = newCoverURL
-                    print("📸 Updated cover URL for \(book.bookModel.title): \(newCoverURL ?? "nil")")
-                    Task {
+                    Task { @MainActor in
+                        // Validate/normalize the selected URL
+                        var finalURL: String? = nil
+                        if let raw = newCoverURL, let safe = URLValidator.createSafeBookCoverURL(from: raw) {
+                            finalURL = safe.absoluteString
+                        } else {
+                            finalURL = newCoverURL
+                        }
+                        let oldURL = book.bookModel.coverImageURL
+                        selectedCoverURL = finalURL
+
+                        // Update model
+                        book.bookModel.coverImageURL = finalURL
+                        print("📸 Updated cover URL for \(book.bookModel.title): \(finalURL ?? "nil")")
+
+                        // Refresh image caches
+                        if let oldURL { _ = await SharedBookCoverManager.shared.refreshCover(for: oldURL) }
+                        if let finalURL { _ = await SharedBookCoverManager.shared.loadFullImage(from: finalURL) }
+
+                        // Refresh palette for this book ID so gradient updates immediately in preview
+                        await BookColorPaletteCache.shared.refreshPalette(for: book.bookModel.id, coverURL: finalURL ?? "")
+
+                        // Reload local preview image
                         await loadCover()
                     }
                 }

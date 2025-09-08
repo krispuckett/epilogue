@@ -275,14 +275,16 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             
             // Check for cover
             let hasCover = book.coverImageURL != nil && !book.coverImageURL!.isEmpty
-            if hasCover {
-                score += 30 // Significant boost for having a cover
+            if hasCover { score += 40 }
+            // Bigger images are preferred
+            if let links = volumeInfo.imageLinks, (links.extraLarge ?? links.large ?? links.medium ?? links.small) != nil {
+                score += 10
             }
             
             // Check for ISBN
             let hasISBN = book.isbn != nil
             if hasISBN {
-                score += 10
+                score += 15
                 
                 // Exact ISBN match gets huge boost
                 if let preferredISBN = preferredISBN,
@@ -414,14 +416,17 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 ]
                 
                 if majorPublishers.contains(where: { publisher.contains($0) }) {
-                    score += 10
+                    score += 15
                 }
             }
             
             // Penalize if title contains unwanted terms
             let unwantedTerms = [
                 "summary", "notes", "study guide", "spark",
-                "cliff", "analysis", "workbook", "teacher"
+                "cliff", "analysis", "workbook", "teacher",
+                "illustrated", "graphic", "companion", "annotated",
+                "movie tie-in", "calendar", "journal", "notebook",
+                "coloring", "colouring"
             ]
             
             for term in unwantedTerms {
@@ -431,8 +436,14 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             }
             
             // Check for language (prefer English)
-            if volumeInfo.language != "en" {
-                score -= 10
+            if let lang = volumeInfo.language, lang != "en" { score -= 10 }
+
+            // Popularity: boost high ratings and counts when available
+            if let avg = volumeInfo.averageRating { score += avg * 10 } // up to +50 for 5.0
+            if let cnt = volumeInfo.ratingsCount {
+                // log-scale boost up to ~+40 for very popular editions
+                let boost = min(40.0, log10(Double(max(cnt, 1))) * 20.0)
+                score += boost
             }
             
             return ScoredBook(
@@ -494,28 +505,4 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     }
 }
 
-// Extend VolumeInfo to include more metadata
-extension VolumeInfo {
-    var ratingsCount: Int? {
-        // This would need to be added to the VolumeInfo struct
-        // For now, return nil
-        return nil
-    }
-    
-    var averageRating: Double? {
-        // This would need to be added to the VolumeInfo struct
-        // For now, return nil
-        return nil
-    }
-    
-    var publisher: String? {
-        // This would need to be added to the VolumeInfo struct
-        // For now, return nil
-        return nil
-    }
-    
-    var language: String? {
-        // This would need to be added to the VolumeInfo struct
-        return "en"
-    }
-}
+    // Removed placeholder extension; real fields are in VolumeInfo now

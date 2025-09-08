@@ -198,13 +198,8 @@ public class OKLABColorExtractor {
         // For dark covers, perform multi-scale analysis to find small accent colors
         if isDarkCover {
             print("\nPerforming multi-scale analysis for dark cover...")
-            // Skip multi-scale if already downsampled significantly
-            let wasDownsampled = originalSize.width > CGFloat(width) * 1.5
-            if wasDownsampled {
-                print("  Skipping multi-scale (already downsampled)")
-            }
-            
-            let multiScaleColors = wasDownsampled ? [] : performMultiScaleAnalysis(cgImage: cgImage, pixelData: pixelData, width: width, height: height, bytesPerRow: bytesPerRow)
+            // Always run multi-scale on dark covers to capture small bright accents (e.g., title bars/emblems)
+            let multiScaleColors = performMultiScaleAnalysis(cgImage: cgImage, pixelData: pixelData, width: width, height: height, bytesPerRow: bytesPerRow)
             
             // Merge multi-scale results into the main color cube
             for (color, weight) in multiScaleColors {
@@ -262,8 +257,8 @@ public class OKLABColorExtractor {
                         if isDarkCover {
                             var h: CGFloat = 0, s: CGFloat = 0, brightness: CGFloat = 0
                             color.getHue(&h, saturation: &s, brightness: &brightness, alpha: nil)
-                            if brightness > 0.5 && s > 0.5 {
-                                adjustedCount *= 3  // Triple weight for bright colors on dark covers
+                            if brightness > 0.45 && s > 0.55 {
+                                adjustedCount *= 6  // Strongly favor vivid accents on dark covers
                             }
                         }
                         
@@ -528,19 +523,20 @@ public class OKLABColorExtractor {
     nonisolated private func assignColorRolesDirectly(_ sortedPeaks: [(color: UIColor, count: Int, distinctiveness: Double)], isDarkCover: Bool) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
         
         if isDarkCover {
-            // For dark covers, prefer bright/saturated colors for primary
+            // For dark covers, prefer truly saturated accent colors for primary
             let brightPeaks = sortedPeaks.filter { peak in
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                return b > 0.5 || s > 0.6  // Bright or saturated
+                return (s > 0.55 && b > 0.35)
             }
             
             let primary = brightPeaks.first?.color ?? sortedPeaks[safe: 0]?.color ?? UIColor.orange
             let secondary = sortedPeaks[safe: 1]?.color ?? primary
             let accent = sortedPeaks[safe: 2]?.color ?? secondary
             
-            // For dark covers, background should always be very dark
-            let background = UIColor.black
+            // For dark covers, use a deep tinted version of the brightest peak
+            let baseForBackground = brightPeaks.first?.color ?? primary
+            let background = self.tintedDarkBackground(from: baseForBackground)
             
             print("🎯 Dark Cover Role Assignment:")
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
@@ -601,6 +597,16 @@ public class OKLABColorExtractor {
             return (primary, secondary, accent, background)
         }
     }
+
+    // Create a deep tinted background based on an accent color
+    nonisolated private func tintedDarkBackground(from color: UIColor) -> UIColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        // Keep hue, ensure decent saturation, and lower brightness to a deep tone
+        let bgS = min(max(s, 0.60), 0.85)
+        let bgB = max(min(b * 0.22, 0.22), 0.10)
+        return UIColor(hue: h, saturation: bgS, brightness: bgB, alpha: 1.0)
+    }
     
     
     
@@ -653,5 +659,3 @@ extension UIImage {
         }
     }
 }
-
-

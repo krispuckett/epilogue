@@ -85,9 +85,18 @@ enum URLValidator {
         // For book covers, ensure it's from a known good source
         if let host = url.host?.lowercased() {
             let trustedImageHosts = [
+                // Google Books official hosts
                 "books.google.com",
                 "www.googleapis.com",
                 "googleapis.com",
+                // Google image delivery hosts often used by imageLinks
+                "books.googleusercontent.com",
+                "lh3.googleusercontent.com",
+                "books.gstatic.com",
+                // Open Library
+                "covers.openlibrary.org",
+                "openlibrary.org",
+                // Amazon (occasionally used)
                 "images-na.ssl-images-amazon.com",
                 "m.media-amazon.com"
             ]

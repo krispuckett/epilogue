@@ -143,7 +143,7 @@ struct CoverOption: View {
                         }
                 }
                 
-                if isSelected {
+                if isSelected, coverImage != nil {
                     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .stroke(Color.orange, lineWidth: 3)
                     
@@ -161,24 +161,13 @@ struct CoverOption: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
         }
-        .task {
-            await loadCover()
-        }
+        .task { await loadCover() }
     }
     
     private func loadCover() async {
-        guard let url = URL(string: coverURL) else { return }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let image = UIImage(data: data) {
-                await MainActor.run {
-                    self.coverImage = image
-                }
-            }
-        } catch {
-            print("Failed to load cover: \(error)")
-        }
+        // Use shared manager for consistent caching and URL handling
+        let image = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL, targetSize: CGSize(width: 200, height: 300))
+        await MainActor.run { self.coverImage = image }
     }
 }
 

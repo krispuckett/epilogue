@@ -224,21 +224,37 @@ struct LibraryView: View {
     private var coverPickerSheet: some View {
         if let book = selectedBookForEdit {
             BookSearchSheet(
-                searchQuery: book.title,
-                onBookSelected: { newBook in
-                    print("📖 Cover change: Selected book '\(newBook.title)'")
-                    print("  🖼️ New cover URL: \(newBook.coverImageURL ?? "NO URL")")
-                    print("  📚 Original book: '\(book.title)'")
-                    print("  🔄 Updating cover...")
-                    
-                    if newBook.coverImageURL == nil {
-                        print("  ⚠️ WARNING: Selected book has no cover URL!")
+                searchQuery: book.title + " " + book.author,
+                onBookSelected: { selected in
+                    Task { @MainActor in
+                        print("📖 Cover change: Selected book '\(selected.title)'")
+                        let oldURL = book.coverImageURL
+                        let resolved = await DisplayCoverURLResolver.resolveDisplayURL(
+                            googleID: selected.id,
+                            isbn: selected.isbn,
+                            thumbnailURL: selected.coverImageURL
+                        )
+                        let finalURL = resolved ?? selected.coverImageURL
+                        if finalURL == nil { print("  ⚠️ WARNING: Selected book has no cover URL!") }
+
+                        // Update cover on the existing book (do not replace metadata here)
+                        viewModel.updateBookCover(book, newCoverURL: finalURL)
+
+                        // Refresh image caches and palette
+                        if let oldURL {
+                            _ = await SharedBookCoverManager.shared.refreshCover(for: oldURL)
+                        }
+                        if let finalURL {
+                            _ = await SharedBookCoverManager.shared.loadFullImage(from: finalURL)
+                            await BookColorPaletteCache.shared.refreshPalette(for: book.id, coverURL: finalURL)
+                        }
+
+                        NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                        showingCoverPicker = false
+                        selectedBookForEdit = nil
                     }
-                    
-                    viewModel.updateBookCover(book, newCoverURL: newBook.coverImageURL)
-                    showingCoverPicker = false
-                    selectedBookForEdit = nil
-                }
+                },
+                mode: .replace
             )
         }
     }

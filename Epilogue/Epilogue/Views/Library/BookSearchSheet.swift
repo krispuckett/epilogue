@@ -3,14 +3,17 @@ import UIKit
 
 // MARK: - Book Search Sheet (Matching Session Summary Design)
 struct BookSearchSheet: View {
+    enum Mode { case add, replace }
     let searchQuery: String
     let onBookSelected: (Book) -> Void
+    var mode: Mode = .add
     @Environment(\.dismiss) private var dismiss
     @StateObject private var booksService = GoogleBooksService()
     @State private var searchResults: [Book] = []
     @State private var isLoading = true
     @State private var searchError: String?
     @State private var refinedSearchQuery: String = ""
+    @State private var hasAutoSearched = false
     @FocusState private var isSearchFocused: Bool
     
     var body: some View {
@@ -37,7 +40,7 @@ struct BookSearchSheet: View {
                 }
                 .scrollIndicators(.hidden)
             }
-            .navigationTitle("Add Book")
+            .navigationTitle(mode == .add ? "Add Book" : "Replace Book")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -58,16 +61,15 @@ struct BookSearchSheet: View {
         .onAppear {
             print("📚 BookSearchSheet appeared with query: '\(searchQuery)'")
             refinedSearchQuery = searchQuery
-            
-            // Only auto-focus if we don't have a search query
             if searchQuery.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isSearchFocused = true
-                }
-            } else {
-                // We have a query, perform the search
-                performSearch()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { isSearchFocused = true }
             }
+        }
+        // Ensure first-open search reliably triggers
+        .task(id: searchQuery) {
+            guard !searchQuery.isEmpty, !hasAutoSearched else { return }
+            hasAutoSearched = true
+            await search(query: searchQuery)
         }
     }
     
@@ -633,4 +635,3 @@ struct BookSearchResultCard: View {
         isPressed ? DesignSystem.Colors.primaryAccent.opacity(0.3) : Color.white.opacity(0.1)
     }
 }
-

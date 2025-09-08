@@ -336,15 +336,40 @@ struct BookDetailView: View {
             }
         }
         .sheet(isPresented: $showingBookSearch) {
-            EditBookSheet(
-                currentBook: book,
-                initialSearchTerm: editedTitle,
-                onBookReplaced: { newBook in
-                    libraryViewModel.replaceBook(originalBook: book, with: newBook)
-                    showingBookSearch = false
-                }
+            BookSearchSheet(
+                searchQuery: editedTitle,
+                onBookSelected: { selected in
+                    Task { @MainActor in
+                        // Resolve a canonical display URL for the selected book
+                        let resolved = await DisplayCoverURLResolver.resolveDisplayURL(
+                            googleID: selected.id,
+                            isbn: selected.isbn,
+                            thumbnailURL: selected.coverImageURL
+                        )
+                        var updated = selected
+                        updated.coverImageURL = resolved ?? selected.coverImageURL
+
+                        // Replace while preserving user data
+                        libraryViewModel.replaceBook(originalBook: book, with: updated, preserveCover: false)
+
+                        // Update cover explicitly to override any preserved-cover logic
+                        libraryViewModel.updateBookCover(updated, newCoverURL: updated.coverImageURL)
+
+                        // Refresh image caches and palette
+                        if let oldURL = book.coverImageURL {
+                            _ = await SharedBookCoverManager.shared.refreshCover(for: oldURL)
+                        }
+                        if let newURL = updated.coverImageURL {
+                            _ = await SharedBookCoverManager.shared.loadFullImage(from: newURL)
+                            await BookColorPaletteCache.shared.refreshPalette(for: updated.id, coverURL: newURL)
+                        }
+
+                        NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                        showingBookSearch = false
+                    }
+                },
+                mode: .replace
             )
-            .environmentObject(libraryViewModel)
         }
         .sheet(isPresented: $showingCompletionSheet) {
             BookCompletionSheet(
@@ -625,10 +650,6 @@ struct BookDetailView: View {
             } else if book.readingStatus == .wantToRead {
                 // Want to Read sections
                 startReadingSection
-                
-                if let description = book.description {
-                    aboutThisBookSection(description: description)
-                }
                 
                 if let pageCount = book.pageCount {
                     estimatedReadingTimeSection(pageCount: pageCount)
