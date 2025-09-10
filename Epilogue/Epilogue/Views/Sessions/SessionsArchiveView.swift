@@ -94,7 +94,7 @@ struct SessionsArchiveView: View {
                     .foregroundStyle(.white)
                 }
             }
-            .searchable(text: $searchText, prompt: "Search sessions...")
+            .searchable(text: $searchText, prompt: "Search sessions")
         }
         .sheet(item: $showingSessionDetail) { session in
             AmbientSessionSummaryView(

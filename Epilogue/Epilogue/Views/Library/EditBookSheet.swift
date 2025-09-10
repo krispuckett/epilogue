@@ -98,7 +98,7 @@ struct EditBookSheet: View {
                 // Standardized search field
                 StandardizedSearchField(
                     text: $searchTerm,
-                    placeholder: "Enter book title or author..."
+                    placeholder: "Enter book title or author"
                 )
                 .onSubmit {
                     performSearch()

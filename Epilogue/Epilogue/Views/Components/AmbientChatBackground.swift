@@ -133,7 +133,7 @@ struct RaycastInputBar: View {
                 
                 // Input field with glass effect
                 HStack(spacing: 8) {
-                    TextField("Ask anything...", text: $text, axis: .vertical)
+                    TextField("Ask anything", text: $text, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
                         .foregroundStyle(.white)

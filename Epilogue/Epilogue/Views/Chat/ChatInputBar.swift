@@ -40,7 +40,7 @@ struct ChatInputBar: View {
             
             // Main input field (center) - expandable with AI shimmer
             AIEnhancedInputField(
-                placeholder: "Ask your books anything...",
+                placeholder: "Ask your books anything",
                 isProcessing: isProcessing,
                 shimmerColors: [
                     DesignSystem.Colors.primaryAccent,

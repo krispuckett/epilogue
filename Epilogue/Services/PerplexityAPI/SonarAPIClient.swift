@@ -8,11 +8,10 @@ actor SonarAPIClient {
     
     private let session: URLSession
     private let logger = Logger(subsystem: "com.epilogue.app", category: "SonarAPI")
-    private var apiKey: String?
     
-    // Configuration
-    private let baseURL = "https://api.perplexity.ai"
-    private let streamingEndpoint = "/chat/completions"
+    // Configuration - Using proxy instead of direct API
+    private let proxyURL = "https://epilogue-proxy.kris-puckett.workers.dev"
+    private let appSecret = "epilogue_testflight_2025_secret"
     
     init() {
         let configuration = URLSessionConfiguration.default
@@ -23,8 +22,15 @@ actor SonarAPIClient {
         self.session = URLSession(configuration: configuration)
     }
     
-    func setAPIKey(_ key: String) {
-        self.apiKey = key
+    private func getUserID() -> String {
+        let userDefaults = UserDefaults.standard
+        if let existingID = userDefaults.string(forKey: "epilogue_user_id") {
+            return existingID
+        } else {
+            let newID = UUID().uuidString
+            userDefaults.set(newID, forKey: "epilogue_user_id")
+            return newID
+        }
     }
     
     // MARK: - Streaming Chat Completion

@@ -407,7 +407,7 @@ struct QueryInputBar: View {
             }
             .buttonStyle(.plain)
             
-            TextField("Ask about this book...", text: $query)
+            TextField("Ask about this book", text: $query)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .disabled(isLoading || !canSubmit)
                 .onSubmit(onSubmit)

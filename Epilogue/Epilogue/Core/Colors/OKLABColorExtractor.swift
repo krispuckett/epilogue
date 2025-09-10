@@ -268,16 +268,32 @@ public class OKLABColorExtractor {
             }
         }
         
-        // Sort by visual importance (prioritize frequency for better color selection)
-        colorPeaks.sort { peak1, peak2 in
-            // For non-dark covers, prioritize frequency over distinctiveness
-            if !isDarkCover {
-                return peak1.count > peak2.count  // Sort by frequency first!
+        // Sort by visual importance
+        // - For dark covers: use combined score (existing behavior)
+        // - For non-dark covers: prefer vibrant/warm accents, not just area coverage
+        func vibrancy(_ color: UIColor) -> Double {
+            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+            color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+            // Base vibrancy: saturation × brightness
+            var v = Double(s) * (0.6 + 0.4 * Double(b))
+            // Warmth boost: prefer amber/gold hues (~25°–55°)
+            let hueDeg = Double(h) * 360.0
+            if hueDeg >= 25 && hueDeg <= 55 { v *= 1.25 }
+            // Penalize near-gray
+            if s < 0.15 { v *= 0.6 }
+            return v
+        }
+
+        colorPeaks.sort { a, b in
+            if isDarkCover {
+                let s1 = Double(a.count) * a.distinctiveness
+                let s2 = Double(b.count) * b.distinctiveness
+                return s1 > s2
             } else {
-                // For dark covers, still use combined score
-                let score1 = Double(peak1.count) * peak1.distinctiveness
-                let score2 = Double(peak2.count) * peak2.distinctiveness
-                return score1 > score2
+                // Combined metric: area (soft) × vibrancy (strong)
+                let s1 = pow(Double(a.count), 0.7) * pow(vibrancy(a.color), 1.4)
+                let s2 = pow(Double(b.count), 0.7) * pow(vibrancy(b.color), 1.4)
+                return s1 > s2
             }
         }
         
@@ -549,10 +565,26 @@ public class OKLABColorExtractor {
             
             return (primary, secondary, accent, background)
         } else {
-            // For normal covers, just use frequency order directly
-            let primary = sortedPeaks[safe: 0]?.color ?? UIColor.orange
-            let secondary = sortedPeaks[safe: 1]?.color ?? primary
-            let accent = sortedPeaks[safe: 2]?.color ?? secondary
+            // For non-dark covers, use a hybrid role assignment that showcases vibrant/warm accents
+            // Primary: most frequent non-gray color (from frequency perspective to maintain brand presence)
+            let freqSorted = sortedPeaks.sorted { $0.count > $1.count }
+            let primary = freqSorted.first?.color ?? UIColor.orange
+            // Accent: most vibrant/warm color from the combined-sorted list
+            let accent = sortedPeaks.first?.color ?? primary
+            // Secondary: next best distinct color (avoid near-duplicates of primary/accent)
+            let secondary = (freqSorted.first { peak in
+                let c = peak.color
+                // Ensure it's not too close to primary or accent
+                var hp: CGFloat = 0, sp: CGFloat = 0, bp: CGFloat = 0
+                var ha: CGFloat = 0, sa: CGFloat = 0, ba: CGFloat = 0
+                var hx: CGFloat = 0, sx: CGFloat = 0, bx: CGFloat = 0
+                primary.getHue(&hp, saturation: &sp, brightness: &bp, alpha: nil)
+                accent.getHue(&ha, saturation: &sa, brightness: &ba, alpha: nil)
+                c.getHue(&hx, saturation: &sx, brightness: &bx, alpha: nil)
+                let closeToPrimary = abs(Double(hx - hp)) < 0.05 && abs(Double(sx - sp)) < 0.1
+                let closeToAccent  = abs(Double(hx - ha)) < 0.05 && abs(Double(sx - sa)) < 0.1
+                return !(closeToPrimary || closeToAccent)
+            })?.color ?? primary
             
             // Smart background selection
             let background: UIColor
@@ -586,7 +618,7 @@ public class OKLABColorExtractor {
                 print("  No peaks available, using default dark gray for background")
             }
             
-            print("🎯 Normal Cover Role Assignment (Pure Frequency):")
+            print("🎯 Normal Cover Role Assignment (Hybrid Vibrancy):")
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
             print("  Assigned roles:")
             print("    Primary: \(colorDescription(primary))")

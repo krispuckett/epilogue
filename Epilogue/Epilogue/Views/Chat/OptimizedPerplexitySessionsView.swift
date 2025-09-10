@@ -86,7 +86,7 @@ struct OptimizedPerplexitySessionsView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
                 
-                TextField("Search sessions...", text: $searchText)
+                TextField("Search sessions", text: $searchText)
                     .font(.system(size: 15))
                     .foregroundStyle(.white)
                     .textFieldStyle(.plain)
@@ -167,6 +167,13 @@ struct OptimizedPerplexitySessionsView: View {
             }
             .coordinateSpace(name: "scroll")
             .scrollIndicators(.hidden)
+
+            // Centered empty state when no sessions
+            if cachedGroupedSessions.isEmpty && searchText.isEmpty {
+                ModernEmptyStates.noNotes
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+            }
         }
     }
     

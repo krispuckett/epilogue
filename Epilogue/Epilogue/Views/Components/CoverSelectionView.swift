@@ -144,9 +144,14 @@ struct CoverOption: View {
                 }
                 
                 if isSelected, coverImage != nil {
+                    // Soft glow instead of hard stroke
                     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                        .stroke(Color.orange, lineWidth: 3)
-                    
+                        .fill(Color.orange.opacity(0.12))
+                        .blendMode(.plusLighter)
+                        .allowsHitTesting(false)
+                        .animation(.easeInOut(duration: 0.15), value: isSelected)
+
+                    // Check badge
                     Circle()
                         .fill(Color.orange)
                         .frame(width: 24, height: 24)

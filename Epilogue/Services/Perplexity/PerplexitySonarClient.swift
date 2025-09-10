@@ -8,10 +8,10 @@ actor PerplexitySonarClient {
     
     private let session: URLSession
     private let logger = Logger(subsystem: "com.epilogue.app", category: "PerplexityAPI")
-    private var apiKey: String?
     
-    private let baseURL = "https://api.perplexity.ai"
-    private let streamingEndpoint = "/chat/completions"
+    // Using proxy instead of direct API
+    private let proxyURL = "https://epilogue-proxy.kris-puckett.workers.dev"
+    private let appSecret = "epilogue_testflight_2025_secret"
     
     init() {
         let configuration = URLSessionConfiguration.default
@@ -23,9 +23,15 @@ actor PerplexitySonarClient {
         self.session = URLSession(configuration: configuration)
     }
     
-    func configure(apiKey: String) {
-        self.apiKey = apiKey
-        logger.info("Perplexity API configured")
+    private func getUserID() -> String {
+        let userDefaults = UserDefaults.standard
+        if let existingID = userDefaults.string(forKey: "epilogue_user_id") {
+            return existingID
+        } else {
+            let newID = UUID().uuidString
+            userDefaults.set(newID, forKey: "epilogue_user_id")
+            return newID
+        }
     }
     
     // MARK: - Streaming Chat Completion

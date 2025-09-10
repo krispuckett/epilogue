@@ -145,12 +145,10 @@ struct SwiftDataNotesView: View {
                         }
                     }
                 } else {
-                    // Show empty state when there are no notes
+                    // Keep search empty for query results; general empty is overlaid to center in view
                     if !searchText.isEmpty {
                         EmptyStateView.noSearchResults
-                            .transition(.opacity)
-                    } else {
-                        EmptyStateView.noNotes
+                            .frame(maxWidth: .infinity)
                             .transition(.opacity)
                     }
                 }
@@ -347,6 +345,13 @@ struct SwiftDataNotesView: View {
                     
                     // Undo snackbar overlay
                     UndoSnackbar()
+                    
+                    // Centered empty state overlay
+                    if allNotes.isEmpty && questions.isEmpty && !isInitialLoad && searchText.isEmpty {
+                        ModernEmptyStates.noNotes
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.opacity)
+                    }
                 }
             .navigationTitle(selectionManager.isSelectionMode ? "" : "Notes")
             .navigationBarTitleDisplayMode(selectionManager.isSelectionMode ? .inline : .large)

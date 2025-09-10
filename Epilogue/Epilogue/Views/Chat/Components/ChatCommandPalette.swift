@@ -93,7 +93,7 @@ struct ChatCommandPalette: View {
             // Search bar - using standardized styles
             StandardizedSearchField(
                 text: $searchText,
-                placeholder: "Search commands or books..."
+                placeholder: "Search commands or books"
             )
             .onSubmit {
                 handleSubmit()

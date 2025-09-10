@@ -250,6 +250,11 @@ struct LibraryView: View {
                         }
 
                         NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                        SensoryFeedback.success()
+                        NotificationCenter.default.post(
+                            name: Notification.Name("ShowGlassToast"),
+                            object: "Cover updated"
+                        )
                         showingCoverPicker = false
                         selectedBookForEdit = nil
                     }
@@ -291,8 +296,12 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var goodreadsImportSheet: some View {
-        CleanGoodreadsImportView()
-            .environmentObject(viewModel)
+        GoodreadsImportView(
+            modelContext: modelContext,
+            googleBooksService: googleBooksService,
+            libraryViewModel: viewModel
+        )
+        .environmentObject(googleBooksService)
     }
     
     @ViewBuilder
@@ -312,8 +321,8 @@ struct LibraryView: View {
                     }
                     .transition(.opacity)
                 } else if viewModel.books.isEmpty {
-                    emptyStateView
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    // Keep space reserved; actual empty state is overlaid for perfect centering
+                    Color.clear.frame(height: 200)
                 } else {
                     ZStack {
                         if viewMode == .grid {
@@ -370,6 +379,15 @@ struct LibraryView: View {
                 
                 navigationLink
                 mainContent
+
+                // Centered empty state overlay for a more refined look
+                if !viewModel.isLoading && viewModel.books.isEmpty {
+                    emptyStateView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .offset(y: -40) // Nudge the centered empty state upward by ~40px
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
             }
             .navigationTitle("Library")
             .navigationBarTitleDisplayMode(.large)
@@ -1116,10 +1134,11 @@ struct LibraryBookListView: View {
     
     @State private var colorPalettes: [String: ColorPalette] = [:]
     @State private var loadingGradients: Set<String> = []
+    @StateObject private var appState = AppStateManager.shared
     
     var body: some View {
         LazyVStack(spacing: 16) {
-            ForEach(books) { book in
+            ForEach(Array(books.enumerated()), id: \.element.localId) { index, book in
                 LibraryBookListRow(
                     book: book,
                     viewModel: viewModel,
@@ -1136,6 +1155,7 @@ struct LibraryBookListView: View {
                 .task {
                     await loadColorPalette(for: book)
                 }
+                .materialize(order: index)
             }
         }
         .padding(.horizontal)
@@ -1148,6 +1168,11 @@ struct LibraryBookListView: View {
               !loadingGradients.contains(book.id),
               let coverURL = book.coverImageURL else { return }
         
+        // Skip heavy extraction while importing — will compute on demand later
+        if appState.isImportingLibrary {
+            return
+        }
+
         loadingGradients.insert(book.id)
         
         // Check cache first
@@ -1359,6 +1384,7 @@ class LibraryViewModel: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let booksKey = "com.epilogue.savedBooks"
     private let bookOrderKey = "com.epilogue.bookOrder"
+    private var saveDebounceWorkItem: DispatchWorkItem?
     
     init() {
         loadBooks()
@@ -1691,8 +1717,17 @@ class LibraryViewModel: ObservableObject {
     func updateReadingStatus(for bookId: String, status: ReadingStatus) {
         if let index = books.firstIndex(where: { $0.id == bookId }) {
             books[index].readingStatus = status
-            saveBooks()
+            // Force publish so SwiftUI updates immediately
+            books = books
+            debounceSaveBooks()
         }
+    }
+
+    private func debounceSaveBooks(delay: TimeInterval = 0.4) {
+        saveDebounceWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.saveBooks() }
+        saveDebounceWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
     
     func updateBookCover(_ book: Book, newCoverURL: String?) {

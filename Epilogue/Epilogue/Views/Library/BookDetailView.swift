@@ -101,7 +101,7 @@ struct BookDetailView: View {
     private var gradientOpacity: Double {
         // Fixed calculation - no more crazy values
         let opacity = 1.0 - (min(scrollOffset, 200) / 200)
-        return max(0.4, opacity)  // Increased minimum from 0.2 to 0.4
+        return max(0.85, opacity)  // Keep gradient strong when not scrolled
     }
     
     // Color extraction
@@ -176,6 +176,7 @@ struct BookDetailView: View {
     // Edit book states
     @State private var showingBookSearch = false
     @State private var editedTitle = ""
+    @State private var currentPublisherHint: String? = nil
     @State private var isEditingTitle = false
     
     // Progress editing states
@@ -328,6 +329,13 @@ struct BookDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Edit Book") {
                     editedTitle = book.title
+                    if let isbn = book.isbn {
+                        Task {
+                            if let raw = await EnhancedGoogleBooksService().fetchRawByISBN(isbn) {
+                                await MainActor.run { currentPublisherHint = raw.volumeInfo.publisher }
+                            }
+                        }
+                    }
                     showingBookSearch = true
                     SensoryFeedback.light()
                 }
@@ -368,7 +376,8 @@ struct BookDetailView: View {
                         showingBookSearch = false
                     }
                 },
-                mode: .replace
+                mode: .replace,
+                publisherHint: currentPublisherHint
             )
         }
         .sheet(isPresented: $showingCompletionSheet) {
@@ -756,14 +765,17 @@ struct BookDetailView: View {
                 }
             }
             
-            // Ambient Reading Progress Timeline - Detailed View
-            AmbientReadingProgressView(
-                book: book,
-                width: 320,
-                showDetailed: true,
-                colorPalette: colorPalette
-            )
-            .environmentObject(libraryViewModel)
+            // Directly actionable embedded progress timeline (same behavior as sheet)
+            GeometryReader { geo in
+                EmbeddedAmbientProgress(
+                    book: book,
+                    width: max(280, geo.size.width - DesignSystem.Spacing.listItemPadding * 2),
+                    colorPalette: colorPalette
+                )
+                .environmentObject(libraryViewModel)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .frame(height: 220)
         }
         .sheet(isPresented: $showingProgressEditor) {
             AmbientProgressSheet(book: book, isPresented: $showingProgressEditor, colorPalette: colorPalette)

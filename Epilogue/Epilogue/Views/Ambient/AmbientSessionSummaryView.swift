@@ -376,7 +376,7 @@ struct AmbientSessionSummaryView: View {
                         .fill(Color.white.opacity(0.1))
                         .frame(height: 0.5)
                     
-                    Text(try! AttributedString(markdown: answer))
+                    Text((try? AttributedString(markdown: answer)) ?? AttributedString(answer))
                         .font(.custom("Georgia", size: 15))
                         .foregroundStyle(.white.opacity(0.85))
                         .lineSpacing(6)
@@ -894,7 +894,7 @@ struct MinimalThreadView: View {
                         .fill(Color.white.opacity(0.10))
                         .frame(height: 0.5)
                     
-                    Text(try! AttributedString(markdown: answer))
+                    Text((try? AttributedString(markdown: answer)) ?? AttributedString(answer))
                         .font(.custom("Georgia", size: 15))
                         .foregroundStyle(.white.opacity(0.85))
                         .lineSpacing(6)
