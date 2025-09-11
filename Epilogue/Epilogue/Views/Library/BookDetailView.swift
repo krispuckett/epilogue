@@ -1572,7 +1572,7 @@ struct BookDetailView: View {
         do {
             // Use OKLABColorExtractor directly like AmbientMode does
             let extractor = OKLABColorExtractor()
-            let palette = try await extractor.extractPalette(from: displayedImage)
+            let palette = try await extractor.extractPalette(from: displayedImage, imageSource: book.title)
             
             await MainActor.run {
                 self.colorPalette = palette
@@ -1648,7 +1648,7 @@ struct BookDetailView: View {
             
             // Use OKLABColorExtractor directly like AmbientMode does
             let extractor = OKLABColorExtractor()
-            let palette = try await extractor.extractPalette(from: uiImage)
+            let palette = try await extractor.extractPalette(from: uiImage, imageSource: book.title)
             
             await MainActor.run {
                 self.colorPalette = palette

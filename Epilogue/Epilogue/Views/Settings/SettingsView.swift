@@ -154,7 +154,8 @@ struct SettingsView: View {
                         }
                     }
                     .onChange(of: gandalfMode) { _, enabled in
-                        PerplexityService.shared.enableGandalf(enabled)
+                        // Gandalf mode is now handled in OptimizedPerplexityService
+                        print("🧙‍♂️ Gandalf mode \(enabled ? "enabled" : "disabled")")
                     }
                     
                     if gandalfMode {

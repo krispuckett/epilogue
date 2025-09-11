@@ -186,8 +186,8 @@ actor ResponseCache {
     }
 }
 
-// MARK: - PerplexityService Extension
-extension PerplexityService {
+// MARK: - OptimizedPerplexityService Extension
+extension OptimizedPerplexityService {
     static func cachedChat(message: String, bookContext: Book? = nil) async throws -> String {
         let bookTitle = bookContext?.title
         
@@ -199,7 +199,7 @@ extension PerplexityService {
         
         // Generate new response
         print("🔄 Generating new response for: \(message)")
-        let response = try await staticChat(message: message, bookContext: bookContext)
+        let response = try await shared.chat(message: message, bookContext: bookContext)
         
         // Cache the response
         await ResponseCache.shared.cacheResponse(response, for: message, bookTitle: bookTitle)

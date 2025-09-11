@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os.log
 
 // MARK: - Secure API Manager for Production
 final class SecureAPIManager {
@@ -7,30 +8,144 @@ final class SecureAPIManager {
     
     private let userDefaults = UserDefaults.standard
     private let rateLimitKey = "perplexity_usage"
-    private let dailyQuestionLimit = 10
+    private let dailyQuestionLimit = 20  // Matches CloudFlare worker default
+    private let logger = Logger(subsystem: "com.epilogue.app", category: "SecureAPIManager")
+    
+    // MARK: - Proxy Configuration
+    private let proxyBaseURL = "https://epilogue-proxy.kris-puckett.workers.dev"
+    private let appSecret = "epilogue_testflight_2025_secret"  // App identification only
     
     private init() {}
     
-    // MARK: - Obfuscated API Key
-    // Split and obfuscated for security - reconstructed at runtime
-    private var apiKeyComponents: [String] {
-        // IMPORTANT: Replace these parts with your actual Perplexity API key
-        // Split your key into 4-5 parts for obfuscation
-        // Example: if your key is "pplx-abc123def456ghi789"
-        // Split it like: ["pplx-abc123", "def456", "ghi789"]
-        return [
-            "pplx-jb3WZP",       // Part 1 - Replace with your actual key part 1
-            "6iivi8Dl78",          // Part 2 - Replace with your actual key part 2
-            "S7BuM05HgW",         // Part 3 - Replace with your actual key part 3
-            "4M2qMvbFyTc",   // Part 4 - Replace with your actual key part 4
-            "ULIObfP61SE"           // Part 5 - Replace with your actual key part 5
-        ]
+    // MARK: - Proxy API Management
+    
+    enum APIError: LocalizedError {
+        case proxyNotConfigured
+        case unauthorized
+        case rateLimitExceeded(resetTime: Date?)
+        case serviceError(String)
+        case networkError(String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .proxyNotConfigured:
+                return "API proxy not configured. Please contact support."
+            case .unauthorized:
+                return "App authentication failed. Please update the app."
+            case .rateLimitExceeded(let resetTime):
+                if let reset = resetTime {
+                    let formatter = DateFormatter()
+                    formatter.timeStyle = .short
+                    return "Daily limit reached. Resets at \(formatter.string(from: reset))"
+                }
+                return "Daily limit reached. Please try again tomorrow."
+            case .serviceError(let message):
+                return "Service error: \(message)"
+            case .networkError(let message):
+                return "Network error: \(message)"
+            }
+        }
     }
     
-    // Reconstruct the API key at runtime
-    func getAPIKey() -> String {
-        // Join the components to form the complete key
-        return apiKeyComponents.joined()
+    /// Get or create a unique user ID for rate limiting
+    private func getUserID() -> String {
+        if let existingID = userDefaults.string(forKey: "epilogue_user_id") {
+            return existingID
+        } else {
+            let newID = UUID().uuidString
+            userDefaults.set(newID, forKey: "epilogue_user_id")
+            return newID
+        }
+    }
+    
+    /// Create authenticated request to proxy
+    func createProxyRequest(endpoint: String = "", body: Data?) -> URLRequest? {
+        guard let url = URL(string: proxyBaseURL + endpoint) else {
+            logger.error("Invalid proxy URL")
+            return nil
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(appSecret, forHTTPHeaderField: "X-Epilogue-Auth")
+        request.setValue(getUserID(), forHTTPHeaderField: "X-User-ID")
+        request.httpBody = body
+        request.timeoutInterval = 30  // 30 second timeout
+        
+        return request
+    }
+    
+    /// Call the proxy API with automatic error handling
+    func callProxyAPI(body: Data) async throws -> Data {
+        guard let request = createProxyRequest(body: body) else {
+            throw APIError.proxyNotConfigured
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError("Invalid response type")
+            }
+            
+            // Handle different status codes
+            switch httpResponse.statusCode {
+            case 200:
+                // Success - check for rate limit headers
+                if let limitStr = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Limit"),
+                   let remainingStr = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Remaining") {
+                    let limit = Int(limitStr) ?? dailyQuestionLimit
+                    let remaining = Int(remainingStr) ?? 0
+                    logger.info("Rate limit: \(remaining)/\(limit) requests remaining")
+                    
+                    // Store for local display
+                    userDefaults.set(remaining, forKey: "api_requests_remaining")
+                    userDefaults.set(limit, forKey: "api_requests_limit")
+                }
+                return data
+                
+            case 401:
+                logger.error("Unauthorized - check app secret")
+                throw APIError.unauthorized
+                
+            case 429:
+                // Rate limit exceeded
+                var resetTime: Date?
+                if let resetStr = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Reset") {
+                    resetTime = ISO8601DateFormatter().date(from: resetStr)
+                }
+                logger.warning("Rate limit exceeded, resets at \(resetTime?.description ?? "unknown")")
+                throw APIError.rateLimitExceeded(resetTime: resetTime)
+                
+            case 500...599:
+                logger.error("Server error: \(httpResponse.statusCode)")
+                throw APIError.serviceError("Server temporarily unavailable")
+                
+            default:
+                // Try to parse error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let message = errorData["message"] as? String {
+                    throw APIError.serviceError(message)
+                }
+                throw APIError.serviceError("Unexpected error: \(httpResponse.statusCode)")
+            }
+            
+        } catch let error as APIError {
+            throw error
+        } catch {
+            logger.error("Network error: \(error.localizedDescription)")
+            throw APIError.networkError(error.localizedDescription)
+        }
+    }
+    
+    /// Check remaining API calls for today
+    func getRemainingCalls() -> (remaining: Int, limit: Int) {
+        let remaining = userDefaults.integer(forKey: "api_requests_remaining")
+        let limit = userDefaults.integer(forKey: "api_requests_limit")
+        return (remaining: remaining > 0 ? remaining : dailyQuestionLimit,
+                limit: limit > 0 ? limit : dailyQuestionLimit)
     }
     
     // MARK: - Rate Limiting
@@ -85,7 +200,7 @@ final class SecureAPIManager {
         
         saveUsage(usage)
         
-        print("📊 Rate Limit: \(usage.questionCount)/\(dailyQuestionLimit) questions used today")
+        logger.info("Rate Limit: \(usage.questionCount)/\(self.dailyQuestionLimit) questions used today")
     }
     
     private func getCurrentUsage() -> UsageData {
@@ -124,6 +239,6 @@ final class SecureAPIManager {
         let usage = getCurrentUsage()
         
         // In production, send this to your analytics service
-        print("📈 Analytics - Device: \(deviceID.prefix(8))..., Questions today: \(usage.questionCount)")
+        logger.info("Analytics - Device: \(self.deviceID.prefix(8))..., Questions today: \(usage.questionCount)")
     }
 }

@@ -22,13 +22,43 @@ struct PerplexityResponse {
     let cached: Bool
 }
 
+// MARK: - Perplexity Error
+enum PerplexityError: LocalizedError {
+    case rateLimitExceeded(remaining: Int, resetTime: Date)
+    case invalidRequest
+    case invalidURL
+    case networkError(Error)
+    case invalidResponse
+    case unauthorized
+    case serverError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .rateLimitExceeded(let remaining, let resetTime):
+            return "Rate limit exceeded. \(remaining) requests remaining. Resets at \(resetTime)"
+        case .invalidRequest:
+            return "Invalid request format"
+        case .invalidURL:
+            return "Invalid URL"
+        case .networkError(let error):
+            return "Network error: \(error.localizedDescription)"
+        case .invalidResponse:
+            return "Invalid response from server"
+        case .unauthorized:
+            return "Unauthorized - check API key"
+        case .serverError(let message):
+            return "Server error: \(message)"
+        }
+    }
+}
+
 // MARK: - Optimized Perplexity Service
 @MainActor
 class OptimizedPerplexityService: ObservableObject {
     static let shared = OptimizedPerplexityService()
     
     private let logger = Logger(subsystem: "com.epilogue", category: "PerplexitySonar")
-    private let sonarEndpoint = "https://api.perplexity.ai/chat/completions"
+    private let sonarEndpoint = "https://epilogue-proxy.kris-puckett.workers.dev"
     private var apiKey: String = ""
     
     // Streaming support
@@ -60,16 +90,10 @@ class OptimizedPerplexityService: ObservableObject {
     }
     
     private func setupAPIKey() {
-        // SECURE: Only use KeychainManager - no Info.plist fallback
-        if let keychainKey = KeychainManager.shared.getPerplexityAPIKey(),
-           !keychainKey.isEmpty,
-           KeychainManager.shared.isValidAPIKey(keychainKey) {
-            self.apiKey = keychainKey
-            logger.info("✅ Using Perplexity API key from secure storage")
-        } else {
-            self.apiKey = ""
-            logger.warning("⚠️ No valid Perplexity API key configured. User needs to configure in Settings.")
-        }
+        // Using CloudFlare proxy authentication - no API key needed
+        // The proxy handles the actual Perplexity API key
+        self.apiKey = "proxy_authenticated"
+        logger.info("🔑 AI Service configured: using CloudFlare proxy authentication")
     }
     
     // MARK: - Cerebras-Powered Streaming with SSE
@@ -388,7 +412,18 @@ class OptimizedPerplexityService: ObservableObject {
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // Use proxy authentication instead of Bearer token
+        request.setValue("epilogue_testflight_2025_secret", forHTTPHeaderField: "X-Epilogue-Auth")
+        
+        // Get or create userId
+        let userId: String
+        if let existingId = UserDefaults.standard.string(forKey: "userId") {
+            userId = existingId
+        } else {
+            userId = UUID().uuidString
+            UserDefaults.standard.set(userId, forKey: "userId")
+        }
+        request.setValue(userId, forHTTPHeaderField: "X-User-ID")
         
         if stream {
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -406,7 +441,7 @@ class OptimizedPerplexityService: ObservableObject {
         } ?? "Provide detailed, factual responses with citations."
         
         let body: [String: Any] = [
-            "model": model,
+            "model": "sonar",  // Always use sonar for proxy
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": query]

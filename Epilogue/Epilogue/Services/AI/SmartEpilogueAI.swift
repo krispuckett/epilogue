@@ -19,7 +19,7 @@ class SmartEpilogueAI: ObservableObject {
     #endif
     
     // Perplexity Service for external queries
-    private let perplexityService = PerplexityService()
+    private let perplexityService = OptimizedPerplexityService.shared
     
     // Context tracking
     @Published var activeBook: BookModel?
@@ -370,7 +370,7 @@ class SmartEpilogueAI: ObservableObject {
         do {
             let formattedQuestion = formatQuestionWithContext(question)
             let response = try await perplexityService.chat(
-                with: formattedQuestion,
+                message: formattedQuestion,
                 bookContext: activeBook?.toBook()
             )
             lastResponse = response
@@ -452,10 +452,20 @@ class SmartEpilogueAI: ObservableObject {
             let useExternal = currentMode == .externalOnly || shouldUseExternalCheck
             if useExternal {
                 // Stream from Perplexity
-                let stream = try await perplexityService.streamChat(
-                    message: formatQuestionWithContext(question),
-                    bookContext: activeBook?.toBook()
-                )
+                // Convert PerplexityResponse stream to String stream
+                let responseStream = AsyncThrowingStream<String, Error> { continuation in
+                    Task {
+                        do {
+                            for try await response in perplexityService.streamSonarResponse(formatQuestionWithContext(question), bookContext: activeBook?.toBook()) {
+                                continuation.yield(response.text)
+                            }
+                            continuation.finish()
+                        } catch {
+                            continuation.finish(throwing: error)
+                        }
+                    }
+                }
+                let stream = responseStream
                 
                 for try await chunk in stream {
                     await MainActor.run {
@@ -493,9 +503,9 @@ class PerplexitySearchTool: LanguageModelTool {
     let name = "search_web"
     let description = "Search the web for current information, facts, or details not in the model's training data"
     
-    private let service: PerplexityService
+    private let service: OptimizedPerplexityService
     
-    init(service: PerplexityService) {
+    init(service: OptimizedPerplexityService) {
         self.service = service
     }
     

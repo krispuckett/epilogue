@@ -26,7 +26,7 @@ public class UltraFastAmbientProcessor: ObservableObject {
     #if canImport(FoundationModels)
     private var appleSession: LanguageModelSession?
     #endif
-    private let perplexityClient = PerplexityService()
+    private let perplexityClient = OptimizedPerplexityService.shared
     private let deduplicator = QuestionDeduplicator()
     private var whisperModel: WhisperKit?
     
@@ -342,9 +342,20 @@ public class UltraFastAmbientProcessor: ObservableObject {
     // MARK: - Fast Perplexity Fallback
     private func getFastPerplexityResponse(_ question: String) async {
         do {
-            let response = try await perplexityClient.streamChat(
-                message: question
-            )
+            // Convert PerplexityResponse stream to String stream
+            let responseStream = AsyncThrowingStream<String, Error> { continuation in
+                Task {
+                    do {
+                        for try await response in perplexityClient.streamSonarResponse(question, bookContext: nil) {
+                            continuation.yield(response.text)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+            let response = responseStream
             
             var accumulated = ""
             for try await chunk in response {
@@ -369,9 +380,20 @@ public class UltraFastAmbientProcessor: ObservableObject {
     // MARK: - Enhanced Response (Perplexity Pro)
     private func getEnhancedResponse(_ question: String) async {
         do {
-            let response = try await perplexityClient.streamChat(
-                message: question
-            )
+            // Convert PerplexityResponse stream to String stream
+            let responseStream = AsyncThrowingStream<String, Error> { continuation in
+                Task {
+                    do {
+                        for try await response in perplexityClient.streamSonarResponse(question, bookContext: nil) {
+                            continuation.yield(response.text)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+            let response = responseStream
             
             var accumulated = ""
             for try await chunk in response {

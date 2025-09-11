@@ -27,26 +27,26 @@ struct BookAtmosphericGradientView: View {
                     #if DEBUG
                     // Toggle to see gradient logs during debugging
                     let LOG_GRADIENT = false
-                    if LOG_GRADIENT {
+                    let _ = LOG_GRADIENT ? {
                         print("🎨 Rendering gradient with intensity: \(intensity)")
                         print("   Primary: \(colorDescription(ColorPalette(primary: palette.primary, secondary: .clear, accent: .clear, background: .clear, textColor: .clear, luminance: 0, isMonochromatic: false, extractionQuality: 0)))")
                         print("   Opacity applied: \(0.8 * intensity)")
-                    }
+                    }() : ()
                     #endif
                     
-                    // More vibrant gradient like ambient chat
+                    // Restored gradient from 73e8793 for proper vibrancy
                     LinearGradient(
                         stops: [
-                            .init(color: palette.primary.opacity(0.8 * intensity), location: 0.0),
-                            .init(color: palette.secondary.opacity(0.6 * intensity), location: 0.15),
-                            .init(color: palette.accent.opacity(0.4 * intensity), location: 0.3),
-                            .init(color: palette.background.opacity(0.2 * intensity), location: 0.45),
+                            .init(color: palette.primary.opacity(intensity), location: 0.0),
+                            .init(color: palette.secondary.opacity(intensity * 0.8), location: 0.2),
+                            .init(color: palette.accent.opacity(intensity * 0.5), location: 0.35),
+                            .init(color: palette.background.opacity(intensity * 0.3), location: 0.5),
                             .init(color: Color.clear, location: 0.6)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .blur(radius: 30) // Slightly less blur for more definition
+                    .blur(radius: 40) // Restored to 40 for proper atmospheric effect
                     .ignoresSafeArea()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     .animation(.easeInOut(duration: 0.3), value: palette.primary)
@@ -188,13 +188,13 @@ struct BookAtmosphericGradientView: View {
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(targetBrightness), opacity: Double(alpha))
     }
     
-    /// Process colors - enhance them like ambient chat, but keep dark backgrounds dark
+    /// Process colors - enhance them like ambient chat (restored from 73e8793)
     private func processColors(_ palette: ColorPalette) -> ColorPalette {
         return ColorPalette(
             primary: enhanceColor(palette.primary),
             secondary: enhanceColor(palette.secondary),
             accent: enhanceColor(palette.accent),
-            background: enhanceBackground(palette.background),
+            background: enhanceColor(palette.background),  // Restored: use same enhancement for all
             textColor: palette.textColor,
             luminance: palette.luminance,
             isMonochromatic: palette.isMonochromatic,
@@ -212,25 +212,11 @@ struct BookAtmosphericGradientView: View {
         
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         
-        // EXACT same enhancement as ambient chat, with protection for low-sat dark colors
+        // EXACT same enhancement as ambient chat
         saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
-        if !(saturation < 0.18 && brightness < 0.35) {
-            // Only enforce a brightness floor when color has some saturation
-            brightness = max(brightness, 0.4)
-        }
+        brightness = max(brightness, 0.4)         // Minimum brightness
         
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
-    }
-
-    /// Background enhancer that preserves dark mood
-    private func enhanceBackground(_ color: Color) -> Color {
-        let uiColor = UIColor(color)
-        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
-        // Slightly increase saturation but keep brightness capped for depth
-        let outS = min(s * 1.2, 1.0)
-        let outB = min(max(b, 0.18), 0.33) // keep dark, avoid mid-gray
-        return Color(hue: Double(h), saturation: Double(outS), brightness: Double(outB))
     }
     
     /// Start subtle 30-second animation

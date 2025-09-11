@@ -70,7 +70,7 @@ class OptimizedAIResponseService: ObservableObject {
     @Published var recentResponses: [AIResponse] = []
     @Published var isProcessing = false
     
-    private let perplexityService = PerplexityService()
+    private let perplexityService = OptimizedPerplexityService.shared
     private let responseCache = ResponseCache.shared
     private var cancellables = Set<AnyCancellable>()
     
@@ -131,11 +131,20 @@ class OptimizedAIResponseService: ObservableObject {
         
         do {
             // Start streaming response
-            let stream = try await perplexityService.streamChat(
-                message: question,
-                bookContext: bookContext,
-                model: model.rawValue
-            )
+            // Convert PerplexityResponse stream to String stream
+            let responseStream = AsyncThrowingStream<String, Error> { continuation in
+                Task {
+                    do {
+                        for try await response in perplexityService.streamSonarResponse(question, bookContext: bookContext) {
+                            continuation.yield(response.text)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+            let stream = responseStream
             
             var accumulatedText = ""
             
@@ -260,9 +269,8 @@ class OptimizedAIResponseService: ObservableObject {
         
         do {
             let response = try await perplexityService.chat(
-                with: question,
-                bookContext: bookContext,
-                model: model.rawValue
+                message: question,
+                bookContext: bookContext
             )
             
             let responseTime = Date().timeIntervalSince(startTime)

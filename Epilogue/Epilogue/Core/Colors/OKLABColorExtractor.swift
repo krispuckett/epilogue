@@ -257,8 +257,8 @@ public class OKLABColorExtractor {
                         if isDarkCover {
                             var h: CGFloat = 0, s: CGFloat = 0, brightness: CGFloat = 0
                             color.getHue(&h, saturation: &s, brightness: &brightness, alpha: nil)
-                            if brightness > 0.45 && s > 0.55 {
-                                adjustedCount *= 6  // Strongly favor vivid accents on dark covers
+                            if brightness > 0.5 && s > 0.5 {
+                                adjustedCount *= 3  // Triple weight for bright colors on dark covers
                             }
                         }
                         
@@ -323,11 +323,15 @@ public class OKLABColorExtractor {
         // Assign roles based on the sorted order (frequency)
         let roles = assignColorRolesDirectly(filteredPeaks, isDarkCover: isDarkCover)
         
+        // Detect if the palette is monochromatic
+        let isMonochromatic = detectMonochromatic(roles: roles, peaks: filteredPeaks)
+        
         print("\nFinal ColorCube Palette:")
         print("  Primary: \(colorDescription(roles.primary))")
         print("  Secondary: \(colorDescription(roles.secondary))")
         print("  Accent: \(colorDescription(roles.accent))")
         print("  Background: \(colorDescription(roles.background))")
+        print("  Monochromatic: \(isMonochromatic)")
         
         return ColorPalette(
             primary: Color(roles.primary),
@@ -336,7 +340,7 @@ public class OKLABColorExtractor {
             background: Color(roles.background),
             textColor: luminance(of: roles.primary) > 0.5 ? .black : .white,
             luminance: luminance(of: roles.primary),
-            isMonochromatic: false,
+            isMonochromatic: isMonochromatic,
             extractionQuality: min(Double(selectedColors.count) / 4.0, 1.0)
         )
     }
@@ -523,11 +527,11 @@ public class OKLABColorExtractor {
     nonisolated private func assignColorRolesDirectly(_ sortedPeaks: [(color: UIColor, count: Int, distinctiveness: Double)], isDarkCover: Bool) -> (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor) {
         
         if isDarkCover {
-            // For dark covers, prefer truly saturated accent colors for primary
+            // For dark covers, prefer bright/saturated colors for primary
             let brightPeaks = sortedPeaks.filter { peak in
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                return (s > 0.55 && b > 0.35)
+                return b > 0.5 || s > 0.6  // Bright or saturated
             }
             
             let primary = brightPeaks.first?.color ?? sortedPeaks[safe: 0]?.color ?? UIColor.orange
@@ -606,6 +610,52 @@ public class OKLABColorExtractor {
         let bgS = min(max(s, 0.60), 0.85)
         let bgB = max(min(b * 0.22, 0.22), 0.10)
         return UIColor(hue: h, saturation: bgS, brightness: bgB, alpha: 1.0)
+    }
+    
+    // Detect if palette is monochromatic (all colors have similar hues)
+    nonisolated private func detectMonochromatic(roles: (primary: UIColor, secondary: UIColor, accent: UIColor, background: UIColor), 
+                                                  peaks: [(color: UIColor, count: Int, distinctiveness: Double)]) -> Bool {
+        // If we only found 2 or fewer distinct color peaks, likely monochromatic
+        if peaks.count <= 2 {
+            print("  📊 Monochromatic: Only \(peaks.count) distinct peaks found")
+            return true
+        }
+        
+        // Check if all non-background colors have similar hues
+        var hues: [CGFloat] = []
+        var saturations: [CGFloat] = []
+        
+        for color in [roles.primary, roles.secondary, roles.accent] {
+            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+            color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+            
+            // Only consider colors with some saturation (not gray/black/white)
+            if s > 0.1 {
+                hues.append(h)
+                saturations.append(s)
+            }
+        }
+        
+        // If we have no saturated colors, it's grayscale (monochromatic)
+        if hues.isEmpty {
+            print("  📊 Monochromatic: No saturated colors (grayscale)")
+            return true
+        }
+        
+        // Check if all hues are within 10% of each other (36 degrees)
+        if let minHue = hues.min(), let maxHue = hues.max() {
+            let hueDifference = maxHue - minHue
+            // Account for hue wrapping (red at 0° and 360°)
+            let effectiveDifference = min(hueDifference, 1.0 - hueDifference)
+            
+            if effectiveDifference < 0.1 {  // Within 36 degrees
+                print("  📊 Monochromatic: All hues within \(Int(effectiveDifference * 360))°")
+                return true
+            }
+        }
+        
+        print("  📊 Not monochromatic: Colors have varied hues")
+        return false
     }
     
     

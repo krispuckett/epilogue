@@ -776,7 +776,7 @@ struct AmbientSessionSummaryView: View {
                     }
                 } else {
                     // Use Perplexity if available
-                    let response = try await PerplexityService.staticChat(
+                    let response = try await OptimizedPerplexityService.shared.chat(
                         message: prompt,
                         bookContext: session.book
                     )

@@ -2395,7 +2395,7 @@ struct AmbientModeView: View {
                         // Show rate limit message with remaining questions
                         let formatter = DateFormatter()
                         formatter.timeStyle = .short
-                        let resetTimeStr = resetTime.map { formatter.string(from: $0) } ?? "midnight"
+                        let resetTimeStr = formatter.string(from: resetTime)
                         
                         errorContent = """
                         **\(text)**

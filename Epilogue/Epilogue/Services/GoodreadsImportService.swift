@@ -254,6 +254,9 @@ class GoodreadsImportService: ObservableObject {
     private var titleAuthorCache: [String: GoogleBookItem] = [:]
     private var existingBooksCache: Set<String> = []
 
+    // Progressive import callback: emits each processed batch
+    var onBatchProcessed: ((BatchResult, Int, Int) -> Void)? = nil
+
     // Cover selection stats for a run
     struct ImportCoverStats {
         var selectedGoogleColorful: Int = 0
@@ -448,6 +451,11 @@ class GoodreadsImportService: ObservableObject {
                 duplicates: combinedResult.duplicates + batchResult.duplicates,
                 failed: combinedResult.failed + batchResult.failed
             )
+
+            // Emit progressive update to UI
+            await MainActor.run {
+                self.onBatchProcessed?(batchResult, index + 1, totalBatches)
+            }
             
             processedCount += batch.count
             
@@ -490,22 +498,29 @@ class GoodreadsImportService: ObservableObject {
         var cacheHits = 0
         var apiCalls = 0
         
+        // Adaptive concurrency window to reduce heat/usage
+        let baseLimit = 6
+        let thermal = ProcessInfo.processInfo.thermalState
+        let limit: Int = (thermal == .serious || thermal == .critical) ? 3 : baseLimit
+        var iterator = batch.makeIterator()
+
         await withTaskGroup(of: (GoodreadsBook, Result<(ProcessedBook?, Bool), Error>).self) { group in
-            for book in batch {
-                group.addTask {
-                    // Small delay between concurrent API calls
-                    try? await Task.sleep(nanoseconds: UInt64(speed.apiRequestDelay * 1_000_000_000))
-                    
-                    do {
-                        let (result, fromCache) = try await self.matchBookWithCache(book)
-                        return (book, .success((result, fromCache)))
-                    } catch {
-                        return (book, .failure(error))
+            // Prime the group
+            for _ in 0..<min(limit, batch.count) {
+                if let b = iterator.next() {
+                    group.addTask {
+                        try? await Task.sleep(nanoseconds: UInt64(speed.apiRequestDelay * 1_000_000_000))
+                        do {
+                            let (result, fromCache) = try await self.matchBookWithCache(b)
+                            return (b, .success((result, fromCache)))
+                        } catch {
+                            return (b, .failure(error))
+                        }
                     }
                 }
             }
-            
-            for await (book, result) in group {
+
+            while let (book, result) = await group.next() {
                 switch result {
                 case .success(let (processedBook, fromCache)):
                     if fromCache {
@@ -551,6 +566,19 @@ class GoodreadsImportService: ObservableObject {
                         totalBatches: totalBatches
                     )
                 }
+
+                 // Feed next task to maintain window
+                 if let next = iterator.next() {
+                     group.addTask {
+                         try? await Task.sleep(nanoseconds: UInt64(speed.apiRequestDelay * 1_000_000_000))
+                         do {
+                             let (result, fromCache) = try await self.matchBookWithCache(next)
+                             return (next, .success((result, fromCache)))
+                         } catch {
+                             return (next, .failure(error))
+                         }
+                     }
+                 }
             }
         }
         
@@ -1002,6 +1030,11 @@ class GoodreadsImportService: ObservableObject {
         
         // Try ISBN match first (most reliable)
         if let isbn = goodreadsBook.primaryISBN {
+            // If the raw ISBN item is not English, skip straight to ranked English search
+            if let rawItem = await enhancedService.fetchRawByISBN(isbn),
+               let lang = rawItem.volumeInfo.language, lang.lowercased() != "en" {
+                // Bypass ISBN path for non-English editions
+            } else {
             if let cachedBook = isbnCache[isbn] {
                 let bookModel = await createBookModel(from: cachedBook, goodreadsBook: goodreadsBook)
                 return ProcessedBook(
@@ -1016,7 +1049,8 @@ class GoodreadsImportService: ObservableObject {
                 title: goodreadsBook.title,
                 author: goodreadsBook.author,
                 isbn: isbn,
-                publishedYear: String(goodreadsBook.yearPublished)
+                publishedYear: String(goodreadsBook.yearPublished),
+                preferredPublisher: goodreadsBook.publisher
             ) {
                 // Color gate: if initial pick is grayscale, try alternates via ranked search
                 let book: Book
@@ -1072,6 +1106,7 @@ class GoodreadsImportService: ObservableObject {
                     matchMethod: .isbn
                 )
             }
+            }
         }
         
         // Try title/author match as fallback
@@ -1089,7 +1124,7 @@ class GoodreadsImportService: ObservableObject {
         // Use enhanced service with better query parsing
         let searchQuery = "\(goodreadsBook.title) by \(goodreadsBook.author)"
         print("🔍 Searching Google Books for: \(searchQuery)")
-        let results = await enhancedService.searchBooksWithRanking(query: searchQuery)
+        let results = await enhancedService.searchBooksWithRanking(query: searchQuery, preferISBN: nil, publisherHint: goodreadsBook.publisher)
         print("   Found \(results.count) results")
         
         // Pick the first non-grayscale cover among top results
@@ -1321,8 +1356,15 @@ class GoodreadsImportService: ObservableObject {
             book.userRating = rating
         }
         
-        if !goodreadsBook.privateNotes.isEmpty {
-            book.userNotes = goodreadsBook.privateNotes
+        // Notes: prefer Private Notes, otherwise use My Review; if both exist, merge
+        let trimmedPrivate = goodreadsBook.privateNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedReview = goodreadsBook.myReview.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedPrivate.isEmpty && !trimmedReview.isEmpty {
+            book.userNotes = "\(trimmedPrivate)\n\nReview:\n\(trimmedReview)"
+        } else if !trimmedPrivate.isEmpty {
+            book.userNotes = trimmedPrivate
+        } else if !trimmedReview.isEmpty {
+            book.userNotes = trimmedReview
         }
         
         // Set reading status based on exclusive shelf

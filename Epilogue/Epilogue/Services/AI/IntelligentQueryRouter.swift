@@ -101,8 +101,7 @@ class IntelligentQueryRouter {
             logger.info("🌐 Using Perplexity for current events")
             
             do {
-                let service = PerplexityService()
-                let response = try await service.chat(with: query, bookContext: bookContext)
+                let response = try await OptimizedPerplexityService.shared.chat(message: query, bookContext: bookContext)
                 return response
             } catch {
                 logger.error("❌ Perplexity failed: \(error)")
@@ -135,8 +134,7 @@ class IntelligentQueryRouter {
     
     private func fetchWebResult(_ query: String, bookContext: Book?) async -> String? {
         do {
-            let service = PerplexityService()
-            return try await service.chat(with: query, bookContext: bookContext)
+            return try await OptimizedPerplexityService.shared.chat(message: query, bookContext: bookContext)
         } catch {
             logger.error("❌ Web fetch failed: \(error)")
             return nil

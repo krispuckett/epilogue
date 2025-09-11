@@ -145,12 +145,12 @@ class OfflineQueueManager: ObservableObject {
                 bookContext = try modelContext.fetch(descriptor).first
             }
             
-            // Process with Perplexity - we can't cast BookModel to Book directly
+            // Process with OptimizedPerplexityService - we can't cast BookModel to Book directly
             // For now, pass nil to avoid type conflicts
             // TODO: Figure out the proper Book type conversion
-            let response = try await PerplexityService.staticChat(
+            let response = try await OptimizedPerplexityService.shared.chat(
                 message: question.question ?? "",
-                bookContext: nil
+                bookContext: nil as Book?
             )
             
             // Mark as processed

@@ -350,8 +350,7 @@ class AIFoundationModelsManager: ObservableObject {
         logger.info("🔄 Falling back to Perplexity")
         
         do {
-            let service = PerplexityService()
-            return try await service.chat(with: query, bookContext: bookContext)
+            return try await OptimizedPerplexityService.shared.chat(message: query, bookContext: bookContext)
         } catch {
             logger.error("❌ Perplexity fallback failed: \(error)")
             return "I'm having trouble processing your question. Please try again."
@@ -360,8 +359,7 @@ class AIFoundationModelsManager: ObservableObject {
     
     private func fetchWebContext(_ query: String, bookContext: Book?) async -> String? {
         do {
-            let service = PerplexityService()
-            return try await service.chat(with: query, bookContext: bookContext)
+            return try await OptimizedPerplexityService.shared.chat(message: query, bookContext: bookContext)
         } catch {
             logger.error("❌ Web context fetch failed: \(error)")
             return nil
@@ -445,8 +443,7 @@ struct PerplexitySearchTool {
             throw ToolError.invalidParameters
         }
         
-        let service = PerplexityService()
-        return try await service.chat(with: query, bookContext: nil)
+        return try await OptimizedPerplexityService.shared.chat(message: query, bookContext: nil)
     }
     
     enum ToolError: Error {

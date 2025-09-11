@@ -145,11 +145,24 @@ class AICompanionService: ObservableObject {
             history: conversationHistory
         )
         
-        // For streaming, we'll use Perplexity directly for now
+        // For streaming, we'll use OptimizedPerplexityService
         // TODO: Implement streaming for SmartEpilogueAI
-        let service = PerplexityService()
         let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
-        return try await service.streamChat(message: contextualMessage, bookContext: bookContext, model: model)
+        
+        // Create an adapter stream that converts PerplexityResponse to String
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await response in OptimizedPerplexityService.shared.streamSonarResponse(contextualMessage, bookContext: bookContext) {
+                        // Extract text content from the response
+                        continuation.yield(response.text)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
     
     // MARK: - Configuration

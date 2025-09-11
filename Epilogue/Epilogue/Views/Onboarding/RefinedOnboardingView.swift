@@ -15,8 +15,8 @@ struct RefinedOnboardingView: View {
         OnboardingPageData(
             icon: "glass-book-open",
             title: "Welcome to Epilogue",
-            subtitle: "Your reading companion",
-            description: "A beautiful space to track your reading journey, capture thoughts, and discover insights from your books.",
+            subtitle: "YOUR AMBIENT READING COMPANION",
+            description: "Read naturally, capture everything. It's as easy as talking. Epilogue will take care of quotes, notes, and questions as you read.",
             gradientColors: [
                 DesignSystem.Colors.primaryAccent,  // Warm amber
                 Color(red: 1.0, green: 0.45, blue: 0.16)   // Deep orange
@@ -25,18 +25,18 @@ struct RefinedOnboardingView: View {
         OnboardingPageData(
             icon: "glass-msgs",  // Using glass-msgs for ambient mode (chat/voice)
             title: "Ambient Mode",
-            subtitle: "Listen while you read",
-            description: "Place your phone nearby and Epilogue listens for your thoughts and questions. No interruption to your reading flow.",
+            subtitle: "Get lost in your book, not your phone.",
+            description: "Hit the waveform button and start talking. Epilogue listens while you read - no interaction needed.",
             gradientColors: [
                 Color(red: 0.2, green: 0.6, blue: 0.9),  // Ocean blue
                 Color(red: 0.3, green: 0.7, blue: 1.0)   // Sky blue
             ]
         ),
         OnboardingPageData(
-            icon: "simple-book",  // Using simple-book for library
-            title: "Smart Library",
-            subtitle: "Organize beautifully",
-            description: "Add books by scanning covers or searching. Your library adapts its colors to each book's cover art.",
+            icon: "glass-book-open",  // Library
+            title: "Library",
+            subtitle: "CURATE YOUR PERSONAL COLLECTION",
+            description: "Add books by searching, scanning covers, or importing lists. Customize covers however you want.",
             gradientColors: [
                 Color(red: 0.6, green: 0.3, blue: 0.9),  // Royal purple
                 Color(red: 0.8, green: 0.4, blue: 1.0)   // Lavender
@@ -44,9 +44,9 @@ struct RefinedOnboardingView: View {
         ),
         OnboardingPageData(
             icon: "glass-feather",
-            title: "Living Notes",
-            subtitle: "Never lose a thought",
-            description: "Every quote, question, and insight is automatically organized. Rediscover your thoughts exactly when you need them.",
+            title: "NOTES",
+            subtitle: "Never lose a thought or quote",
+            description: "Every quote, thought, question, and insight is automatically organized and saved during Ambient Mode sessions. Intelligently connected, on-device, private by design.",
             gradientColors: [
                 Color(red: 0.2, green: 0.8, blue: 0.4),  // Emerald green
                 Color(red: 0.3, green: 0.9, blue: 0.5)   // Spring green

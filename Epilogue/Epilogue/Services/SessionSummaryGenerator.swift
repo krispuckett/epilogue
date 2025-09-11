@@ -11,7 +11,7 @@ final class SessionSummaryGenerator: ObservableObject {
     @Published var isGenerating: Bool = false  // Required for ObservableObject conformance
     
     private let logger = Logger(subsystem: "com.epilogue", category: "SessionSummary")
-    private let perplexityService = PerplexityService.shared
+    private let perplexityService = OptimizedPerplexityService.shared
     
     private init() {}
     
@@ -57,9 +57,8 @@ final class SessionSummaryGenerator: ObservableObject {
             """
             
             let title = try await perplexityService.chat(
-                with: prompt,
-                bookContext: book,
-                model: "sonar"
+                message: prompt,
+                bookContext: book
             )
             
             // Clean and validate the title
