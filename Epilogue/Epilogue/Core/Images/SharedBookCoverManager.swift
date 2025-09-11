@@ -109,8 +109,8 @@ public class SharedBookCoverManager: ObservableObject {
         }
         
         // Load from network with appropriate zoom for thumbnails
-        // Use zoom=3 for vibrant yet reliable thumbnails (matches previous good state)
-        let thumbnailURL = appendZoomParameter(to: cleanedURL, zoom: 3)
+        // Use a conservative zoom to avoid Google placeholder/gray returns
+        let thumbnailURL = appendZoomParameter(to: cleanedURL, zoom: 2)
         return await loadAndCacheImage(
             from: thumbnailURL,
             cacheKey: cacheKey as String,
@@ -124,8 +124,8 @@ public class SharedBookCoverManager: ObservableObject {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
         let cleanedURL = cleanURL(coverURL)
-        // Use zoom=3 consistently to match the known-good look
-        let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 3)
+        // Use a conservative zoom to avoid placeholder responses
+        let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 4)
         let cacheKey = "\(cleanedURL)_full" as NSString
         
         // print("📱 Loading full image from: \(highQualityURL.suffix(100))")

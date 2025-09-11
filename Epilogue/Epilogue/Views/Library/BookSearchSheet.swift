@@ -7,10 +7,8 @@ struct BookSearchSheet: View {
     let searchQuery: String
     let onBookSelected: (Book) -> Void
     var mode: Mode = .add
-    var publisherHint: String? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var booksService = GoogleBooksService()
-    private let enhancedService = EnhancedGoogleBooksService()
     @State private var searchResults: [Book] = []
     @State private var isLoading = true
     @State private var searchError: String?
@@ -106,7 +104,7 @@ struct BookSearchSheet: View {
                 // Text input
                 ZStack(alignment: .leading) {
                     if refinedSearchQuery.isEmpty {
-                        Text("Search for your books")
+                        Text("Search for books...")
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                             .font(.system(size: 16))
                             .lineLimit(1)
@@ -225,12 +223,6 @@ struct BookSearchSheet: View {
             Spacer()
             
             VStack(spacing: 24) {
-                if searchQuery.isEmpty && refinedSearchQuery.isEmpty {
-                    Text("Search for your books")
-                        .font(.system(size: 28, weight: .semibold, design: .default))
-                        .foregroundStyle(.white)
-                        .transition(.opacity)
-                }
                 // Only show "no results" if they actually searched for something
                 if !searchQuery.isEmpty {
                     VStack(spacing: 12) {
@@ -314,31 +306,33 @@ struct BookSearchSheet: View {
     
     @MainActor
     private func search(query: String) async {
-        print("🔍 Starting search for: '\(query)' (publisher hint: \(publisherHint ?? "nil"))")
+        print("🔍 Starting search for: '\(query)'")
         isLoading = true
         searchError = nil
-
-        // Use enhanced ranking with optional publisher hint
-        let ranked = await enhancedService.searchBooksWithRanking(
-            query: query,
-            preferISBN: nil,
-            publisherHint: publisherHint
-        )
-        searchResults = ranked
+        
+        // Call searchBooks which updates the service's searchResults property
+        await booksService.searchBooks(query: query)
+        
+        // Get the results from the service
+        searchResults = booksService.searchResults
         print("📖 Found \(searchResults.count) results for: '\(query)'")
-
-        // Simple fallback using spell correction with enhanced search
-        if searchResults.isEmpty, let correctedQuery = spellCorrect(query), correctedQuery != query {
-            print("🔤 Trying spell correction: '\(correctedQuery)'")
-            let ranked2 = await enhancedService.searchBooksWithRanking(
-                query: correctedQuery,
-                preferISBN: nil,
-                publisherHint: publisherHint
-            )
-            searchResults = ranked2
-            print("📖 Found \(searchResults.count) results after correction")
+        
+        if searchResults.isEmpty {
+            // Try spell correction
+            if let correctedQuery = spellCorrect(query), correctedQuery != query {
+                print("🔤 Trying spell correction: '\(correctedQuery)'")
+                await booksService.searchBooks(query: correctedQuery)
+                searchResults = booksService.searchResults
+                print("📖 Found \(searchResults.count) results after correction")
+            }
         }
-
+        
+        // Check for errors
+        if let error = booksService.errorMessage {
+            searchError = error
+            print("❌ Search error: \(error)")
+        }
+        
         isLoading = false
     }
     

@@ -93,7 +93,7 @@ struct UnifiedSearchView: View {
                 }
             }
             .navigationTitle("Search")
-            .searchable(text: $searchText, prompt: "Search quotes and notes")
+            .searchable(text: $searchText, prompt: "Search quotes and notes...")
             .searchScopes($searchScope) {
                 ForEach(SearchScope.allCases, id: \.self) { scope in
                     Text(scope.rawValue).tag(scope)

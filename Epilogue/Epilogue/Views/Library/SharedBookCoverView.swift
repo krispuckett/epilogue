@@ -170,31 +170,18 @@ struct SharedBookCoverView: View {
         }
         
         // Check SharedBookCoverManager's cache
-        if loadFullImage {
-            // Only accept HIGH-QUALITY cached image when a full image is requested
-            if let cachedFull = SharedBookCoverManager.shared.getCachedImage(for: urlString, quality: .high) {
-                if LOG_COVER_DEBUG { print("📚 Using HIGH-QUALITY cached image from manager for: \(cleanedURL)") }
-                self.fullImage = cachedFull
-                // Store in quick cache for next time
-                Self.quickImageCache.setObject(cachedFull, forKey: cacheKey)
-                self.isLoading = false
-                self.currentLoadingURL = nil
-                self.onImageLoaded?(cachedFull)
-                return
-            } else if let cachedThumb = SharedBookCoverManager.shared.getCachedImage(for: urlString, quality: .low) {
-                // Show thumbnail for continuity but DO NOT trigger color extraction yet
-                if LOG_COVER_DEBUG { print("📚 Found THUMBNAIL in manager cache; will still fetch full image") }
-                self.thumbnailImage = cachedThumb
-                // Continue to load full image below
+        if let cachedImage = SharedBookCoverManager.shared.getCachedImage(for: urlString) {
+            if LOG_COVER_DEBUG { print("📚 Found image in SharedBookCoverManager cache for: \(cleanedURL)") }
+            if loadFullImage {
+                self.fullImage = cachedImage
+            } else {
+                self.thumbnailImage = cachedImage
             }
-        } else if let cachedAny = SharedBookCoverManager.shared.getCachedImage(for: urlString) {
-            if LOG_COVER_DEBUG { print("📚 Using cached image from manager for thumbnail: \(cleanedURL)") }
-            self.thumbnailImage = cachedAny
             // Store in quick cache for next time
-            Self.quickImageCache.setObject(cachedAny, forKey: cacheKey)
+            Self.quickImageCache.setObject(cachedImage, forKey: cacheKey)
             self.isLoading = false
             self.currentLoadingURL = nil
-            self.onImageLoaded?(cachedAny)
+            self.onImageLoaded?(cachedImage)
             return
         }
         

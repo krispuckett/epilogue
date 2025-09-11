@@ -303,15 +303,8 @@ public class iOS26FoundationModels {
                 "history": history.joined(separator: " [SEP] ")
             ])
         } catch {
-            // Return empty provider on error - this should be safe
-            do {
-                return try MLDictionaryFeatureProvider(dictionary: [:])
-            } catch {
-                // Log error and return nil or handle differently based on your needs
-                os_log("Failed to create MLDictionaryFeatureProvider: %@", log: .default, type: .error, error.localizedDescription)
-                // Create a minimal valid provider as fallback
-                return MLDictionaryFeatureProvider()
-            }
+            // Return empty provider on error
+            return try! MLDictionaryFeatureProvider(dictionary: [:])
         }
     }
     

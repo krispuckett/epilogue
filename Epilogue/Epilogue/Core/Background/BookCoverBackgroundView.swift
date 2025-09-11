@@ -3,19 +3,27 @@ import SwiftUI
 struct BookCoverBackgroundView: View {
     let colorPalette: ColorPalette
     
-    // Re-enable minimal processing for vibrancy/mono safety
-    private var processedPalette: ColorPalette { processColors(colorPalette) }
+    // Process colors for monochromatic safety
+    private var processedPalette: ColorPalette {
+        processColors(colorPalette)
+    }
     
-    private var enhancedPrimary: Color { enhanceColor(processedPalette.primary) }
+    private var enhancedPrimary: Color {
+        enhanceColor(processedPalette.primary)
+    }
     
-    private var enhancedSecondary: Color { enhanceColor(processedPalette.secondary) }
+    private var enhancedSecondary: Color {
+        enhanceColor(processedPalette.secondary)
+    }
     
-    private var enhancedAccent: Color { enhanceColor(processedPalette.accent) }
+    private var enhancedAccent: Color {
+        enhanceColor(processedPalette.accent)
+    }
     
     var body: some View {
         ZStack {
-            // Slightly translucent base to let colors breathe more
-            Color.black.opacity(0.95)
+            // Pure black base layer
+            Color.black
                 .ignoresSafeArea()
             
             // More visible gradient with stronger colors
@@ -25,15 +33,15 @@ struct BookCoverBackgroundView: View {
                     .init(color: enhancedPrimary.opacity(0.9), location: 0.08),    // Was 0.85
                     .init(color: enhancedSecondary.opacity(0.8), location: 0.15),   // Was 0.7
                     .init(color: enhancedAccent.opacity(0.6), location: 0.25),      // Was 0.5
-                    .init(color: processedPalette.background.opacity(0.4), location: 0.52), // color carries further
-                    .init(color: Color.black.opacity(0.28), location: 0.78),        // begin fade much later, lighter
-                    .init(color: Color.black.opacity(0.82), location: 0.92)         // final deep fade near bottom
+                    .init(color: processedPalette.background.opacity(0.4), location: 0.35), // Was 0.3
+                    .init(color: Color.black.opacity(0.6), location: 0.45),         // Was 0.5
+                    .init(color: Color.black, location: 0.55)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            .blur(radius: 28) // reduce blur to increase perceived saturation
+            .blur(radius: 40) // EXACTLY 40
             
             // Extra radial glow at top
             VStack {
@@ -58,12 +66,35 @@ struct BookCoverBackgroundView: View {
             .ignoresSafeArea()
             
             // Subtle noise texture overlay
-            // Keep subtle overlay commented out to preserve vibrancy (can re-enable if needed)
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.05) // EXACTLY 0.03
+                .ignoresSafeArea()
+                .blendMode(.plusLighter)
         }
     }
     
-    // No enhancement; preserve incoming color palette
-    private func enhanceColor(_ color: Color) -> Color { color }
+    // MORE aggressive enhancement for vibrant colors
+    private func enhanceColor(_ color: Color) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // MORE aggressive enhancement
+        saturation = min(saturation * 2.0, 1.0)  // Was 1.6, now 2.0
+        brightness = max(brightness, 0.7)         // Was 0.6, now 0.7
+        
+        // Extra boost for very dark colors
+        if brightness < 0.3 {
+            brightness = brightness + 0.4
+        }
+        
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
+    }
     
     // Simple monochromatic safety check
     private func processColors(_ palette: ColorPalette) -> ColorPalette {

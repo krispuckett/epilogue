@@ -1,9 +1,8 @@
 import SwiftUI
 import SwiftData
 
-// DISABLED: This is the old app entry point. Using Epilogue/Epilogue/EpilogueApp.swift instead
-// @main
-struct EpilogueApp_OLD: App {
+@main
+struct EpilogueApp: App {
     let modelContainer: ModelContainer
     
     init() {

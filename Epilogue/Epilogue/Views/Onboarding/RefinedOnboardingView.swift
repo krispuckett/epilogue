@@ -15,8 +15,8 @@ struct RefinedOnboardingView: View {
         OnboardingPageData(
             icon: "glass-book-open",
             title: "Welcome to Epilogue",
-            subtitle: "YOUR AMBIENT READING COMPANION",
-            description: "Read naturally, capture everything. It's as easy as talking. Epilogue will take care of quotes, notes, and questions as you read.",
+            subtitle: "Your reading companion",
+            description: "A beautiful space to track your reading journey, capture thoughts, and discover insights from your books.",
             gradientColors: [
                 DesignSystem.Colors.primaryAccent,  // Warm amber
                 Color(red: 1.0, green: 0.45, blue: 0.16)   // Deep orange
@@ -25,18 +25,18 @@ struct RefinedOnboardingView: View {
         OnboardingPageData(
             icon: "glass-msgs",  // Using glass-msgs for ambient mode (chat/voice)
             title: "Ambient Mode",
-            subtitle: "Get lost in your book, not your phone.",
-            description: "Hit the waveform button and start talking. Epilogue listens while you read - no interaction needed.",
+            subtitle: "Listen while you read",
+            description: "Place your phone nearby and Epilogue listens for your thoughts and questions. No interruption to your reading flow.",
             gradientColors: [
                 Color(red: 0.2, green: 0.6, blue: 0.9),  // Ocean blue
                 Color(red: 0.3, green: 0.7, blue: 1.0)   // Sky blue
             ]
         ),
         OnboardingPageData(
-            icon: "glass-book-open",  // Library
-            title: "Library",
-            subtitle: "CURATE YOUR PERSONAL COLLECTION",
-            description: "Add books by searching, scanning covers, or importing lists. Customize covers however you want.",
+            icon: "simple-book",  // Using simple-book for library
+            title: "Smart Library",
+            subtitle: "Organize beautifully",
+            description: "Add books by scanning covers or searching. Your library adapts its colors to each book's cover art.",
             gradientColors: [
                 Color(red: 0.6, green: 0.3, blue: 0.9),  // Royal purple
                 Color(red: 0.8, green: 0.4, blue: 1.0)   // Lavender
@@ -44,9 +44,9 @@ struct RefinedOnboardingView: View {
         ),
         OnboardingPageData(
             icon: "glass-feather",
-            title: "NOTES",
-            subtitle: "Never lose a thought or quote",
-            description: "Every quote, thought, question, and insight is automatically organized and saved during Ambient Mode sessions. Intelligently connected, on-device, private by design.",
+            title: "Living Notes",
+            subtitle: "Never lose a thought",
+            description: "Every quote, question, and insight is automatically organized. Rediscover your thoughts exactly when you need them.",
             gradientColors: [
                 Color(red: 0.2, green: 0.8, blue: 0.4),  // Emerald green
                 Color(red: 0.3, green: 0.9, blue: 0.5)   // Spring green
@@ -237,50 +237,44 @@ struct OnboardingPageContent: View {
             Spacer()
             
             // CENTERED CONTENT
-            VStack(spacing: 28) {
-                // Icon — slightly smaller for better hierarchy
+            VStack(spacing: 40) {
+                // Much larger icon without circle background
                 Image(page.icon)
                     .renderingMode(.template)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 120, height: 120)
+                    .frame(width: 150, height: 150)  // Even larger
                     .foregroundStyle(.white)
                     .opacity(iconOpacity)
-
-                // Type stack
-                VStack(spacing: 14) {
-                    let subtitleText = page.title == "Ambient Mode" ?
-                        page.subtitle.replacingOccurrences(of: "not your phone", with: "not\u{00A0}your\u{00A0}phone") :
-                        page.subtitle
-                    // Title
+                
+                // Typography matching note cards
+                VStack(spacing: 20) {
+                    // Title - clean sans-serif like note cards
                     Text(page.title)
-                        .font(.system(size: 34, weight: .semibold, design: .default))
-                        .kerning(-0.2)
+                        .font(.system(size: 38, weight: .regular, design: .default))
                         .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
                         .offset(y: textOffset)
-
-                    // Eyebrow / Sub-head (uppercase with generous tracking)
-                    Text(subtitleText.uppercased())
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .tracking(2.6)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .multilineTextAlignment(.center)
+                    
+                    // Subtitle - monospaced like metadata on note cards
+                    Text(page.subtitle.uppercased())
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .tracking(2)
                         .offset(y: textOffset)
-
-                    // Body copy — calm leading and optimal measure
+                    
+                    // Description - clean sans-serif
                     Text(page.description)
-                        .font(.system(size: 16, weight: .regular, design: .default))
+                        .font(.system(size: 17, weight: .regular, design: .default))
                         .foregroundStyle(.white.opacity(0.85))
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(7)
-                        .frame(maxWidth: min(geometry.size.width * 0.85, 360), alignment: .leading)
-                        .padding(.top, 6)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(8)
+                        .frame(maxWidth: min(geometry.size.width * 0.85, 380))
+                        .padding(.top, 8)
                         .offset(y: textOffset)
                 }
             }
-            .padding(.horizontal, 28)
-
+            .padding(.horizontal, 30)
+            
             Spacer()
             Spacer() // Extra spacer to center content vertically
         }

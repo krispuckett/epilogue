@@ -78,7 +78,6 @@ struct OptimizedLibraryGrid: View {
                             insertion: .opacity.combined(with: .scale(scale: 0.95)),
                             removal: .opacity
                         ))
-                        .materialize(order: index)
                     }
                 }
                 .padding(.horizontal)

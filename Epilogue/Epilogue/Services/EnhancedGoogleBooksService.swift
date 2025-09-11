@@ -115,7 +115,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     }
     
     // Override the search to add smart filtering and ranking
-    func searchBooksWithRanking(query: String, preferISBN: String? = nil, publisherHint: String? = nil) async -> [Book] {
+    func searchBooksWithRanking(query: String, preferISBN: String? = nil) async -> [Book] {
         // Parse the query to extract title, author, etc.
         let parsedQuery = ParsedQuery(from: query)
         
@@ -162,8 +162,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             uniqueResults,
             originalQuery: query,
             preferredISBN: preferISBN,
-            parsedQuery: parsedQuery,
-            publisherHint: publisherHint
+            parsedQuery: parsedQuery
         )
         
         // Return top results, prioritizing books with covers
@@ -260,27 +259,15 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             return nil
         }
     }
-
-    // Fetch a single raw GoogleBookItem by ISBN (used for language checks)
-    func fetchRawByISBN(_ isbn: String) async -> GoogleBookItem? {
-        let query = "isbn:\(isbn)"
-        if let items = await performRawSearch(query: query, maxResults: 1) {
-            return items.first
-        }
-        return nil
-    }
     
     private func rankBooks(
         _ items: [GoogleBookItem],
         originalQuery: String,
         preferredISBN: String?,
-        parsedQuery: ParsedQuery? = nil,
-        publisherHint: String? = nil
+        parsedQuery: ParsedQuery? = nil
     ) -> [ScoredBook] {
         let queryWords = originalQuery.lowercased().split(separator: " ")
-        let originalLower = originalQuery.lowercased()
-        let isLOTRUmbrella = originalLower.contains("lord of the rings")
-
+        
         return items.compactMap { item in
             var score = 0.0
             let volumeInfo = item.volumeInfo
@@ -431,12 +418,6 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 if majorPublishers.contains(where: { publisher.contains($0) }) {
                     score += 15
                 }
-                // Publisher hint from CSV (Goodreads). Light boost on substring match
-                if let hint = publisherHint?.lowercased(), !hint.isEmpty {
-                    if publisher.contains(hint) || hint.contains(publisher) {
-                        score += 12
-                    }
-                }
             }
             
             // Penalize if title contains unwanted terms
@@ -464,19 +445,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 let boost = min(40.0, log10(Double(max(cnt, 1))) * 20.0)
                 score += boost
             }
-
-            // Heuristic: For LOTR umbrella queries, demote per-volume titles
-            if isLOTRUmbrella {
-                let t = volumeInfo.title.lowercased()
-                let perVolumeKeywords = [
-                    "fellowship of the ring", "two towers", "return of the king",
-                    "book 1", "book one", "book i", "#1", "part 1", "volume 1", "vol 1"
-                ]
-                if perVolumeKeywords.contains(where: { t.contains($0) }) {
-                    score -= 40 // prefer omnibus/canonical LOTR title
-                }
-            }
-
+            
             return ScoredBook(
                 book: book,
                 googleItem: item,
@@ -494,8 +463,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         title: String,
         author: String,
         isbn: String? = nil,
-        publishedYear: String? = nil,
-        preferredPublisher: String? = nil
+        publishedYear: String? = nil
     ) async -> Book? {
         // Try ISBN first if available
         if let isbn = isbn, !isbn.isEmpty {
@@ -513,16 +481,14 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         // Strategy 1: Title and author
         candidates.append(contentsOf: await searchBooksWithRanking(
             query: "intitle:\"\(title)\" inauthor:\"\(author)\"",
-            preferISBN: isbn,
-            publisherHint: preferredPublisher
+            preferISBN: isbn
         ))
         
         // Strategy 2: Just title (sometimes author names don't match)
         if candidates.isEmpty {
             candidates.append(contentsOf: await searchBooksWithRanking(
                 query: title,
-                preferISBN: isbn,
-                publisherHint: preferredPublisher
+                preferISBN: isbn
             ))
         }
         
@@ -530,8 +496,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         if candidates.isEmpty && publishedYear != nil {
             candidates.append(contentsOf: await searchBooksWithRanking(
                 query: "\(title) \(publishedYear!)",
-                preferISBN: isbn,
-                publisherHint: preferredPublisher
+                preferISBN: isbn
             ))
         }
         

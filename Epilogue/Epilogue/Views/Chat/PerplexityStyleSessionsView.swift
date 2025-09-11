@@ -20,7 +20,7 @@ struct PerplexityStyleSessionsView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
                 
-                TextField("Search sessions", text: $searchText)
+                TextField("Search sessions...", text: $searchText)
                     .font(.system(size: 15))
                     .foregroundStyle(.white)
                     .textFieldStyle(.plain)

@@ -23,7 +23,6 @@ struct GoodreadsImportView: View {
     @State private var showingSuccessToast = false
     @State private var successMessage = ""
     @State private var overwriteDuplicates = false
-    @StateObject private var appState = AppStateManager.shared
     
     init(modelContext: ModelContext, googleBooksService: GoogleBooksService, libraryViewModel: LibraryViewModel? = nil) {
         self.libraryViewModel = libraryViewModel
@@ -56,11 +55,8 @@ struct GoodreadsImportView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Ambient gradient background + subtle dark overlay for legibility
-                AmbientChatGradientView()
-                    .opacity(0.6)
-                    .ignoresSafeArea()
-                Color.black.opacity(0.2)
+                // Settings-style background
+                Color(red: 0.11, green: 0.11, blue: 0.118)
                     .ignoresSafeArea()
                 
                 // Main content based on state
@@ -74,9 +70,12 @@ struct GoodreadsImportView: View {
                         resultsView
                     }
                 }
-                .transition(.opacity)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
             }
-            .navigationTitle("")
+            .navigationTitle("Import from Goodreads")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -270,19 +269,16 @@ struct GoodreadsImportView: View {
                 }
                 .padding(.top, 8)
                 
-                // Fused instruction card: previous style + current content (liquid glass)
-                VStack(alignment: .leading, spacing: 16) {
-                    // Header chip
-                    HStack(spacing: 8) {
-                        Image(systemName: "text.book.closed")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.orange)
-                        Text("Goodreads Export Instructions")
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.8))
+                // Streamlined instructions
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("EXPORT STEPS")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .kerning(1.5)
                         Spacer()
                     }
-
+                    
                     VStack(spacing: 0) {
                         InstructionStep(number: 1, text: "Visit goodreads.com on desktop", isFirst: true)
                         InstructionStep(number: 2, text: "Go to My Books")
@@ -290,21 +286,29 @@ struct GoodreadsImportView: View {
                         InstructionStep(number: 4, text: "Click Export Library")
                         InstructionStep(number: 5, text: "Download CSV file", isLast: true)
                     }
-
+                    
+                    // Desktop requirement note
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 12))
                             .foregroundColor(.orange)
+                        
                         Text("Export is only available on desktop. On Safari mobile, tap 'aA' → Request Desktop Website")
                             .font(.system(size: 12))
                             .foregroundStyle(.white.opacity(0.7))
                             .multilineTextAlignment(.leading)
                     }
+                    .padding(.top, 12)
+                    .padding(.horizontal, 4)
                 }
                 .padding(20)
-                .glassEffect(
-                    .regular.tint(Color.white.opacity(0.08)),
-                    in: .rect(cornerRadius: 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.white.opacity(0.1), lineWidth: 1)
+                        )
                 )
                 .padding(.horizontal)
                 
@@ -402,67 +406,41 @@ struct GoodreadsImportView: View {
     // MARK: - Progress View
     
     private var progressView: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                let pct = importService.currentProgress?.percentComplete ?? 0
-                // Circular progress
-                ZStack {
-                    // Ambient glow that grows with progress (stronger)
-                    // Outer soft aura
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [Color.orange.opacity(0.45), Color.orange.opacity(0.0)],
-                                center: .center,
-                                startRadius: 8,
-                                endRadius: 220
-                            )
-                        )
-                        .frame(width: 280, height: 280)
-                        .blur(radius: 34)
-                        .opacity(min(0.35 + pct * 0.65, 0.85))
-                    // Inner core glow for definition
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [Color.orange.opacity(0.55), Color.orange.opacity(0.0)],
-                                center: .center,
-                                startRadius: 4,
-                                endRadius: 120
-                            )
-                        )
-                        .frame(width: 220, height: 220)
-                        .blur(radius: 20)
-                        .opacity(min(0.25 + pct * 0.5, 0.7))
-                    Circle()
-                        .stroke(Color.white.opacity(0.1), lineWidth: 8)
-                        .frame(width: 200, height: 200)
+        VStack(spacing: 32) {
+            Spacer()
+            
+            // Circular progress
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 8)
+                    .frame(width: 200, height: 200)
+                
+                Circle()
+                    .trim(from: 0, to: importService.currentProgress?.percentComplete ?? 0)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.orange, .orange.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(width: 200, height: 200)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut, value: importService.currentProgress?.percentComplete)
+                
+                VStack(spacing: 8) {
+                    Text("\(Int((importService.currentProgress?.percentComplete ?? 0) * 100))%")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(.white)
                     
-                    Circle()
-                        .trim(from: 0, to: importService.currentProgress?.percentComplete ?? 0)
-                        .stroke(
-                            LinearGradient(
-                                colors: [.orange, .orange.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                        )
-                        .frame(width: 200, height: 200)
-                        .rotationEffect(.degrees(-90))
-                    
-                    VStack(spacing: 8) {
-                        Text("\(Int((importService.currentProgress?.percentComplete ?? 0) * 100))%")
-                            .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        if let progress = importService.currentProgress {
-                            Text("\(progress.current) of \(progress.total)")
-                                .font(.subheadline)
-                                .foregroundColor(DesignSystem.Colors.textSecondary)
-                        }
+                    if let progress = importService.currentProgress {
+                        Text("\(progress.current) of \(progress.total)")
+                            .font(.subheadline)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
                     }
                 }
+            }
             
             // Current book
             if let currentBook = importService.currentProgress?.currentBook {
@@ -475,12 +453,12 @@ struct GoodreadsImportView: View {
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.95)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 300)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                .padding(.vertical, 16)
+                .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
             }
             
             // Stats grid
@@ -557,7 +535,7 @@ struct GoodreadsImportView: View {
                         }
                         .foregroundColor(.white)
                         .frame(width: 120, height: 44)
-                        .glassEffect(.regular.tint(Color.orange.opacity(0.35)), in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
+                        .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     }
                     
                     Button {
@@ -567,18 +545,18 @@ struct GoodreadsImportView: View {
                         Text("Cancel")
                             .foregroundColor(.red)
                             .frame(width: 120, height: 44)
-                            .glassEffect(.regular.tint(Color.red.opacity(0.35)), in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
+                            .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     }
                 }
             }
             
             // Background processing note
-            Text("You can close this screen — import continues in background")
+            Text("You can close this screen - import continues in background")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
-                .padding(.bottom, 24)
-        }
+            
+            Spacer()
         }
     }
     
@@ -673,7 +651,7 @@ struct GoodreadsImportView: View {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                         
-                        TextField("Search books", text: $searchText)
+                        TextField("Search books...", text: $searchText)
                             .foregroundColor(.white)
                             .autocorrectionDisabled()
                     }
@@ -753,40 +731,10 @@ struct GoodreadsImportView: View {
                     withAnimation {
                         self.importState = .progress
                     }
-                    appState.isImportingLibrary = true
                 }
                 
                 print("📊 Import state after transition: \(importState)")
                 print("🎯 Calling importService.importCSV...")
-                var progressiveAdded = 0
-                // Progressive batch hook: add books to library as we go
-                importService.onBatchProcessed = { batch, batchIndex, totalBatches in
-                    print("📦 Progressive batch \(batchIndex)/\(totalBatches): adding \(batch.successful.count) to library")
-                    if let libraryVM = self.libraryViewModel {
-                        for processed in batch.successful {
-                            var book = Book(
-                                id: processed.bookModel.id,
-                                title: processed.bookModel.title,
-                                author: processed.bookModel.author,
-                                publishedYear: processed.bookModel.publishedYear,
-                                coverImageURL: processed.bookModel.coverImageURL,
-                                isbn: processed.bookModel.isbn,
-                                description: processed.bookModel.desc,
-                                pageCount: processed.bookModel.pageCount,
-                                localId: UUID(uuidString: processed.bookModel.localId) ?? UUID()
-                            )
-                            book.isInLibrary = true
-                            book.userRating = processed.bookModel.userRating
-                            book.userNotes = processed.bookModel.userNotes
-                            book.dateAdded = processed.bookModel.dateAdded
-                            if let status = ReadingStatus(rawValue: processed.bookModel.readingStatus) {
-                                book.readingStatus = status
-                            }
-                            libraryVM.addBook(book, overwriteIfExists: self.overwriteDuplicates)
-                            progressiveAdded += 1
-                        }
-                    }
-                }
                 
                 let result = try await importService.importCSV(from: url, speed: selectedSpeed)
                 
@@ -797,42 +745,61 @@ struct GoodreadsImportView: View {
                     withAnimation {
                         self.importState = .results
                     }
-                    appState.isImportingLibrary = false
                     
-                    // Show success toast; if progressive added, skip re-adding to avoid duplicates
+                    // Show success toast AND actually add books to the library
                     if result.successful.count > 0 {
                         print("📚 Adding \(result.successful.count) books to library")
-                        if progressiveAdded == 0 {
-                            // Add each successfully imported book to the LibraryViewModel
-                            for (index, processedBook) in result.successful.enumerated() {
-                                var book = Book(
-                                    id: processedBook.bookModel.id,
-                                    title: processedBook.bookModel.title,
-                                    author: processedBook.bookModel.author,
-                                    publishedYear: processedBook.bookModel.publishedYear,
-                                    coverImageURL: processedBook.bookModel.coverImageURL,
-                                    isbn: processedBook.bookModel.isbn,
-                                    description: processedBook.bookModel.desc,
-                                    pageCount: processedBook.bookModel.pageCount,
-                                    localId: UUID(uuidString: processedBook.bookModel.localId) ?? UUID()
-                                )
-                                book.isInLibrary = true
-                                book.userRating = processedBook.bookModel.userRating
-                                book.userNotes = processedBook.bookModel.userNotes
-                                book.dateAdded = processedBook.bookModel.dateAdded
-                                if let status = ReadingStatus(rawValue: processedBook.bookModel.readingStatus) {
-                                    book.readingStatus = status
-                                }
-                                if let libraryVM = self.libraryViewModel {
-                                    libraryVM.addBook(book, overwriteIfExists: self.overwriteDuplicates)
-                                    print("  ✅ \(self.overwriteDuplicates ? "Updated" : "Added") book \(index + 1)/\(result.successful.count): \(book.title)")
-                                }
+                        
+                        // Add each successfully imported book to the LibraryViewModel
+                        for (index, processedBook) in result.successful.enumerated() {
+                            print("🔄 Converting BookModel to Book for: \(processedBook.bookModel.title)")
+                            print("   BookModel.id: \(processedBook.bookModel.id)")
+                            print("   BookModel.coverImageURL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                            
+                            var book = Book(
+                                id: processedBook.bookModel.id,
+                                title: processedBook.bookModel.title,
+                                author: processedBook.bookModel.author,
+                                publishedYear: processedBook.bookModel.publishedYear,
+                                coverImageURL: processedBook.bookModel.coverImageURL,
+                                isbn: processedBook.bookModel.isbn,
+                                description: processedBook.bookModel.desc,
+                                pageCount: processedBook.bookModel.pageCount,
+                                localId: UUID(uuidString: processedBook.bookModel.localId) ?? UUID()
+                            )
+                            
+                            print("   Resulting Book.id: \(book.id)")
+                            print("   Resulting Book.coverImageURL: \(book.coverImageURL ?? "nil")")
+                            
+                            // Set additional properties from the imported book
+                            book.isInLibrary = true
+                            book.userRating = processedBook.bookModel.userRating
+                            book.userNotes = processedBook.bookModel.userNotes
+                            book.dateAdded = processedBook.bookModel.dateAdded
+                            
+                            // Set reading status
+                            if let status = ReadingStatus(rawValue: processedBook.bookModel.readingStatus) {
+                                book.readingStatus = status
                             }
+                            
+                            print("    📚 Import data for \(book.title):")
+                            print("       Rating: \(book.userRating ?? 0) stars")
+                            print("       Status: \(book.readingStatus.rawValue)")
+                            print("       Notes: \(book.userNotes?.prefix(50) ?? "None")")
+                            print("       Added: \(book.dateAdded)")
+                            
+                            // Add to library through the view model
                             if let libraryVM = self.libraryViewModel {
-                                print("📊 Library now contains \(libraryVM.books.count) total books")
+                                libraryVM.addBook(book, overwriteIfExists: self.overwriteDuplicates)
+                                print("  ✅ \(self.overwriteDuplicates ? "Updated" : "Added") book \(index + 1)/\(result.successful.count): \(book.title)")
+                            } else {
+                                print("  ❌ LibraryViewModel is nil! Cannot add book: \(book.title)")
                             }
-                        } else {
-                            print("✅ Progressive import already added \(progressiveAdded) books during import; skipping final re-add.")
+                        }
+                        
+                        // Verify the books were added
+                        if let libraryVM = self.libraryViewModel {
+                            print("📊 Library now contains \(libraryVM.books.count) total books")
                         }
                         
                         self.successMessage = "\(result.successful.count) books successfully added to your library"
@@ -861,7 +828,6 @@ struct GoodreadsImportView: View {
                     withAnimation {
                         self.importState = .start
                     }
-                    appState.isImportingLibrary = false
                 }
             }
         }
@@ -1131,13 +1097,6 @@ struct ImportedBookRow: View {
 
                         // Reload local preview image
                         await loadCover()
-
-                        // Haptic + toast
-                        SensoryFeedback.success()
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ShowGlassToast"),
-                            object: "Cover updated"
-                        )
                     }
                 }
             )
@@ -1448,7 +1407,7 @@ struct ManualMatchView: View {
                 .font(.body)
                 .foregroundColor(DesignSystem.Colors.textTertiary)
             
-            TextField("Search for this book", text: $searchQuery)
+            TextField("Search for this book...", text: $searchQuery)
                 .foregroundColor(.white)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -1801,19 +1760,11 @@ struct BookSearchRow: View {
 }
 
 #Preview {
-    do {
-        let container = try ModelContainer(for: BookModel.self)
-        return GoodreadsImportView(
-            modelContext: ModelContext(container),
-            googleBooksService: GoogleBooksService(),
-            libraryViewModel: LibraryViewModel()
-        )
-    } catch {
-        // Return a simple error view for preview
-        return Text("Preview failed to load: \(error.localizedDescription)")
-            .foregroundColor(.red)
-            .padding()
-    }
+    GoodreadsImportView(
+        modelContext: ModelContext(try! ModelContainer(for: BookModel.self)),
+        googleBooksService: GoogleBooksService(),
+        libraryViewModel: LibraryViewModel()
+    )
 }
 // MARK: - New Helper Views for Redesigned UI
 

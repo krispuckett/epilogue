@@ -2983,9 +2983,9 @@ struct SimplifiedUnifiedChatInputBar: View {
     
     private var placeholderText: String {
         if let book = currentBook {
-            return "Ask about \(book.title)"
+            return "Ask about \(book.title)..."
         } else {
-            return "Ask about your books"
+            return "Ask about your books..."
         }
     }
     

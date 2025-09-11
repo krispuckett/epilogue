@@ -128,7 +128,7 @@ struct QuickActionsSheet: View {
             ZStack {
                 StandardizedSearchField(
                     text: $searchText,
-                    placeholder: "Search commands or books"
+                    placeholder: "Search commands or books..."
                 )
                 .onSubmit {
                     handleSubmit()

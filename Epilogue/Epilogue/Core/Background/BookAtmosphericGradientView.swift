@@ -24,13 +24,22 @@ struct BookAtmosphericGradientView: View {
                 
                 // Single direction gradient - no mirroring, with intensity control
                 if let palette = displayedPalette {
+                    #if DEBUG
+                    // Toggle to see gradient logs during debugging
+                    let LOG_GRADIENT = false
+                    if LOG_GRADIENT {
+                        print("🎨 Rendering gradient with intensity: \(intensity)")
+                        print("   Primary: \(colorDescription(ColorPalette(primary: palette.primary, secondary: .clear, accent: .clear, background: .clear, textColor: .clear, luminance: 0, isMonochromatic: false, extractionQuality: 0)))")
+                        print("   Opacity applied: \(0.8 * intensity)")
+                    }
+                    #endif
+                    
                     // More vibrant gradient like ambient chat
                     LinearGradient(
                         stops: [
-                            // Place warm accent at the top for correct look (amber/gold first)
-                            .init(color: palette.accent.opacity(0.8 * intensity), location: 0.0),
-                            .init(color: palette.primary.opacity(0.6 * intensity), location: 0.15),
-                            .init(color: palette.secondary.opacity(0.4 * intensity), location: 0.3),
+                            .init(color: palette.primary.opacity(0.8 * intensity), location: 0.0),
+                            .init(color: palette.secondary.opacity(0.6 * intensity), location: 0.15),
+                            .init(color: palette.accent.opacity(0.4 * intensity), location: 0.3),
                             .init(color: palette.background.opacity(0.2 * intensity), location: 0.45),
                             .init(color: Color.clear, location: 0.6)
                         ],
@@ -43,7 +52,12 @@ struct BookAtmosphericGradientView: View {
                     .animation(.easeInOut(duration: 0.3), value: palette.primary)
                 }
                 
-                // Overlay removed to avoid muting the gradient
+                // Subtle noise texture overlay
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.05) // Very subtle texture
+                    .ignoresSafeArea()
+                    .blendMode(.plusLighter)
             }
         }
         .onAppear {
@@ -54,7 +68,6 @@ struct BookAtmosphericGradientView: View {
                 print("   Initial palette: \(colorDescription(colorPalette))")
             }
             #endif
-            // Re-enable enhancement pipeline for vibrancy
             displayedPalette = processColors(colorPalette)
             #if DEBUG
             if LOG_GRADIENT {
@@ -199,9 +212,10 @@ struct BookAtmosphericGradientView: View {
         
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         
-        // Boost vibrancy with a sensible floor (matches prior correct behavior)
-        saturation = min(saturation * 1.4, 1.0)
+        // EXACT same enhancement as ambient chat, with protection for low-sat dark colors
+        saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
         if !(saturation < 0.18 && brightness < 0.35) {
+            // Only enforce a brightness floor when color has some saturation
             brightness = max(brightness, 0.4)
         }
         
@@ -213,9 +227,9 @@ struct BookAtmosphericGradientView: View {
         let uiColor = UIColor(color)
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
-        // Slight saturation lift, keep depth by bounding brightness
+        // Slightly increase saturation but keep brightness capped for depth
         let outS = min(s * 1.2, 1.0)
-        let outB = min(max(b, 0.18), 0.33)
+        let outB = min(max(b, 0.18), 0.33) // keep dark, avoid mid-gray
         return Color(hue: Double(h), saturation: Double(outS), brightness: Double(outB))
     }
     

@@ -11,19 +11,19 @@ enum InputContext {
     var placeholderText: String {
         switch self {
         case .library:
-            return "Search, add books, or capture"
+            return "Search, add books, or capture..."
         case .chat(let book):
             if let book = book {
-                return "Ask about \(book.title)"
+                return "Ask about \(book.title)..."
             } else {
-                return "Ask about your books"
+                return "Ask about your books..."
             }
         case .notes:
-            return "Search notes or create new"
+            return "Search notes or create new..."
         case .bookDetail(let book):
-            return "Add quote or note from \(book.title)"
+            return "Add quote or note from \(book.title)..."
         case .quickActions:
-            return "Search, add books, or capture thoughts"
+            return "Search, add books, or capture thoughts..."
         }
     }
 }

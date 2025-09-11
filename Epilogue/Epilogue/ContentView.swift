@@ -74,7 +74,6 @@ struct ContentView: View {
     @State private var batchBookTitles: [String] = []
     @State private var currentBatchIndex = 0
     @State private var showBatchBookSearch = false
-    @State private var onboardingFadeOpacity: Double = 0.0
     
     // Command processing
     @Environment(\.modelContext) private var modelContext
@@ -117,7 +116,6 @@ struct ContentView: View {
                         }
                 }
             }
-            // Onboarding handled by existing screens; removing new coordinator overlay
             .fullScreenCover(isPresented: $showBookScanner) {
                 BookScannerView()
                     .environmentObject(libraryViewModel)
@@ -206,11 +204,6 @@ struct ContentView: View {
                 RefinedOnboardingView {
                     hasCompletedOnboarding = true
                     showOnboarding = false
-                    // Smooth crossfade into main UI
-                    onboardingFadeOpacity = 1.0
-                    withAnimation(.easeInOut(duration: 0.45)) {
-                        onboardingFadeOpacity = 0.0
-                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
@@ -381,15 +374,6 @@ struct ContentView: View {
                 case .library: selectedTab = 0
                 case .notes: selectedTab = 1
                 case .chat: selectedTab = 2
-                }
-            }
-            // Onboarding exit crossfade overlay
-            .overlay {
-                if onboardingFadeOpacity > 0.001 {
-                    Color.black
-                        .opacity(onboardingFadeOpacity)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
                 }
             }
             .safeAreaInset(edge: .bottom) {

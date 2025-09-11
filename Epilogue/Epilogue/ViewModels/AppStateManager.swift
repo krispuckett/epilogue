@@ -12,9 +12,6 @@ final class AppStateManager: ObservableObject {
     @Published var showingEnhancedScanner = false
     @Published var showingSettings = false
     
-    // Import state
-    @Published var isImportingLibrary = false
-    
     // Selected book for actions
     @Published var selectedBook: Book?
     

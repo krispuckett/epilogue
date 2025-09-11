@@ -11,11 +11,8 @@ enum URLValidator {
         "www.googleapis.com",
         "googleapis.com",
         "books.google.com",
-        "api.perplexity.ai",  // Keep for validation even though we use proxy
-        "perplexity.ai",
-        "workers.dev",  // CloudFlare Workers domain
-        "epilogue-proxy.kris-puckett.workers.dev",  // Your specific proxy
-        "kris-puckett.workers.dev"  // Your workers subdomain
+        "api.perplexity.ai",
+        "perplexity.ai"
     ])
     
     /// Validates a URL string for general use (e.g., book covers)

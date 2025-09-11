@@ -28,10 +28,8 @@ class OptimizedPerplexityService: ObservableObject {
     static let shared = OptimizedPerplexityService()
     
     private let logger = Logger(subsystem: "com.epilogue", category: "PerplexitySonar")
-    // Using secure proxy instead of direct API access
-    private let proxyEndpoint = "https://epilogue-proxy.kris-puckett.workers.dev"
-    private let appSecret = "epilogue_testflight_2025_secret"
-    // No API key needed - handled by proxy
+    private let sonarEndpoint = "https://api.perplexity.ai/chat/completions"
+    private var apiKey: String = ""
     
     // Streaming support
     private var eventSource: URLSessionDataTask?
@@ -62,8 +60,16 @@ class OptimizedPerplexityService: ObservableObject {
     }
     
     private func setupAPIKey() {
-        // No longer needed - proxy handles authentication
-        logger.info("✅ Using secure proxy for API access")
+        // SECURE: Only use KeychainManager - no Info.plist fallback
+        if let keychainKey = KeychainManager.shared.getPerplexityAPIKey(),
+           !keychainKey.isEmpty,
+           KeychainManager.shared.isValidAPIKey(keychainKey) {
+            self.apiKey = keychainKey
+            logger.info("✅ Using Perplexity API key from secure storage")
+        } else {
+            self.apiKey = ""
+            logger.warning("⚠️ No valid Perplexity API key configured. User needs to configure in Settings.")
+        }
     }
     
     // MARK: - Cerebras-Powered Streaming with SSE
@@ -373,31 +379,16 @@ class OptimizedPerplexityService: ObservableObject {
         }
     }
     
-    // MARK: - User Identification
-    
-    private func getUserID() -> String {
-        let userDefaults = UserDefaults.standard
-        if let existingID = userDefaults.string(forKey: "epilogue_user_id") {
-            return existingID
-        } else {
-            let newID = UUID().uuidString
-            userDefaults.set(newID, forKey: "epilogue_user_id")
-            return newID
-        }
-    }
-    
     // MARK: - Request Creation
     
     private func createSonarRequest(query: String, bookContext: Book?, model: String, stream: Bool) throws -> URLRequest {
-        guard let url = URL(string: proxyEndpoint) else {
+        guard let url = URL(string: sonarEndpoint) else {
             throw PerplexityError.invalidURL
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        // Add app authentication headers for proxy
-        request.setValue(appSecret, forHTTPHeaderField: "X-Epilogue-Auth")
-        request.setValue(getUserID(), forHTTPHeaderField: "X-User-ID")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         if stream {
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")

@@ -253,7 +253,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                
                 // MARK: - Privacy & Data
                 Section {
                     Button {

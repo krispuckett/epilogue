@@ -33,7 +33,7 @@ struct ChatBookPickerSheet: View {
             // Search bar - using standardized styles
             StandardizedSearchField(
                 text: $searchText,
-                placeholder: "Search books"
+                placeholder: "Search books..."
             )
             .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             

@@ -365,7 +365,7 @@ struct ChatInputBarView: View {
             }
             
             HStack {
-                TextField("Ask about this book", text: $text, axis: .vertical)
+                TextField("Ask about this book...", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
                     .fixedSize(horizontal: false, vertical: true)

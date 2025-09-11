@@ -33,14 +33,7 @@ struct ModernEmptyStates {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .glassEffect(
-                            .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.30)),
-                            in: .rect(cornerRadius: 16)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(DesignSystem.Colors.primaryAccent.opacity(0.6), lineWidth: 1)
-                        )
+                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
                 

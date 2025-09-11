@@ -1,13 +1,15 @@
 import Foundation
 import Combine
 
-// MARK: - Perplexity Service (Using Secure Proxy)
+// MARK: - Perplexity Service
 class PerplexityService: ObservableObject {
     static let shared = PerplexityService()
     
-    // Using proxy endpoint
-    private let proxyURL = "https://epilogue-proxy.kris-puckett.workers.dev"
-    private let appSecret = "epilogue_testflight_2025_secret"
+    private var apiKey: String {
+        // Use secure API manager for production
+        SecureAPIManager.shared.getAPIKey()
+    }
+    private let baseURL = "https://api.perplexity.ai/chat/completions"
     private let session: URLSession
     private var responseCache = [String: String]()  // Simple cache
     private var isGandalfEnabled = false
@@ -37,13 +39,27 @@ class PerplexityService: ObservableObject {
         return try await service.chat(with: message, bookContext: bookContext)
     }
     
-    // Fast streaming chat for real-time responses (using proxy)
+    // Fast streaming chat for real-time responses
     func streamChat(message: String, bookContext: Book? = nil, model: String? = nil) async throws -> AsyncThrowingStream<String, Error> {
-        // Check local rate limit for UX (proxy will enforce actual limit)
-        let (remaining, _) = secureManager.getRemainingCalls()
-        guard remaining > 0 || isGandalfEnabled else {
-            throw PerplexityError.rateLimitExceeded(remaining: 0, resetTime: Date().addingTimeInterval(86400))
+        // Check rate limit first (unless unlimited)
+        if !secureManager.hasUnlimitedQuestions {
+            let (allowed, remaining, resetTime) = secureManager.canMakeAPICall()
+            
+            guard allowed else {
+                throw PerplexityError.rateLimitExceeded(remaining: remaining, resetTime: resetTime)
+            }
         }
+        
+        guard let url = URL(string: baseURL),
+              URLValidator.isValidAPIURL(url) else {
+            throw PerplexityError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         // Create detailed system prompt with book context for streaming
         let systemPrompt: String
@@ -82,17 +98,12 @@ class PerplexityService: ObservableObject {
             "max_tokens": selectedModel == "sonar-pro" ? 2000 : 1000  // Increased for detailed responses
         ]
         
-        let bodyData = try JSONSerialization.data(withJSONObject: requestBody)
-        
-        // Create proxy request instead of direct Perplexity request
-        guard let proxyRequest = secureManager.createProxyRequest(body: bodyData) else {
-            throw PerplexityError.invalidRequest
-        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
         return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let (bytes, response) = try await session.bytes(for: proxyRequest)
+                    let (bytes, response) = try await session.bytes(for: request)
                     
                     guard let httpResponse = response as? HTTPURLResponse,
                           httpResponse.statusCode == 200 else {
@@ -110,8 +121,11 @@ class PerplexityService: ObservableObject {
                            let content = delta["content"] as? String {
                             continuation.yield(content)
                             
-                            // Proxy handles rate limiting, no need to record locally
-                            hasRecordedCall = true  // Mark as recorded for logic flow
+                            // Record API call on first successful content
+                            if !hasRecordedCall && !secureManager.hasUnlimitedQuestions {
+                                secureManager.recordAPICall()
+                                hasRecordedCall = true
+                            }
                         }
                     }
                     continuation.finish()
@@ -124,11 +138,25 @@ class PerplexityService: ObservableObject {
     
     // Original non-streaming method
     func chat(with message: String, bookContext: Book? = nil, model: String? = nil) async throws -> String {
-        // Check local rate limit for UX (proxy will enforce actual limit)
-        let (remaining, _) = secureManager.getRemainingCalls()
-        guard remaining > 0 || isGandalfEnabled else {
-            throw PerplexityError.rateLimitExceeded(remaining: 0, resetTime: Date().addingTimeInterval(86400))
+        // Check rate limit first (unless unlimited)
+        if !secureManager.hasUnlimitedQuestions {
+            let (allowed, remaining, resetTime) = secureManager.canMakeAPICall()
+            
+            guard allowed else {
+                throw PerplexityError.rateLimitExceeded(remaining: remaining, resetTime: resetTime)
+            }
         }
+        
+        guard let url = URL(string: baseURL),
+              URLValidator.isValidAPIURL(url) else {
+            throw PerplexityError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         // Create detailed system prompt with book context
         let systemPrompt: String
@@ -170,13 +198,25 @@ class PerplexityService: ObservableObject {
             "max_tokens": selectedModel == "sonar-pro" ? 2000 : 1000  // Increased for detailed responses
         ]
         
-        let bodyData = try JSONSerialization.data(withJSONObject: requestBody)
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        // Use proxy instead of direct API call
-        let responseData = try await secureManager.callProxyAPI(body: bodyData)
+        // Make request with configured session
+        let (data, response) = try await session.data(for: request)
         
-        // Parse response from proxy
-        guard let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PerplexityError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 401 {
+            throw PerplexityError.unauthorized
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw PerplexityError.httpError(statusCode: httpResponse.statusCode)
+        }
+        
+        // Parse response
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let firstChoice = choices.first,
               let message = firstChoice["message"] as? [String: Any],
@@ -184,7 +224,10 @@ class PerplexityService: ObservableObject {
             throw PerplexityError.invalidResponse
         }
         
-        // Proxy handles rate limiting, no need to record locally
+        // Record successful API call for rate limiting
+        if !secureManager.hasUnlimitedQuestions {
+            secureManager.recordAPICall()
+        }
         
         return content
     }
@@ -193,7 +236,6 @@ class PerplexityService: ObservableObject {
 // MARK: - Errors
 enum PerplexityError: LocalizedError {
     case invalidURL
-    case invalidRequest
     case invalidResponse
     case unauthorized
     case httpError(statusCode: Int)
@@ -203,8 +245,6 @@ enum PerplexityError: LocalizedError {
         switch self {
         case .invalidURL:
             return "Invalid API URL"
-        case .invalidRequest:
-            return "Invalid request format"
         case .invalidResponse:
             return "Invalid response from API"
         case .unauthorized:
