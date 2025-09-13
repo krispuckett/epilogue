@@ -1364,6 +1364,11 @@ class LibraryViewModel: ObservableObject {
         loadBooks()
         updateBookCoverURLsToHigherQuality()
         
+        // Generate context for all books in background
+        Task {
+            await BookContextCache.shared.generateContextForAllBooks(books)
+        }
+        
         // Listen for library refresh notification
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("RefreshLibrary"),

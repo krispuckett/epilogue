@@ -40,6 +40,9 @@ class BookAdditionService {
             await extractAndCacheColors(for: book)
         }
         
+        // Generate AI context for instant responses
+        await BookContextCache.shared.generateContextForBook(book)
+        
         #if DEBUG
         print("✅ Successfully added: \(book.title)")
         #endif

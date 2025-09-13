@@ -2053,8 +2053,15 @@ extension TrueAmbientProcessor {
             // Enhance the question with explicit book context
             let enhancedQuestion: String
             if let book = bookContext {
-                // Make the book context EXPLICIT in the question
-                enhancedQuestion = "In the book '\(book.title)' by \(book.author), \(question)"
+                // Check for cached context first
+                if let cachedContext = BookContextCache.shared.getContext(for: book) {
+                    logger.info("📚 Using cached context for \(book.title)")
+                    // Include rich context in the question
+                    enhancedQuestion = "\(cachedContext.contextString). Question: \(question)"
+                } else {
+                    // Fallback to basic enhancement
+                    enhancedQuestion = "In the book '\(book.title)' by \(book.author), \(question)"
+                }
                 logger.info("📚 Asking about \(book.title): \(question)")
             } else {
                 enhancedQuestion = question
