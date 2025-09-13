@@ -137,6 +137,7 @@ struct AmbientModeView: View {
     @State private var capturedImage: UIImage?
     @State private var extractedText: String = ""
     @State private var showQuoteHighlighter = false
+    @State private var streamingResponses: [UUID: String] = [:]  // Track streaming text by message ID
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
     @State private var isTranscriptionDissolving = false
@@ -366,37 +367,107 @@ struct AmbientModeView: View {
                 isKeyboardFocused = false
             }
         }
-        .onReceive(processor.$detectedContent.debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)) { newContent in
-            // Only process if there are actual new items
+        // Single unified listener for all content updates
+        .onReceive(processor.$detectedContent) { newContent in
+            // Handle new content items (questions, notes, quotes)
             if newContent.count > lastProcessedCount {
                 let newItems = Array(newContent.suffix(newContent.count - lastProcessedCount))
-                processAndSaveDetectedContent(newItems)
+                
+                // Process questions immediately to create "Thinking..." message
+                for item in newItems where item.type == .question {
+                    // Check if we already have a message for this question
+                    let hasMessage = messages.contains { msg in
+                        !msg.isUser && msg.content.contains("**\(item.text)**")
+                    }
+                    
+                    print("🔍 Checking for existing message for: \(item.text.prefix(30))... Found: \(hasMessage)")
+                    
+                    if !hasMessage {
+                        // Create the "Thinking..." message immediately
+                        let thinkingMessage = UnifiedChatMessage(
+                            content: "**\(item.text)**",
+                            isUser: false,
+                            timestamp: Date(),
+                            messageType: .text
+                        )
+                        messages.append(thinkingMessage)
+                        
+                        // Auto-expand the thinking message and collapse others
+                        // Use a refined delay for perfect timing
+                        let messageId = thinkingMessage.id
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            // Subtle haptic when new question appears
+                            SensoryFeedback.light()
+                            
+                            withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.825, blendDuration: 0)) {
+                                print("📊 Before expansion: expanded IDs = \(expandedMessageIds.count)")
+                                expandedMessageIds.removeAll()
+                                expandedMessageIds.insert(messageId)
+                                print("📊 After expansion: expanded IDs = \(expandedMessageIds.count), contains new message: \(expandedMessageIds.contains(messageId))")
+                            }
+                        }
+                        
+                        print("🔄 Created thinking message with ID: \(messageId) for: \(item.text.prefix(30))...")
+                    }
+                }
+                
+                // Process other content with delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    processAndSaveDetectedContent(newItems)
+                }
                 lastProcessedCount = newContent.count
             }
-            // Always check for response updates
-            checkForResponseUpdates(in: newContent)
-        }
-        // Add a second listener without debounce specifically for progressive updates
-        .onReceive(processor.$detectedContent) { content in
-            // Immediate check for progressive response updates (no debounce)
-            // This ensures streaming responses show immediately
-            for item in content.suffix(5) where item.type == .question {
+            
+            // Handle progressive response updates immediately
+            for item in newContent.suffix(5) where item.type == .question {
                 if let response = item.response, !response.isEmpty && response != "Thinking..." {
-                    // Update UI immediately for progressive loading
-                    if let existingMsgIndex = messages.lastIndex(where: { msg in
-                        !msg.isUser && msg.content.contains("**\(item.text)**")
-                    }) {
-                        let currentMsg = messages[existingMsgIndex]
-                        let updatedContent = "**\(item.text)**\n\n\(response)"
-                        if currentMsg.content != updatedContent {
-                            messages[existingMsgIndex] = UnifiedChatMessage(
-                                content: updatedContent,
-                                isUser: false,
-                                timestamp: currentMsg.timestamp,
-                                bookContext: currentBookContext,
-                                messageType: .text
-                            )
-                            print("📝 Progressive UI update: \(response.count) chars")
+                    // Use question text + response length as unique key
+                    let responseKey = "\(item.text)_\(response.count)"
+                    
+                    // Only update if this is a new response or longer than what we have
+                    if !processedContentHashes.contains(responseKey) {
+                        processedContentHashes.insert(responseKey)
+                        
+                        // Find the message to update
+                        if let existingMsgIndex = messages.lastIndex(where: { msg in
+                            !msg.isUser && msg.content.contains("**\(item.text)**")
+                        }) {
+                            let currentMsg = messages[existingMsgIndex]
+                            let messageId = currentMsg.id
+                            
+                            // Update streaming text for this message ID
+                            let currentStreamingText = streamingResponses[messageId] ?? ""
+                            
+                            // Only update if we have more text
+                            if response.count > currentStreamingText.count {
+                                // Clean citations from response (remove [1][2] etc)
+                                let cleanedResponse = response
+                                    .replacingOccurrences(of: #"\[\d+\]"#, with: "", options: .regularExpression)
+                                    .replacingOccurrences(of: "  ", with: " ") // Clean up double spaces
+                                
+                                // Update the streaming text with buttery smooth animation
+                                withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
+                                    streamingResponses[messageId] = cleanedResponse
+                                }
+                                
+                                // Make sure the message stays expanded during streaming
+                                if !expandedMessageIds.contains(messageId) {
+                                    print("⚠️ Message lost expansion during streaming, re-expanding...")
+                                    expandedMessageIds.insert(messageId)
+                                }
+                                
+                                print("📝 Progressive update: \(response.count) chars (smooth), expanded: \(expandedMessageIds.contains(messageId))")
+                                
+                                // Also update the saved question in SwiftData
+                                if let session = currentSession,
+                                   let savedQuestion = (session.capturedQuestions ?? []).first(where: { $0.content == item.text }),
+                                   savedQuestion.answer != response {
+                                    savedQuestion.answer = response
+                                    try? modelContext.save()
+                                }
+                            }
+                        } else {
+                            print("⚠️ No message found to update for: \(item.text.prefix(30))...")
                         }
                     }
                 }
@@ -703,8 +774,12 @@ struct AmbientModeView: View {
                                             index: index,
                                             totalMessages: messages.filter { !$0.isUser }.count,
                                             isExpanded: expandedMessageIds.contains(message.id),
+                                            streamingText: streamingResponses[message.id],
                                             onToggle: {
-                                                withAnimation(DesignSystem.Animation.easeQuick) {
+                                                // Refined haptic feedback
+                                                SensoryFeedback.selection()
+                                                
+                                                withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.86, blendDuration: 0)) {
                                                     if expandedMessageIds.contains(message.id) {
                                                         expandedMessageIds.remove(message.id)
                                                     } else {
@@ -733,14 +808,14 @@ struct AmbientModeView: View {
                     }
                     
                     // Bottom spacer for input area - adjusted for keyboard mode
+                    // Add more bottom padding to ensure content is scrollable above input
                     Color.clear
-                        .frame(height: inputMode == .textInput ? 20 : 100)
+                        .frame(height: inputMode == .textInput ? 80 : 160)
                         .id("bottom")
                 }
             }
             .scrollBounceBehavior(.basedOnSize, axes: .vertical) // Prevent excessive bouncing
             .scrollDismissesKeyboard(.immediately)
-            .contentMargins(.top, 0, for: .scrollContent) // Prevent scrolling above content
             .scrollClipDisabled(false) // Ensure content doesn't scroll outside bounds
             .onAppear {
                 scrollProxy = proxy
@@ -1412,46 +1487,27 @@ struct AmbientModeView: View {
                         
                         messages.append(aiMessage)
                         
-                        // Auto-collapse all previous messages and expand only the new one
-                        withAnimation(DesignSystem.Animation.easeStandard) {
-                            expandedMessageIds.removeAll()
-                            expandedMessageIds.insert(aiMessage.id)
+                        // Expand the new message without collapsing others
+                        // The thinking message should already be expanded
+                        if !expandedMessageIds.contains(aiMessage.id) {
+                            withAnimation(DesignSystem.Animation.easeStandard) {
+                                expandedMessageIds.insert(aiMessage.id)
+                            }
                         }
                         print("✅ Added AI response for question: \(item.text.prefix(30))...")
                     } else {
                         print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
                     }
                 } else {
-                    // Question detected but no response yet - add thinking message
-                    // Check if we already have a thinking message for this question
-                    let alreadyHasThinking = messages.contains { msg in
-                        !msg.isUser && msg.content.contains(item.text) && !msg.content.contains("\n\n")
-                    }
+                    // Question detected but no response yet
+                    // The thinking message is already created in the onReceive listener
+                    // Just trigger the AI response
+                    pendingQuestion = item.text
+                    print("💭 Triggering AI response for: \(item.text.prefix(30))...")
                     
-                    if !alreadyHasThinking {
-                        let thinkingMessage = UnifiedChatMessage(
-                            content: "**\(item.text)**",
-                            isUser: false,
-                            timestamp: Date(),
-                            messageType: .text
-                        )
-                        messages.append(thinkingMessage)
-                        
-                        // Collapse all previous messages and only expand the new one
-                        withAnimation(DesignSystem.Animation.easeStandard) {
-                            expandedMessageIds.removeAll()
-                            expandedMessageIds.insert(thinkingMessage.id)
-                        }
-                        
-                        pendingQuestion = item.text
-                        print("💭 Added thinking message for question: \(item.text.prefix(30))...")
-                        
-                        // Trigger AI response
-                        Task {
-                            await getAIResponseForAmbientQuestion(item.text)
-                        }
-                    } else {
-                        print("⚠️ Thinking message already exists for: \(item.text.prefix(30))...")
+                    // Trigger AI response
+                    Task {
+                        await getAIResponseForAmbientQuestion(item.text)
                     }
                 }
             }
@@ -2720,6 +2776,12 @@ struct AmbientModeView: View {
         if let session = currentSession {
             session.endTime = Date()
             
+            // Debug: Log the session's questions before saving
+            print("📊 DEBUG: About to save session. Questions in session:")
+            for (i, q) in (session.capturedQuestions ?? []).enumerated() {
+                print("   \(i+1). \(q.content?.prefix(50) ?? "nil") - Answer: \(q.answer != nil ? "Yes" : "No")")
+            }
+            
             // Force save to ensure all relationships are persisted
             do {
                 try modelContext.save()
@@ -3145,6 +3207,7 @@ struct AmbientMessageThreadView: View {
     let index: Int
     let totalMessages: Int
     let isExpanded: Bool
+    let streamingText: String?
     let onToggle: () -> Void
     let onEdit: ((String) -> Void)?
     
@@ -3211,8 +3274,11 @@ struct AmbientMessageThreadView: View {
                         .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    // Extract question from AI response if formatted
-                    let content = extractContent(from: message.content)
+                    // Use streaming text if available, otherwise use message content
+                    let displayContent = streamingText != nil ? 
+                        "**\(extractContent(from: message.content).question)**\n\n\(streamingText!)" : 
+                        message.content
+                    let content = extractContent(from: displayContent)
                     
                     // Show question text
                     Text(content.question)
@@ -3274,11 +3340,15 @@ struct AmbientMessageThreadView: View {
             
             // Answer (expandable for AI responses) with blur transition
             if !message.isUser && isExpanded {
-                let content = extractContent(from: message.content)
+                // Use streaming text if available
+                let displayContent = streamingText != nil ? 
+                    "**\(extractContent(from: message.content).question)**\n\n\(streamingText!)" : 
+                    message.content
+                let content = extractContent(from: displayContent)
                 
                 // If no answer yet, don't show anything special
                 // The scrolling text is already shown above the input field
-                if content.answer.isEmpty {
+                if content.answer.isEmpty && streamingText == nil {
                     // Empty state - answer will appear here when ready
                 } else {
                     // Show answer when ready with staggered fade-in
@@ -3302,8 +3372,11 @@ struct AmbientMessageThreadView: View {
                     .onAppear {
                         // Show answer immediately without delay
                         hasShownAnswer = true
-                        withAnimation(.easeOut(duration: 0.3)) {
+                        // Elegant fade-in with perfect timing
+                        withAnimation(.timingCurve(0.32, 0, 0.67, 0, duration: 0.5)) {
                             answerOpacity = 1.0
+                        }
+                        withAnimation(.interactiveSpring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
                             answerBlur = 0
                         }
                     }
@@ -3334,8 +3407,14 @@ struct AmbientMessageThreadView: View {
     }
     
     private func formatResponseText(_ text: String) -> AttributedString {
-        // Split text into sentences and group into paragraphs
-        let sentences = text.components(separatedBy: ". ")
+        // Clean and format text with refined typography
+        var cleanText = text
+            .replacingOccurrences(of: "**", with: "") // Remove markdown bold
+            .replacingOccurrences(of: "  ", with: " ") // Clean double spaces
+            .replacingOccurrences(of: "..", with: ".") // Fix double periods
+        
+        // Split into natural paragraphs
+        let sentences = cleanText.components(separatedBy: ". ")
         var paragraphs: [String] = []
         var currentParagraph = ""
         
@@ -3343,19 +3422,18 @@ struct AmbientMessageThreadView: View {
             let cleanSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             if !cleanSentence.isEmpty {
                 currentParagraph += cleanSentence
-                if !cleanSentence.hasSuffix(".") {
+                if !cleanSentence.hasSuffix(".") && !cleanSentence.hasSuffix("?") && !cleanSentence.hasSuffix("!") {
                     currentParagraph += "."
                 }
                 
-                // Create paragraph break every 2-3 sentences or at natural breaks
-                if (index + 1) % 3 == 0 || 
-                   cleanSentence.contains("However") || 
-                   cleanSentence.contains("Additionally") ||
-                   cleanSentence.contains("Furthermore") ||
-                   cleanSentence.contains("In conclusion") ||
-                   cleanSentence.contains("First") ||
-                   cleanSentence.contains("Second") ||
-                   cleanSentence.contains("Finally") {
+                // Create paragraph breaks at natural transition points
+                let isNaturalBreak = cleanSentence.contains(where: { phrase in
+                    ["However", "Additionally", "Furthermore", "Moreover", 
+                     "In conclusion", "First", "Second", "Finally", "Therefore",
+                     "As a result", "In summary", "Notably"].contains { cleanSentence.contains($0) }
+                })
+                
+                if (index + 1) % 3 == 0 || isNaturalBreak {
                     paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
                     currentParagraph = ""
                 } else if index < sentences.count - 1 {
