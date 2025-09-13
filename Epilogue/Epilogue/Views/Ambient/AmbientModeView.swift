@@ -372,9 +372,33 @@ struct AmbientModeView: View {
                 let newItems = Array(newContent.suffix(newContent.count - lastProcessedCount))
                 processAndSaveDetectedContent(newItems)
                 lastProcessedCount = newContent.count
-            } else if newContent.count == lastProcessedCount && newContent.count > 0 {
-                // Check for response updates on existing items
-                checkForResponseUpdates(in: newContent)
+            }
+            // Always check for response updates
+            checkForResponseUpdates(in: newContent)
+        }
+        // Add a second listener without debounce specifically for progressive updates
+        .onReceive(processor.$detectedContent) { content in
+            // Immediate check for progressive response updates (no debounce)
+            // This ensures streaming responses show immediately
+            for item in content.suffix(5) where item.type == .question {
+                if let response = item.response, !response.isEmpty && response != "Thinking..." {
+                    // Update UI immediately for progressive loading
+                    if let existingMsgIndex = messages.lastIndex(where: { msg in
+                        !msg.isUser && msg.content.contains("**\(item.text)**")
+                    }) {
+                        let currentMsg = messages[existingMsgIndex]
+                        let updatedContent = "**\(item.text)**\n\n\(response)"
+                        if currentMsg.content != updatedContent {
+                            messages[existingMsgIndex] = UnifiedChatMessage(
+                                content: updatedContent,
+                                isUser: false,
+                                timestamp: currentMsg.timestamp,
+                                bookContext: currentBookContext,
+                                messageType: .text
+                            )
+                        }
+                    }
+                }
             }
         }
         .onReceive(bookDetector.$detectedBook) { book in
@@ -1167,6 +1191,16 @@ struct AmbientModeView: View {
                     processedContentHashes.insert(responseKey)
                     
                     print("✅ Response update detected for: \(item.text.prefix(30))...")
+                    
+                    // Update the saved question in SwiftData with the answer
+                    if let session = currentSession {
+                        if let savedQuestion = (session.capturedQuestions ?? []).first(where: { $0.content == item.text }) {
+                            savedQuestion.answer = response
+                            savedQuestion.wasAnswered = true
+                            try? modelContext.save()
+                            print("✅ Updated saved question with answer")
+                        }
+                    }
                     
                     // Find and update the thinking message with the actual response
                     if let thinkingIndex = messages.lastIndex(where: { 
