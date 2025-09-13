@@ -584,6 +584,7 @@ class OptimizedPerplexityService: ObservableObject {
         logger.info("🚀 Starting chat request: \(message.prefix(50))...")
         var fullResponse = ""
         var responseCount = 0
+        let startTime = Date()
         
         do {
             for try await response in streamSonarResponse(message, bookContext: bookContext) {
@@ -593,6 +594,13 @@ class OptimizedPerplexityService: ObservableObject {
                 // Log progress every 10 responses
                 if responseCount % 10 == 0 {
                     logger.info("📝 Received \(responseCount) streaming chunks, current length: \(fullResponse.count)")
+                }
+                
+                // Return early if we have a good response and it's been over 2 seconds
+                // This prevents waiting for slow stream closures
+                if fullResponse.count > 200 && Date().timeIntervalSince(startTime) > 2.0 {
+                    logger.info("✅ Returning early with \(fullResponse.count) chars after \(String(format: "%.1f", Date().timeIntervalSince(startTime)))s")
+                    break
                 }
             }
             
