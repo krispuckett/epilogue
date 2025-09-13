@@ -71,6 +71,7 @@ struct ContentView: View {
     @State private var toastMessage = ""
     @State private var showBookSearch = false
     @State private var bookSearchQuery = ""
+    @State private var pendingBookSearch = false  // Track pending search
     @State private var batchBookTitles: [String] = []
     @State private var currentBatchIndex = 0
     @State private var showBatchBookSearch = false
@@ -130,7 +131,11 @@ struct ContentView: View {
                     }
                 )
             }
-            .sheet(isPresented: $showBookSearch) {
+            .sheet(isPresented: $showBookSearch, onDismiss: {
+                // Clean up when sheet is dismissed
+                bookSearchQuery = ""
+                pendingBookSearch = false
+            }) {
                 BookSearchSheet(
                     searchQuery: bookSearchQuery,
                     onBookSelected: { book in
@@ -238,6 +243,8 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
                 if let query = notification.object as? String {
                     bookSearchQuery = query
+                    pendingBookSearch = true  // Mark as pending
+                    
                     // Dismiss command input with animation
                     withAnimation(DesignSystem.Animation.springStandard) {
                         showCommandInput = false
@@ -246,9 +253,12 @@ struct ContentView: View {
                     commandText = ""
                     isInputFocused = false
                     
-                    // Longer delay to ensure dismissal completes before showing sheet
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        showBookSearch = true
+                    // Use onChange to trigger sheet after state settles
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        if pendingBookSearch {
+                            pendingBookSearch = false
+                            showBookSearch = true
+                        }
                     }
                 }
             }
