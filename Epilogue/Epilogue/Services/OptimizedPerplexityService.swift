@@ -577,7 +577,7 @@ class OptimizedPerplexityService: ObservableObject {
     // MARK: - Public Methods
     
     func chat(message: String, bookContext: Book?) async throws -> String {
-        // Use streaming internally but return complete response
+        // Progressive loading: get 200 chars fast, then up to 600+ chars
         logger.info("🚀 Starting chat request: \(message.prefix(100))...")
         if let book = bookContext {
             logger.info("📚 Book context: \(book.title) by \(book.author)")
@@ -596,10 +596,19 @@ class OptimizedPerplexityService: ObservableObject {
                     logger.info("📝 Received \(responseCount) streaming chunks, current length: \(fullResponse.count)")
                 }
                 
-                // Return early if we have a good response and it's been over 2 seconds
-                // This prevents waiting for slow stream closures
-                if fullResponse.count > 200 && Date().timeIntervalSince(startTime) > 2.0 {
-                    logger.info("✅ Returning early with \(fullResponse.count) chars after \(String(format: "%.1f", Date().timeIntervalSince(startTime)))s")
+                // Progressive loading thresholds:
+                // 1. Return at 200 chars after 1.5 seconds (quick preview)
+                // 2. Return at 400 chars after 3 seconds (good response)
+                // 3. Return at 600 chars after 4 seconds (comprehensive)
+                // 4. Hard stop at 5 seconds regardless
+                
+                let elapsed = Date().timeIntervalSince(startTime)
+                
+                if (fullResponse.count >= 200 && elapsed > 1.5) ||
+                   (fullResponse.count >= 400 && elapsed > 3.0) ||
+                   (fullResponse.count >= 600 && elapsed > 4.0) ||
+                   elapsed > 5.0 {
+                    logger.info("✅ Returning with \(fullResponse.count) chars after \(String(format: "%.1f", elapsed))s")
                     break
                 }
             }

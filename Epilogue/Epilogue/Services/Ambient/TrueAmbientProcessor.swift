@@ -2048,66 +2048,110 @@ extension TrueAmbientProcessor {
         
         logger.info("🚀 Using Perplexity for book knowledge question")
         
-        let response: String
-        do {
-            // Enhance the question with explicit book context
-            let enhancedQuestion: String
-            if let book = bookContext {
-                // Check for cached context first
-                if let cachedContext = BookContextCache.shared.getContext(for: book) {
-                    logger.info("📚 Using cached context for \(book.title)")
-                    // Include rich context in the question
-                    enhancedQuestion = "\(cachedContext.contextString). Question: \(question)"
-                } else {
-                    // Fallback to basic enhancement
-                    enhancedQuestion = "In the book '\(book.title)' by \(book.author), \(question)"
-                }
-                logger.info("📚 Asking about \(book.title): \(question)")
+        // Enhance the question with explicit book context
+        let enhancedQuestion: String
+        if let book = bookContext {
+            // Check for cached context first
+            if let cachedContext = BookContextCache.shared.getContext(for: book) {
+                logger.info("📚 Using cached context for \(book.title)")
+                // Include rich context in the question
+                enhancedQuestion = "\(cachedContext.contextString). Question: \(question)"
             } else {
-                enhancedQuestion = question
+                // Fallback to basic enhancement
+                enhancedQuestion = "In the book '\(book.title)' by \(book.author), \(question)"
             }
-            
-            // Use Perplexity with timeout (5 seconds should be enough with early return)
-            response = try await withThrowingTimeout(seconds: 5.0) {
-                try await OptimizedPerplexityService.shared.chat(
-                    message: enhancedQuestion,
-                    bookContext: bookContext
-                )
-            }
-            logger.info("✅ Got Perplexity response in time: \(response.prefix(50))...")
-        } catch is CancellationError {
-            logger.error("⏱️ Request timed out after 5 seconds")
-            response = "Taking too long. Try a simpler question."
-        } catch let error as PerplexityError {
-            logger.error("❌ Perplexity error: \(error.localizedDescription)")
-            response = error.localizedDescription
-        } catch {
-            logger.error("❌ Unexpected error: \(error)")
-            response = "Something went wrong. Please try again."
+            logger.info("📚 Asking about \(book.title): \(question)")
+        } else {
+            enhancedQuestion = question
         }
         
-        // Update UI with the response
-        await MainActor.run {
-            if questionIndexToUpdate < self.detectedContent.count && 
-               self.detectedContent[questionIndexToUpdate].type == .question {
-                let oldContent = self.detectedContent[questionIndexToUpdate]
-                self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
-                    text: oldContent.text,
-                    type: oldContent.type,
-                    timestamp: oldContent.timestamp,
-                    confidence: oldContent.confidence,
-                    response: response,
-                    bookTitle: oldContent.bookTitle,
-                    bookAuthor: oldContent.bookAuthor
-                )
-                self.objectWillChange.send()
-                logger.info("✅ Updated question with response")
+        // Stream the response progressively
+        var streamedResponse = ""
+        var lastUpdateLength = 0
+        let updateThresholds = [50, 150, 300, 500, 750, 1000] // Progressive update points
+        var thresholdIndex = 0
+        
+        do {
+            for try await chunk in OptimizedPerplexityService.shared.streamSonarResponse(enhancedQuestion, bookContext: bookContext) {
+                streamedResponse = chunk.text
+                
+                // Update UI at thresholds for smooth progressive loading
+                if thresholdIndex < updateThresholds.count && 
+                   streamedResponse.count >= updateThresholds[thresholdIndex] {
+                    
+                    await MainActor.run {
+                        if questionIndexToUpdate < self.detectedContent.count && 
+                           self.detectedContent[questionIndexToUpdate].type == .question {
+                            let oldContent = self.detectedContent[questionIndexToUpdate]
+                            self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                                text: oldContent.text,
+                                type: oldContent.type,
+                                timestamp: oldContent.timestamp,
+                                confidence: oldContent.confidence,
+                                response: streamedResponse,
+                                bookTitle: oldContent.bookTitle,
+                                bookAuthor: oldContent.bookAuthor
+                            )
+                            self.objectWillChange.send()
+                            logger.info("📝 Progressive update at \(streamedResponse.count) chars")
+                        }
+                    }
+                    thresholdIndex += 1
+                    lastUpdateLength = streamedResponse.count
+                }
+                
+                // Stop at 1000 chars or 5 seconds
+                if streamedResponse.count >= 1000 {
+                    logger.info("✅ Reached 1000 char limit")
+                    break
+                }
+            }
+            
+            // Final update if we have more content
+            if streamedResponse.count > lastUpdateLength {
+                await MainActor.run {
+                    if questionIndexToUpdate < self.detectedContent.count && 
+                       self.detectedContent[questionIndexToUpdate].type == .question {
+                        let oldContent = self.detectedContent[questionIndexToUpdate]
+                        self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                            text: oldContent.text,
+                            type: oldContent.type,
+                            timestamp: oldContent.timestamp,
+                            confidence: oldContent.confidence,
+                            response: streamedResponse,
+                            bookTitle: oldContent.bookTitle,
+                            bookAuthor: oldContent.bookAuthor
+                        )
+                        self.objectWillChange.send()
+                        logger.info("✅ Final update with \(streamedResponse.count) chars")
+                    }
+                }
+            }
+            
+        } catch {
+            logger.error("❌ Streaming error: \(error)")
+            let errorMessage = error.localizedDescription
+            await MainActor.run {
+                if questionIndexToUpdate < self.detectedContent.count && 
+                   self.detectedContent[questionIndexToUpdate].type == .question {
+                    let oldContent = self.detectedContent[questionIndexToUpdate]
+                    self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                        text: oldContent.text,
+                        type: oldContent.type,
+                        timestamp: oldContent.timestamp,
+                        confidence: oldContent.confidence,
+                        response: errorMessage,
+                        bookTitle: oldContent.bookTitle,
+                        bookAuthor: oldContent.bookAuthor
+                    )
+                    self.objectWillChange.send()
+                }
             }
         }
         
         // Audio feedback if enabled  
-        if QuestionSettings.audioFeedbackEnabled {
-            await speakResponse(response)
+        if QuestionSettings.audioFeedbackEnabled && !streamedResponse.isEmpty {
+            await speakResponse(streamedResponse)
         }
         
         // Return now that we're done
