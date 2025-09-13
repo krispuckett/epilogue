@@ -1990,6 +1990,12 @@ extension TrueAmbientProcessor {
         // Use AICompanionService directly for reliable responses
         let bookContext = AmbientBookDetector.shared.detectedBook
         
+        if let book = bookContext {
+            logger.info("📚 Have book context: \(book.title) by \(book.author)")
+        } else {
+            logger.warning("⚠️ No book context available!")
+        }
+        
         logger.info("🤖 Calling AICompanionService for: \(question.prefix(50))...")
         
         guard AICompanionService.shared.isConfigured() else {
