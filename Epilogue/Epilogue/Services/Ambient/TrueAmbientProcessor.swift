@@ -2068,12 +2068,19 @@ extension TrueAmbientProcessor {
         // Stream the response progressively
         var streamedResponse = ""
         var lastUpdateLength = 0
-        let updateThresholds = [50, 150, 300, 500, 750, 1000] // Progressive update points
+        let updateThresholds = [200, 400, 600, 800, 1000] // Progressive update points
         var thresholdIndex = 0
+        let startTime = Date()
         
         do {
             for try await chunk in OptimizedPerplexityService.shared.streamSonarResponse(enhancedQuestion, bookContext: bookContext) {
                 streamedResponse = chunk.text
+                
+                // Wait at least 2 seconds before showing first response (keep thinking animation)
+                let elapsed = Date().timeIntervalSince(startTime)
+                if elapsed < 2.0 {
+                    continue // Keep collecting but don't update UI yet
+                }
                 
                 // Update UI at thresholds for smooth progressive loading
                 if thresholdIndex < updateThresholds.count && 
@@ -2107,7 +2114,12 @@ extension TrueAmbientProcessor {
                 }
             }
             
-            // Final update if we have more content
+            // Final update if we have more content (but respect 2-second minimum)
+            let finalElapsed = Date().timeIntervalSince(startTime)
+            if finalElapsed < 2.0 {
+                try? await Task.sleep(nanoseconds: UInt64((2.0 - finalElapsed) * 1_000_000_000))
+            }
+            
             if streamedResponse.count > lastUpdateLength {
                 await MainActor.run {
                     if questionIndexToUpdate < self.detectedContent.count && 
