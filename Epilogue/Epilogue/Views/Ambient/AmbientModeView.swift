@@ -1009,10 +1009,10 @@ struct AmbientModeView: View {
                                 // Camera feedback indicator
                                 if cameraJustUsed && !isProcessingImage {
                                     HStack(spacing: 6) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.green)
+                                        Image(systemName: keyboardText.contains("Quote") ? "quote.bubble.fill" : "checkmark.circle.fill")
+                                            .foregroundColor(keyboardText.contains("Quote") ? .blue : .green)
                                             .font(.system(size: 12))
-                                        Text("Page captured - question generated")
+                                        Text(keyboardText.contains("Quote") ? "Quote detected - ready to save" : "Page captured - question generated")
                                             .font(.caption)
                                             .foregroundColor(.white.opacity(0.6))
                                     }
@@ -2353,16 +2353,35 @@ struct AmbientModeView: View {
     // MARK: - Visual Intelligence Smart Question Generation
     
     private func generateSmartQuestion(from text: String) -> String {
-        let truncated = String(text.prefix(200))
+        let truncated = String(text.prefix(300))
         let wordCount = text.split(separator: " ").count
+        
+        // QUOTE DETECTION - Primary focus
+        // Check if this looks like a meaningful quote worth capturing
+        let isLikelyQuote = detectIfQuote(text)
+        
+        if isLikelyQuote {
+            // Format as a quote capture with context
+            let cleanQuote = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Automatically save as quote if it's perfect length
+            if wordCount >= 15 && wordCount <= 60 {
+                // Auto-save the quote
+                saveExtractedQuote(cleanQuote)
+                return "💭 Quote saved: \"\(truncated)\"... - Add a note?"
+            } else if wordCount < 100 {
+                return "📖 Save this quote: \"\(truncated)\"... [Tap send to save]"
+            }
+        }
         
         // Detect content type and generate appropriate question
         if wordCount < 15 {
             // Very short - likely a title or heading
             return "What is the significance of '\(truncated)'?"
         } else if text.contains("\"") && wordCount < 50 {
-            // Short quote
-            return "Explain this quote: '\(truncated)'"
+            // Contains quotation marks - save as quote
+            saveExtractedQuote(text)
+            return "💭 Quote captured! Add your thoughts?"
         } else if text.contains(where: { ["thee", "thou", "thy", "hath", "doth"].contains(String($0)) }) {
             // Old English detected
             return "Translate to modern English: '\(truncated)...'"
@@ -2382,9 +2401,55 @@ struct AmbientModeView: View {
     }
     
     private func shouldAutoSubmit(_ text: String) -> Bool {
-        // Auto-submit if it's a clear, short quote or title
+        // Don't auto-submit quotes - let user confirm or add notes
+        return false
+    }
+    
+    private func detectIfQuote(_ text: String) -> Bool {
         let wordCount = text.split(separator: " ").count
-        return wordCount < 30 && (text.contains("\"") || text.contains(":"))
+        
+        // Indicators this is a quote worth capturing
+        let quotableIndicators = [
+            text.contains("\""),  // Has quotation marks
+            text.contains("—"),    // Has em dash (often used in quotes)
+            text.contains("..."),  // Has ellipsis
+            wordCount >= 10 && wordCount <= 150,  // Good quote length
+            text.contains(where: { ["love", "life", "death", "time", "hope", "fear", "dream", "heart", "soul", "truth", "beauty", "wisdom", "courage", "strength"].contains(String($0).lowercased()) }),  // Contains profound words
+            text.first?.isUppercase == true && (text.last == "." || text.last == "!" || text.last == "?"),  // Complete sentence
+        ]
+        
+        // If 2+ indicators, it's likely a quote
+        return quotableIndicators.filter { $0 }.count >= 2
+    }
+    
+    private func saveExtractedQuote(_ text: String) {
+        // Save quote to SwiftData immediately
+        let quote = CapturedQuote(
+            text: text,
+            book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+            author: currentBookContext?.author,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual  // User captured via camera
+        )
+        
+        modelContext.insert(quote)
+        
+        do {
+            try modelContext.save()
+            print("💭 Quote auto-saved from camera: \(text.prefix(50))...")
+            
+            // Haptic feedback for saved quote
+            SensoryFeedback.success()
+            
+            // Show toast
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToastMessage"),
+                object: ["message": "Quote saved to \(currentBookContext?.title ?? "your collection")"]
+            )
+        } catch {
+            print("Failed to save quote: \(error)")
+        }
     }
     
     private func saveHighlightedQuote(_ quote: String, pageNumber: Int? = nil) {
