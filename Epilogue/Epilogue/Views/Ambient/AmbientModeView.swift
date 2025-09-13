@@ -1196,7 +1196,6 @@ struct AmbientModeView: View {
                     if let session = currentSession {
                         if let savedQuestion = (session.capturedQuestions ?? []).first(where: { $0.content == item.text }) {
                             savedQuestion.answer = response
-                            savedQuestion.wasAnswered = true
                             try? modelContext.save()
                             print("✅ Updated saved question with answer")
                         }
