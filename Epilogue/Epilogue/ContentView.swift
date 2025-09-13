@@ -241,7 +241,7 @@ struct ContentView: View {
                 showingLibraryCommandPalette = false
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
-                if let query = notification.object as? String {
+                if let query = notification.object as? String, !query.isEmpty {
                     print("📚 Received ShowBookSearch with query: '\(query)'")
                     
                     // Don't trigger if already showing or pending
@@ -250,8 +250,9 @@ struct ContentView: View {
                         return
                     }
                     
+                    // Set the query FIRST before any other state changes
                     bookSearchQuery = query
-                    pendingBookSearch = true  // Mark as pending
+                    pendingBookSearch = true
                     
                     // Dismiss command input with animation
                     withAnimation(DesignSystem.Animation.springStandard) {
@@ -261,12 +262,15 @@ struct ContentView: View {
                     commandText = ""
                     isInputFocused = false
                     
-                    // Use onChange to trigger sheet after state settles
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    // Single async dispatch to show sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
                         if pendingBookSearch && !bookSearchQuery.isEmpty && !showBookSearch {
                             print("📚 Opening sheet with query: '\(bookSearchQuery)'")
                             pendingBookSearch = false
-                            showBookSearch = true
+                            // Ensure query is still set
+                            if !bookSearchQuery.isEmpty {
+                                showBookSearch = true
+                            }
                         }
                     }
                 }
@@ -552,14 +556,14 @@ struct ContentView: View {
         // Provide haptic feedback
         SensoryFeedback.success()
         
-        // Only dismiss if not a book search (book search will dismiss after sheet shows)
+        // Handle dismissal based on command type
         if !isBookSearch {
             dismissCommandInput()
         } else {
-            // For book search, just clear the text but keep the overlay
-            // It will be dismissed when the sheet appears
+            // For book search, just clear text and unfocus
             commandText = ""
             isInputFocused = false
+            // The notification handler will dismiss the overlay and show the sheet
         }
     }
     
