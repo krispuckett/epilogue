@@ -504,12 +504,15 @@ struct AmbientModeView: View {
             breathingTimer?.invalidate()
         }
         .sheet(isPresented: $showImagePicker) {
-            ImagePicker(image: $capturedImage)
-                .onDisappear {
-                    if let image = capturedImage {
-                        processImageForText(image)
-                    }
+            // Use Live Text Scanner for precise quote selection
+            LiveTextScannerView(
+                isPresented: $showImagePicker,
+                scannedText: $extractedText,
+                onQuoteCaptured: { selectedText in
+                    // Process the selected quote
+                    processSelectedQuote(selectedText)
                 }
+            )
         }
         .sheet(isPresented: $showQuoteHighlighter) {
             QuoteHighlighterView(
@@ -2282,7 +2285,42 @@ struct AmbientModeView: View {
         messageText = ""
     }
     
-    // MARK: - Visual Intelligence Photo Capture & OCR
+    // MARK: - Visual Intelligence Live Text Selection
+    private func processSelectedQuote(_ selectedText: String) {
+        // Show processing state
+        isProcessingImage = true
+        cameraJustUsed = true
+        
+        // Haptic feedback for quote capture
+        SensoryFeedback.success()
+        
+        // Generate smart input based on selected text
+        let smartInput = generateSmartQuestion(from: selectedText)
+        
+        // Update the input field
+        withAnimation(.easeInOut(duration: 0.3)) {
+            keyboardText = smartInput
+        }
+        
+        // Reset states
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isProcessingImage = false
+        }
+        
+        // Reset camera indicator after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            withAnimation {
+                cameraJustUsed = false
+            }
+        }
+        
+        // If it's a perfect quote, save it immediately
+        if detectIfQuote(selectedText) && selectedText.split(separator: " ").count <= 60 {
+            saveExtractedQuote(selectedText)
+        }
+    }
+    
+    // MARK: - Visual Intelligence Photo Capture & OCR (Fallback)
     private func processImageForText(_ image: UIImage) {
         guard let cgImage = image.cgImage else { return }
         
