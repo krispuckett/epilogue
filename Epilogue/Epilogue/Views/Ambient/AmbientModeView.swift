@@ -396,6 +396,7 @@ struct AmbientModeView: View {
                                 bookContext: currentBookContext,
                                 messageType: .text
                             )
+                            print("📝 Progressive UI update: \(response.count) chars")
                         }
                     }
                 }
@@ -1223,7 +1224,12 @@ struct AmbientModeView: View {
                             expandedMessageIds.insert(updatedMessage.id)
                         }
                         
+                        // Force UI refresh
+                        objectWillChange.send()
+                        
                         print("✅ Updated thinking message with response and expanded it")
+                        print("   Message content: \(updatedMessage.content.prefix(100))...")
+                        print("   Total messages: \(messages.count)")
                     } else {
                         // No thinking message found, add response as new message
                         let aiMessage = UnifiedChatMessage(
