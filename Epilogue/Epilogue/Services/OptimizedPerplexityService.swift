@@ -525,31 +525,24 @@ class OptimizedPerplexityService: ObservableObject {
         
         let systemPrompt = bookContext.map { book in
             """
-            You are answering questions about the specific book "\(book.title)" by \(book.author).
-            The user is asking about THIS SPECIFIC BOOK ONLY.
-            Answer based on your knowledge of "\(book.title)" - its plot, characters, themes, and events.
-            DO NOT provide general information about storytelling or literature.
-            DO NOT search the web. Use your training knowledge of this classic book.
-            IMPORTANT: The question is specifically about "\(book.title)" by \(book.author).
+            You are discussing the book "\(book.title)" by \(book.author).
+            Focus your answer specifically on this book's content, characters, and themes.
             """
         } ?? "Be concise and helpful."
         
-        // For book questions, use a model without web search
-        let modelToUse = bookContext != nil ? "llama-3.1-70b-instruct" : "sonar"
-        
-        // Always include search parameters for hybrid responses
+        // Back to sonar - it was working fine before
         let body: [String: Any] = [
-            "model": modelToUse,  // Use appropriate model
+            "model": "sonar",  // Always use sonar for proxy
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": query]
             ],
             "stream": stream,
             "search_recency": "month",
-            "return_citations": false,  // Don't need citations for book knowledge
+            "return_citations": true,
             "return_images": false,
             "search_domain_filter": [],  // No domain restrictions
-            "temperature": 0.3,  // Lower temperature for more factual responses
+            "temperature": 0.7,
             "max_tokens": 500  // Reduced for faster responses
         ]
         
@@ -585,7 +578,10 @@ class OptimizedPerplexityService: ObservableObject {
     
     func chat(message: String, bookContext: Book?) async throws -> String {
         // Use streaming internally but return complete response
-        logger.info("🚀 Starting chat request: \(message.prefix(50))...")
+        logger.info("🚀 Starting chat request: \(message.prefix(100))...")
+        if let book = bookContext {
+            logger.info("📚 Book context: \(book.title) by \(book.author)")
+        }
         var fullResponse = ""
         var responseCount = 0
         let startTime = Date()
