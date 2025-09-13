@@ -1224,9 +1224,6 @@ struct AmbientModeView: View {
                             expandedMessageIds.insert(updatedMessage.id)
                         }
                         
-                        // Force UI refresh
-                        objectWillChange.send()
-                        
                         print("✅ Updated thinking message with response and expanded it")
                         print("   Message content: \(updatedMessage.content.prefix(100))...")
                         print("   Total messages: \(messages.count)")
