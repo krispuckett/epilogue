@@ -243,6 +243,13 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
                 if let query = notification.object as? String {
                     print("📚 Received ShowBookSearch with query: '\(query)'")
+                    
+                    // Don't trigger if already showing or pending
+                    guard !showBookSearch && !pendingBookSearch else {
+                        print("⚠️ Book search already showing or pending, ignoring")
+                        return
+                    }
+                    
                     bookSearchQuery = query
                     pendingBookSearch = true  // Mark as pending
                     
@@ -256,7 +263,7 @@ struct ContentView: View {
                     
                     // Use onChange to trigger sheet after state settles
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        if pendingBookSearch && !bookSearchQuery.isEmpty {
+                        if pendingBookSearch && !bookSearchQuery.isEmpty && !showBookSearch {
                             print("📚 Opening sheet with query: '\(bookSearchQuery)'")
                             pendingBookSearch = false
                             showBookSearch = true
@@ -527,6 +534,8 @@ struct ContentView: View {
             dismissCommandInput()
             return
         }
+        
+        print("📝 Processing command: '\(trimmedText)'")
         
         // Check if this is a book search command (don't dismiss if it is)
         let intent = CommandParser.parse(trimmedText, books: libraryViewModel.books, notes: notesViewModel.notes)
