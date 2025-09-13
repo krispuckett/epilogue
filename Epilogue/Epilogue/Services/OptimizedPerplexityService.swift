@@ -525,27 +525,31 @@ class OptimizedPerplexityService: ObservableObject {
         
         let systemPrompt = bookContext.map { book in
             """
-            You are answering questions ONLY about the book "\(book.title)" by \(book.author).
-            DO NOT search for other books or web content.
-            When asked about "this book" or "the book", the user means "\(book.title)".
-            Base your answers on the well-known plot, characters, and themes of "\(book.title)".
-            Be concise and factual.
+            You are answering questions about the specific book "\(book.title)" by \(book.author).
+            The user is asking about THIS SPECIFIC BOOK ONLY.
+            Answer based on your knowledge of "\(book.title)" - its plot, characters, themes, and events.
+            DO NOT provide general information about storytelling or literature.
+            DO NOT search the web. Use your training knowledge of this classic book.
+            IMPORTANT: The question is specifically about "\(book.title)" by \(book.author).
             """
         } ?? "Be concise and helpful."
         
+        // For book questions, use a model without web search
+        let modelToUse = bookContext != nil ? "llama-3.1-70b-instruct" : "sonar"
+        
         // Always include search parameters for hybrid responses
         let body: [String: Any] = [
-            "model": "sonar",  // Always use sonar for proxy
+            "model": modelToUse,  // Use appropriate model
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": query]
             ],
             "stream": stream,
             "search_recency": "month",
-            "return_citations": true,
+            "return_citations": false,  // Don't need citations for book knowledge
             "return_images": false,
             "search_domain_filter": [],  // No domain restrictions
-            "temperature": 0.7,
+            "temperature": 0.3,  // Lower temperature for more factual responses
             "max_tokens": 500  // Reduced for faster responses
         ]
         
