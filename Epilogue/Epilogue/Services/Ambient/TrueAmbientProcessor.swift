@@ -2054,8 +2054,8 @@ extension TrueAmbientProcessor {
                 enhancedQuestion = question
             }
             
-            // Use Perplexity with timeout
-            response = try await withThrowingTimeout(seconds: 3.0) {
+            // Use Perplexity with timeout (10 seconds for complete responses)
+            response = try await withThrowingTimeout(seconds: 10.0) {
                 try await OptimizedPerplexityService.shared.chat(
                     message: enhancedQuestion,
                     bookContext: bookContext
@@ -2063,7 +2063,7 @@ extension TrueAmbientProcessor {
             }
             logger.info("✅ Got Perplexity response in time: \(response.prefix(50))...")
         } catch is CancellationError {
-            logger.error("⏱️ Request timed out after 3 seconds")
+            logger.error("⏱️ Request timed out after 10 seconds")
             response = "Taking too long. Try a simpler question."
         } catch let error as PerplexityError {
             logger.error("❌ Perplexity error: \(error.localizedDescription)")
