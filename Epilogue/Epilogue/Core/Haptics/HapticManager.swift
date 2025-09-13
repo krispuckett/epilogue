@@ -28,7 +28,9 @@ final class HapticManager {
                 hapticEngine = try CHHapticEngine()
                 try hapticEngine?.start()
             } catch {
+                #if DEBUG
                 print("Failed to initialize haptic engine: \(error)")
+                #endif
             }
         }
         
@@ -173,7 +175,9 @@ final class HapticManager {
             do {
                 try hapticEngine?.start()
             } catch {
+                #if DEBUG
                 print("Failed to restart haptic engine: \(error)")
+                #endif
             }
         }
     }

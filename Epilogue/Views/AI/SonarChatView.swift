@@ -581,7 +581,9 @@ class SonarChatViewModel: ObservableObject {
                 ) {
                     switch update {
                     case .started(let estimatedTokens):
+                        #if DEBUG
                         print("Starting stream with ~\(estimatedTokens) tokens")
+                        #endif
                         
                     case .content(let text, let total):
                         streamingContent = total
@@ -610,11 +612,15 @@ class SonarChatViewModel: ObservableObject {
                         // Update remaining queries
                         queriesRemaining = await requestManager.getRemainingQueries()
                         
+                        #if DEBUG
                         print("Stream completed: \(totalTokens) tokens, cost: $\(String(format: "%.4f", cost))")
+                        #endif
                     }
                 }
             } catch {
+                #if DEBUG
                 print("Stream error: \(error)")
+                #endif
                 isStreaming = false
                 
                 // Show error message

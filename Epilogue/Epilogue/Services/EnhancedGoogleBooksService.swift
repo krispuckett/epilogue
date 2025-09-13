@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 // Enhanced Google Books Service with smart ranking and filtering
 class EnhancedGoogleBooksService: GoogleBooksService {
@@ -256,7 +257,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             let response = try JSONDecoder().decode(GoogleBooksResponse.self, from: data)
             return response.items ?? []
         } catch {
-            print("Search error: \(error)")
+            os_log(.error, log: OSLog.default, "Search error: %@", error.localizedDescription)
             return nil
         }
     }

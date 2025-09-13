@@ -10,10 +10,14 @@ extension ModelContext {
         do {
             if hasChanges {
                 try save()
+                #if DEBUG
                 print("✅ SwiftData saved successfully")
+                #endif
             }
         } catch {
+            #if DEBUG
             print("❌ SwiftData save failed: \(error)")
+            #endif
             // Log to crash reporting
             CrashPreventionManager.shared.logError(error, context: "SwiftData.save")
             
@@ -27,7 +31,9 @@ extension ModelContext {
         do {
             return try fetch(descriptor)
         } catch {
+            #if DEBUG
             print("❌ SwiftData fetch failed: \(error)")
+            #endif
             CrashPreventionManager.shared.logError(error, context: "SwiftData.fetch")
             return []
         }
@@ -38,9 +44,13 @@ extension ModelContext {
         do {
             delete(model)
             try save()
+            #if DEBUG
             print("✅ SwiftData deleted model successfully")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ SwiftData delete failed: \(error)")
+            #endif
             CrashPreventionManager.shared.logError(error, context: "SwiftData.delete")
             rollback()
         }
@@ -53,9 +63,13 @@ extension ModelContext {
                 delete(model)
             }
             try save()
+            #if DEBUG
             print("✅ SwiftData batch deleted \(models.count) models")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ SwiftData batch delete failed: \(error)")
+            #endif
             CrashPreventionManager.shared.logError(error, context: "SwiftData.batchDelete")
             rollback()
         }
@@ -66,9 +80,13 @@ extension ModelContext {
         do {
             insert(model)
             try save()
+            #if DEBUG
             print("✅ SwiftData inserted model successfully")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ SwiftData insert failed: \(error)")
+            #endif
             CrashPreventionManager.shared.logError(error, context: "SwiftData.insert")
             rollback()
         }
@@ -81,7 +99,9 @@ extension ModelContext {
             try save()
             return result
         } catch {
+            #if DEBUG
             print("❌ SwiftData transaction failed: \(error)")
+            #endif
             CrashPreventionManager.shared.logError(error, context: "SwiftData.transaction")
             rollback()
             return nil
@@ -99,7 +119,9 @@ extension ModelContext {
             _ = try fetch(descriptor)
             return true
         } catch {
+            #if DEBUG
             print("⚠️ ModelContext health check failed: \(error)")
+            #endif
             return false
         }
     }
@@ -143,7 +165,9 @@ struct SafeQuery<T: PersistentModel> {
         do {
             results = try modelContext.fetch(fetchDescriptor)
         } catch {
+            #if DEBUG
             print("❌ SafeQuery fetch failed: \(error)")
+            #endif
             hasError = true
             results = []
         }
@@ -206,12 +230,16 @@ struct SwiftDataMigrationModifier: ViewModifier {
     
     private func migrate() async throws {
         // Perform migration logic here
+        #if DEBUG
         print("🔄 Starting SwiftData migration...")
+        #endif
         
         // Mark migration as complete
         UserDefaults.standard.set(true, forKey: "com.epilogue.swiftdata.migration.v1")
         
+        #if DEBUG
         print("✅ SwiftData migration complete")
+        #endif
     }
 }
 
@@ -230,7 +258,9 @@ extension PersistentModel {
             updates()
             try context.save()
         } catch {
+            #if DEBUG
             print("❌ Model update failed: \(error)")
+            #endif
             context.rollback()
         }
     }
@@ -258,7 +288,9 @@ extension ModelContext {
                     try save()
                 }
             } catch {
+                #if DEBUG
                 print("❌ Batch insert failed at item \(Int(inserted)): \(error)")
+                #endif
                 // Continue with next item
             }
         }

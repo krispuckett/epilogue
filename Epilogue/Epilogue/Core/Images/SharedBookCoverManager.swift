@@ -236,14 +236,18 @@ public class SharedBookCoverManager: ObservableObject {
         // Create loading task with retry logic
         let task = Task<UIImage?, Never> {
             guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else {
+                #if DEBUG
                 print("❌ Invalid or unsafe URL")
+                #endif
                 return nil
             }
             
             // Try up to 3 times with exponential backoff
             for attempt in 1...3 {
                 do {
+                    #if DEBUG
                     print("📥 Loading book cover from: \(url.absoluteString.suffix(100)) (attempt \(attempt))")
+                    #endif
                     
                     // Create request with timeout
                     var request = URLRequest(url: url)
@@ -281,7 +285,9 @@ public class SharedBookCoverManager: ObservableObject {
                     }
                     
                     guard let originalImage = UIImage(data: data) else { 
+                        #if DEBUG
                         print("❌ Failed to decode image data")
+                        #endif
                         if attempt < 3 {
                             try? await Task.sleep(nanoseconds: 1_000_000_000)
                             continue

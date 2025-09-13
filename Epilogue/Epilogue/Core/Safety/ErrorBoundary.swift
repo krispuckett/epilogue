@@ -96,7 +96,9 @@ struct SafeTask<Content: View>: View {
                     do {
                         try await action()
                     } catch {
+                        #if DEBUG
                         print("❌ SafeTask error: \(error)")
+                        #endif
                         await MainActor.run {
                             hasError = true
                         }
@@ -124,8 +126,10 @@ class CrashPreventionManager: ObservableObject {
     private func setupGlobalErrorHandling() {
         // Set up NSSetUncaughtExceptionHandler for Objective-C exceptions
         NSSetUncaughtExceptionHandler { exception in
+            #if DEBUG
             print("🚨 Uncaught exception: \(exception)")
             print("📍 Call stack: \(exception.callStackSymbols)")
+            #endif
             
             // Log to crash reporting service if available
             Task { @MainActor in
@@ -136,12 +140,16 @@ class CrashPreventionManager: ObservableObject {
     }
     
     func logError(_ error: Error, context: String = "") {
+        #if DEBUG
         print("❌ Error in \(context): \(error)")
+        #endif
         // Add crash reporting service here if needed
     }
     
     func logWarning(_ message: String) {
+        #if DEBUG
         print("⚠️ Warning: \(message)")
+        #endif
     }
 }
 

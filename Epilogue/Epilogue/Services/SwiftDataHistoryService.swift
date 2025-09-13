@@ -63,7 +63,9 @@ final class SwiftDataHistoryService {
             
             self.modelContext = modelContainer?.mainContext
         } catch {
+            #if DEBUG
             print("Failed to initialize SwiftData history: \(error)")
+            #endif
             self.modelContainer = nil
             self.modelContext = nil
         }
@@ -176,7 +178,9 @@ final class SwiftDataHistoryService {
             fetchDescriptor.fetchLimit = limit
             return try context.fetch(fetchDescriptor)
         } catch {
+            #if DEBUG
             print("Failed to fetch history: \(error)")
+            #endif
             return []
         }
     }
@@ -196,7 +200,9 @@ final class SwiftDataHistoryService {
         do {
             return try context.fetch(descriptor)
         } catch {
+            #if DEBUG
             print("Failed to fetch recent changes: \(error)")
+            #endif
             return []
         }
     }
@@ -251,7 +257,9 @@ final class SwiftDataHistoryService {
         do {
             try context.save()
         } catch {
+            #if DEBUG
             print("Failed to save history entry: \(error)")
+            #endif
         }
     }
     

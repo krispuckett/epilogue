@@ -567,7 +567,9 @@ class PerplexityChatViewModel: ObservableObject {
                 ) {
                     switch update {
                     case .started(let estimatedTokens):
+                        #if DEBUG
                         print("Starting stream with ~\(estimatedTokens) tokens")
+                        #endif
                         
                     case .content(let text, let total):
                         streamingContent = total
@@ -595,11 +597,15 @@ class PerplexityChatViewModel: ObservableObject {
                         
                         queriesRemaining = await requestManager.getRemainingQueries()
                         
+                        #if DEBUG
                         print("Completed: \(totalTokens) tokens, $\(String(format: "%.4f", cost))")
+                        #endif
                     }
                 }
             } catch {
+                #if DEBUG
                 print("Stream error: \(error)")
+                #endif
                 isStreaming = false
                 
                 let errorMessage = ChatMessage(

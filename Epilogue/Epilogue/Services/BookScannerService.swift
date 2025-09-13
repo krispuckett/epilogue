@@ -153,7 +153,9 @@ class BookScannerService: NSObject, ObservableObject {
             }
             
         } catch {
+            #if DEBUG
             print("Vision processing error: \(error)")
+            #endif
             await MainActor.run {
                 scanError = .processingFailed
             }
@@ -186,7 +188,9 @@ class BookScannerService: NSObject, ObservableObject {
                         let size = observation.boundingBox.size
                         allText.append((text: text, position: position, size: size))
                         confidenceScores.append(candidate.confidence)
+                        #if DEBUG
                         print("📝 Detected text at Y:\(position.y), size: \(size.height)")
+                        #endif
                         break // Use first good candidate
                     }
                 }
@@ -201,7 +205,9 @@ class BookScannerService: NSObject, ObservableObject {
             // The largest text is likely the main title
             if let largestText = sortedBySize.first {
                 info.title = largestText.text
+                #if DEBUG
                 print("📖 Main title identified")
+                #endif
                 
                 // Special case: if title is just "ENDURANCE", it's definitely the Shackleton book
                 if largestText.text.uppercased() == "ENDURANCE" {
@@ -230,7 +236,9 @@ class BookScannerService: NSObject, ObservableObject {
                     let numbers = item.text.filter { $0.isNumber }
                     if numbers.count == 13 {
                         info.isbn = numbers
+                        #if DEBUG
                         print("📚 Found ISBN")
+                        #endif
                     }
                 }
             }
@@ -287,7 +295,9 @@ class BookScannerService: NSObject, ObservableObject {
                 self.extractedText = allTextStrings.joined(separator: " ")
             }
             
+            #if DEBUG
             print("📖 Final extraction completed")
+            #endif
         }
         
         return info

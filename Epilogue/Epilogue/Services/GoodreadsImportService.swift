@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Combine
 import UIKit
+import os.log
 
 // Service for importing Goodreads CSV exports
 @MainActor
@@ -349,10 +350,12 @@ class GoodreadsImportService: ObservableObject {
                 totalBatches: totalBatches
             )
             isImporting = false
+            #if DEBUG
             print("\n📊 Cover Selection Stats:")
             print("  🎯 Google colorful: \(coverStats.selectedGoogleColorful)")
             print("  🚫 Google grayscale skipped: \(coverStats.grayscaleGoogleSkipped)")
             print("  🔄 Open Library fallback used: \(coverStats.openLibraryFallback)")
+            #endif
             
             return result
             
@@ -459,10 +462,12 @@ class GoodreadsImportService: ObservableObject {
             
             processedCount += batch.count
             
+            #if DEBUG
             // Log progress
             let batchTime = Date().timeIntervalSince(batchStart)
             print("📚 Batch \(index + 1)/\(totalBatches): \(batch.count) books in \(String(format: "%.1f", batchTime))s")
             print("   Cache hits: \(batchResult.cacheHits), API calls: \(batchResult.apiCalls)")
+            #endif
             
             // Adaptive delay between batches
             if index < batches.count - 1 {
@@ -480,7 +485,9 @@ class GoodreadsImportService: ObservableObject {
             }
         }
         
+        #if DEBUG
         print("✅ Import complete: \(totalCacheHits) cache hits, \(totalAPICalls) API calls")
+        #endif
         return combinedResult
     }
     
@@ -683,8 +690,10 @@ class GoodreadsImportService: ObservableObject {
         let headers = parseCSVLine(headerLine)
         let columnMap = createColumnMap(from: headers)
         
+        #if DEBUG
         print("📚 Found \(headers.count) columns in CSV")
         print("📚 Processing \(lines.count - 1) rows")
+        #endif
         
         var books: [GoodreadsBook] = []
         var skippedRows = 0
@@ -700,7 +709,9 @@ class GoodreadsImportService: ObservableObject {
                 books.append(book)
             } else {
                 skippedRows += 1
+                #if DEBUG
                 print("⚠️ Skipped invalid row \(index + 1)")
+                #endif
             }
             
             // Update progress every 25 rows
@@ -718,7 +729,9 @@ class GoodreadsImportService: ObservableObject {
             }
         }
         
+        #if DEBUG
         print("✅ Parsed \(books.count) books, skipped \(skippedRows) invalid rows")
+        #endif
         return books
     }
     
@@ -1123,9 +1136,13 @@ class GoodreadsImportService: ObservableObject {
         
         // Use enhanced service with better query parsing
         let searchQuery = "\(goodreadsBook.title) by \(goodreadsBook.author)"
+        #if DEBUG
         print("🔍 Searching Google Books for: \(searchQuery)")
+        #endif
         let results = await enhancedService.searchBooksWithRanking(query: searchQuery, preferISBN: nil, publisherHint: goodreadsBook.publisher)
+        #if DEBUG
         print("   Found \(results.count) results")
+        #endif
         
         // Pick the first non-grayscale cover among top results
         if let book = await pickBestNonGrayscale(from: results) ?? results.first {
@@ -1224,10 +1241,14 @@ class GoodreadsImportService: ObservableObject {
             if let url = candidate.coverImageURL,
                let image = await SharedBookCoverManager.shared.loadThumbnail(from: url) {
                 if !ImageQualityEvaluator.isLikelyGrayscale(image) {
+                    #if DEBUG
                     print("✅ Using result #\(idx + 1) with colorful cover: \(candidate.id)")
+                    #endif
                     return candidate
                 } else {
+                    #if DEBUG
                     print("⚠️ Result #\(idx + 1) appears grayscale, trying next…")
+                    #endif
                 }
             }
         }
@@ -1294,27 +1315,41 @@ class GoodreadsImportService: ObservableObject {
         if let thumbnail = volumeInfo.imageLinks?.thumbnail {
             // Thumbnail is the most reliable and always present
             coverURL = thumbnail
+            #if DEBUG
             print("   ✅ Using thumbnail URL: \(thumbnail)")
+            #endif
         } else if let small = volumeInfo.imageLinks?.small {
             coverURL = small
+            #if DEBUG
             print("   ✅ Using small URL: \(small)")
+            #endif
         } else if let medium = volumeInfo.imageLinks?.medium {
             coverURL = medium
+            #if DEBUG
             print("   ✅ Using medium URL: \(medium)")
+            #endif
         } else if let large = volumeInfo.imageLinks?.large {
             coverURL = large
+            #if DEBUG
             print("   ✅ Using large URL: \(large)")
+            #endif
         } else if let extraLarge = volumeInfo.imageLinks?.extraLarge {
             coverURL = extraLarge
+            #if DEBUG
             print("   ✅ Using extraLarge URL: \(extraLarge)")
+            #endif
         } else {
+            #if DEBUG
             print("   ⚠️ No image URLs found in volumeInfo.imageLinks")
+            #endif
         }
         
         // Ensure HTTPS for all URLs
         if let url = coverURL, url.starts(with: "http://") {
             coverURL = url.replacingOccurrences(of: "http://", with: "https://")
+            #if DEBUG
             print("   🔒 Converted to HTTPS: \(coverURL!)")
+            #endif
         }
         
         if verboseLogging {
@@ -1498,7 +1533,7 @@ class GoodreadsImportService: ObservableObject {
                 }
             })
         } catch {
-            print("Failed to load existing books: \(error)")
+            os_log(.error, log: OSLog.default, "Failed to load existing books: %@", error.localizedDescription)
         }
     }
     
@@ -1530,23 +1565,31 @@ class GoodreadsImportService: ObservableObject {
         let saveChunks = books.chunked(into: 20)
         let totalChunks = saveChunks.count
         
+        #if DEBUG
         print("📚 Starting to save \(books.count) books in \(totalChunks) batches")
+        #endif
         
         for (index, chunk) in saveChunks.enumerated() {
+            #if DEBUG
             print("💾 Saving batch \(index + 1) of \(totalChunks) (\(chunk.count) books)")
+            #endif
             
             // Insert books in this chunk
             for processedBook in chunk {
+                #if DEBUG
                 print("  📖 Inserting: \(processedBook.bookModel.title) by \(processedBook.bookModel.author)")
+                #endif
                 modelContext.insert(processedBook.bookModel)
             }
             
             // Save after each chunk
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("  ✅ Batch \(index + 1) saved successfully")
+                #endif
             } catch {
-                print("  ❌ Failed to save batch \(index + 1): \(error)")
+                os_log(.error, log: OSLog.default, "Failed to save batch %d: %@", index + 1, error.localizedDescription)
                 throw error
             }
             
@@ -1574,7 +1617,9 @@ class GoodreadsImportService: ObservableObject {
             }
         }
         
+        #if DEBUG
         print("💾 Successfully saved \(books.count) books in \(totalChunks) batches")
+        #endif
     }
     
     // MARK: - Cache Management
@@ -1668,7 +1713,9 @@ class GoodreadsImportService: ObservableObject {
         isbnCache.removeAll()
         titleAuthorCache.removeAll()
         existingBooksCache.removeAll()
+        #if DEBUG
         print("🧹 Cleared all caches")
+        #endif
     }
     
     private func matchBookViaAPI(_ goodreadsBook: GoodreadsBook) async throws -> ProcessedBook? {
@@ -1773,8 +1820,7 @@ class GoodreadsImportService: ObservableObject {
     // MARK: - Testing
     
     func runTestImport(modelContext: ModelContext, googleBooksService: GoogleBooksService) async {
-        print("\n🧪 Starting Goodreads Import Test")
-        print(String(repeating: "=", count: 50))
+        #if DEBUG
         
         // Test CSV data with various edge cases
         let testCSV = """
@@ -1951,6 +1997,7 @@ class GoodreadsImportService: ObservableObject {
             print("\n❌ Test failed: \(error.localizedDescription)")
             print(String(repeating: "=", count: 50))
         }
+        #endif
     }
     
     // MARK: - Errors

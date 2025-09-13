@@ -5,16 +5,22 @@ struct SimpleColorExtractor {
     
     // Extract dominant colors from an image
     static func extractColors(from image: UIImage, maxColors: Int = 5) -> (colors: [Color], brightness: Double) {
+        #if DEBUG
         print("🎨 Starting color extraction for image size: \(image.size)")
+        #endif
         
         // Resize image for performance
         guard let resizedImage = resizeImage(image, targetSize: CGSize(width: 100, height: 150)),
               let cgImage = resizedImage.cgImage else {
+            #if DEBUG
             print("❌ Failed to resize image")
+            #endif
             return ([], 0.5)
         }
         
+        #if DEBUG
         print("📐 Resized to: \(resizedImage.size)")
+        #endif
         
         // Extract pixel data
         let width = cgImage.width
@@ -103,18 +109,24 @@ struct SimpleColorExtractor {
         var colors = Array(sortedColors)
         let averageBrightness = pixelCount > 0 ? totalBrightness / Double(pixelCount) : 0.5
         
+        #if DEBUG
         print("🎨 Extracted \(colors.count) colors (before enhancement):")
+        #endif
         for (index, color) in colors.enumerated() {
             let uiColor = UIColor(color)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
             let brightness = (r + g + b) / 3.0
+            #if DEBUG
             print("  Color \(index): R:\(String(format: "%.2f", r)) G:\(String(format: "%.2f", g)) B:\(String(format: "%.2f", b)) Brightness:\(String(format: "%.2f", brightness))")
+            #endif
         }
         
         // Enhance colors if too dark
         if averageBrightness < 0.3 {
+            #if DEBUG
             print("⚡ Enhancing dark colors (avg brightness: \(String(format: "%.2f", averageBrightness)))")
+            #endif
             colors = colors.map { color in
                 let uiColor = UIColor(color)
                 var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -156,19 +168,27 @@ struct SimpleColorExtractor {
             }
         }
         
+        #if DEBUG
         print("🎨 Enhanced colors:")
+        #endif
         for (index, color) in colors.enumerated() {
             let uiColor = UIColor(color)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
             let brightness = (r + g + b) / 3.0
+            #if DEBUG
             print("  Color \(index): R:\(String(format: "%.2f", r)) G:\(String(format: "%.2f", g)) B:\(String(format: "%.2f", b)) Brightness:\(String(format: "%.2f", brightness))")
+            #endif
         }
+        #if DEBUG
         print("🔆 Average brightness: \(String(format: "%.2f", averageBrightness))")
+        #endif
         
         // Temporary debug boost for testing
         if averageBrightness < 0.3 && colors.isEmpty == false {
+            #if DEBUG
             print("🔥 DEBUG: Applying additional brightness boost")
+            #endif
             colors = colors.map { color in
                 let uiColor = UIColor(color)
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0

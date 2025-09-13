@@ -44,7 +44,9 @@ public class OKLABColorExtractor {
         
         // Check image size to detect cropped covers
         if image.size.width < 100 || image.size.height < 100 {
+            #if DEBUG
             print("WARNING: Image too small (\(image.size.width)x\(image.size.height)), likely cropped!")
+            #endif
         }
         
         guard let cgImage = image.cgImage else {
@@ -61,7 +63,9 @@ public class OKLABColorExtractor {
         let scale = min(maxDimension / CGFloat(cgImage.width), maxDimension / CGFloat(cgImage.height), 1.0)
         
         if scale < 1.0 {
+            #if DEBUG
             print("  Image too large (\(cgImage.width)x\(cgImage.height)), downsampling to \(Int(CGFloat(cgImage.width) * scale))x\(Int(CGFloat(cgImage.height) * scale))")
+            #endif
             
             // Downsample image first
             if let downsampledImage = await downsampleImage(cgImage, scale: scale) {
@@ -117,15 +121,19 @@ public class OKLABColorExtractor {
         let bytesPerPixel = 4
         let bytesPerRow = cgImage.bytesPerRow
         
+        #if DEBUG
         print("\nColorCube Extraction for \(imageSource)")
         print("  🚀 FRESH EXTRACTION STARTING (not from cache)")
         print("  Processing size: \(width)x\(height) = \(width * height) pixels")
         if originalSize.width > CGFloat(width) {
             print("  Original size: \(Int(originalSize.width))x\(Int(originalSize.height))")
         }
+        #endif
         
+        #if DEBUG
         // Add debug logging
         print("  Creating bitmap context...")
+        #endif
         var pixelData = [UInt8](repeating: 0, count: bytesPerRow * height)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         
@@ -143,7 +151,9 @@ public class OKLABColorExtractor {
         
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
         
+        #if DEBUG
         print("  Building ColorCube...")
+        #endif
         // Build 3D color histogram (ColorCube)
         let cubeSize = 16  // 16x16x16 = 4096 possible colors
         var colorCube = Array(repeating: Array(repeating: Array(repeating: 0, count: cubeSize), count: cubeSize), count: cubeSize)
@@ -152,9 +162,13 @@ public class OKLABColorExtractor {
         
         // Skip edge detection for performance
         let _: [(Int, Int)] = []
+        #if DEBUG
         print("  Skipping edge detection for performance...")
+        #endif
         
+        #if DEBUG
         print("  Building histogram from \(width * height) pixels...")
+        #endif
         // First pass: Build 3D histogram
         for y in 0..<height {
             for x in 0..<width {
@@ -192,12 +206,16 @@ public class OKLABColorExtractor {
         let blackPercentage = Double(blackPixels) * 100.0 / Double(width * height)
         let isDarkCover = blackPercentage > 70
         
+        #if DEBUG
         print("  Black pixels: \(String(format: "%.1f", blackPercentage))%")
         print("  Dark cover detected: \(isDarkCover)")
+        #endif
         
         // For dark covers, perform multi-scale analysis to find small accent colors
         if isDarkCover {
+            #if DEBUG
             print("\nPerforming multi-scale analysis for dark cover...")
+            #endif
             // Always run multi-scale on dark covers to capture small bright accents (e.g., title bars/emblems)
             let multiScaleColors = performMultiScaleAnalysis(cgImage: cgImage, pixelData: pixelData, width: width, height: height, bytesPerRow: bytesPerRow)
             
@@ -281,8 +299,11 @@ public class OKLABColorExtractor {
             }
         }
         
+        #if DEBUG
         print("\nFound \(colorPeaks.count) distinct color peaks")
+        #endif
         
+        #if DEBUG
         // After sorting peaks
         print("DEBUG: Sorted peaks for role assignment:")
         for (index, peak) in colorPeaks.prefix(3).enumerated() {
@@ -290,6 +311,7 @@ public class OKLABColorExtractor {
             peak.color.getRed(&r, green: &g, blue: &b, alpha: &a)
             print("  \(index+1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - Count: \(peak.count)")
         }
+        #endif
         
         // Filter out compression artifacts (colors that appear in regular patterns)
         let filteredPeaks = filterCompressionArtifacts(colorPeaks)
@@ -312,7 +334,9 @@ public class OKLABColorExtractor {
                             Int(h*360), s, brightness,
                             peak.count, peak.distinctiveness)
             colorInfo.append((peak.color, info))
+            #if DEBUG
             print("  \(info)")
+            #endif
         }
         
         // Ensure we have at least 4 colors
@@ -326,12 +350,14 @@ public class OKLABColorExtractor {
         // Detect if the palette is monochromatic
         let isMonochromatic = detectMonochromatic(roles: roles, peaks: filteredPeaks)
         
+        #if DEBUG
         print("\nFinal ColorCube Palette:")
         print("  Primary: \(colorDescription(roles.primary))")
         print("  Secondary: \(colorDescription(roles.secondary))")
         print("  Accent: \(colorDescription(roles.accent))")
         print("  Background: \(colorDescription(roles.background))")
         print("  Monochromatic: \(isMonochromatic)")
+        #endif
         
         return ColorPalette(
             primary: Color(roles.primary),
@@ -357,7 +383,9 @@ public class OKLABColorExtractor {
         ]
         
         for (scale, weight) in scales {
+            #if DEBUG
             print("  Analyzing at \(Int(scale * 100))% scale (weight: \(Int(weight * 100))%)...")
+            #endif
             
             if scale == 1.0 {
                 // Use existing pixel data for 100% scale
@@ -408,12 +436,14 @@ public class OKLABColorExtractor {
         // Sort by weighted count
         let sortedColors = vibrantColors.sorted { $0.1 > $1.1 }
         
+        #if DEBUG
         print("  Found \(sortedColors.count) vibrant colors across scales")
         for (index, (color, count)) in sortedColors.prefix(5).enumerated() {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             color.getRed(&r, green: &g, blue: &b, alpha: &a)
             print("    \(index + 1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - Weighted count: \(count)")
         }
+        #endif
         
         return sortedColors
     }
@@ -542,6 +572,7 @@ public class OKLABColorExtractor {
             let baseForBackground = brightPeaks.first?.color ?? primary
             let background = self.tintedDarkBackground(from: baseForBackground)
             
+            #if DEBUG
             print("🎯 Dark Cover Role Assignment:")
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
             print("  Bright peaks: \(brightPeaks.prefix(3).map { colorDescription($0.color) })")
@@ -550,6 +581,7 @@ public class OKLABColorExtractor {
             print("    Secondary: \(colorDescription(secondary))")
             print("    Accent: \(colorDescription(accent))")
             print("    Background: \(colorDescription(background))")
+            #endif
             
             return (primary, secondary, accent, background)
         } else {
@@ -568,7 +600,9 @@ public class OKLABColorExtractor {
                 if b < 0.3 {
                     // Use it if actually dark
                     background = darkestPeak.color
+                    #if DEBUG
                     print("  Using darkest color as background: \(colorDescription(darkestPeak.color)) (brightness: \(String(format: "%.2f", b)))")
+                    #endif
                 } else {
                     // Otherwise, try to find a dark color in the peaks
                     if let darkColor = sortedPeaks.first(where: { peak in
@@ -577,19 +611,26 @@ public class OKLABColorExtractor {
                         return b < 0.3
                     }) {
                         background = darkColor.color
+                        #if DEBUG
                         print("  Found dark color for background: \(colorDescription(darkColor.color)) (brightness: \(String(format: "%.2f", b)))")
+                        #endif
                     } else {
                         // Default to dark gray if no dark colors found
                         background = UIColor(white: 0.1, alpha: 1)
+                        #if DEBUG
                         print("  No dark colors found, using default dark gray for background")
+                        #endif
                     }
                 }
             } else {
                 // Fallback to dark gray
                 background = UIColor(white: 0.1, alpha: 1)
+                #if DEBUG
                 print("  No peaks available, using default dark gray for background")
+                #endif
             }
             
+            #if DEBUG
             print("🎯 Normal Cover Role Assignment (Pure Frequency):")
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
             print("  Assigned roles:")
@@ -597,6 +638,7 @@ public class OKLABColorExtractor {
             print("    Secondary: \(colorDescription(secondary))")
             print("    Accent: \(colorDescription(accent))")
             print("    Background: \(colorDescription(background))")
+            #endif
             
             return (primary, secondary, accent, background)
         }
@@ -617,7 +659,9 @@ public class OKLABColorExtractor {
                                                   peaks: [(color: UIColor, count: Int, distinctiveness: Double)]) -> Bool {
         // If we only found 2 or fewer distinct color peaks, likely monochromatic
         if peaks.count <= 2 {
+            #if DEBUG
             print("  📊 Monochromatic: Only \(peaks.count) distinct peaks found")
+            #endif
             return true
         }
         
@@ -638,7 +682,9 @@ public class OKLABColorExtractor {
         
         // If we have no saturated colors, it's grayscale (monochromatic)
         if hues.isEmpty {
+            #if DEBUG
             print("  📊 Monochromatic: No saturated colors (grayscale)")
+            #endif
             return true
         }
         
@@ -649,12 +695,16 @@ public class OKLABColorExtractor {
             let effectiveDifference = min(hueDifference, 1.0 - hueDifference)
             
             if effectiveDifference < 0.1 {  // Within 36 degrees
+                #if DEBUG
                 print("  📊 Monochromatic: All hues within \(Int(effectiveDifference * 360))°")
+                #endif
                 return true
             }
         }
         
+        #if DEBUG
         print("  📊 Not monochromatic: Colors have varied hues")
+        #endif
         return false
     }
     

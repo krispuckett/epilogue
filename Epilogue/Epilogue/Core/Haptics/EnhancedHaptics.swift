@@ -31,20 +31,28 @@ final class EnhancedHapticManager: ObservableObject {
             
             // Handle engine reset
             engine?.resetHandler = { [weak self] in
+                #if DEBUG
                 print("Haptic engine reset")
+                #endif
                 do {
                     try self?.engine?.start()
                 } catch {
+                    #if DEBUG
                     print("Failed to restart haptic engine: \(error)")
+                    #endif
                 }
             }
             
             // Handle engine stop
             engine?.stoppedHandler = { reason in
+                #if DEBUG
                 print("Haptic engine stopped: \(reason)")
+                #endif
             }
         } catch {
+            #if DEBUG
             print("Failed to create haptic engine: \(error)")
+            #endif
         }
     }
     

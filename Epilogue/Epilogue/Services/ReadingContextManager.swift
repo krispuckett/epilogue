@@ -305,7 +305,9 @@ class ReadingContextManager: ObservableObject {
         currentMood = .neutral
         conversationThreads = []
         
+        #if DEBUG
         print("📚 Started reading session for: \(book.title)")
+        #endif
     }
     
     func endReadingSession() {
@@ -332,7 +334,9 @@ class ReadingContextManager: ObservableObject {
         currentChapter = nil
         sessionStartTime = nil
         
+        #if DEBUG
         print("📚 Ended reading session. Duration: \(session.duration)s")
+        #endif
     }
     
     // MARK: - Context Building
@@ -548,7 +552,9 @@ class ReadingContextManager: ObservableObject {
         let threadsToArchive = conversationThreads.filter { !$0.turns.isEmpty }
         
         for thread in threadsToArchive {
+            #if DEBUG
             print("📝 Archiving thread: \(thread.topic) with \(thread.turns.count) turns")
+            #endif
         }
     }
     

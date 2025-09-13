@@ -20,7 +20,9 @@ class CoreDataManager {
         
         container.loadPersistentStores { _, error in
             if let error = error as NSError? {
+                #if DEBUG
                 print("Core Data failed to load: \(error), \(error.userInfo)")
+                #endif
             }
         }
         
@@ -43,7 +45,9 @@ class CoreDataManager {
                 try context.save()
             } catch {
                 let nsError = error as NSError
+                #if DEBUG
                 print("Core Data save error: \(nsError), \(nsError.userInfo)")
+                #endif
             }
         }
     }
@@ -70,7 +74,9 @@ class CoreDataManager {
             }
             save()
         } catch {
+            #if DEBUG
             print("Error cleaning up cache: \(error)")
+            #endif
         }
     }
     
@@ -194,7 +200,9 @@ class CoreDataManager {
             do {
                 try context.save()
             } catch {
+                #if DEBUG
                 print("Batch insert failed: \(error)")
+                #endif
             }
         }
     }

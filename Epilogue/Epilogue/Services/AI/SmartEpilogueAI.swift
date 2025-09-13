@@ -2,6 +2,7 @@ import SwiftUI
 import Foundation
 import Combine
 import SwiftData
+import os.log
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -41,7 +42,9 @@ class SmartEpilogueAI: ObservableObject {
     private func setupSession() {
         #if canImport(FoundationModels)
         guard #available(iOS 26.0, *) else {
+            #if DEBUG
             print("⚠️ Foundation Models requires iOS 26.0 or later")
+            #endif
             return
         }
         
@@ -65,7 +68,9 @@ class SmartEpilogueAI: ObservableObject {
             """
             
             // Add book-specific knowledge for popular books  
+            #if DEBUG
             print("📚 Setting up AI context for book: \(book.title) by \(book.author)")
+            #endif
             
             if book.title.lowercased().contains("project hail mary") {
                 bookInfo += """
@@ -145,25 +150,39 @@ class SmartEpilogueAI: ObservableObject {
         switch model.availability {
         case .available:
             session = LanguageModelSession(instructions: instructions)
+            #if DEBUG
             print("✅ Foundation Models session created successfully")
+            #endif
         case .unavailable(.deviceNotEligible):
+            #if DEBUG
             print("⚠️ Device not eligible for Apple Intelligence")
+            #endif
             session = nil
         case .unavailable(.appleIntelligenceNotEnabled):
+            #if DEBUG
             print("⚠️ Apple Intelligence not enabled in Settings")
+            #endif
             session = nil
         case .unavailable(.modelNotReady):
+            #if DEBUG
             print("⚠️ Model is downloading or not ready")
+            #endif
             session = nil
         case .unavailable(let other):
+            #if DEBUG
             print("⚠️ Foundation Models unavailable: \(other)")
+            #endif
             session = nil
         @unknown default:
+            #if DEBUG
             print("⚠️ Foundation Models availability unknown")
+            #endif
             session = nil
         }
         #else
+        #if DEBUG
         print("⚠️ Foundation Models not available on this iOS version")
+        #endif
         #endif
     }
     
@@ -179,11 +198,15 @@ class SmartEpilogueAI: ObservableObject {
                 return true
             case .unavailable(.modelNotReady):
                 // Model is still downloading or preparing
+                #if DEBUG
                 print("⚠️ Model is downloading or not ready")
+                #endif
                 return false
             case .unavailable(let reason):
                 // Other unavailability reasons
+                #if DEBUG
                 print("⚠️ Model unavailable: \(reason)")
+                #endif
                 return false
             @unknown default:
                 return false
@@ -227,7 +250,9 @@ class SmartEpilogueAI: ObservableObject {
                 if isLocalModelActuallyReady() {
                     return await queryLocal(question)
                 } else {
+                    #if DEBUG
                     print("⚡ Local model not ready - using Perplexity for fast response")
+                    #endif
                 }
             }
             #endif
@@ -243,7 +268,9 @@ class SmartEpilogueAI: ObservableObject {
         
         // Fast path: If no book context, use Perplexity for general questions
         guard activeBook != nil else {
+            #if DEBUG
             print("🌐 No book context - using Perplexity for speed")
+            #endif
             return true
         }
         
@@ -263,7 +290,9 @@ class SmartEpilogueAI: ObservableObject {
         // Check for external needs FIRST
         for keyword in externalKeywords {
             if questionLower.contains(keyword) {
+                #if DEBUG
                 print("🌐 External knowledge required for: \(keyword)")
+                #endif
                 return true
             }
         }
@@ -292,13 +321,17 @@ class SmartEpilogueAI: ObservableObject {
         // Check if it matches book question patterns
         for pattern in bookQuestionPatterns {
             if questionLower.contains(pattern) {
+                #if DEBUG
                 print("📚 Book content question detected: '\(pattern)' - using local AI")
+                #endif
                 return false // Use local AI with book context
             }
         }
         
         // 3. Default: Assume it's about the book (when in reading mode)
+        #if DEBUG
         print("📚 Default: Treating as book question - using local AI")
+        #endif
         return false
     }
     
@@ -307,7 +340,9 @@ class SmartEpilogueAI: ObservableObject {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
             guard let session = session else {
+                #if DEBUG
                 print("⚠️ No Foundation Models session available, falling back to Perplexity")
+                #endif
                 return await queryWithPerplexity(question)
             }
             
@@ -317,7 +352,9 @@ class SmartEpilogueAI: ObservableObject {
                 lastResponse = response.content
                 return response.content
             } catch {
+                #if DEBUG
                 print("Smart routing failed: \(error)")
+                #endif
                 // Fallback to Perplexity
                 return await queryWithPerplexity(question)
             }
@@ -336,7 +373,9 @@ class SmartEpilogueAI: ObservableObject {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
             guard let session = session else {
+                #if DEBUG
                 print("⚠️ No Foundation Models session - falling back to Perplexity")
+                #endif
                 // Automatically fallback to Perplexity when local model unavailable
                 return await queryWithPerplexity(question)
             }
@@ -348,11 +387,15 @@ class SmartEpilogueAI: ObservableObject {
                 lastResponse = response.content
                 
                 let responseTime = Date().timeIntervalSince(startTime) * 1000
+                #if DEBUG
                 print("⚡ Local response in \(String(format: "%.1f", responseTime))ms")
+                #endif
                 
                 return response.content
             } catch {
+                #if DEBUG
                 print("❌ Foundation Models error: \(error)")
+                #endif
                 lastResponse = "Unable to process question locally: \(error.localizedDescription)"
                 return lastResponse
             }
@@ -376,7 +419,9 @@ class SmartEpilogueAI: ObservableObject {
             lastResponse = response
             
             let responseTime = Date().timeIntervalSince(startTime) * 1000
+            #if DEBUG
             print("⚡ Perplexity response in \(String(format: "%.1f", responseTime))ms")
+            #endif
             
             return response
         } catch {
@@ -423,7 +468,9 @@ class SmartEpilogueAI: ObservableObject {
             for: question, 
             confidence: 0.6
         ) {
+            #if DEBUG
             print("📝 Correcting transcription: '\(question)' → '\(correction)'")
+            #endif
             finalQuestion = correction
         }
         

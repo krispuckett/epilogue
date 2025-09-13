@@ -61,10 +61,14 @@ public class UltraFastAmbientProcessor: ObservableObject {
                 """
             
             self.appleSession = LanguageModelSession(instructions: instructions)
+            #if DEBUG
             print("✅ Foundation Models ready for ultra-fast responses")
+            #endif
             
         case .unavailable(.modelNotReady):
+            #if DEBUG
             print("⏳ Foundation Models downloading - using Perplexity")
+            #endif
             // Retry in 5 seconds
             Task {
                 try? await Task.sleep(for: .seconds(5))
@@ -72,15 +76,21 @@ public class UltraFastAmbientProcessor: ObservableObject {
             }
             
         case .unavailable(let reason):
+            #if DEBUG
             print("❌ Foundation Models unavailable: \(reason)")
+            #endif
             self.appleSession = nil
             
         @unknown default:
+            #if DEBUG
             print("⚠️ Unknown Foundation Models state")
+            #endif
             self.appleSession = nil
         }
         #else
+        #if DEBUG
         print("ℹ️ Foundation Models not available on this iOS version")
+        #endif
         #endif
     }
     
@@ -94,9 +104,13 @@ public class UltraFastAmbientProcessor: ObservableObject {
                 )
                 
                 whisperModel = try await WhisperKit(config)
+                #if DEBUG
                 print("✅ WhisperKit initialized with low-volume optimization")
+                #endif
             } catch {
+                #if DEBUG
                 print("❌ WhisperKit initialization failed: \(error)")
+                #endif
             }
         }
     }
@@ -119,9 +133,13 @@ public class UltraFastAmbientProcessor: ObservableObject {
         do {
             try audioEngine.start()
             isListening = true
+            #if DEBUG
             print("🎤 Started listening with enhanced sensitivity")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to start audio engine: \(error)")
+            #endif
         }
     }
     
@@ -131,7 +149,9 @@ public class UltraFastAmbientProcessor: ObservableObject {
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         isListening = false
+        #if DEBUG
         print("🛑 Stopped listening")
+        #endif
     }
     
     // MARK: - Audio Processing (Low Volume Optimized)
@@ -188,7 +208,9 @@ public class UltraFastAmbientProcessor: ObservableObject {
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Transcription error: \(error)")
+            #endif
         }
     }
     
@@ -216,7 +238,9 @@ public class UltraFastAmbientProcessor: ObservableObject {
         if isQuestion {
             // Use deduplicator to prevent duplicates
             guard deduplicator.shouldProcess(text) else {
+                #if DEBUG
                 print("🚫 Duplicate question blocked: \(text)")
+                #endif
                 return
             }
             
@@ -268,11 +292,15 @@ public class UltraFastAmbientProcessor: ObservableObject {
         }) {
             // Update existing question
             detectedContent[existingIndex] = questionContent
+            #if DEBUG
             print("📝 Updated evolving question")
+            #endif
         } else {
             // Add new question
             detectedContent.append(questionContent)
+            #if DEBUG
             print("✅ Added new question")
+            #endif
         }
         
         // INSTANT RESPONSE: Try Apple Intelligence first
@@ -329,7 +357,9 @@ public class UltraFastAmbientProcessor: ObservableObject {
                 detectedContent[index].response = response.content
             }
             
+            #if DEBUG
             print("⚡ Instant response in <50ms")
+            #endif
         } catch {
             print("❌ Foundation Models error: \(error)")
             await getFastPerplexityResponse(question)

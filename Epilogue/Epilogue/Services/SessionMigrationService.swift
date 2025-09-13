@@ -11,7 +11,9 @@ class SessionMigrationService {
     
     /// Migrate all sessions without books by analyzing their content
     func migrateOrphanedSessions(modelContext: ModelContext, libraryViewModel: LibraryViewModel) async {
+        #if DEBUG
         print("🔄 Starting session migration...")
+        #endif
         
         // Fetch all sessions without a book
         let descriptor = FetchDescriptor<AmbientSession>(
@@ -21,11 +23,15 @@ class SessionMigrationService {
         )
         
         guard let orphanedSessions = try? modelContext.fetch(descriptor) else {
+            #if DEBUG
             print("❌ Failed to fetch orphaned sessions")
+            #endif
             return
         }
         
+        #if DEBUG
         print("📊 Found \(orphanedSessions.count) orphaned sessions to migrate")
+        #endif
         
         var migratedCount = 0
         
@@ -57,16 +63,22 @@ class SessionMigrationService {
                 }
                 
                 migratedCount += 1
+                #if DEBUG
                 print("✅ Migrated session to book: \(matchedBook.title)")
+                #endif
             }
         }
         
         // Save all changes
         do {
             try modelContext.save()
+            #if DEBUG
             print("🎉 Migration complete! Migrated \(migratedCount) of \(orphanedSessions.count) sessions")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to save migration: \(error)")
+            #endif
         }
     }
     

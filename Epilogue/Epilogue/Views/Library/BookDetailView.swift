@@ -473,12 +473,9 @@ struct BookDetailView: View {
                 }
             )
             .accessibilityLabel("Book cover for \(book.title)")
-            #if DEBUG
-            .colorExtractionDebug(book: book, coverImage: coverImage)
-            #endif
             .scaleEffect(coverScale)
             .opacity(coverOpacity)
-            .shadow(color: .black.opacity(coverOpacity * 0.3), radius: 20 * coverOpacity, y: 10 * coverOpacity)
+            .shadow(color: Color.black.opacity(coverOpacity * 0.3), radius: 20 * coverOpacity, y: 10 * coverOpacity)
             .task(id: book.localId) {
                 // Color extraction now happens when image loads in SharedBookCoverView
             }

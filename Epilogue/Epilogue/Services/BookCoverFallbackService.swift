@@ -11,7 +11,9 @@ class BookCoverFallbackService {
         if let isbn = book.isbn {
             let openLibraryURL = "https://covers.openlibrary.org/b/isbn/\(isbn)-L.jpg"
             if await validateImageURL(openLibraryURL) {
+                #if DEBUG
                 print("📚 Using Open Library cover for ISBN: \(isbn)")
+                #endif
                 return openLibraryURL
             }
         }
@@ -30,12 +32,16 @@ class BookCoverFallbackService {
                 
                 let openLibraryCover = "https://covers.openlibrary.org/b/id/\(coverId)-L.jpg"
                 if await validateImageURL(openLibraryCover) {
+                    #if DEBUG
                     print("📚 Using Open Library cover by search for: \(book.title)")
+                    #endif
                     return openLibraryCover
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Open Library search failed: \(error)")
+            #endif
         }
         
         return nil
@@ -57,7 +63,9 @@ class BookCoverFallbackService {
                 return true
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to validate image URL: \(urlString)")
+            #endif
         }
         
         return false

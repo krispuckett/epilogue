@@ -787,6 +787,18 @@ public class TrueAmbientProcessor: ObservableObject {
         currentState = .listening
     }
     
+    // MARK: - Public API for direct question processing
+    
+    func processQuestionDirectly(_ question: String, bookContext: Book?) async {
+        // Set the book context in the detector if provided
+        if let book = bookContext {
+            AmbientBookDetector.shared.setCurrentBook(book)
+        }
+        
+        // Process the question using the same path as voice input
+        await processQuestionWithFeedback(question, confidence: 1.0)
+    }
+    
     // MARK: - Helper Functions
     
     private func withThrowingTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {

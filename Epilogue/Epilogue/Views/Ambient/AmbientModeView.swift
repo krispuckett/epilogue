@@ -1987,9 +1987,12 @@ struct AmbientModeView: View {
                 expandedMessageIds.insert(thinkingMessage.id)
             }
             
-            // Get AI response - it will update the thinking message
+            // Get AI response using the same processor as voice input
             Task {
-                await getAIResponseForAmbientQuestion(messageText)
+                // Add to processor's detected content
+                processor.detectedContent.append(content)
+                // Process through the same path as voice questions
+                await processor.processQuestionDirectly(messageText, bookContext: currentBookContext)
             }
         } else {
             // For notes and quotes, save immediately

@@ -178,7 +178,9 @@ class AICompanionService: ObservableObject {
         case .smart, .perplexity:
             // We now have a built-in API key in PerplexityService
             // No need to check KeychainManager or Info.plist
+            #if DEBUG
             print("🔑 AI Service configured: true (using built-in API key)")
+            #endif
             return true
             
         case .appleIntelligence:
@@ -383,25 +385,36 @@ class AICompanionService: ObservableObject {
     // MARK: - Debug Methods
     
     func debugProcessMessage(_ message: String, bookContext: Book?) async {
+        #if DEBUG
         print("AI Service Debug")
         print("Message: \(message)")
         print("Book: \(bookContext?.title ?? "None")")
         print("🔧 Provider: \(currentProvider.rawValue)")
         print("Configured: \(isConfigured())")
+        #endif
         
         do {
             switch currentProvider {
             case .smart:
+                #if DEBUG
                 print("🧠 Testing Smart AI with automatic routing...")
+                #endif
                 if isConfigured() {
+                    #if DEBUG
                     print("Smart AI is configured (Perplexity API key found)")
+                    #endif
                     let response = try await processMessage(message, bookContext: bookContext)
+                    #if DEBUG
                     print("📤 Response received [\(response.count) characters]")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("Smart AI requires Perplexity API key for external queries")
+                    #endif
                 }
                 
             case .perplexity:
+                #if DEBUG
                 print("🌐 Testing Perplexity service...")
                 if isConfigured() {
                     print("Perplexity API key is configured")
@@ -415,16 +428,21 @@ class AICompanionService: ObservableObject {
                         print("🔑 No API key found in Info.plist")
                     }
                 }
+                #endif
                 
             case .appleIntelligence:
+                #if DEBUG
                 print("🍎 Testing Apple Intelligence (Foundation Models)...")
                 let response = try await processMessage(message, bookContext: bookContext)
                 print("📤 Response received [\(response.count) characters]")
+                #endif
             }
             
         } catch {
+            #if DEBUG
             print("Error during debug: \(error)")
             print("Error details: \(error.localizedDescription)")
+            #endif
         }
     }
 }

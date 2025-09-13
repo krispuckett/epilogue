@@ -238,10 +238,13 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
                 if let query = notification.object as? String {
                     bookSearchQuery = query
-                    showBookSearch = true
-                    // Dismiss command input if it's open
+                    // Dismiss command input first
                     showCommandInput = false
                     commandText = ""
+                    // Add delay to allow command input dismissal animation to complete
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showBookSearch = true
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBatchBookSearch"))) { notification in

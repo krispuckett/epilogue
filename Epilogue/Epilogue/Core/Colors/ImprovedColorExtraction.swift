@@ -9,7 +9,9 @@ struct ImprovedColorExtraction {
     
     // Extract colors with validation and intelligent role assignment
     static func extractColors(from image: UIImage, bookTitle: String) async -> ColorPalette? {
+        #if DEBUG
         print("Starting improved color extraction for: \(bookTitle)")
+        #endif
         
         // Removed hard-coded test - was causing inconsistent extractions
         
@@ -20,44 +22,62 @@ struct ImprovedColorExtraction {
         let processedImage = preprocessImageForColorExtraction(image)
         
         // Try OKLAB first since it handles dark covers better
+        #if DEBUG
         print("Trying OKLAB extractor (primary method)...")
+        #endif
         let extractor = OKLABColorExtractor()
         if let cgImage = processedImage.cgImage {
             let palette = await extractor.extractPalette(from: cgImage, imageSource: bookTitle)
+            #if DEBUG
             print("OKLAB extraction completed")
+            #endif
             return palette
         }
         
         // Fallback 1: Try vibrant pixel finder for dark covers
+        #if DEBUG
         print("Trying vibrant pixel finder...")
+        #endif
         let vibrantColors = findVibrantColors(in: image)
         if vibrantColors.count >= 3 {
+            #if DEBUG
             print("Found \(vibrantColors.count) vibrant colors")
+            #endif
             return createPaletteFromVibrantColors(vibrantColors, bookTitle: bookTitle)
         }
         
         // Fallback 2: Try UIImageColors for light covers
+        #if DEBUG
         print("Trying UIImageColors as fallback...")
+        #endif
         if let colors = image.getColors(quality: .high) {
             // Only use if validation passes
             if validateExtractedColors(colors) {
+                #if DEBUG
                 print("UIImageColors extraction validated")
+                #endif
                 return intelligentRoleAssignment(colors)
             } else {
+                #if DEBUG
                 print("UIImageColors extraction failed validation")
+                #endif
             }
         }
         
         // Fallback 3: Try extracting from center region
         if let centeredColors = extractFromCenterRegion(image) {
             if validateExtractedColors(centeredColors) {
+                #if DEBUG
                 print("Center region extraction succeeded")
+                #endif
                 return intelligentRoleAssignment(centeredColors)
             }
         }
         
         // Fallback 4: Enhance image and retry OKLAB
+        #if DEBUG
         print("Trying enhanced image extraction...")
+        #endif
         if let enhancedImage = enhanceImageForExtraction(image) {
             // DEBUG: Save enhanced image - DISABLED
             // print("📸 Saving ENHANCED image for \(bookTitle)")
@@ -65,12 +85,16 @@ struct ImprovedColorExtraction {
             
             if let cgImage = enhancedImage.cgImage {
                 let enhancedPalette = await extractor.extractPalette(from: cgImage, imageSource: bookTitle)
+                #if DEBUG
                 print("Enhanced image extraction succeeded")
+                #endif
                 return enhancedPalette
             }
         }
         
+        #if DEBUG
         print("All extraction methods failed")
+        #endif
         return nil
     }
     
@@ -80,7 +104,9 @@ struct ImprovedColorExtraction {
         guard let primary = colors.primary,
               let secondary = colors.secondary,
               let detail = colors.detail else {
+            #if DEBUG
             print("Some colors are nil")
+            #endif
             return false
         }
         
@@ -100,21 +126,27 @@ struct ImprovedColorExtraction {
         // Check if all colors have very low saturation (grayscale)
         let avgSaturation = saturations.reduce(0, +) / CGFloat(saturations.count)
         if avgSaturation < 0.2 {
+            #if DEBUG
             print("Low saturation detected (\(String(format: "%.2f", Double(avgSaturation)))) - likely grayscale")
+            #endif
             return false
         }
         
         // Check if all colors are too dark
         let avgBrightness = brightnesses.reduce(0, +) / CGFloat(brightnesses.count)
         if avgBrightness < 0.2 {
+            #if DEBUG
             print("All colors too dark (\(String(format: "%.2f", Double(avgBrightness))))")
+            #endif
             return false
         }
         
         // Check if all hues are within 0.1 range AND low saturation
         let hueRange = (hues.max() ?? 0) - (hues.min() ?? 0)
         if hueRange < 0.1 && avgSaturation < 0.5 {
+            #if DEBUG
             print("All colors too similar - hue range: \(String(format: "%.2f", Double(hueRange)))")
+            #endif
             return false
         }
         
@@ -128,7 +160,9 @@ struct ImprovedColorExtraction {
               let secondary = colors.secondary,
               let detail = colors.detail,
               let background = colors.background else {
+            #if DEBUG
             print("Failed to unwrap colors, using defaults")
+            #endif
             return ColorPalette(
                 primary: .red,
                 secondary: .orange, 
@@ -157,10 +191,12 @@ struct ImprovedColorExtraction {
         // Sort by vibrancy (most vibrant first)
         let sorted = colorData.sorted { $0.vibrancy > $1.vibrancy }
         
+        #if DEBUG
         print("Color role assignment by vibrancy:")
         for (index, item) in sorted.enumerated() {
             print("  \(index + 1). \(item.role): H=\(String(format: "%.2f", Double(item.hue))), S=\(String(format: "%.2f", Double(item.saturation))), B=\(String(format: "%.2f", Double(item.brightness))), V=\(String(format: "%.2f", Double(item.vibrancy)))")
         }
+        #endif
         
         // Create palette with most vibrant colors in primary positions
         guard sorted.count >= 4 else {
@@ -192,7 +228,9 @@ struct ImprovedColorExtraction {
     
     // Extract from center region where important details often are
     private static func extractFromCenterRegion(_ image: UIImage) -> UIImageColors? {
+        #if DEBUG
         print("Trying center region extraction...")
+        #endif
         
         guard let cgImage = image.cgImage else { return nil }
         
@@ -291,7 +329,9 @@ struct ImprovedColorExtraction {
     
     // Create palette from vibrant colors
     private static func createPaletteFromVibrantColors(_ colors: [UIColor], bookTitle: String) -> ColorPalette {
+        #if DEBUG
         print("Creating palette from \(colors.count) vibrant colors")
+        #endif
         
         // Ensure we have at least 4 colors
         var finalColors = colors
@@ -390,7 +430,9 @@ struct ImprovedColorExtraction {
         guard let cgImage = context.createCGImage(croppedImage, from: croppedImage.extent) else { return image }
         
         let processedImage = UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        #if DEBUG
         print("🔧 Applied preprocessing: slight blur to reduce text artifacts")
+        #endif
         
         return processedImage
     }

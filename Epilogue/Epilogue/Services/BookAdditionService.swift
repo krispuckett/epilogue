@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import os.log
 
 /// Unified service for adding books to the library
 /// Ensures consistent behavior between manual and bulk additions
@@ -19,14 +20,18 @@ class BookAdditionService {
         preloadCover: Bool = true,
         overwriteIfExists: Bool = false
     ) async {
+        #if DEBUG
         print("📚 BookAdditionService: Adding \(book.title)")
+        #endif
         
         // Add to library
         libraryViewModel.addBook(book, overwriteIfExists: overwriteIfExists)
         
         // Preload cover image
         if preloadCover, let coverURL = book.coverImageURL {
+            #if DEBUG
             print("🖼️ Pre-loading cover for \(book.title)")
+            #endif
             _ = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL)
         }
         
@@ -35,7 +40,9 @@ class BookAdditionService {
             await extractAndCacheColors(for: book)
         }
         
+        #if DEBUG
         print("✅ Successfully added: \(book.title)")
+        #endif
     }
     
     // MARK: - Batch Book Addition
@@ -49,7 +56,9 @@ class BookAdditionService {
         overwriteIfExists: Bool = true,
         progressHandler: ((Int, Int, String) -> Void)? = nil
     ) async {
+        #if DEBUG
         print("📚 BookAdditionService: Adding \(books.count) books")
+        #endif
         
         for (index, book) in books.enumerated() {
             // Update progress
@@ -72,12 +81,16 @@ class BookAdditionService {
         
         // Extract colors for all books in batch
         if extractColors {
+            #if DEBUG
             print("🎨 Starting batch color extraction...")
+            #endif
             progressHandler?(0, books.count, "Extracting colors...")
             await extractColorsInBatch(for: books, progressHandler: progressHandler)
         }
         
+        #if DEBUG
         print("✅ Batch addition complete: \(books.count) books added")
+        #endif
     }
     
     // MARK: - Color Extraction
@@ -91,43 +104,55 @@ class BookAdditionService {
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             // Check if it's a placeholder palette (gray/monochromatic with low quality)
             if cachedPalette.extractionQuality < 0.5 || (cachedPalette.isMonochromatic && cachedPalette.luminance < 0.4) {
+                #if DEBUG
                 print("⚠️ Found low-quality/placeholder palette for: \(book.title), re-extracting...")
+                #endif
                 // Continue to re-extract
             } else {
+                #if DEBUG
                 print("✅ Colors already cached for: \(book.title)")
+                #endif
                 return
             }
         }
         
+        #if DEBUG
         print("🎨 Extracting colors for: \(book.title)")
         print("📔 Book ID for caching: \(bookID)")
+        #endif
         
         // Load the full image for color extraction
         guard let coverImage = await SharedBookCoverManager.shared.loadFullImage(from: coverURL) else {
-            print("❌ Failed to load cover for color extraction: \(book.title)")
+            os_log(.error, log: OSLog.default, "Failed to load cover for color extraction: %@", book.title)
             return
         }
         
+        #if DEBUG
         print("📐 Loaded image size for color extraction: \(coverImage.size)")
+        #endif
         
         do {
             // Use OKLABColorExtractor directly (same as BookDetailView)
             let extractor = OKLABColorExtractor()
             let palette = try await extractor.extractPalette(from: coverImage)
             
+            #if DEBUG
             print("🎨 Extracted palette for \(book.title):")
             print("  Primary: \(palette.primary)")
             print("  Secondary: \(palette.secondary)")
             print("  Accent: \(palette.accent)")
             print("  Background: \(palette.background)")
             print("  Is Monochromatic: \(palette.isMonochromatic)")
+            #endif
             
             // Cache the result
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: coverURL)
             
+            #if DEBUG
             print("✅ Colors extracted and cached for: \(book.title) with ID: \(bookID)")
+            #endif
         } catch {
-            print("❌ Error extracting colors for \(book.title): \(error)")
+            os_log(.error, log: OSLog.default, "Error extracting colors for %@: %@", book.title, error.localizedDescription)
         }
     }
     
@@ -169,7 +194,9 @@ class BookAdditionService {
     
     /// Pre-warm color cache for visible books in library
     func warmColorCache(for books: [Book]) async {
+        #if DEBUG
         print("🔥 Warming color cache for \(books.count) books")
+        #endif
         
         // Only process books without cached colors
         var booksNeedingColors: [Book] = []
@@ -182,10 +209,14 @@ class BookAdditionService {
         }
         
         if !booksNeedingColors.isEmpty {
+            #if DEBUG
             print("📊 \(booksNeedingColors.count) books need color extraction")
+            #endif
             await extractColorsInBatch(for: booksNeedingColors)
         } else {
+            #if DEBUG
             print("✅ All books already have cached colors")
+            #endif
         }
     }
 }

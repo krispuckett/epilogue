@@ -299,12 +299,14 @@ extension View {
         let accent = SmartAccentColor.getSmartAccent(from: palette)
         
         if debug {
+            #if DEBUG
             print("🎨 Smart Accent: \(accent)")
             if let palette = palette {
                 let original = palette.accent ?? palette.primary
                 let analysis = SmartAccentColor.analyzeColorSuitability(original)
                 print(SmartAccentColor.debugAnalysis(analysis))
             }
+            #endif
         }
         
         return self.foregroundStyle(accent)

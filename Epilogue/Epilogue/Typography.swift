@@ -189,7 +189,9 @@ struct Note: Identifiable, Codable, Equatable {
 class NotesViewModel: ObservableObject {
     @Published var notes: [Note] = [] {
         didSet {
+            #if DEBUG
             print("📝 DEBUG: notes array didSet - count: \(notes.count)")
+            #endif
             objectWillChange.send()
         }
     }
@@ -199,20 +201,28 @@ class NotesViewModel: ObservableObject {
     private let notesKey = "com.epilogue.savedNotes"
     
     init() {
+        #if DEBUG
         print("🏗 DEBUG: NotesViewModel init")
+        #endif
         
         // Debug: Check if UserDefaults has data
         if let data = userDefaults.data(forKey: notesKey) {
+            #if DEBUG
             print("📦 DEBUG: Found existing data in UserDefaults, size: \(data.count) bytes")
+            #endif
         } else {
+            #if DEBUG
             print("📦 DEBUG: No existing data in UserDefaults")
+            #endif
         }
         
         loadNotes()
         
         // Ensure we have some data
         if notes.isEmpty {
+            #if DEBUG
             print("⚠️ DEBUG: No notes after loadNotes(), forcing sample data")
+            #endif
             loadSampleData()
         }
         
@@ -229,100 +239,142 @@ class NotesViewModel: ObservableObject {
     }
     
     private func loadNotes() {
+        #if DEBUG
         print("🔍 DEBUG: loadNotes() called")
         print("🔍 DEBUG: UserDefaults key: \(notesKey)")
+        #endif
         
         if let data = userDefaults.data(forKey: notesKey) {
+            #if DEBUG
             print("🔍 DEBUG: Found data in UserDefaults, size: \(data.count) bytes")
+            #endif
             
             do {
                 let decodedNotes = try JSONDecoder().decode([Note].self, from: data)
+                #if DEBUG
                 print("🔍 DEBUG: Successfully decoded \(decodedNotes.count) notes")
+                #endif
                 self.notes = decodedNotes
                 
                 // Print details of each note
                 for (index, note) in decodedNotes.enumerated() {
+                    #if DEBUG
                     print("🔍 DEBUG: Note \(index): type=\(note.type.rawValue), [\(note.content.count) characters]")
+                    #endif
                 }
             } catch {
+                #if DEBUG
                 print("❌ DEBUG: Failed to decode notes: \(error)")
                 print("❌ DEBUG: Error details: \(error.localizedDescription)")
+                #endif
                 // Load sample data on decode error
                 loadSampleData()
             }
         } else {
+            #if DEBUG
             print("🔍 DEBUG: No data found in UserDefaults for key: \(notesKey)")
+            #endif
             // Load sample data only on first launch
             loadSampleData()
         }
         
+        #if DEBUG
         print("🔍 DEBUG: loadNotes() finished. Total notes: \(self.notes.count)")
+        #endif
     }
     
     private func saveNotes() {
+        #if DEBUG
         print("💾 DEBUG: saveNotes() called")
         print("💾 DEBUG: Attempting to save \(notes.count) notes")
         print("💾 DEBUG: UserDefaults key: \(notesKey)")
+        #endif
         
         do {
             let encoded = try JSONEncoder().encode(notes)
+            #if DEBUG
             print("💾 DEBUG: Successfully encoded notes, size: \(encoded.count) bytes")
+            #endif
             userDefaults.set(encoded, forKey: notesKey)
             
             // Force synchronize to ensure data is written
             let success = userDefaults.synchronize()
+            #if DEBUG
             print("💾 DEBUG: UserDefaults synchronize: \(success)")
+            #endif
             
             // Verify the save
+            #if DEBUG
             if let verifyData = userDefaults.data(forKey: notesKey) {
                 print("✅ DEBUG: Verified data saved to UserDefaults, size: \(verifyData.count) bytes")
             } else {
                 print("❌ DEBUG: Failed to verify data in UserDefaults after save")
             }
+            #endif
         } catch {
+            #if DEBUG
             print("❌ DEBUG: Failed to encode notes: \(error)")
             print("❌ DEBUG: Error details: \(error.localizedDescription)")
+            #endif
         }
     }
     
     func addNote(_ note: Note) {
+        #if DEBUG
         print("➕ DEBUG: addNote() called")
         print("➕ DEBUG: Adding note - type: \(note.type.rawValue), [\(note.content.count) characters]")
         print("➕ DEBUG: Notes count before: \(notes.count)")
+        #endif
         
         notes.append(note)
         
+        #if DEBUG
         print("➕ DEBUG: Notes count after: \(notes.count)")
+        #endif
         saveNotes()
     }
     
     func deleteNote(_ note: Note) {
+        #if DEBUG
         print("🗑 DEBUG: deleteNote() called for note ID: \(note.id)")
         print("🗑 DEBUG: Notes count before: \(notes.count)")
+        #endif
         
         notes.removeAll { $0.id == note.id }
         
+        #if DEBUG
         print("🗑 DEBUG: Notes count after: \(notes.count)")
+        #endif
         saveNotes()
     }
     
     func updateNote(_ note: Note) {
+        #if DEBUG
         print("✏️ DEBUG: updateNote() called for note ID: \(note.id)")
+        #endif
         
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
+            #if DEBUG
             print("✏️ DEBUG: Found note at index: \(index)")
+            #endif
             notes[index] = note
             saveNotes()
         } else {
+            #if DEBUG
             print("❌ DEBUG: Note not found for update")
+            #endif
         }
     }
     
     func updateNote(_ oldNote: Note, with newNote: Note) {
+        #if DEBUG
         print("✏️ DEBUG: updateNote() called for note ID: \(oldNote.id)")
+        #endif
         
         if let index = notes.firstIndex(where: { $0.id == oldNote.id }) {
+            #if DEBUG
             print("✏️ DEBUG: Found note at index: \(index)")
+            #endif
             // Keep the same ID but update the content
             var updatedNote = newNote
             updatedNote = Note(
@@ -338,13 +390,17 @@ class NotesViewModel: ObservableObject {
             notes[index] = updatedNote
             saveNotes()
         } else {
+            #if DEBUG
             print("❌ DEBUG: Note not found for update")
+            #endif
         }
     }
     
     // Public method to manually reload notes
     func reloadNotes() {
+        #if DEBUG
         print("🔄 DEBUG: Manual reload requested")
+        #endif
         loadNotes()
     }
     
@@ -403,7 +459,9 @@ class NotesViewModel: ObservableObject {
             return
         }
         
+        #if DEBUG
         print("📚 DEBUG: Handling book replacement: \(oldLocalId) -> \(newLocalId)")
+        #endif
         
         var updatedNotes = false
         for i in notes.indices {
@@ -419,17 +477,22 @@ class NotesViewModel: ObservableObject {
                     id: notes[i].id
                 )
                 updatedNotes = true
+                #if DEBUG
                 print("📚 DEBUG: Updated note \(notes[i].id) to new book")
+                #endif
             }
         }
         
         if updatedNotes {
             saveNotes()
+            #if DEBUG
             print("📚 DEBUG: Saved updated notes after book replacement")
+            #endif
         }
     }
     
     // Debug method to check UserDefaults
+    #if DEBUG
     func debugUserDefaults() {
         print("🔍 DEBUG: Checking UserDefaults diagnostics")
         print("🔍 DEBUG: UserDefaults suite: \(userDefaults)")
@@ -470,9 +533,12 @@ class NotesViewModel: ObservableObject {
             }
         }
     }
+    #endif
     
     private func loadSampleData() {
+        #if DEBUG
         print("📚 DEBUG: loadSampleData() called - Loading sample notes")
+        #endif
         
         notes = [
             Note(
@@ -509,7 +575,9 @@ class NotesViewModel: ObservableObject {
             )
         ]
         
+        #if DEBUG
         print("📚 DEBUG: Created \(notes.count) sample notes")
+        #endif
         
         // Save the sample data
         saveNotes()

@@ -60,19 +60,25 @@ class GoodreadsCleanImporter: ObservableObject {
     
     // MARK: - Main Import Function
     func importCSV(from url: URL, libraryViewModel: LibraryViewModel) async {
+        #if DEBUG
         print("\n📚 Starting clean Goodreads import from: \(url.lastPathComponent)")
+        #endif
         isImporting = true
         importedBooks = []
         failedBooks = []
         
         // Parse CSV
         guard let csvBooks = parseCSV(from: url) else {
+            #if DEBUG
             print("❌ Failed to parse CSV")
+            #endif
             isImporting = false
             return
         }
         
+        #if DEBUG
         print("✅ Parsed \(csvBooks.count) books from CSV")
+        #endif
         
         // Import each book
         for (index, csvBook) in csvBooks.enumerated() {
@@ -83,7 +89,9 @@ class GoodreadsCleanImporter: ObservableObject {
                 phase: .importing
             )
             
+            #if DEBUG
             print("\n[\(index + 1)/\(csvBooks.count)] Importing: \(csvBook.title)")
+            #endif
             
             // Search Google Books
             if var book = await searchGoogleBooks(for: csvBook) {
@@ -108,6 +116,7 @@ class GoodreadsCleanImporter: ObservableObject {
                     enrichedBook.dateAdded = date
                 }
                 
+                #if DEBUG
                 print("  ✅ Found on Google Books: \(book.title)")
                 print("  📖 Cover URL: \(book.coverImageURL ?? "NO COVER")")
                 print("  🆔 Book LocalID: \(enrichedBook.localId.uuidString)")
@@ -115,6 +124,7 @@ class GoodreadsCleanImporter: ObservableObject {
                 print("  ⭐ Rating: \(enrichedBook.userRating ?? 0)")
                 print("  📝 Notes: \(enrichedBook.userNotes ?? "None")")
                 print("  📚 Status: \(enrichedBook.readingStatus.rawValue)")
+                #endif
                 
                 // (Verbose debug removed)
                 
@@ -140,7 +150,9 @@ class GoodreadsCleanImporter: ObservableObject {
                 // Small delay to not overwhelm the API
                 try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
             } else {
+                #if DEBUG
                 print("  ❌ Not found on Google Books")
+                #endif
                 failedBooks.append((csvBook, "Not found on Google Books"))
             }
         }
@@ -152,9 +164,13 @@ class GoodreadsCleanImporter: ObservableObject {
             phase: .complete
         )
         
+        #if DEBUG
+        #if DEBUG
         print("\n✅ Import complete!")
         print("  Imported: \(importedBooks.count)")
         print("  Failed: \(failedBooks.count)")
+        #endif
+        #endif
         
         isImporting = false
         
@@ -166,7 +182,9 @@ class GoodreadsCleanImporter: ObservableObject {
     private func parseCSV(from url: URL) -> [CSVBook]? {
         // Start accessing the security-scoped resource
         guard url.startAccessingSecurityScopedResource() else {
+            #if DEBUG
             print("❌ Failed to access security scoped resource")
+            #endif
             return nil
         }
         
@@ -185,7 +203,9 @@ class GoodreadsCleanImporter: ObservableObject {
             let headers = parseCSVRow(rows[0])
             guard let titleIndex = headers.firstIndex(of: "Title"),
                   let authorIndex = headers.firstIndex(of: "Author") else {
+                #if DEBUG
                 print("❌ Required columns not found in CSV")
+                #endif
                 return nil
             }
             
@@ -225,7 +245,9 @@ class GoodreadsCleanImporter: ObservableObject {
             
             return books
         } catch {
+            #if DEBUG
             print("❌ Error reading CSV: \(error)")
+            #endif
             return nil
         }
     }
@@ -289,16 +311,28 @@ class GoodreadsCleanImporter: ObservableObject {
     private func searchGoogleBooks(for csvBook: CSVBook) async -> Book? {
         // 1) Try ISBN first via enhanced service
         if let isbn = csvBook.primaryISBN, !isbn.isEmpty {
+            #if DEBUG
+            #if DEBUG
             print("  🔍 Searching by ISBN: \(isbn)")
+            #endif
+            #endif
             if let byIsbn = await googleBooksService.searchBookByISBN(isbn) {
                 if await isColorful(byIsbn) { return byIsbn }
+                #if DEBUG
+                #if DEBUG
                 print("  ⚠️ ISBN result appears grayscale, trying ranked search…")
+                #endif
+                #endif
             }
         }
 
         // 2) Ranked search like manual add
         let searchQuery = "\(csvBook.title) by \(csvBook.author)"
+        #if DEBUG
+        #if DEBUG
         print("  🔍 Searching by title/author: \(searchQuery)")
+        #endif
+        #endif
         let results = await enhancedService.searchBooksWithRanking(query: searchQuery, preferISBN: csvBook.primaryISBN)
         if let picked = await pickBestNonGrayscale(from: results) ?? results.first {
             return picked
@@ -333,10 +367,14 @@ class GoodreadsCleanImporter: ObservableObject {
     private func pickBestNonGrayscale(from results: [Book], maxCheck: Int = 5) async -> Book? {
         for (idx, book) in results.prefix(maxCheck).enumerated() {
             if await isColorful(book) {
+                #if DEBUG
                 print("✅ Using result #\(idx + 1) with colorful cover: \(book.id)")
+                #endif
                 return book
             } else {
+                #if DEBUG
                 print("⚠️ Result #\(idx + 1) appears grayscale, trying next…")
+                #endif
             }
         }
         return nil

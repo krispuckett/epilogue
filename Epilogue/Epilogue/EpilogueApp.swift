@@ -45,6 +45,7 @@ struct EpilogueApp: App {
     
     private func requestNotificationPermissions() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            #if DEBUG
             if granted {
                 print("✅ Notification permissions granted")
             } else if let error = error {
@@ -52,6 +53,7 @@ struct EpilogueApp: App {
             } else {
                 print("⚠️ Notification permissions denied")
             }
+            #endif
         }
         
         // Set the delegate to handle notification taps
@@ -86,7 +88,9 @@ struct EpilogueApp: App {
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
+            #if DEBUG
             print("Failed to create ModelContainer: \(error)")
+            #endif
             // Create a basic container as fallback
             modelContainer = try? ModelContainer(for: schema)
         }
@@ -104,9 +108,13 @@ struct EpilogueApp: App {
                 try fileManager.createDirectory(at: appSupportURL, 
                                               withIntermediateDirectories: true, 
                                               attributes: nil)
+                #if DEBUG
                 print("✅ Created Application Support directory")
+                #endif
             } catch {
+                #if DEBUG
                 print("⚠️ Could not create Application Support directory: \(error)")
+                #endif
             }
         }
     }

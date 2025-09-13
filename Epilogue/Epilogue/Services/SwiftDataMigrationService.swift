@@ -11,7 +11,9 @@ final class SwiftDataMigrationService {
     
     /// Run all necessary migrations and fixes
     func runMigrations(modelContext: ModelContext) async {
+        #if DEBUG
         print("🔧 Starting SwiftData migrations...")
+        #endif
         
         // Fix orphaned sessions
         await fixOrphanedSessions(modelContext: modelContext)
@@ -25,7 +27,9 @@ final class SwiftDataMigrationService {
         // Clean up duplicate books
         await removeDuplicateBooks(modelContext: modelContext)
         
+        #if DEBUG
         print("✅ SwiftData migrations completed")
+        #endif
     }
     
     /// Fix ambient sessions without books
@@ -40,18 +44,24 @@ final class SwiftDataMigrationService {
             let orphanedSessions = try modelContext.fetch(descriptor)
             
             if !orphanedSessions.isEmpty {
+                #if DEBUG
                 print("📋 Found \(orphanedSessions.count) orphaned sessions")
+                #endif
                 
                 // Try to match sessions to books based on content
                 for session in orphanedSessions {
                     if let matchedBook = await findBookForSession(session, modelContext: modelContext) {
                         session.bookModel = matchedBook
+                        #if DEBUG
                         print("  ✓ Linked session to book: \(matchedBook.title)")
+                        #endif
                     } else {
                         // Create a "No Book" placeholder if needed
                         let noBook = await getOrCreateNoBook(modelContext: modelContext)
                         session.bookModel = noBook
+                        #if DEBUG
                         print("  ✓ Linked session to 'No Book' placeholder")
+                        #endif
                     }
                 }
                 

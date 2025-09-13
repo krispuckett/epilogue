@@ -9,11 +9,15 @@ class ColorIntelligenceEngine: ObservableObject {
     
     func extractAmbientPalette(from uiImage: UIImage) async -> AmbientPalette {
         guard let inputImage = CIImage(image: uiImage) else {
+            #if DEBUG
             print("Failed to create CIImage")
+            #endif
             return AmbientPalette.default
         }
         
+        #if DEBUG
         print("Starting enhanced color extraction for image size: \(uiImage.size)")
+        #endif
         
         // Step 1: Enhance image vibrancy before extraction
         let enhancedImage = enhanceImageVibrancy(inputImage)
@@ -33,12 +37,16 @@ class ColorIntelligenceEngine: ObservableObject {
         // Step 6: Calculate luminance and create palette
         let luminance = calculateAverageLuminance(processedColors)
         
+        #if DEBUG
         print("Final palette - Luminance: \(luminance)")
+        #endif
         for (index, color) in processedColors.enumerated() {
             let uiColor = UIColor(color)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
             uiColor.getRed(&r, green: &g, blue: &b, alpha: nil)
+            #if DEBUG
             print("Color \(index): R:\(String(format: "%.2f", r)) G:\(String(format: "%.2f", g)) B:\(String(format: "%.2f", b)) Brightness:\(String(format: "%.2f", (r+g+b)/3))")
+            #endif
         }
         
         return AmbientPalette(
@@ -96,11 +104,13 @@ class ColorIntelligenceEngine: ObservableObject {
         // Strategy 3: Golden ratio sampling (existing)
         pixelData.append(contentsOf: sampleGoldenPoints(cgImage))
         
+        #if DEBUG
         print("🎨 Multi-strategy sampling results:")
         print("  Edge samples: \(sampleAlongEdges(cgImage, edgeMap: edgeCGImage).count)")
         print("  High variance samples: \(sampleHighVarianceRegions(cgImage).count)")
         print("  Golden point samples: \(sampleGoldenPoints(cgImage).count)")
         print("  Total samples: \(pixelData.count)")
+        #endif
         return pixelData
     }
     
@@ -489,7 +499,9 @@ class ColorIntelligenceEngine: ObservableObject {
             return sum + brightness
         } / Double(colors.count)
         
+        #if DEBUG
         print("Average brightness before processing: \(avgBrightness)")
+        #endif
         
         // Force minimum brightness for ALL colors
         processedColors = processedColors.map { color in
@@ -524,7 +536,9 @@ class ColorIntelligenceEngine: ObservableObject {
         
         // Check for monochrome (all similar colors)
         if isMonochrome(colors: processedColors) {
+            #if DEBUG
             print("Detected monochrome cover, generating variations")
+            #endif
             processedColors = generateMonochromeVariations(baseColor: processedColors.first ?? .gray)
         }
         

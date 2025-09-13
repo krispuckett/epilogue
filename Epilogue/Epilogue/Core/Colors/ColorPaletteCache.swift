@@ -65,7 +65,9 @@ public class BookColorPaletteCache {
     }
     
     @objc private func handleMemoryWarning() {
+        #if DEBUG
         print("⚠️ Memory warning - reducing color palette cache")
+        #endif
         // Reduce cache to half capacity
         memoryCache.countLimit = 25
         gradientCache.countLimit = 50
@@ -205,7 +207,9 @@ public class BookColorPaletteCache {
                 return cached
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to load cached palette: \(error)")
+            #endif
             return nil
         }
     }
@@ -221,7 +225,9 @@ public class BookColorPaletteCache {
             let data = try encoder.encode(cached)
             try data.write(to: url)
         } catch {
+            #if DEBUG
             print("❌ Failed to save palette to disk: \(error)")
+            #endif
         }
     }
     
@@ -238,11 +244,15 @@ public class BookColorPaletteCache {
                        let creationDate = attributes.creationDate,
                        creationDate < thirtyDaysAgo {
                         try? FileManager.default.removeItem(at: file)
+                        #if DEBUG
                         print("🧹 Cleaned expired cache: \(file.lastPathComponent)")
+                        #endif
                     }
                 }
             } catch {
+                #if DEBUG
                 print("❌ Failed to clean cache: \(error)")
+                #endif
             }
         }
     }
@@ -292,7 +302,9 @@ public class BookColorPaletteCache {
             // Cache the result
             await cachePalette(palette, for: bookID, coverURL: coverURL)
         } catch {
+            #if DEBUG
             print("❌ Failed to extract colors for warming: \(error)")
+            #endif
         }
     }
     
@@ -318,7 +330,9 @@ public class BookColorPaletteCache {
                     }
                 }
             } catch {
+                #if DEBUG
                 print("❌ Failed to get cache stats: \(error)")
+                #endif
             }
         }
         
