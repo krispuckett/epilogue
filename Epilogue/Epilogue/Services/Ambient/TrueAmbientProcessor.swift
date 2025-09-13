@@ -790,7 +790,7 @@ public class TrueAmbientProcessor: ObservableObject {
     // MARK: - Public API for direct question processing
     
     func processQuestionDirectly(_ question: String, bookContext: Book?) async {
-        // Set the book context in the detector if provided
+        // Set the book context in the detector if provided (now synchronous)
         if let book = bookContext {
             AmbientBookDetector.shared.setCurrentBook(book)
         }

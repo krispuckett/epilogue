@@ -274,6 +274,12 @@ class AmbientBookDetector: ObservableObject {
     
     // Public method to manually set the book context
     func setCurrentBook(_ book: Book) {
+        // Set synchronously for immediate use
+        self.detectedBook = book
+        self.confidence = 1.0
+        print("📖 Book context set immediately: \(book.title)")
+        
+        // Also trigger the async update for UI
         setDetectedBook(book, confidence: 1.0)
     }
     
