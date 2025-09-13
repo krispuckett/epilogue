@@ -440,10 +440,13 @@ struct AmbientModeView: View {
                             
                             // Only update if we have more text
                             if response.count > currentStreamingText.count {
-                                // Clean citations from response (remove [1][2] etc)
+                                // Clean citations from response and fix spacing
                                 let cleanedResponse = response
                                     .replacingOccurrences(of: #"\[\d+\]"#, with: "", options: .regularExpression)
-                                    .replacingOccurrences(of: "  ", with: " ") // Clean up double spaces
+                                    .replacingOccurrences(of: #"\.([A-Z])"#, with: ". $1", options: .regularExpression) // Add space after period before capital letter
+                                    .replacingOccurrences(of: #"\?([A-Z])"#, with: "? $1", options: .regularExpression) // Add space after question mark
+                                    .replacingOccurrences(of: #"\!([A-Z])"#, with: "! $1", options: .regularExpression) // Add space after exclamation
+                                    .replacingOccurrences(of: "  ", with: " ") // Clean up any double spaces
                                 
                                 // Update the streaming text with buttery smooth animation
                                 withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
