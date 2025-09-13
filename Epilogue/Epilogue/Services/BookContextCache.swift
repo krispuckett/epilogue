@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - Book Context Cache
 // Pre-caches book context for instant AI responses
-class BookContextCache: ObservableObject {
+class BookContextCache {
     static let shared = BookContextCache()
     
     // Cache storage
@@ -54,7 +54,7 @@ class BookContextCache: ObservableObject {
     
     func getContext(for book: Book) -> BookContext? {
         cacheQueue.sync {
-            return contextCache[book.localId]
+            return contextCache[book.localId.uuidString]
         }
     }
     
@@ -73,7 +73,7 @@ class BookContextCache: ObservableObject {
         
         // Cache it
         cacheQueue.async { [weak self] in
-            self?.contextCache[book.localId] = context
+            self?.contextCache[book.localId.uuidString] = context
             self?.saveCachedContexts()
         }
         
@@ -164,9 +164,9 @@ class BookContextCache: ObservableObject {
             mainCharacter: nil,
             keyThemes: [],
             plotSummary: nil,
-            genre: book.categories?.first,
+            genre: nil,  // Book doesn't have categories
             setting: nil,
-            yearPublished: book.publishedDate != nil ? Calendar.current.component(.year, from: book.publishedDate!) : nil,
+            yearPublished: book.publishedYear != nil ? Int(book.publishedYear!) : nil,
             generatedAt: Date()
         )
     }
