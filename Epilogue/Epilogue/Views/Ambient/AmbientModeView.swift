@@ -137,6 +137,8 @@ struct AmbientModeView: View {
     @State private var capturedImage: UIImage?
     @State private var extractedText: String = ""
     @State private var showQuoteHighlighter = false
+    @State private var cameraJustUsed = false
+    @State private var isProcessingImage = false
     @State private var streamingResponses: [UUID: String] = [:]  // Track streaming text by message ID
     @State private var processedContentHashes = Set<String>() // Deduplication
     @State private var transcriptionFadeTimer: Timer?
@@ -1004,21 +1006,57 @@ struct AmbientModeView: View {
                             
                             // Text input mode content
                             if inputMode == .textInput {
+                                // Camera feedback indicator
+                                if cameraJustUsed && !isProcessingImage {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                            .font(.system(size: 12))
+                                        Text("Page captured - question generated")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(8)
+                                    .transition(.move(edge: .top).combined(with: .opacity))
+                                    .animation(.easeInOut(duration: 0.3), value: cameraJustUsed)
+                                    .padding(.bottom, 4)
+                                }
+                                
                                 HStack(spacing: 8) {
-                                    // Camera button
+                                    // Visual Intelligence Camera button
                                     Button {
+                                        SensoryFeedback.light()
                                         showImagePicker = true
                                     } label: {
-                                        Image(systemName: "camera")
-                                            .font(.system(size: 17, weight: .medium))
-                                            .foregroundStyle(.white.opacity(0.6))
-                                            .frame(width: 32, height: 32)
-                                            .contentShape(Rectangle())
+                                        ZStack {
+                                            // Subtle glow when processing
+                                            if isProcessingImage {
+                                                Circle()
+                                                    .fill(Color.blue.opacity(0.2))
+                                                    .frame(width: 36, height: 36)
+                                                    .blur(radius: 4)
+                                            }
+                                            
+                                            Image(systemName: cameraJustUsed ? "camera.fill" : "camera")
+                                                .font(.system(size: 18, weight: .medium))
+                                                .foregroundStyle(cameraJustUsed ? Color.blue : .white.opacity(0.7))
+                                                .frame(width: 32, height: 32)
+                                                .background(
+                                                    Circle()
+                                                        .fill(Color.white.opacity(isProcessingImage ? 0.1 : 0.05))
+                                                )
+                                                .contentShape(Circle())
+                                                .scaleEffect(cameraJustUsed ? 1.1 : 1.0)
+                                        }
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(inputMode == .textInput ? 1 : 0)
                                     .scaleEffect(inputMode == .textInput ? 1 : 0.5)
                                     .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.15), value: inputMode)
+                                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
                                     
                                     // Enhanced text field with ambient blur
                                     ZStack(alignment: .leading) {
@@ -2244,22 +2282,61 @@ struct AmbientModeView: View {
         messageText = ""
     }
     
-    // MARK: - Photo Capture & OCR
+    // MARK: - Visual Intelligence Photo Capture & OCR
     private func processImageForText(_ image: UIImage) {
         guard let cgImage = image.cgImage else { return }
+        
+        // Show processing state
+        isProcessingImage = true
+        cameraJustUsed = true
         
         let requestHandler = VNImageRequestHandler(cgImage: cgImage)
         let request = VNRecognizeTextRequest { request, error in
             guard let observations = request.results as? [VNRecognizedTextObservation],
-                  error == nil else { return }
+                  error == nil else {
+                DispatchQueue.main.async {
+                    self.isProcessingImage = false
+                    // Show error feedback
+                    SensoryFeedback.error()
+                    self.keyboardText = "Couldn't read the text. Try better lighting."
+                }
+                return
+            }
             
             let recognizedStrings = observations.compactMap { observation in
                 observation.topCandidates(1).first?.string
             }
             
+            let extractedText = recognizedStrings.joined(separator: " ")
+            
             DispatchQueue.main.async {
-                self.extractedText = recognizedStrings.joined(separator: "\n")
-                self.showQuoteHighlighter = true
+                self.isProcessingImage = false
+                self.extractedText = extractedText
+                
+                // Generate smart question based on extracted text
+                let smartQuestion = self.generateSmartQuestion(from: extractedText)
+                
+                // Auto-populate the input field
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.keyboardText = smartQuestion
+                }
+                
+                // Haptic feedback for success
+                SensoryFeedback.success()
+                
+                // Auto-submit if it's a short quote
+                if self.shouldAutoSubmit(extractedText) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.sendTextMessage()
+                    }
+                }
+                
+                // Reset camera state after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation {
+                        self.cameraJustUsed = false
+                    }
+                }
             }
         }
         
@@ -2271,6 +2348,43 @@ struct AmbientModeView: View {
         } catch {
             print("Failed to perform OCR: \(error)")
         }
+    }
+    
+    // MARK: - Visual Intelligence Smart Question Generation
+    
+    private func generateSmartQuestion(from text: String) -> String {
+        let truncated = String(text.prefix(200))
+        let wordCount = text.split(separator: " ").count
+        
+        // Detect content type and generate appropriate question
+        if wordCount < 15 {
+            // Very short - likely a title or heading
+            return "What is the significance of '\(truncated)'?"
+        } else if text.contains("\"") && wordCount < 50 {
+            // Short quote
+            return "Explain this quote: '\(truncated)'"
+        } else if text.contains(where: { ["thee", "thou", "thy", "hath", "doth"].contains(String($0)) }) {
+            // Old English detected
+            return "Translate to modern English: '\(truncated)...'"
+        } else if text.contains("?") && wordCount < 100 {
+            // Contains questions - philosophical passage
+            return "What is the deeper meaning of: '\(truncated)...'"
+        } else if text.contains(where: { ["said", "replied", "asked", "exclaimed"].contains(String($0)) }) {
+            // Dialogue detected
+            return "Analyze this dialogue: '\(truncated)...'"
+        } else if currentBookContext?.title.contains("Hobbit") == true || currentBookContext?.title.contains("Lord") == true {
+            // Context-aware for specific books
+            return "How does this passage relate to the broader themes: '\(truncated)...'"
+        } else {
+            // Default - general explanation
+            return "What does this passage mean: '\(truncated)...'"
+        }
+    }
+    
+    private func shouldAutoSubmit(_ text: String) -> Bool {
+        // Auto-submit if it's a clear, short quote or title
+        let wordCount = text.split(separator: " ").count
+        return wordCount < 30 && (text.contains("\"") || text.contains(":"))
     }
     
     private func saveHighlightedQuote(_ quote: String, pageNumber: Int? = nil) {
