@@ -238,11 +238,16 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
                 if let query = notification.object as? String {
                     bookSearchQuery = query
-                    // Dismiss command input first
-                    showCommandInput = false
+                    // Dismiss command input with animation
+                    withAnimation(DesignSystem.Animation.springStandard) {
+                        showCommandInput = false
+                        showingLibraryCommandPalette = false
+                    }
                     commandText = ""
-                    // Add delay to allow command input dismissal animation to complete
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isInputFocused = false
+                    
+                    // Longer delay to ensure dismissal completes before showing sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         showBookSearch = true
                     }
                 }
@@ -511,6 +516,10 @@ struct ContentView: View {
             return
         }
         
+        // Check if this is a book search command (don't dismiss if it is)
+        let intent = CommandParser.parse(trimmedText, books: libraryViewModel.books, notes: notesViewModel.notes)
+        let isBookSearch = if case .searchLibrary = intent { true } else { false }
+        
         // Create and use command processor
         let processor = CommandProcessingManager(
             modelContext: modelContext,
@@ -519,9 +528,18 @@ struct ContentView: View {
         )
         processor.processInlineCommand(trimmedText)
         
-        // Provide haptic feedback and dismiss
+        // Provide haptic feedback
         SensoryFeedback.success()
-        dismissCommandInput()
+        
+        // Only dismiss if not a book search (book search will dismiss after sheet shows)
+        if !isBookSearch {
+            dismissCommandInput()
+        } else {
+            // For book search, just clear the text but keep the overlay
+            // It will be dismissed when the sheet appears
+            commandText = ""
+            isInputFocused = false
+        }
     }
     
     private func dismissCommandInput() {
