@@ -195,9 +195,9 @@ class CommandProcessingManager: ObservableObject {
     // MARK: - Book Operations
     
     private func searchBooks(query: String) {
-        // Trigger book search
+        // Trigger book search (ContentView expects "ShowBookSearch")
         NotificationCenter.default.post(
-            name: Notification.Name("SearchBooks"),
+            name: Notification.Name("ShowBookSearch"),
             object: query
         )
     }
