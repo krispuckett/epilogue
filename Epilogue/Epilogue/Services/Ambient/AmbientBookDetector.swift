@@ -272,6 +272,11 @@ class AmbientBookDetector: ObservableObject {
         return union.isEmpty ? 0 : Double(intersection.count) / Double(union.count)
     }
     
+    // Public method to manually set the book context
+    func setCurrentBook(_ book: Book) {
+        setDetectedBook(book, confidence: 1.0)
+    }
+    
     private func setDetectedBook(_ book: Book, confidence: Double) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }

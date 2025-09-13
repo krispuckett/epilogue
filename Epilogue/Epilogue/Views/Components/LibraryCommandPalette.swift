@@ -161,19 +161,25 @@ struct LibraryCommandPalette: View {
         
         switch command.action {
         case .scanBook:
-            // Post notification to trigger enhanced book scanner with Visual Intelligence & ISBN
-            NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+            // Dismiss first, then trigger enhanced book scanner after a delay
             dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+            }
             
         case .addBook:
-            // Immediately show Google Books search
-            NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+            // Dismiss first, then show Google Books search after a delay
             dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+            }
             
         case .importFromGoodreads:
-            // Trigger Goodreads import
-            NotificationCenter.default.post(name: Notification.Name("ShowGoodreadsImport"), object: nil)
+            // Dismiss first, then trigger Goodreads import after a delay
             dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: Notification.Name("ShowGoodreadsImport"), object: nil)
+            }
             
         case .createNote, .createQuote, .searchNotes:
             // These are now handled through intelligent input parsing

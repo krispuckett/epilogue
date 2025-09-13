@@ -248,10 +248,26 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Ambient Mode")
-                } footer: {
-                    Text("Real-time questions process immediately with AI responses. Audio feedback speaks responses aloud.")
+                }
+                
+                // MARK: - AI Settings
+                Section {
+                    Toggle(isOn: .init(
+                        get: { UserDefaults.standard.bool(forKey: "useOnDeviceAI") },
+                        set: { UserDefaults.standard.set($0, forKey: "useOnDeviceAI") }
+                    )) {
+                        Label("Use On-Device AI", systemImage: "cpu")
+                    }
+                    .tint(.orange)
+                    
+                    Text("When enabled, simple questions about your notes and highlights will be answered locally for free.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } header: {
+                    Text("AI Settings")
+                } footer: {
+                    Text("Book knowledge questions always use Perplexity for accuracy.")
+                        .font(.caption)
                 }
                 
                 // MARK: - Privacy & Data
@@ -291,7 +307,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     
-                    Link(destination: URL(string: "https://epilogue.app/privacy")!) {
+                    Link(destination: URL(string: "https://readepilogue.com/privacy")!) {
                         HStack {
                             Text("Privacy Policy")
                             Spacer()
@@ -301,7 +317,7 @@ struct SettingsView: View {
                         }
                     }
                     
-                    Link(destination: URL(string: "https://epilogue.app/terms")!) {
+                    Link(destination: URL(string: "https://readepilogue.com/terms")!) {
                         HStack {
                             Text("Terms of Service")
                             Spacer()

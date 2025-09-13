@@ -311,16 +311,16 @@ struct AmbientModeView: View {
         }
         // Removed - moved above transcription bar
         .statusBarHidden(true)
-        .fullScreenCover(isPresented: $showingSessionSummary, onDismiss: {
-            // After summary is dismissed, close ambient mode with a tiny delay to fix transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                dismiss()
-            }
-        }) {
+        .fullScreenCover(isPresented: $showingSessionSummary) {
             if let session = currentSession {
                 AmbientSessionSummaryView(
                     session: session,
-                    colorPalette: colorPalette
+                    colorPalette: colorPalette,
+                    onDismiss: {
+                        // Dismiss both the summary and ambient mode together
+                        showingSessionSummary = false
+                        dismiss()
+                    }
                 )
                 .environment(\.modelContext, modelContext)
                 .environmentObject(libraryViewModel)
@@ -1160,17 +1160,54 @@ struct AmbientModeView: View {
         let recentItems = content.suffix(10)
         
         for item in recentItems {
-            if item.type == .question, let response = item.response {
+            if item.type == .question, let response = item.response, response != "Thinking..." {
                 // Check if we already have this response displayed
                 let responseKey = "\(item.text)_response"
                 if !processedContentHashes.contains(responseKey) {
                     processedContentHashes.insert(responseKey)
                     
-                    // The response should already be added via getAIResponseForAmbientQuestion
-                    // which updates the thinking message. We just need to track that we've seen it.
                     print("✅ Response update detected for: \(item.text.prefix(30))...")
                     
-                    // Don't add a new message here - the thinking message was already updated
+                    // Find and update the thinking message with the actual response
+                    if let thinkingIndex = messages.lastIndex(where: { 
+                        !$0.isUser && 
+                        ($0.content.contains("**\(item.text)**") || 
+                         $0.content == "[Thinking]" ||
+                         $0.content == "**\(item.text)**")
+                    }) {
+                        let updatedMessage = UnifiedChatMessage(
+                            content: "**\(item.text)**\n\n\(response)",
+                            isUser: false,
+                            timestamp: messages[thinkingIndex].timestamp,
+                            bookContext: currentBookContext,
+                            messageType: .text
+                        )
+                        messages[thinkingIndex] = updatedMessage
+                        pendingQuestion = nil
+                        
+                        // Automatically expand the message to show the response
+                        if !expandedMessageIds.contains(updatedMessage.id) {
+                            expandedMessageIds.insert(updatedMessage.id)
+                        }
+                        
+                        print("✅ Updated thinking message with response and expanded it")
+                    } else {
+                        // No thinking message found, add response as new message
+                        let aiMessage = UnifiedChatMessage(
+                            content: "**\(item.text)**\n\n\(response)",
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: currentBookContext,
+                            messageType: .text
+                        )
+                        messages.append(aiMessage)
+                        pendingQuestion = nil
+                        
+                        // Automatically expand the new message to show the response
+                        expandedMessageIds.insert(aiMessage.id)
+                        
+                        print("✅ Added new message with response and expanded it")
+                    }
                 }
             }
         }
@@ -2756,6 +2793,9 @@ struct AmbientModeView: View {
     }
     
     private func startNewSessionForBook(_ book: Book) {
+        // Set the book context in the detector
+        bookDetector.setCurrentBook(book)
+        
         // Create a fresh session for the new book
         let newSession = AmbientSession()
         newSession.startTime = Date()
@@ -3221,18 +3261,9 @@ struct AmbientMessageThreadView: View {
                     .opacity(isExpanded ? answerOpacity : 0)
                     .blur(radius: isExpanded ? answerBlur : 8)
                     .onAppear {
-                        // Only animate the very first time
-                        if !hasShownAnswer {
-                            hasShownAnswer = true
-                            withAnimation(
-                                .timingCurve(0.215, 0.61, 0.355, 1, duration: 0.8)
-                                .delay(0.6) // Wait for question to fade in first
-                            ) {
-                                answerOpacity = 1.0
-                                answerBlur = 0
-                            }
-                        } else {
-                            // Already shown - no animation
+                        // Show answer immediately without delay
+                        hasShownAnswer = true
+                        withAnimation(.easeOut(duration: 0.3)) {
                             answerOpacity = 1.0
                             answerBlur = 0
                         }

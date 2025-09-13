@@ -5,6 +5,7 @@ import SwiftData
 struct AmbientSessionSummaryView: View {
     let session: AmbientSession
     let colorPalette: ColorPalette?
+    var onDismiss: (() -> Void)? = nil  // Custom dismiss callback
     
     @State private var expandedQuestions = Set<String>()
     @State private var hasInitializedExpanded = false
@@ -98,7 +99,13 @@ struct AmbientSessionSummaryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
-                        dismiss()
+                        if let onDismiss = onDismiss {
+                            // Use custom dismiss callback if provided
+                            onDismiss()
+                        } else {
+                            // Otherwise use standard dismiss
+                            dismiss()
+                        }
                     }
                 }
             }

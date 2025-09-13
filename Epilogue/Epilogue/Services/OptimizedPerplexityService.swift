@@ -30,22 +30,32 @@ enum PerplexityError: LocalizedError {
     case networkError(Error)
     case invalidResponse
     case unauthorized
+    case authenticationFailed
     case serverError(String)
+    case timeout
+    case noBookContext
+    case tokenLimitExceeded
     
     var errorDescription: String? {
         switch self {
-        case .rateLimitExceeded(let remaining, let resetTime):
-            return "Rate limit exceeded. \(remaining) requests remaining. Resets at \(resetTime)"
+        case .timeout:
+            return "Taking too long. Try a simpler question."
+        case .noBookContext:
+            return "Please select a book first."
+        case .tokenLimitExceeded:
+            return "Question too long. Please shorten."
+        case .rateLimitExceeded:
+            return "Too many requests. Please wait a moment."
         case .invalidRequest:
             return "Invalid request format"
         case .invalidURL:
             return "Invalid URL"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
+        case .networkError:
+            return "Connection issue. Please check your internet."
         case .invalidResponse:
             return "Invalid response from server"
-        case .unauthorized:
-            return "Unauthorized - check API key"
+        case .unauthorized, .authenticationFailed:
+            return "Authentication failed - check API key configuration"
         case .serverError(let message):
             return "Server error: \(message)"
         }
@@ -58,7 +68,10 @@ class OptimizedPerplexityService: ObservableObject {
     static let shared = OptimizedPerplexityService()
     
     private let logger = Logger(subsystem: "com.epilogue", category: "PerplexitySonar")
-    private let sonarEndpoint = "https://epilogue-proxy.kris-puckett.workers.dev"
+    private let primaryProxy = "https://epilogue-proxy.kris-puckett.workers.dev"
+    private let backupProxy = "https://epilogue-backup.workers.dev"  // Add a backup proxy
+    private let perplexityDirectEndpoint = "https://api.perplexity.ai/chat/completions"
+    private var currentEndpoint: String = ""
     private var apiKey: String = ""
     
     // Streaming support
@@ -90,10 +103,18 @@ class OptimizedPerplexityService: ObservableObject {
     }
     
     private func setupAPIKey() {
-        // Using CloudFlare proxy authentication - no API key needed
-        // The proxy handles the actual Perplexity API key
-        self.apiKey = "proxy_authenticated"
-        logger.info("🔑 AI Service configured: using CloudFlare proxy authentication")
+        // First check if user has provided their own API key via Keychain
+        if let userKey = KeychainManager.shared.getPerplexityAPIKey(),
+           !userKey.isEmpty {
+            self.apiKey = userKey
+            self.currentEndpoint = perplexityDirectEndpoint
+            logger.info("🔑 AI Service configured: using user's Perplexity API key")
+        } else {
+            // Use proxy authentication
+            self.apiKey = "proxy_authenticated"
+            self.currentEndpoint = primaryProxy
+            logger.info("🔑 AI Service configured: using CloudFlare proxy authentication")
+        }
     }
     
     // MARK: - Cerebras-Powered Streaming with SSE
@@ -129,9 +150,9 @@ class OptimizedPerplexityService: ObservableObject {
                         return
                     }
                     
-                    // Smart model selection
-                    let model = selectModel(for: query)
-                    logger.info("🤖 Selected model: \(model)")
+                    // Use fast model for immediate responses
+                    let model = "sonar"  // Always use fast model for real-time responses
+                    logger.info("🚀 Using fast sonar model for speed")
                     
                     // Create SSE request
                     let request = try createSonarRequest(
@@ -172,8 +193,28 @@ class OptimizedPerplexityService: ObservableObject {
         do {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
             
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                logger.error("❌ Invalid response type")
+                throw PerplexityError.invalidResponse
+            }
+            
+            // Handle various HTTP status codes
+            switch httpResponse.statusCode {
+            case 200:
+                // Success - continue processing
+                break
+            case 401:
+                logger.error("❌ Authentication failed - check API key")
+                throw PerplexityError.authenticationFailed
+            case 429:
+                logger.error("⚠️ Rate limit exceeded")
+                // Use default values for rate limit since we don't have the headers here
+                throw PerplexityError.rateLimitExceeded(remaining: 0, resetTime: Date().addingTimeInterval(60))
+            case 500...599:
+                logger.error("❌ Server error: \(httpResponse.statusCode)")
+                throw PerplexityError.serverError("Server error: \(httpResponse.statusCode)")
+            default:
+                logger.error("❌ Unexpected status code: \(httpResponse.statusCode)")
                 throw PerplexityError.invalidResponse
             }
             
@@ -235,12 +276,55 @@ class OptimizedPerplexityService: ObservableObject {
             }
             
         } catch {
-            // Handle reconnection
-            if self.reconnectAttempts < self.maxReconnectAttempts {
-                self.reconnectAttempts += 1
-                logger.warning("🔄 Reconnecting... (attempt \(self.reconnectAttempts))")
+            // Determine if error is retryable
+            let isRetryable: Bool
+            let baseDelay: TimeInterval
+            
+            switch error {
+            case let perplexityError as PerplexityError:
+                switch perplexityError {
+                case .serverError:
+                    isRetryable = true
+                    baseDelay = 2.0  // Start with 2 seconds for server errors
+                case .rateLimitExceeded:
+                    isRetryable = true
+                    baseDelay = 5.0  // Longer delay for rate limits
+                case .networkError:
+                    isRetryable = true
+                    baseDelay = 1.0  // Quick retry for network issues
+                default:
+                    isRetryable = false
+                    baseDelay = 0
+                }
+            default:
+                // For unknown errors, attempt retry with standard delay
+                isRetryable = true
+                baseDelay = 1.0
                 
-                try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(self.reconnectAttempts))) * 1_000_000_000)
+                // If proxy is failing, try backup proxy or suggest user add their own key
+                if currentEndpoint == primaryProxy && self.reconnectAttempts >= 2 {
+                    logger.warning("⚠️ Primary proxy appears down. User can add their own API key in Settings > AI & Intelligence")
+                    // Could switch to backup proxy here if available
+                    // self.currentEndpoint = backupProxy
+                }
+            }
+            
+            // Handle reconnection with exponential backoff
+            if isRetryable && self.reconnectAttempts < self.maxReconnectAttempts {
+                self.reconnectAttempts += 1
+                
+                // Calculate exponential backoff with jitter
+                let delay = baseDelay * pow(2.0, Double(self.reconnectAttempts - 1))
+                let jitter = Double.random(in: 0...0.3) * delay  // Add up to 30% jitter
+                let finalDelay = min(delay + jitter, 30.0)  // Cap at 30 seconds
+                
+                logger.warning("🔄 Reconnecting... (attempt \(self.reconnectAttempts)/\(self.maxReconnectAttempts)) after \(String(format: "%.1f", finalDelay))s")
+                
+                try await Task.sleep(nanoseconds: UInt64(finalDelay * 1_000_000_000))
+                
+                // Reset attempts on successful reconnection
+                self.reconnectAttempts = 0
+                
                 try await streamWithReconnection(
                     request: request,
                     query: query,
@@ -249,6 +333,7 @@ class OptimizedPerplexityService: ObservableObject {
                     continuation: continuation
                 )
             } else {
+                logger.error("❌ Max retry attempts reached or non-retryable error: \(error)")
                 throw error
             }
         }
@@ -406,14 +491,20 @@ class OptimizedPerplexityService: ObservableObject {
     // MARK: - Request Creation
     
     private func createSonarRequest(query: String, bookContext: Book?, model: String, stream: Bool) throws -> URLRequest {
-        guard let url = URL(string: sonarEndpoint) else {
+        guard let url = URL(string: currentEndpoint) else {
             throw PerplexityError.invalidURL
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        // Use proxy authentication instead of Bearer token
-        request.setValue("epilogue_testflight_2025_secret", forHTTPHeaderField: "X-Epilogue-Auth")
+        
+        if currentEndpoint == perplexityDirectEndpoint {
+            // Direct API authentication with user's key
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        } else {
+            // Proxy authentication
+            request.setValue("epilogue_testflight_2025_secret", forHTTPHeaderField: "X-Epilogue-Auth")
+        }
         
         // Get or create userId
         let userId: String
@@ -434,12 +525,15 @@ class OptimizedPerplexityService: ObservableObject {
         
         let systemPrompt = bookContext.map { book in
             """
-            Discussing '\(book.title)' by \(book.author).
-            Provide detailed, factual responses with citations.
-            Include page references and quotes when possible.
+            You are answering questions ONLY about the book "\(book.title)" by \(book.author).
+            DO NOT search for other books or web content.
+            When asked about "this book" or "the book", the user means "\(book.title)".
+            Base your answers on the well-known plot, characters, and themes of "\(book.title)".
+            Be concise and factual.
             """
-        } ?? "Provide detailed, factual responses with citations."
+        } ?? "Be concise and helpful."
         
+        // Always include search parameters for hybrid responses
         let body: [String: Any] = [
             "model": "sonar",  // Always use sonar for proxy
             "messages": [
@@ -452,7 +546,7 @@ class OptimizedPerplexityService: ObservableObject {
             "return_images": false,
             "search_domain_filter": [],  // No domain restrictions
             "temperature": 0.7,
-            "max_tokens": model == "sonar-pro" ? 2000 : 1000
+            "max_tokens": 500  // Reduced for faster responses
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -487,13 +581,32 @@ class OptimizedPerplexityService: ObservableObject {
     
     func chat(message: String, bookContext: Book?) async throws -> String {
         // Use streaming internally but return complete response
+        logger.info("🚀 Starting chat request: \(message.prefix(50))...")
         var fullResponse = ""
+        var responseCount = 0
         
-        for try await response in streamSonarResponse(message, bookContext: bookContext) {
-            fullResponse = response.text
+        do {
+            for try await response in streamSonarResponse(message, bookContext: bookContext) {
+                responseCount += 1
+                fullResponse = response.text
+                
+                // Log progress every 10 responses
+                if responseCount % 10 == 0 {
+                    logger.info("📝 Received \(responseCount) streaming chunks, current length: \(fullResponse.count)")
+                }
+            }
+            
+            if fullResponse.isEmpty {
+                logger.error("❌ Received empty response from Perplexity")
+                throw PerplexityError.invalidResponse
+            }
+            
+            logger.info("✅ Chat completed with \(responseCount) chunks, final length: \(fullResponse.count)")
+            return fullResponse
+        } catch {
+            logger.error("❌ Chat failed: \(error)")
+            throw error
         }
-        
-        return fullResponse
     }
     
     func clearCache() async {
