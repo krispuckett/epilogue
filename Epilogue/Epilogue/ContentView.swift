@@ -133,8 +133,8 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showBookSearch, onDismiss: {
                 // Clean up when sheet is dismissed
-                bookSearchQuery = ""
                 pendingBookSearch = false
+                bookSearchQuery = ""
             }) {
                 BookSearchSheet(
                     searchQuery: bookSearchQuery,
@@ -147,7 +147,7 @@ struct ContentView: View {
                         showGlassToast = true
                         
                         showBookSearch = false
-                        bookSearchQuery = ""
+                        // bookSearchQuery will be cleared in onDismiss
                     }
                 )
             }
@@ -242,6 +242,7 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
                 if let query = notification.object as? String {
+                    print("📚 Received ShowBookSearch with query: '\(query)'")
                     bookSearchQuery = query
                     pendingBookSearch = true  // Mark as pending
                     
@@ -255,7 +256,8 @@ struct ContentView: View {
                     
                     // Use onChange to trigger sheet after state settles
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        if pendingBookSearch {
+                        if pendingBookSearch && !bookSearchQuery.isEmpty {
+                            print("📚 Opening sheet with query: '\(bookSearchQuery)'")
                             pendingBookSearch = false
                             showBookSearch = true
                         }
