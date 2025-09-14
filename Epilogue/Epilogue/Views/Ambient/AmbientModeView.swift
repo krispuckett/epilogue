@@ -504,21 +504,16 @@ struct AmbientModeView: View {
             breathingTimer?.invalidate()
         }
         .sheet(isPresented: $showImagePicker) {
-            RealVisualIntelligenceView(
+            SnapshotTextSelector(
                 isPresented: $showImagePicker,
-                onTextCaptured: { capturedText in
-                    // Process the ACTUAL captured text from camera
-                    extractedText = capturedText
-                    keyboardText = capturedText
-                    
-                    // Auto-detect and process
-                    if detectIfQuote(capturedText) {
-                        processSelectedQuote(capturedText)
-                    } else {
-                        let question = generateSmartQuestion(from: capturedText)
-                        Task {
-                            await getAIResponseForAmbientQuestion(question)
-                        }
+                onQuoteSaved: { text, pageNumber in
+                    // Save quote with attribution
+                    saveQuoteWithAttribution(text, pageNumber: pageNumber)
+                },
+                onQuestionAsked: { text in
+                    // Ask Perplexity about the selected text
+                    Task {
+                        await askPerplexityAboutText(text)
                     }
                 }
             )
@@ -2292,6 +2287,33 @@ struct AmbientModeView: View {
         await MainActor.run {
             showImagePicker = true
         }
+    }
+    
+    // MARK: - Quote Saving with Attribution
+    private func saveQuoteWithAttribution(_ text: String, pageNumber: String?) {
+        // Get current book if available
+        let bookTitle = bookDetector.detectedBook?.title ?? "Unknown Book"
+        let author = bookDetector.detectedBook?.author ?? ""
+        
+        // Create attributed quote
+        var attributedText = text
+        if let page = pageNumber {
+            attributedText += "\n\n— \(bookTitle), p. \(page)"
+        } else {
+            attributedText += "\n\n— \(bookTitle)"
+        }
+        
+        // Save as quote
+        processSelectedQuote(attributedText)
+    }
+    
+    // MARK: - Perplexity Integration
+    private func askPerplexityAboutText(_ text: String) async {
+        // Create a question about the text
+        let question = "What does this passage mean: \"\(text)\""
+        
+        // Process through AI
+        await getAIResponseForAmbientQuestion(question)
     }
     
     private func processSelectedQuote(_ selectedText: String) {
