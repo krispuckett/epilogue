@@ -503,27 +503,7 @@ struct AmbientModeView: View {
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
         }
-        .sheet(isPresented: $showImagePicker) {
-            // Use simplified text capture for better performance
-            SimplifiedTextCapture(
-                isPresented: $showImagePicker,
-                onTextCaptured: { capturedText in
-                    // Determine if it's a quote or needs a question
-                    extractedText = capturedText
-                    let question = generateSmartQuestion(from: capturedText)
-                    
-                    // If it looks like a quote, save it
-                    if detectIfQuote(capturedText) {
-                        processSelectedQuote(capturedText)
-                    } else {
-                        // Otherwise ask about it
-                        Task {
-                            await getAIResponseForAmbientQuestion(question)
-                        }
-                    }
-                }
-            )
-        }
+        // Removed camera sheet - using clipboard approach for simplicity
         .sheet(isPresented: $showQuoteHighlighter) {
             QuoteHighlighterView(
                 image: capturedImage,
@@ -1039,31 +1019,23 @@ struct AmbientModeView: View {
                                 }
                                 
                                 HStack(spacing: 8) {
-                                    // Visual Intelligence Camera button
+                                    // Simplified paste button for text capture
                                     Button {
                                         SensoryFeedback.light()
-                                        showImagePicker = true
-                                    } label: {
-                                        ZStack {
-                                            // Subtle glow when processing
-                                            if isProcessingImage {
-                                                Circle()
-                                                    .fill(Color.blue.opacity(0.2))
-                                                    .frame(width: 36, height: 36)
-                                                    .blur(radius: 4)
-                                            }
-                                            
-                                            Image(systemName: cameraJustUsed ? "camera.fill" : "camera")
-                                                .font(.system(size: 18, weight: .medium))
-                                                .foregroundStyle(cameraJustUsed ? Color.blue : .white.opacity(0.7))
-                                                .frame(width: 32, height: 32)
-                                                .background(
-                                                    Circle()
-                                                        .fill(Color.white.opacity(isProcessingImage ? 0.1 : 0.05))
-                                                )
-                                                .contentShape(Circle())
-                                                .scaleEffect(cameraJustUsed ? 1.1 : 1.0)
+                                        // Simple clipboard paste
+                                        if let text = UIPasteboard.general.string, !text.isEmpty {
+                                            keyboardText = text
                                         }
+                                    } label: {
+                                        Image(systemName: "doc.on.clipboard")
+                                            .font(.system(size: 18, weight: .medium))
+                                            .foregroundStyle(.white.opacity(0.7))
+                                            .frame(width: 32, height: 32)
+                                            .background(
+                                                Circle()
+                                                    .fill(Color.white.opacity(0.05))
+                                            )
+                                            .contentShape(Circle())
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(inputMode == .textInput ? 1 : 0)
