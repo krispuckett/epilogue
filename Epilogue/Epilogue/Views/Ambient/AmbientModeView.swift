@@ -504,13 +504,23 @@ struct AmbientModeView: View {
             breathingTimer?.invalidate()
         }
         .sheet(isPresented: $showImagePicker) {
-            // Use Live Text Scanner for precise quote selection
-            LiveTextScannerView(
+            // Use Enhanced Text Scanner for better selection control
+            EnhancedTextScannerView(
                 isPresented: $showImagePicker,
-                scannedText: $extractedText,
-                onQuoteCaptured: { selectedText in
-                    // Process the selected quote
-                    processSelectedQuote(selectedText)
+                onTextSelected: { selectedText, mode in
+                    switch mode {
+                    case .quote:
+                        // Save as quote
+                        processSelectedQuote(selectedText)
+                    case .question:
+                        // Ask a question about the text
+                        keyboardText = ""
+                        extractedText = selectedText
+                        let question = generateSmartQuestion(from: selectedText)
+                        Task {
+                            await getAIResponseForAmbientQuestion(question)
+                        }
+                    }
                 }
             )
         }
