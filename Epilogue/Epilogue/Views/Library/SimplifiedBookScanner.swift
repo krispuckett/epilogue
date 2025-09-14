@@ -69,7 +69,7 @@ struct SimplifiedBookScanner: View {
                 onBookSelected: { book in
                     onBookFound(book)
                     showBookSearch = false
-                    dismiss()
+                    // Don't dismiss scanner - let user continue scanning or manually close
                 }
             )
         }

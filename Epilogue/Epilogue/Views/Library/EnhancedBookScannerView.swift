@@ -180,7 +180,15 @@ struct EnhancedBookScannerView: View {
                 onBookSelected: { book in
                     onBookFound(book)
                     showBookSearch = false
-                    dismiss()
+                    // Don't dismiss scanner - let user continue scanning or manually close
+                    
+                    // Show success feedback
+                    detectionStatus = "Added \"\(book.title)\""
+                    
+                    // Reset status after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        detectionStatus = "Position book cover or ISBN barcode"
+                    }
                 }
             )
         }
@@ -190,7 +198,15 @@ struct EnhancedBookScannerView: View {
                 onBookSelected: { book in
                     onBookFound(book)
                     bookScanner.reset()
-                    dismiss()
+                    // Don't dismiss scanner - let user continue scanning or manually close
+                    
+                    // Show success feedback
+                    detectionStatus = "Added \"\(book.title)\""
+                    
+                    // Reset status after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        detectionStatus = "Position book cover or ISBN barcode"
+                    }
                 }
             )
         }
