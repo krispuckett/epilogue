@@ -10,6 +10,7 @@ struct SimplifiedTextCapture: View {
     @State private var capturedImage: UIImage?
     @State private var extractedText: String = ""
     @State private var isProcessing = false
+    @State private var showingImagePicker = false
     
     var body: some View {
         NavigationStack {
@@ -22,6 +23,12 @@ struct SimplifiedTextCapture: View {
                 } else {
                     // Simple camera button
                     cameraPromptView
+                        .onAppear {
+                            // Auto-show camera on appear
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingImagePicker = true
+                            }
+                        }
                 }
                 
                 if isProcessing {
@@ -31,6 +38,13 @@ struct SimplifiedTextCapture: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingImagePicker) {
+                CameraImagePicker(image: $capturedImage) { image in
+                    if let image = image {
+                        processImage(image)
+                    }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -66,7 +80,7 @@ struct SimplifiedTextCapture: View {
                 .foregroundStyle(.white)
             
             Button {
-                showCamera()
+                showingImagePicker = true
             } label: {
                 Text("Open Camera")
                     .font(.system(size: 18, weight: .medium))
@@ -85,7 +99,7 @@ struct SimplifiedTextCapture: View {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(maxHeight: UIScreen.main.bounds.height * 0.4)
+                .frame(maxHeight: 400)
                 .clipped()
             
             // Extracted text below
@@ -129,7 +143,7 @@ struct SimplifiedTextCapture: View {
             Button {
                 capturedImage = nil
                 extractedText = ""
-                showCamera()
+                showingImagePicker = true
             } label: {
                 HStack {
                     Image(systemName: "camera")
@@ -142,23 +156,6 @@ struct SimplifiedTextCapture: View {
                 .glassEffect(in: RoundedRectangle(cornerRadius: 12))
             }
             .padding()
-        }
-    }
-    
-    // MARK: - Camera Handling
-    private func showCamera() {
-        let picker = UIImagePickerController()
-        picker.sourceType = .camera
-        picker.delegate = ImagePickerCoordinator(
-            onImagePicked: { image in
-                capturedImage = image
-                processImage(image)
-            }
-        )
-        
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(picker, animated: true)
         }
     }
     
@@ -204,24 +201,44 @@ struct SimplifiedTextCapture: View {
     }
 }
 
-// MARK: - Image Picker Coordinator
-private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-    let onImagePicked: (UIImage) -> Void
+// MARK: - Camera Image Picker
+struct CameraImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    let onImagePicked: (UIImage?) -> Void
+    @Environment(\.presentationMode) private var presentationMode
     
-    init(onImagePicked: @escaping (UIImage) -> Void) {
-        self.onImagePicked = onImagePicked
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        picker.allowsEditing = false
+        return picker
     }
     
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        picker.dismiss(animated: true)
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraImagePicker
         
-        if let image = info[.originalImage] as? UIImage {
-            onImagePicked(image)
+        init(_ parent: CameraImagePicker) {
+            self.parent = parent
         }
-    }
-    
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        picker.dismiss(animated: true)
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = uiImage
+                parent.onImagePicked(uiImage)
+            }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
+        }
     }
 }
 
