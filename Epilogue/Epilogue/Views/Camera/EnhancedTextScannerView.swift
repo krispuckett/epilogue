@@ -58,7 +58,7 @@ struct EnhancedTextScannerView: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 28))
                     .foregroundStyle(.white.opacity(0.9))
-                    .background(Circle().fill(Color.black.opacity(0.3)))
+                    .glassEffect(in: Circle())
             }
             .padding()
             
@@ -75,7 +75,7 @@ struct EnhancedTextScannerView: View {
                 .foregroundColor(.yellow)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Capsule().fill(Color.yellow.opacity(0.2)))
+                .glassEffect(in: Capsule())
                 .overlay(Capsule().stroke(Color.yellow.opacity(0.4), lineWidth: 1))
                 .padding(.trailing)
             }
@@ -108,9 +108,10 @@ struct EnhancedTextScannerView: View {
                     .foregroundColor(selectionMode == mode ? .black : .white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(
+                    .glassEffect(in: Capsule())
+                    .overlay(
                         Capsule()
-                            .fill(selectionMode == mode ? Color.white : Color.white.opacity(0.2))
+                            .fill(selectionMode == mode ? Color.white.opacity(0.3) : Color.clear)
                     )
                 }
             }
@@ -143,7 +144,7 @@ struct EnhancedTextScannerView: View {
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white)
                             .frame(width: 50, height: 50)
-                            .background(Circle().fill(Color.red.opacity(0.3)))
+                            .glassEffect(in: Circle())
                             .overlay(Circle().stroke(Color.red.opacity(0.5), lineWidth: 1))
                     }
                     
@@ -160,10 +161,11 @@ struct EnhancedTextScannerView: View {
                             Text(selectionMode == .quote ? "Save Quote" : "Ask About This")
                                 .font(.system(size: 16, weight: .semibold))
                         }
-                        .foregroundColor(.black)
+                        .foregroundColor(.white)
                         .padding(.horizontal, 24)
                         .frame(height: 50)
-                        .background(Capsule().fill(Color.white))
+                        .glassEffect(in: Capsule())
+                        .overlay(Capsule().fill(Color.white.opacity(0.2)))
                     }
                 }
             }
@@ -209,13 +211,10 @@ struct EnhancedTextScannerView: View {
             .foregroundColor(.white.opacity(0.9))
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
-            .background(
+            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    )
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
             )
             
             Text("Point camera at text and tap to select")
@@ -251,13 +250,10 @@ struct EnhancedTextScannerView: View {
             .frame(maxHeight: 80)
         }
         .padding(14)
-        .background(
+        .glassEffect(in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .fill((selectionMode == .quote ? Color.blue : Color.green).opacity(0.15))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke((selectionMode == .quote ? Color.blue : Color.green).opacity(0.3), lineWidth: 1)
-                )
+                .stroke((selectionMode == .quote ? Color.blue : Color.green).opacity(0.3), lineWidth: 1)
         )
         .padding(.horizontal, 20)
     }
