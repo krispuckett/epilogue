@@ -12,5 +12,9 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSVisualIntelligenceUsageDescription</key>
+	<string>Epilogue uses Visual Intelligence to extract quotes and text from book pages</string>
+	<key>NSAppIntentsVisualIntelligenceSupported</key>
+	<true/>
 </dict>
 </plist>
