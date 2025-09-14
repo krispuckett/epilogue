@@ -503,7 +503,26 @@ struct AmbientModeView: View {
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
         }
-        // Removed camera sheet - using clipboard approach for simplicity
+        .sheet(isPresented: $showImagePicker) {
+            RealVisualIntelligenceView(
+                isPresented: $showImagePicker,
+                onTextCaptured: { capturedText in
+                    // Process the ACTUAL captured text from camera
+                    extractedText = capturedText
+                    keyboardText = capturedText
+                    
+                    // Auto-detect and process
+                    if detectIfQuote(capturedText) {
+                        processSelectedQuote(capturedText)
+                    } else {
+                        let question = generateSmartQuestion(from: capturedText)
+                        Task {
+                            await getAIResponseForAmbientQuestion(question)
+                        }
+                    }
+                }
+            )
+        }
         .sheet(isPresented: $showQuoteHighlighter) {
             QuoteHighlighterView(
                 image: capturedImage,
@@ -2268,31 +2287,10 @@ struct AmbientModeView: View {
     }
     
     // MARK: - Visual Intelligence Live Text Selection
-    // MARK: - iOS 26 Visual Intelligence Integration
-    @available(iOS 26.0, *)
+    // MARK: - Visual Intelligence Integration
     private func triggerVisualIntelligence() async {
-        if #available(iOS 26.0, *) {
-            // This would trigger the native Visual Intelligence camera
-            // In a real implementation, this would use the Visual Intelligence framework
-            // For now, we'll use a placeholder implementation
-            
-            // Visual Intelligence would handle:
-            // 1. Camera presentation
-            // 2. Real-time text detection
-            // 3. Smart selection UI
-            // 4. Return extracted text
-            
-            // Placeholder: Use clipboard as fallback
-            if let text = UIPasteboard.general.string, !text.isEmpty {
-                await MainActor.run {
-                    keyboardText = text
-                    
-                    // Auto-detect quote vs question
-                    if detectIfQuote(text) {
-                        processSelectedQuote(text)
-                    }
-                }
-            }
+        await MainActor.run {
+            showImagePicker = true
         }
     }
     
