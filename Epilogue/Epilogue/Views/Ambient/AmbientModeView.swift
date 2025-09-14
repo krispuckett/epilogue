@@ -503,6 +503,8 @@ struct AmbientModeView: View {
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
         }
+        // Camera temporarily disabled due to memory issues
+        /*
         .sheet(isPresented: $showImagePicker) {
             SnapshotTextSelector(
                 isPresented: $showImagePicker,
@@ -518,6 +520,7 @@ struct AmbientModeView: View {
                 }
             )
         }
+        */
         .sheet(isPresented: $showQuoteHighlighter) {
             QuoteHighlighterView(
                 image: capturedImage,
@@ -1033,15 +1036,14 @@ struct AmbientModeView: View {
                                 }
                                 
                                 HStack(spacing: 8) {
-                                    // iOS 26 Visual Intelligence button
+                                    // Simple paste button - camera causing memory issues
                                     Button {
-                                        SensoryFeedback.light()
-                                        // Trigger Visual Intelligence camera
-                                        Task {
-                                            await triggerVisualIntelligence()
+                                        // Just paste from clipboard for now
+                                        if let text = UIPasteboard.general.string {
+                                            keyboardText = text
                                         }
                                     } label: {
-                                        Image(systemName: "camera.metering.multispot")
+                                        Image(systemName: "doc.on.clipboard")
                                             .font(.system(size: 18, weight: .medium))
                                             .foregroundStyle(.white.opacity(0.7))
                                             .frame(width: 32, height: 32)

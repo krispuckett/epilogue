@@ -304,11 +304,7 @@ struct BookDetailView: View {
                                     .combined(with: .offset(y: 20)),
                                 removal: .opacity
                             ))
-                            .scrollTransition { content, phase in
-                                content
-                                    .opacity(phase.isIdentity ? 1 : 0.8)
-                                    .scaleEffect(phase.isIdentity ? 1 : 0.98)
-                            }
+                            // Removed scrollTransition to fix text stretching bug
                     }
                     }
                 }
