@@ -301,7 +301,8 @@ struct CircularProgressView: View {
                         style: StrokeStyle(lineWidth: 10, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.5), value: progress)
+                    // Only animate when progress actually changes, not on load
+                    .animation(progress > 0 ? .spring(response: 0.5) : nil, value: progress)
                 
                 Text("\(Int(progress * 100))%")
                     .font(.system(size: 24, weight: .semibold, design: .monospaced))

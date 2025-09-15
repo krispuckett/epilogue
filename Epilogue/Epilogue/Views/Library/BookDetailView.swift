@@ -672,20 +672,31 @@ struct BookDetailView: View {
                 Spacer()
             }
             
-            // Summary text - natural layout
-            Text(description)
-                .font(.system(size: 15))
-                .foregroundColor(textColor.opacity(0.85))
-                .lineSpacing(8)
-                .lineLimit(summaryExpanded ? nil : 4)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Summary text - clean cut animation, no morphing
+            Group {
+                if summaryExpanded {
+                    Text(description)
+                        .font(.system(size: 15))
+                        .foregroundColor(textColor.opacity(0.85))
+                        .lineSpacing(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                } else {
+                    Text(description)
+                        .font(.system(size: 15))
+                        .foregroundColor(textColor.opacity(0.85))
+                        .lineSpacing(8)
+                        .lineLimit(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: summaryExpanded)
             
             // Read more/less button
             if description.count > 200 {
                 Button {
-                    withAnimation {
-                        summaryExpanded.toggle()
-                    }
+                    summaryExpanded.toggle()
                 } label: {
                     Text(summaryExpanded ? "Read less" : "Read more")
                         .font(.caption)
@@ -916,9 +927,7 @@ struct BookDetailView: View {
             
             if description.count > 300 {
                 Button {
-                    withAnimation {
-                        summaryExpanded.toggle()
-                    }
+                    summaryExpanded.toggle()
                 } label: {
                     Text(summaryExpanded ? "Show less" : "Read more")
                         .font(.caption)

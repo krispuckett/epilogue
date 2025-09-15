@@ -1089,10 +1089,7 @@ struct LibraryBookListView: View {
                     namespace: namespace
                 )
                 .id(book.localId)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.95).combined(with: .opacity),
-                    removal: .scale(scale: 0.95).combined(with: .opacity)
-                ))
+                // No transition to prevent horizontal expansion on load
                 .task {
                     await loadColorPalette(for: book)
                 }

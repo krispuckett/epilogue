@@ -73,10 +73,7 @@ struct OptimizedLibraryGrid: View {
                             }
                         }
                         .id(book.localId)
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
-                            removal: .opacity
-                        ))
+                        // No transition on load to prevent horizontal expansion
                 }
             }
             .padding(.horizontal)
@@ -152,12 +149,14 @@ struct OptimizedGridItem: View {
                 if highlightedBookId == book.localId {
                     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
                         .stroke(Color.orange, lineWidth: 3)
-                        .animation(DesignSystem.Animation.easeStandard, value: highlightedBookId)
+                        // Animation only when highlight changes
+                        .animation(highlightedBookId != nil ? DesignSystem.Animation.easeStandard : nil, value: highlightedBookId)
                 }
             }
         }
         .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(DesignSystem.Animation.springStandard, value: isPressed)
+        // Only animate press, not initial load
+        .animation(isPressed ? DesignSystem.Animation.springStandard : nil, value: isPressed)
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity) { pressing in
             isPressed = pressing
             if pressing {
