@@ -261,7 +261,7 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var settingsSheet: some View {
-        MinimalSettingsView()
+        SettingsView()
             .matchedGeometryEffect(id: "settings-view", in: settingsTransition, isSource: false)
     }
     
