@@ -81,6 +81,9 @@ final class PerformanceMonitorService: ObservableObject {
     // MARK: - Public Methods
 
     func startMonitoring() {
+        // DISABLED: Performance monitoring causes performance issues ironically
+        return
+
         guard !isMonitoring else { return }
 
         isMonitoring = true

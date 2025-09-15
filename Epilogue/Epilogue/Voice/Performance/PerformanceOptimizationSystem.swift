@@ -63,11 +63,12 @@ public class PerformanceOptimizationSystem: ObservableObject {
     // MARK: - Monitoring
     
     private func startMonitoring() {
-        performanceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateMetrics()
-            }
-        }
+        // DISABLED: Timer updating every second causes performance issues
+        // performanceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        //     Task { @MainActor in
+        //         self?.updateMetrics()
+        //     }
+        // }
     }
     
     private func updateMetrics() {
