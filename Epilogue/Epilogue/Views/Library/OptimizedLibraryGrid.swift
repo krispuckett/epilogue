@@ -24,6 +24,7 @@ struct OptimizedLibraryGrid: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 32) {
+                    Section {
                     ForEach(Array(books.enumerated()), id: \.element.localId) { index, book in
                         ZStack {
                             // Placeholder for dragged item
@@ -46,13 +47,11 @@ struct OptimizedLibraryGrid: View {
                                 )
                                 .opacity(draggedBook?.id == book.id ? 0.01 : 1)
                                 .scaleEffect(targetIndex == index && draggedBook != nil ? 1.05 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: targetIndex)
+                                .animation(nil) // Disabled for smooth scrolling
                                 .draggable(book) {
                                     DragPreview(book: book, viewModel: viewModel)
                                         .onAppear {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                                draggedBook = book
-                                            }
+                                            draggedBook = book // No animation during drag
                                         }
                                 }
                                 .dropDestination(for: Book.self) { items, location in
@@ -62,27 +61,25 @@ struct OptimizedLibraryGrid: View {
                                         return false
                                     }
                                     
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex)
-                                    }
+                                    viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex) // No animation
                                     return true
                                 } isTargeted: { isTargeted in
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        targetIndex = isTargeted ? index : nil
-                                    }
+                                    targetIndex = isTargeted ? index : nil // No animation
                                 }
                             }
                         }
                         .id(book.localId)
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
-                            removal: .opacity
-                        ))
+                        // Removed transition for 120Hz performance
                     }
+                    } // End Section
                 }
+                .scrollTargetLayout() // iOS 18 optimization
                 .padding(.horizontal)
                 .padding(.bottom, 100)
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.immediately)
+            .scrollIndicators(.hidden)
         }
         .onDrop(of: [.text], delegate: BookDropDelegate(
             draggedBook: $draggedBook,

@@ -299,6 +299,7 @@ struct LibraryView: View {
     private var mainContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                // iOS 18 optimization
                 ScrollViewTracker(isScrolling: $isScrolling)
                 
                 if viewModel.isLoading {
@@ -318,25 +319,21 @@ struct LibraryView: View {
                     ZStack {
                         if viewMode == .grid {
                             gridContent
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                    removal: .opacity.combined(with: .scale(scale: 1.02))
-                                ))
+                                // Removed transition for performance
                         } else {
                             listContent
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                    removal: .opacity.combined(with: .scale(scale: 1.02))
-                                ))
+                                // Removed transition for performance
                         }
                     }
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewMode)
+                    // Removed animation for smoother scrolling
                 }
                 
                 // Add bottom padding to prevent content from scrolling under action buttons
                 Color.clear
                     .frame(height: 45) // Space for action buttons above tab bar
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.immediately)
             .refreshable {
                 await refreshLibrary()
             }
@@ -1129,15 +1126,13 @@ struct LibraryBookListView: View {
                     namespace: namespace
                 )
                 .id(book.localId)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.95).combined(with: .opacity),
-                    removal: .scale(scale: 0.95).combined(with: .opacity)
-                ))
+                // Removed transition for 120Hz scrolling
                 .task {
                     await loadColorPalette(for: book)
                 }
             }
         }
+        .scrollTargetLayout() // iOS 18 optimization
         .padding(.horizontal)
         .padding(.top, 8)
         .padding(.bottom, 100)

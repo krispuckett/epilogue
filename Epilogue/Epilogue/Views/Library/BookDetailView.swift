@@ -287,6 +287,9 @@ struct BookDetailView: View {
                     }
                     }
                 }
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollDismissesKeyboard(.immediately)
+                .scrollIndicators(.hidden)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
