@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import OSLog
 
 private let logger = Logger(subsystem: "com.epilogue", category: "ContentViewExtensions")
@@ -193,10 +194,10 @@ extension View {
 // MARK: - Toast Extensions
 
 extension View {
-    func glassToast(appStateCoordinator: AppStateCoordinator) -> some View {
+    func glassToast(isShowing: Binding<Bool>, message: String) -> some View {
         self.modifier(GlassToastModifier(
-            isShowing: $appStateCoordinator.showingGlassToast,
-            message: appStateCoordinator.toastMessage
+            isShowing: isShowing,
+            message: message
         ))
     }
 }
