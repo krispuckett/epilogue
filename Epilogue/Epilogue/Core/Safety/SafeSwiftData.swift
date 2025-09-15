@@ -1,6 +1,9 @@
 import SwiftData
 import SwiftUI
 import Combine
+import OSLog
+
+private let logger = Logger(subsystem: "com.epilogue", category: "SwiftData")
 
 // MARK: - Safe ModelContext Extensions
 extension ModelContext {
@@ -15,12 +18,8 @@ extension ModelContext {
                 #endif
             }
         } catch {
-            #if DEBUG
-            print("❌ SwiftData save failed: \(error)")
-            #endif
-            // Log to crash reporting
-            CrashPreventionManager.shared.logError(error, context: "SwiftData.save")
-            
+            logger.error("SwiftData save failed: \(error.localizedDescription)")
+
             // Attempt to rollback if possible
             rollback()
         }
@@ -31,10 +30,7 @@ extension ModelContext {
         do {
             return try fetch(descriptor)
         } catch {
-            #if DEBUG
-            print("❌ SwiftData fetch failed: \(error)")
-            #endif
-            CrashPreventionManager.shared.logError(error, context: "SwiftData.fetch")
+            logger.error("SwiftData fetch failed: \(error.localizedDescription)")
             return []
         }
     }
@@ -48,10 +44,7 @@ extension ModelContext {
             print("✅ SwiftData deleted model successfully")
             #endif
         } catch {
-            #if DEBUG
-            print("❌ SwiftData delete failed: \(error)")
-            #endif
-            CrashPreventionManager.shared.logError(error, context: "SwiftData.delete")
+            logger.error("SwiftData delete failed: \(error.localizedDescription)")
             rollback()
         }
     }
@@ -67,10 +60,7 @@ extension ModelContext {
             print("✅ SwiftData batch deleted \(models.count) models")
             #endif
         } catch {
-            #if DEBUG
-            print("❌ SwiftData batch delete failed: \(error)")
-            #endif
-            CrashPreventionManager.shared.logError(error, context: "SwiftData.batchDelete")
+            logger.error("SwiftData batch delete failed: \(error.localizedDescription)")
             rollback()
         }
     }
@@ -84,10 +74,7 @@ extension ModelContext {
             print("✅ SwiftData inserted model successfully")
             #endif
         } catch {
-            #if DEBUG
-            print("❌ SwiftData insert failed: \(error)")
-            #endif
-            CrashPreventionManager.shared.logError(error, context: "SwiftData.insert")
+            logger.error("SwiftData insert failed: \(error.localizedDescription)")
             rollback()
         }
     }
@@ -99,10 +86,7 @@ extension ModelContext {
             try save()
             return result
         } catch {
-            #if DEBUG
-            print("❌ SwiftData transaction failed: \(error)")
-            #endif
-            CrashPreventionManager.shared.logError(error, context: "SwiftData.transaction")
+            logger.error("SwiftData transaction failed: \(error.localizedDescription)")
             rollback()
             return nil
         }
@@ -183,9 +167,9 @@ struct SwiftDataMigrationModifier: ViewModifier {
     func body(content: Content) -> some View {
         Group {
             if let error = migrationError {
-                ErrorFallbackView(
-                    errorMessage: "Database migration failed: \(error.localizedDescription)",
-                    onRetry: {
+                ErrorView(
+                    error: AppError.data(.migrationFailed),
+                    retry: {
                         migrationError = nil
                         performMigration()
                     }
