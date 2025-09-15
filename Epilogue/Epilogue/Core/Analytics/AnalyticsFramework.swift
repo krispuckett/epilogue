@@ -459,7 +459,7 @@ final class Analytics: AnalyticsService {
     }
 
     func setUserProperty(_ key: String, value: Any) {
-        logger.debug("User property set: \(key) = \(value)")
+        logger.debug("User property set: \(key) = \(String(describing: value))")
         // In production, send to analytics backend
     }
 
@@ -511,7 +511,7 @@ final class Analytics: AnalyticsService {
     }
 
     func endSession() {
-        guard let sessionId = sessionId else { return }
+        guard let sessionId = self.sessionId else { return }
 
         let event = AnalyticsEvent(
             name: "session_end",

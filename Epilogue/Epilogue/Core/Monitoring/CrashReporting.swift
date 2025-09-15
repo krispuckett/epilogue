@@ -271,7 +271,7 @@ private class MockTransaction: Transaction {
     }
 
     func finish(status: TransactionStatus) {
-        logger.debug("Finished transaction: \(name) with status: \(status)")
+        logger.debug("Finished transaction: \(self.name) with status: \(status)")
     }
 }
 
