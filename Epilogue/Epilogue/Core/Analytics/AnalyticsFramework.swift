@@ -501,7 +501,7 @@ final class Analytics: AnalyticsService {
 
     func startSession() {
         sessionId = UUID().uuidString
-        logger.info("Analytics session started: \(sessionId ?? "")")
+        logger.info("Analytics session started: \(self.sessionId ?? "")")
 
         let event = AnalyticsEvent(
             name: "session_start",
