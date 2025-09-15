@@ -248,16 +248,9 @@ struct BookDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
-                        // Scroll detector with FIXED calculation
-                        GeometryReader { geo in
-                            Color.clear
-                                .onChange(of: geo.frame(in: .global).minY) { oldValue, newValue in
-                                    // Simple, reliable calculation
-                                    let offset = -newValue + 150  // Adjust based on header height
-                                    scrollOffset = max(0, offset)
-                                }
-                        }
-                        .frame(height: 0)
+                        // Simplified scroll detection - removed for performance
+                        Color.clear
+                            .frame(height: 0)
                         
                         // Book info section
                         centeredHeaderView
@@ -270,12 +263,7 @@ struct BookDetailView: View {
                             summarySection(description: description)
                                 .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                                 .padding(.top, 32)
-                                .transition(.asymmetric(
-                                    insertion: .opacity
-                                        .combined(with: .scale(scale: 0.95, anchor: .top))
-                                        .combined(with: .offset(y: 10)),
-                                    removal: .opacity
-                                ))
+                                // Removed transition for performance
                         }
                         
                         // Progress section
@@ -283,11 +271,7 @@ struct BookDetailView: View {
                             progressSection
                                 .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                                 .padding(.top, 24)
-                                .transition(.asymmetric(
-                                    insertion: .opacity
-                                        .combined(with: .scale(scale: 0.98)),
-                                    removal: .opacity
-                                ))
+                                // Removed transition for performance
                         }
                     }
                     
@@ -298,12 +282,7 @@ struct BookDetailView: View {
                             .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                             .padding(.top, 24)
                             .padding(.bottom, 100) // Space for tab bar
-                            .transition(.asymmetric(
-                                insertion: .opacity
-                                    .combined(with: .scale(scale: 0.96, anchor: .bottom))
-                                    .combined(with: .offset(y: 20)),
-                                removal: .opacity
-                            ))
+                            // Removed transition for performance
                             // Removed scrollTransition to fix text stretching bug
                     }
                     }

@@ -86,49 +86,30 @@ struct CleanGoodreadsImportView: View {
                 Spacer()
                     .frame(height: 40)
             
-            // Icon and title with animated gradient
-            VStack(spacing: 32) {
-                ZStack {
-                    // Animated glow effect
-                    Circle()
-                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.3))
-                        .frame(width: 140, height: 140)
-                        .blur(radius: 40)
-                        .scaleEffect(1.2)
-                    
-                    Image(systemName: "books.vertical.fill")
-                        .font(.system(size: 80))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    DesignSystem.Colors.primaryAccent,
-                                    DesignSystem.Colors.primaryAccent.opacity(0.7),
-                                    .white.opacity(0.9)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+            // Simplified header
+            VStack(spacing: 24) {
+                Image(systemName: "books.vertical.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color.warmAmber,
+                                Color.warmAmber.opacity(0.8)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .symbolRenderingMode(.hierarchical)
-                        .symbolEffect(.pulse, isActive: true)
-                }
+                    )
+                    .symbolRenderingMode(.hierarchical)
                 
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     Text("Import Your Library")
-                        .font(.system(size: 36, weight: .bold, design: .serif))
+                        .font(.system(size: 32, weight: .bold, design: .serif))
                         .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
                     
                     Text("Bring your reading history to life")
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.white.opacity(0.8), .white.opacity(0.6)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .multilineTextAlignment(.center)
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
             }
             .padding(.horizontal, 40)
@@ -182,11 +163,11 @@ struct CleanGoodreadsImportView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "info.circle.fill")
                         .font(.system(size: 20))
-                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .foregroundStyle(Color.warmAmber)
                     
                     Text("EXPORT INSTRUCTIONS")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .foregroundStyle(Color.warmAmber)
                         .tracking(1.5)
                     
                     Spacer()
@@ -230,12 +211,12 @@ struct CleanGoodreadsImportView: View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                    .fill(Color.warmAmber.opacity(0.2))
                     .frame(width: 32, height: 32)
                 
                 Text(number)
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .foregroundStyle(Color.warmAmber)
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -261,7 +242,7 @@ struct CleanGoodreadsImportView: View {
             ZStack {
                 // Background glow
                 Circle()
-                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                    .fill(Color.warmAmber.opacity(0.2))
                     .frame(width: 200, height: 200)
                     .blur(radius: 50)
                     .scaleEffect(1.2)
@@ -288,7 +269,7 @@ struct CleanGoodreadsImportView: View {
                     HStack(spacing: 8) {
                         Text("\(progress.current)")
                             .font(.system(size: 36, weight: .bold, design: .monospaced))
-                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                            .foregroundStyle(Color.warmAmber)
                         
                         Text("of")
                             .font(.system(size: 20))
@@ -296,7 +277,7 @@ struct CleanGoodreadsImportView: View {
                         
                         Text("\(progress.total)")
                             .font(.system(size: 36, weight: .bold, design: .monospaced))
-                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                            .foregroundStyle(Color.warmAmber)
                     }
                     
                     // Current book title with animation
@@ -382,7 +363,7 @@ struct CleanGoodreadsImportView: View {
                     VStack {
                         Text("\(importer.importedBooks.count)")
                             .font(.system(size: 36, weight: .bold, design: .monospaced))
-                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                            .foregroundStyle(Color.warmAmber)
                         Text("Imported")
                             .font(.system(size: 14))
                             .foregroundStyle(.white.opacity(0.7))

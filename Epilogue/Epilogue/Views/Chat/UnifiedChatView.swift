@@ -2953,13 +2953,25 @@ struct AmbientChatGradientView: View {
             // Deep black base
             Color.black
             
-            // Warm sunset glow gradient for empty state - top only
+            // More prominent warm sunset gradient - top
             LinearGradient(
                 stops: [
-                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.4), location: 0.0),
-                    .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.25), location: 0.15),
-                    .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.15), location: 0.3),
-                    .init(color: Color.clear, location: 0.5)
+                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.7), location: 0.0),
+                    .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.5), location: 0.15),
+                    .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.3), location: 0.3),
+                    .init(color: Color.clear, location: 0.6)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            
+            // Bottom gradient for balance
+            LinearGradient(
+                stops: [
+                    .init(color: Color.clear, location: 0.4),
+                    .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.2), location: 0.7),
+                    .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.35), location: 0.85),
+                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.5), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
