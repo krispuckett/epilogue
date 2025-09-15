@@ -60,10 +60,7 @@ struct AmbientProgressSheet: View {
                     heroTimelineSection
                     
                     Spacer()
-                    
-                    // Minimal bottom info
-                    bottomInfo
-                        .padding(.bottom, 40)
+                        .frame(height: 40)
                 }
                 
                 // Floating progress indicator removed per user request
@@ -152,7 +149,7 @@ struct AmbientProgressSheet: View {
     }
     
     private var interactiveTimeline: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: 50) {  // Increased spacing from 30 to 50 for more vertical padding
             // Progress ring (visual centerpiece)
             ZStack {
                 // Background ring
@@ -190,7 +187,42 @@ struct AmbientProgressSheet: View {
             .scaleEffect(isDragging ? 1.05 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
             
-            // Interactive timeline bar
+            // Page counters - moved above the timeline bar
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(displayPage)")
+                        .font(.system(size: 24, weight: .light, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText())
+                        .animation(DesignSystem.Animation.easeQuick, value: displayPage)
+                    
+                    Text("current page")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .textCase(.uppercase)
+                        .tracking(1)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let pageCount = book.pageCount {
+                        Text("\(pageCount - displayPage)")
+                            .font(.system(size: 24, weight: .light, design: .monospaced))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                            .contentTransition(.numericText())
+                            .animation(DesignSystem.Animation.easeQuick, value: displayPage)
+                        
+                        Text("pages left")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.textTertiary)
+                            .textCase(.uppercase)
+                            .tracking(1)
+                    }
+                }
+            }
+            
+            // Interactive timeline bar - now below page counters
             timelineBar
                 .frame(height: 12)
         }
@@ -272,43 +304,6 @@ struct AmbientProgressSheet: View {
         }
     }
     
-    private var bottomInfo: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(displayPage)")
-                    .font(.system(size: 24, weight: .light, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .contentTransition(.numericText())
-                    .animation(DesignSystem.Animation.easeQuick, value: displayPage)
-                
-                Text("current page")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
-                    .textCase(.uppercase)
-                    .tracking(1)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                if let pageCount = book.pageCount {
-                    Text("\(pageCount - displayPage)")
-                        .font(.system(size: 24, weight: .light, design: .monospaced))
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-                        .contentTransition(.numericText())
-                        .animation(DesignSystem.Animation.easeQuick, value: displayPage)
-                    
-                    Text("pages left")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(DesignSystem.Colors.textTertiary)
-                        .textCase(.uppercase)
-                        .tracking(1)
-                }
-            }
-        }
-        .padding(.horizontal, 40)
-    }
-    
     // Floating progress indicator removed per user request
     
     // MARK: - Gesture Handling
@@ -331,7 +326,7 @@ struct AmbientProgressSheet: View {
     }
     
     private func handleTimelineDrag(value: DragGesture.Value, geometry: GeometryProxy) {
-        guard let pageCount = book.pageCount else { return }
+        guard book.pageCount != nil else { return }
         
         if !isDragging {
             isDragging = true
