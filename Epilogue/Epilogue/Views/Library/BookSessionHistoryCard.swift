@@ -137,7 +137,7 @@ struct BookSessionHistoryCard: View {
                         .padding(.top, 4)
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             } else if isExpanded && bookSessions.isEmpty {
                 Text("No reading sessions yet")
                     .font(.system(size: 13))

@@ -148,7 +148,7 @@ struct AmbientProgressSheet: View {
     }
     
     private var interactiveTimeline: some View {
-        VStack(spacing: 35) {  // Reduced spacing from 50 to 35 to bring elements closer
+        VStack(spacing: 35) {
             // Progress ring (visual centerpiece)
             ZStack {
                 // Background ring
@@ -220,6 +220,7 @@ struct AmbientProgressSheet: View {
                     }
                 }
             }
+            .padding(.bottom, 48)  // Add 48px padding between counters and slider
             
             // Interactive timeline bar - now below page counters
             timelineBar
