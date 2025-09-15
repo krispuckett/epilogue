@@ -17,7 +17,7 @@ struct LibraryView: View {
     @State private var scrollToBookId: UUID? = nil
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
-    @State private var isScrolling = false
+    // Removed scroll tracking - not needed
     @State private var settingsButtonPressed = false
     @State private var visibleBookIDs: Set<UUID> = []
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
@@ -297,10 +297,8 @@ struct LibraryView: View {
     
     @ViewBuilder
     private var mainContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                // iOS 18 optimization
-                ScrollViewTracker(isScrolling: $isScrolling)
+        ScrollView {
+            VStack(spacing: 0) {
                 
                 if viewModel.isLoading {
                     // Show skeleton screens while loading
@@ -332,22 +330,11 @@ struct LibraryView: View {
                 Color.clear
                     .frame(height: 45) // Space for action buttons above tab bar
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.immediately)
-            .refreshable {
-                await refreshLibrary()
-            }
-            .onChange(of: scrollToBookId) { _, bookId in
-                if let bookId = bookId {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        proxy.scrollTo(bookId, anchor: .center)
-                    }
-                    // Clear the scroll request after scrolling
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        scrollToBookId = nil
-                    }
-                }
-            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
+        .refreshable {
+            await refreshLibrary()
         }
     }
     
@@ -1054,31 +1041,7 @@ private func statusColor(for status: ReadingStatus) -> Color {
     }
 }
 
-// MARK: - Scroll Performance Tracking
-struct ScrollViewTracker: View {
-    @Binding var isScrolling: Bool
-    @State private var lastOffset: CGFloat = 0
-    
-    var body: some View {
-        GeometryReader { geometry in
-            Color.clear
-                .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                    let delta = abs(value - lastOffset)
-                    isScrolling = delta > 10
-                    lastOffset = value
-                }
-        }
-        .frame(height: 0)
-    }
-}
-
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+// Removed unnecessary scroll tracking - iOS 26 handles this
 
 // MARK: - Performance Monitoring
 #if DEBUG
@@ -1126,13 +1089,16 @@ struct LibraryBookListView: View {
                     namespace: namespace
                 )
                 .id(book.localId)
-                // Removed transition for 120Hz scrolling
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                    removal: .scale(scale: 0.95).combined(with: .opacity)
+                ))
                 .task {
                     await loadColorPalette(for: book)
                 }
             }
         }
-        .scrollTargetLayout() // iOS 18 optimization
+        // Natural layout - let SwiftUI handle it
         .padding(.horizontal)
         .padding(.top, 8)
         .padding(.bottom, 100)

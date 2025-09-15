@@ -244,13 +244,9 @@ struct BookDetailView: View {
                 .animation(.easeOut(duration: 0.3), value: gradientOpacity)
                 .id(book.id) // Force view recreation when book changes
             
-            // Content - always visible but colors update
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    VStack(spacing: 0) {
-                        // Simplified scroll detection - removed for performance
-                        Color.clear
-                            .frame(height: 0)
+            // Content - simple and natural
+            ScrollView {
+                VStack(spacing: 20) {
                         
                         // Book info section
                         centeredHeaderView
@@ -285,12 +281,10 @@ struct BookDetailView: View {
                             // Removed transition for performance
                             // Removed scrollTransition to fix text stretching bug
                     }
-                    }
                 }
-                .scrollBounceBehavior(.basedOnSize)
-                .scrollDismissesKeyboard(.immediately)
-                .scrollIndicators(.hidden)
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.immediately)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.automatic, for: .navigationBar)
@@ -678,15 +672,13 @@ struct BookDetailView: View {
                 Spacer()
             }
             
-            // Summary text
+            // Summary text - natural layout
             Text(description)
-                .font(.system(size: 15, weight: .regular))
+                .font(.system(size: 15))
                 .foregroundColor(textColor.opacity(0.85))
                 .lineSpacing(8)
                 .lineLimit(summaryExpanded ? nil : 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                // NO animation on the text itself
             
             // Read more/less button
             if description.count > 200 {

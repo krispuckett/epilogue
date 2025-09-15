@@ -21,11 +21,9 @@ struct OptimizedLibraryGrid: View {
     ]
     
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 32) {
-                    Section {
-                    ForEach(Array(books.enumerated()), id: \.element.localId) { index, book in
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 32) {
+                ForEach(Array(books.enumerated()), id: \.element.localId) { index, book in
                         ZStack {
                             // Placeholder for dragged item
                             if draggedBook?.id == book.id {
@@ -47,11 +45,13 @@ struct OptimizedLibraryGrid: View {
                                 )
                                 .opacity(draggedBook?.id == book.id ? 0.01 : 1)
                                 .scaleEffect(targetIndex == index && draggedBook != nil ? 1.05 : 1.0)
-                                .animation(nil) // Disabled for smooth scrolling
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: targetIndex)
                                 .draggable(book) {
                                     DragPreview(book: book, viewModel: viewModel)
                                         .onAppear {
-                                            draggedBook = book // No animation during drag
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                draggedBook = book
+                                            }
                                         }
                                 }
                                 .dropDestination(for: Book.self) { items, location in
@@ -61,26 +61,29 @@ struct OptimizedLibraryGrid: View {
                                         return false
                                     }
                                     
-                                    viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex) // No animation
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex)
+                                    }
                                     return true
                                 } isTargeted: { isTargeted in
-                                    targetIndex = isTargeted ? index : nil // No animation
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        targetIndex = isTargeted ? index : nil
+                                    }
                                 }
                             }
                         }
                         .id(book.localId)
-                        // Removed transition for 120Hz performance
-                    }
-                    } // End Section
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                            removal: .opacity
+                        ))
                 }
-                .scrollTargetLayout() // iOS 18 optimization
-                .padding(.horizontal)
-                .padding(.bottom, 100)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.immediately)
-            .scrollIndicators(.hidden)
+            .padding(.horizontal)
+            .padding(.bottom, 100)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
         .onDrop(of: [.text], delegate: BookDropDelegate(
             draggedBook: $draggedBook,
             targetIndex: $targetIndex
