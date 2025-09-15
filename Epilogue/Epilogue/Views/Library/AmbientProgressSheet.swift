@@ -55,12 +55,12 @@ struct AmbientProgressSheet: View {
                 // Main content
                 VStack(spacing: 0) {
                     Spacer()
+                        .frame(height: 80)  // Move content higher but not at the very top
                     
                     // Hero timeline - the only interface
                     heroTimelineSection
                     
                     Spacer()
-                        .frame(height: 40)
                 }
                 
                 // Floating progress indicator removed per user request
@@ -125,7 +125,7 @@ struct AmbientProgressSheet: View {
     }
     
     private var heroTimelineSection: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: 30) {  // Reduced spacing from 40 to 30
             // Book title (minimal)
             VStack(spacing: 8) {
                 Text(book.title)
@@ -143,19 +143,18 @@ struct AmbientProgressSheet: View {
             
             // The hero timeline - main interaction
             interactiveTimeline
-                .frame(height: 300)
                 .padding(.horizontal, 30)
         }
     }
     
     private var interactiveTimeline: some View {
-        VStack(spacing: 50) {  // Increased spacing from 30 to 50 for more vertical padding
+        VStack(spacing: 35) {  // Reduced spacing from 50 to 35 to bring elements closer
             // Progress ring (visual centerpiece)
             ZStack {
                 // Background ring
                 Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 8)
-                    .frame(width: 180, height: 180)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 10)
+                    .frame(width: 220, height: 220)  // Increased from 180 to 220
                 
                 // Progress ring
                 Circle()
@@ -170,16 +169,16 @@ struct AmbientProgressSheet: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
                     )
-                    .frame(width: 180, height: 180)
+                    .frame(width: 220, height: 220)  // Increased from 180 to 220
                     .rotationEffect(.degrees(-90))
                     .shadow(color: primaryColor.opacity(0.5), radius: 8)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8), value: displayProgress)
                 
                 // Center percentage
                 Text("\(Int(displayProgress * 100))%")
-                    .font(.system(size: 32, weight: .thin, design: .monospaced))
+                    .font(.system(size: 38, weight: .thin, design: .monospaced))  // Increased from 32 to 38
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
                     .animation(DesignSystem.Animation.easeStandard, value: displayProgress)

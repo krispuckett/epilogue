@@ -1,28 +1,36 @@
 import SwiftUI
 import Combine
+import OSLog
+
+private let logger = Logger(subsystem: "com.epilogue", category: "NavigationCoordinator")
 
 // MARK: - Navigation Coordinator
 
 @MainActor
-class NavigationCoordinator: ObservableObject {
+final class NavigationCoordinator: ObservableObject {
     static let shared = NavigationCoordinator()
-    
+
     // Tab selection
     @Published var selectedTab: TabItem = .library
-    
+
     // Deep linking IDs
     @Published var highlightedNoteID: UUID?
     @Published var highlightedQuoteID: UUID?
     @Published var scrollToBookID: String?
-    
+
     // Navigation flags
     @Published var shouldNavigateToNotes = false
     @Published var shouldNavigateToLibrary = false
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+
     private init() {
         setupNotificationObservers()
+    }
+
+    deinit {
+        logger.debug("NavigationCoordinator deallocated")
+        cancellables.removeAll()
     }
     
     // MARK: - Tab Items
