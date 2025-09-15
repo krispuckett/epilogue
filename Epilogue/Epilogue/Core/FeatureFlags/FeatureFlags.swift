@@ -114,7 +114,7 @@ final class RemoteConfig: FeatureFlagService {
     static let shared = RemoteConfig()
 
     private var flags: [String: Any] = [:]
-    private var listeners: [WeakBox<FeatureFlagListener>] = []
+    private var listeners: [WeakBox<AnyObject>] = []
     private let queue = DispatchQueue(label: "com.epilogue.featureflags")
     private var refreshTimer: Timer?
 
@@ -164,7 +164,7 @@ final class RemoteConfig: FeatureFlagService {
 
     func addListener(_ listener: FeatureFlagListener) {
         queue.async {
-            self.listeners.append(WeakBox(listener))
+            self.listeners.append(WeakBox(listener as AnyObject))
             self.cleanupListeners()
         }
     }
@@ -239,7 +239,9 @@ final class RemoteConfig: FeatureFlagService {
         queue.async {
             self.cleanupListeners()
             for weakListener in self.listeners {
-                weakListener.value?.featureFlagsDidUpdate(currentFlags)
+                if let listener = weakListener.value as? FeatureFlagListener {
+                    listener.featureFlagsDidUpdate(currentFlags)
+                }
             }
         }
     }
