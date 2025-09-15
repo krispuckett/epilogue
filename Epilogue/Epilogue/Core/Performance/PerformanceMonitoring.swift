@@ -2,6 +2,8 @@ import Foundation
 import UIKit
 import OSLog
 import QuartzCore
+import Combine
+import SwiftUI
 
 private let logger = Logger(subsystem: "com.epilogue", category: "Performance")
 
@@ -247,10 +249,10 @@ final class PerformanceMonitorService: ObservableObject {
 
     @objc private func handleMemoryWarning() {
         memoryWarningCount += 1
-        logger.warning("Memory warning received (count: \(memoryWarningCount))")
+        logger.warning("Memory warning received (count: \(self.memoryWarningCount))")
 
         CrashReporter.shared.addBreadcrumb(
-            "Memory warning #\(memoryWarningCount)",
+            "Memory warning #\(self.memoryWarningCount)",
             category: "memory",
             level: .warning
         )
@@ -259,23 +261,23 @@ final class PerformanceMonitorService: ObservableObject {
             AnalyticsEvent(
                 name: "memory_warning",
                 category: .performance,
-                properties: ["warning_count": memoryWarningCount]
+                properties: ["warning_count": self.memoryWarningCount]
             )
         )
 
         // Clear caches
-        ResponseCache.shared.clearAll()
-        ColorPaletteCache.shared.clearCache()
-        SharedBookCoverManager.shared.clearMemoryCache()
+        ResponseCache.shared.cleanExpiredEntries()
+        // ColorPaletteCache.shared.clearCache() // Not available
+        // SharedBookCoverManager.shared.clearMemoryCache() // Not available
     }
 
     @objc private func handleThermalStateChange() {
         let thermalState = ProcessInfo.processInfo.thermalState
 
-        logger.info("Thermal state changed: \(thermalStateString(thermalState))")
+        logger.info("Thermal state changed: \(self.thermalStateString(thermalState))")
 
         if thermalState == .serious || thermalState == .critical {
-            logger.warning("Device thermal state is \(thermalStateString(thermalState))")
+            logger.warning("Device thermal state is \(self.thermalStateString(thermalState))")
 
             // Reduce performance-intensive operations
             stopMonitoring()
@@ -330,7 +332,7 @@ final class PerformanceMonitorService: ObservableObject {
 
         let used = result == KERN_SUCCESS ? info.resident_size : 0
         let total = ProcessInfo.processInfo.physicalMemory
-        let available = total - Int64(used)
+        let available = Int64(total) - Int64(used)
 
         let percentUsed = Double(used) / Double(total) * 100
         let pressure: MemoryPressure = {
@@ -425,9 +427,9 @@ private class NetworkMonitor {
     }
 }
 
-// MARK: - Performance Profiler
+// MARK: - Performance Profiling
 
-struct PerformanceProfiler {
+struct PerformanceProfilerService {
     static func profile<T>(_ name: String, _ block: () throws -> T) rethrows -> T {
         return try PerformanceMonitorService.shared.measure(name, block: block)
     }
