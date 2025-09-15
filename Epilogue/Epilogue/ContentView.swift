@@ -22,6 +22,7 @@ struct ContentView: View {
 
     // MARK: - Environment
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - Body
     var body: some View {
@@ -36,10 +37,17 @@ struct ContentView: View {
             .environmentObject(deepLinkHandler)
             .setupAppearanceConfiguration()
             .setupSheetPresentations()
-            .setupAmbientMode()
+            .setupAmbientMode(libraryViewModel: libraryViewModel, notesViewModel: notesViewModel)
             .simplifiedAmbientPresentation()
             .onAppear {
                 performInitialSetup()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                handleScenePhaseChange(newPhase)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToLibraryTab"))) { _ in
+                // Switch to library tab when navigating from ambient mode
+                selectedTab = 0
             }
     }
 
@@ -96,5 +104,22 @@ struct ContentView: View {
 
         // Prepare haptics
         SensoryFeedback.light()
+    }
+
+    // MARK: - Scene Phase Handling
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            logger.info("App became active")
+        case .inactive:
+            logger.info("App became inactive")
+            // Don't end Live Activity here - let it persist
+        case .background:
+            logger.info("App entered background")
+            // Don't end Live Activity here - Live Activities should persist in background
+            // They will be ended when the user explicitly exits ambient mode
+        @unknown default:
+            break
+        }
     }
 }

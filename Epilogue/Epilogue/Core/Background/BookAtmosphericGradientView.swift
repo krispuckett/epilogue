@@ -221,9 +221,10 @@ struct BookAtmosphericGradientView: View {
     
     /// Start subtle 30-second animation
     private func startSubtleAnimation() {
-        withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
-            gradientOffset = 0.1 // Subtle movement
-        }
+        // DISABLED: This animation causes high CPU usage
+        // withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
+        //     gradientOffset = 0.1 // Subtle movement
+        // }
     }
     
     /// Debug helper

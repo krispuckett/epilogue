@@ -525,8 +525,16 @@ class OptimizedPerplexityService: ObservableObject {
         
         let systemPrompt = bookContext.map { book in
             """
-            You are discussing the book "\(book.title)" by \(book.author).
-            Focus your answer specifically on this book's content, characters, and themes.
+            IMPORTANT: You are answering questions SPECIFICALLY about the book "\(book.title)" by \(book.author).
+
+            ALL answers MUST relate directly to this book. When asked about characters, plot, themes, or any aspect - answer ONLY about "\(book.title)".
+
+            For example:
+            - "Who is the main character?" → Answer about the main character(s) in "\(book.title)"
+            - "What happens next?" → Answer about what happens next in "\(book.title)"
+            - "What is the theme?" → Answer about the themes in "\(book.title)"
+
+            NEVER give generic definitions. ALWAYS give book-specific answers about "\(book.title)".
             """
         } ?? "Be concise and helpful."
         

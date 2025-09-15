@@ -314,15 +314,47 @@ struct AmbientModeView: View {
         }
         // Removed - moved above transcription bar
         .statusBarHidden(true)
-        .fullScreenCover(isPresented: $showingSessionSummary) {
+        .fullScreenCover(isPresented: $showingSessionSummary, onDismiss: {
+            // This runs AFTER the fullScreenCover is fully dismissed
+            print("📖 Session summary dismissed")
+
+            // Navigate to BookView if we have a book
+            if let book = currentBookContext {
+                print("📚 Will navigate to book: \(book.title)")
+
+                // First, switch to library tab
+                NotificationCenter.default.post(
+                    name: Notification.Name("SwitchToLibraryTab"),
+                    object: nil
+                )
+
+                // Then dismiss ambient mode properly using the coordinator
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    EpilogueAmbientCoordinator.shared.dismiss()
+                }
+
+                // Finally, navigate to the book after ambient mode is dismissed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("📚 Posting navigation to book: \(book.title)")
+                    NotificationCenter.default.post(
+                        name: Notification.Name("NavigateToBook"),
+                        object: book
+                    )
+                }
+            } else {
+                print("📖 No book context, just dismissing ambient mode")
+                // No book context, just dismiss ambient mode using coordinator
+                EpilogueAmbientCoordinator.shared.dismiss()
+            }
+        }) {
             if let session = currentSession {
                 AmbientSessionSummaryView(
                     session: session,
                     colorPalette: colorPalette,
                     onDismiss: {
-                        // Dismiss both the summary and ambient mode together
+                        // Just dismiss the sheet - the onDismiss handler above will handle navigation
+                        print("✅ Done button tapped in session summary")
                         showingSessionSummary = false
-                        dismiss()
                     }
                 )
                 .environment(\.modelContext, modelContext)
@@ -3004,8 +3036,8 @@ struct AmbientModeView: View {
             _ = await processor.endSession()
         }
         
-        // Dismiss the view immediately
-        dismiss()
+        // Dismiss the view immediately using coordinator
+        EpilogueAmbientCoordinator.shared.dismiss()
     }
     
     private func stopAndSaveSession() {
@@ -3065,12 +3097,12 @@ struct AmbientModeView: View {
             } else {
                 // No meaningful content - just dismiss
                 logger.info("📊 No meaningful content in session, dismissing directly")
-                dismiss()
+                EpilogueAmbientCoordinator.shared.dismiss()
             }
         } else {
             // No session - just dismiss
             logger.info("❌ No session found, dismissing")
-            dismiss()
+            EpilogueAmbientCoordinator.shared.dismiss()
         }
     }
     
