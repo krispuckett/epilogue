@@ -57,7 +57,7 @@ struct BookSearchSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(32)
-        .presentationBackground(.clear)
+        .presentationBackground(.black.opacity(0.95))
         .onAppear {
             print("📚 BookSearchSheet appeared with query: '\(searchQuery)'")
             refinedSearchQuery = searchQuery
@@ -75,17 +75,9 @@ struct BookSearchSheet: View {
     
     // MARK: - Ambient Gradient Background
     private var ambientGradientBackground: some View {
-        ZStack {
-            // Ambient chat gradient
-            AmbientChatGradientView()
-                .opacity(0.6)
-                .ignoresSafeArea()
-            
-            // Subtle darkening overlay for readability
-            Color.black.opacity(0.2)
-                .ignoresSafeArea(edges: [.top, .leading, .trailing])
-                .allowsHitTesting(false)
-        }
+        // Simple dark background for modal sheets
+        Color.black.opacity(0.95)
+            .ignoresSafeArea()
     }
     
     // MARK: - Search Input Bar (Bottom)
