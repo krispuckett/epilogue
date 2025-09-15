@@ -81,8 +81,10 @@ struct CleanGoodreadsImportView: View {
     
     // MARK: - Start View
     private var startView: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 0) {
+                Spacer()
+                    .frame(height: 40)
             
             // Icon and title with animated gradient
             VStack(spacing: 32) {
@@ -140,21 +142,23 @@ struct CleanGoodreadsImportView: View {
                 SensoryFeedback.light()
             } label: {
                 ZStack {
-                    // Button background with gradient
+                    // Liquid glass button
                     RoundedRectangle(cornerRadius: 30)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    DesignSystem.Colors.primaryAccent.opacity(0.8),
-                                    DesignSystem.Colors.primaryAccent.opacity(0.6)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(.clear)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 30))
                         .overlay {
                             RoundedRectangle(cornerRadius: 30)
-                                .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            DesignSystem.Colors.primaryAccent.opacity(0.6),
+                                            .white.opacity(0.2)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
                         }
                     
                     HStack(spacing: 14) {
@@ -216,6 +220,8 @@ struct CleanGoodreadsImportView: View {
             .foregroundStyle(.white.opacity(0.5))
             
             Spacer()
+                .frame(height: 40)
+            }
         }
     }
     

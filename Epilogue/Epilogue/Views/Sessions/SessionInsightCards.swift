@@ -274,20 +274,26 @@ struct ThemeTag: View {
     let count: Int
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Text(theme)
-                .font(.system(size: 12, weight: .medium))
-            Text("×\(count)")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.system(size: 13, weight: .medium))
+            if count > 1 {
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .glassEffect(in: Circle())
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background {
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .glassEffect(in: Capsule())
+        .overlay {
             Capsule()
-                .fill(.white.opacity(0.1))
+                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.white.opacity(0.9))
     }
 }
 

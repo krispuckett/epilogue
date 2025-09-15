@@ -521,7 +521,10 @@ struct BookDetailView: View {
                         Button {
                             withAnimation(DesignSystem.Animation.springStandard) {
                                 libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                SensoryFeedback.light()
+                                // Reduced haptics - only for significant status changes
+                                if status == .read && book.readingStatus != .read {
+                                    SensoryFeedback.success()
+                                }
                                 
                                 // Show completion sheet when marking as read
                                 if status == .read && book.readingStatus != .read {
