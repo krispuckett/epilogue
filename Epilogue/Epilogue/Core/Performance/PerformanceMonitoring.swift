@@ -266,7 +266,9 @@ final class PerformanceMonitorService: ObservableObject {
         )
 
         // Clear caches
-        ResponseCache.shared.cleanExpiredEntries()
+        Task {
+            await ResponseCache.shared.cleanExpiredEntries()
+        }
         // ColorPaletteCache.shared.clearCache() // Not available
         // SharedBookCoverManager.shared.clearMemoryCache() // Not available
     }
