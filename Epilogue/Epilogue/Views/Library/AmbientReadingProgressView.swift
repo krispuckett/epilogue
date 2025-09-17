@@ -307,68 +307,14 @@ struct AmbientReadingProgressView: View {
                             .opacity(0.6)
                     }
 
-                    // Interactive liquid glass slider thumb
-                    ZStack {
-                        // Glow effect behind the thumb
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        primaryColor.opacity(isDragging ? 0.6 : 0.4),
-                                        primaryColor.opacity(isDragging ? 0.3 : 0.2),
-                                        primaryColor.opacity(0)
-                                    ],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: isDragging ? 20 : 15
-                                )
-                            )
-                            .frame(width: isDragging ? 44 : 36, height: isDragging ? 44 : 36)
-                            .blur(radius: 3)
-
-                        // Glass thumb
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .frame(width: 24, height: 24)
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                primaryColor.opacity(0.8),
-                                                secondaryColor.opacity(0.6)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: isDragging ? 2 : 1.5
-                                    )
-                            )
-                            .glassEffect(
-                                .regular,
-                                in: Circle()
-                            )
-                            .shadow(color: primaryColor.opacity(isDragging ? 0.5 : 0.3), radius: isDragging ? 8 : 6, y: 2)
-
-                        // Inner glow
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        primaryColor.opacity(isDragging ? 0.5 : 0.3),
-                                        Color.clear
-                                    ],
-                                    center: .center,
-                                    startRadius: 0,
-                                    endRadius: 10
-                                )
-                            )
-                            .frame(width: 16, height: 16)
-                            .blur(radius: 1)
-                    }
-                    .scaleEffect(isDragging ? 1.15 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging)
-                    .offset(x: (geometry.size.width - 24) * animatedProgress)
+                    // Stock iOS 26 liquid glass slider thumb
+                    Circle()
+                        .frame(width: 28, height: 28)
+                        .glassEffect(.regular, in: Circle())
+                        .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+                        .scaleEffect(isDragging ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging)
+                        .offset(x: (geometry.size.width - 28) * animatedProgress)
                 }
                 .contentShape(Rectangle()) // Make entire area tappable
                 .gesture(
