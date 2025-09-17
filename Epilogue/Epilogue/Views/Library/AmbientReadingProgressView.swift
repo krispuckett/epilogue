@@ -14,6 +14,7 @@ struct AmbientReadingProgressView: View {
     @State private var showMilestones: Bool = false
     @State private var progressDots: [ProgressDot] = []
     @State private var hasAppeared: Bool = false
+    @State private var isDragging: Bool = false
     
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -306,17 +307,79 @@ struct AmbientReadingProgressView: View {
                             .opacity(0.6)
                     }
 
-                    // Interactive slider thumb
-                    Circle()
-                        .fill(primaryColor)
-                        .frame(width: 20, height: 20)
-                        .shadow(color: primaryColor.opacity(0.6), radius: 4)
-                        .offset(x: (geometry.size.width - 20) * animatedProgress)
+                    // Interactive liquid glass slider thumb
+                    ZStack {
+                        // Glow effect behind the thumb
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        primaryColor.opacity(isDragging ? 0.6 : 0.4),
+                                        primaryColor.opacity(isDragging ? 0.3 : 0.2),
+                                        primaryColor.opacity(0)
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: isDragging ? 20 : 15
+                                )
+                            )
+                            .frame(width: isDragging ? 44 : 36, height: isDragging ? 44 : 36)
+                            .blur(radius: 3)
+
+                        // Glass thumb
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                primaryColor.opacity(0.8),
+                                                secondaryColor.opacity(0.6)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: isDragging ? 2 : 1.5
+                                    )
+                            )
+                            .glassEffect(
+                                .regular,
+                                in: Circle()
+                            )
+                            .shadow(color: primaryColor.opacity(isDragging ? 0.5 : 0.3), radius: isDragging ? 8 : 6, y: 2)
+
+                        // Inner glow
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        primaryColor.opacity(isDragging ? 0.5 : 0.3),
+                                        Color.clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 10
+                                )
+                            )
+                            .frame(width: 16, height: 16)
+                            .blur(radius: 1)
+                    }
+                    .scaleEffect(isDragging ? 1.15 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging)
+                    .offset(x: (geometry.size.width - 24) * animatedProgress)
                 }
                 .contentShape(Rectangle()) // Make entire area tappable
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            // Set dragging state
+                            if !isDragging {
+                                isDragging = true
+                                SensoryFeedback.impact(.light)
+                            }
+
                             let newProgress = min(max(0, value.location.x / geometry.size.width), 1.0)
                             let newPage = Int(Double(totalPages) * newProgress)
 
@@ -328,8 +391,16 @@ struct AmbientReadingProgressView: View {
                             // Update the book's current page
                             viewModel.updateCurrentPage(for: book, to: newPage)
 
-                            // Haptic feedback
-                            SensoryFeedback.selection()
+                            // Subtle haptic on significant changes
+                            let progressDiff = abs(newProgress - progress)
+                            if progressDiff > 0.05 {
+                                SensoryFeedback.selection()
+                            }
+                        }
+                        .onEnded { _ in
+                            // Release dragging state
+                            isDragging = false
+                            SensoryFeedback.impact(.light)
                         }
                 )
             }
