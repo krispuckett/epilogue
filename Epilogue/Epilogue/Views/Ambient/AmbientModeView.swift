@@ -1004,17 +1004,17 @@ struct AmbientModeView: View {
                             // Voice mode content (stop/waveform icon)
                             if !inputMode.isTextInput {
                                 Button {
-                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
-                                        if inputMode == .listening && isRecording {
-                                            handleMicrophoneTap()
-                                        } else if inputMode == .paused {
+                                    if inputMode == .listening && isRecording {
+                                        handleMicrophoneTap()
+                                    } else if inputMode == .paused {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
                                             inputMode = .textInput
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                isKeyboardFocused = true
-                                            }
-                                        } else {
-                                            handleMicrophoneTap()
                                         }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            isKeyboardFocused = true
+                                        }
+                                    } else {
+                                        handleMicrophoneTap()
                                     }
                                 } label: {
                                     Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
@@ -1025,8 +1025,7 @@ struct AmbientModeView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .opacity(inputMode == .textInput ? 0 : 1)
-                                .scaleEffect(inputMode == .textInput ? 0.7 : 1)
-                                .animation(.easeInOut(duration: 0.3), value: inputMode)
+                                .scaleEffect(inputMode == .textInput ? 0.8 : 1)
                             }
                             
                             // Text input mode content
@@ -1067,8 +1066,7 @@ struct AmbientModeView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.7)
-                                    .animation(.easeInOut(duration: 0.3).delay(0.2), value: inputMode)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.8)
                                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
                                     
                                     // Enhanced text field with ambient blur
@@ -1129,8 +1127,7 @@ struct AmbientModeView: View {
                                     }
                                     .frame(maxWidth: .infinity)  // Fill available space
                                     .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.85)
-                                    .animation(.easeInOut(duration: 0.3).delay(0.25), value: inputMode)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.8)
                                 }
                                 .padding(.leading, 12)  // Proper padding for camera icon
                                 .padding(.trailing, 12)
@@ -1142,7 +1139,6 @@ struct AmbientModeView: View {
                         // Start subtle idle breathing animation
                         startContainerBreathing()
                     }
-                    .animation(.spring(response: 0.6, dampingFraction: 0.9, blendDuration: 0.3), value: inputMode)
                     
                     // Morphing button - waveform when empty, submit when has text
                     if inputMode == .textInput {
@@ -1154,7 +1150,7 @@ struct AmbientModeView: View {
                             } else {
                                 // Return to voice mode
                                 isKeyboardFocused = false
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
                                     keyboardText = ""
                                     textFieldHeight = 44  // Reset to compact height
                                     inputMode = .listening
@@ -1176,10 +1172,9 @@ struct AmbientModeView: View {
                                 )
                         }
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0.7).combined(with: .opacity),
-                            removal: .scale(scale: 0.7).combined(with: .opacity)
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
                         ))
-                        .animation(.easeInOut(duration: 0.3).delay(0.3), value: inputMode)
                         .padding(.leading, 12)
                     }
                     
@@ -1210,6 +1205,7 @@ struct AmbientModeView: View {
             SensoryFeedback.medium()
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
+        .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: textFieldHeight)
         }
     }
     
