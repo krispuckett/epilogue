@@ -1130,8 +1130,8 @@ struct AmbientModeView: View {
                     }
                     
                     // Morphing button - waveform when empty, submit when has text
-                    Button {
-                        if inputMode == .textInput {
+                    if inputMode == .textInput {
+                        Button {
                             if !keyboardText.isEmpty {
                                 // Submit the message
                                 // Removed blur wave for cleaner submission
@@ -1148,23 +1148,24 @@ struct AmbientModeView: View {
                                     startRecording()
                                 }
                             }
+                        } label: {
+                            Circle()
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                                .frame(width: 48, height: 48)
+                                .glassEffect()
+                                .overlay(
+                                    Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
+                                        .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
+                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                                        .contentTransition(.symbolEffect(.replace))
+                                )
                         }
-                    } label: {
-                        Circle()
-                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
-                            .frame(width: 48, height: 48)
-                            .glassEffect()
-                            .overlay(
-                                Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
-                                    .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
-                                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                    .contentTransition(.symbolEffect(.replace))
-                            )
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .padding(.leading, 12)
                     }
-                    .opacity(inputMode == .textInput ? 1 : 0)
-                    .scaleEffect(inputMode == .textInput ? 1 : 0.01)
-                    .padding(.leading, inputMode == .textInput ? 12 : 0)
-                    .allowsHitTesting(inputMode == .textInput)
                     
                     Spacer()
                         .allowsHitTesting(false)  // Don't block touches
