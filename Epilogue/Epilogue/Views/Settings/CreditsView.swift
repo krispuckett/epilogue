@@ -58,8 +58,8 @@ struct CreditsView: View {
                     endPoint: .bottom
                 )
                 .frame(height: UIScreen.main.bounds.height * 0.6)
-                .ignoresSafeArea()
             }
+            .ignoresSafeArea()
 
             // Content overlay
             VStack {
@@ -118,7 +118,7 @@ struct CreditsView: View {
                 .padding(.vertical, 20)
                 .frame(maxWidth: .infinity)
                 .glassEffect(
-                    .regular.tint(Color.black.opacity(0.3)),
+                    .regular,
                     in: RoundedRectangle(cornerRadius: 20)
                 )
                 .padding(.horizontal, 24)
