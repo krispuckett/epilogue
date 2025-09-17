@@ -153,12 +153,12 @@ struct AmbientSessionSummaryView: View {
                     intensity: 0.4, // Subtle but present
                     audioLevel: 0
                 )
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom to avoid conflict with safeAreaBar
             } else {
                 // Fallback gradient
                 AmbientChatGradientView()
                     .opacity(0.6)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom to avoid conflict with safeAreaBar
             }
             
             // Subtle darkening overlay for readability
