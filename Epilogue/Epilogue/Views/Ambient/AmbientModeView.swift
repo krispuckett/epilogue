@@ -1020,8 +1020,9 @@ struct AmbientModeView: View {
                                     .easeIn(duration: 0.2).delay(0.3), value: inputMode)
                                 .allowsHitTesting(!inputMode.isTextInput)
                             
-                            // Text input mode content
-                            if inputMode == .textInput {
+                            // Text input mode content with orchestrated animations
+                            Group {
+                                if inputMode == .textInput {
                                 // Camera feedback indicator
                                 if cameraJustUsed && !isProcessingImage {
                                     HStack(spacing: 6) {
@@ -1058,11 +1059,7 @@ struct AmbientModeView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.3)
-                                    .blur(radius: inputMode == .textInput ? 0 : 20)
-                                    .animation(inputMode == .textInput ?
-                                        .easeIn(duration: 0.2).delay(0.4) :
-                                        .easeOut(duration: 0.15), value: inputMode)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.01)
                                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
                                     
                                     // Enhanced text field with ambient blur
@@ -1123,23 +1120,30 @@ struct AmbientModeView: View {
                                     }
                                     .frame(maxWidth: .infinity)  // Fill available space
                                     .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.3)
-                                    .blur(radius: inputMode == .textInput ? 0 : 20)
-                                    .animation(inputMode == .textInput ?
-                                        .easeIn(duration: 0.2).delay(0.45) :
-                                        .easeOut(duration: 0.1), value: inputMode)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.01)
                                 }
                                 .padding(.leading, 12)  // Proper padding for camera icon
                                 .padding(.trailing, 12)
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
+                            }
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                                removal: .opacity
+                            ))
+                            .animation(inputMode == .textInput ?
+                                .easeInOut(duration: 0.3).delay(0.4) :
+                                .easeOut(duration: 0.2),
+                                value: inputMode
+                            )
                         }
                     }
                     .onAppear {
                         // Start subtle idle breathing animation
                         startContainerBreathing()
                     }
-                    
+                    .animation(.spring(response: 0.6, dampingFraction: 0.88, blendDuration: 0), value: inputMode)
+
                     // Morphing button - waveform when empty, submit when has text
                     if inputMode == .textInput {
                         Button {
