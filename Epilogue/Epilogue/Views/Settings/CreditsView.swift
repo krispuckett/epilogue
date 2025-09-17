@@ -13,30 +13,36 @@ struct CreditsView: View {
 
     var body: some View {
         ZStack {
-            // Full-screen video background
-            if let player = player {
-                VideoPlayer(player: player)
-                    .ignoresSafeArea()
-                    .opacity(videoOpacity)
-                    .onAppear {
-                        player.play()
-                        player.actionAtItemEnd = .none
-
-                        // Loop the video
-                        NotificationCenter.default.addObserver(
-                            forName: .AVPlayerItemDidPlayToEndTime,
-                            object: player.currentItem,
-                            queue: .main
-                        ) { _ in
-                            player.seek(to: .zero)
+            // Full-screen video background - scaled to fill
+            GeometryReader { geometry in
+                if let player = player {
+                    VideoPlayer(player: player)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .ignoresSafeArea()
+                        .opacity(videoOpacity)
+                        .onAppear {
                             player.play()
+                            player.actionAtItemEnd = .none
+
+                            // Loop the video
+                            NotificationCenter.default.addObserver(
+                                forName: .AVPlayerItemDidPlayToEndTime,
+                                object: player.currentItem,
+                                queue: .main
+                            ) { _ in
+                                player.seek(to: .zero)
+                                player.play()
+                            }
                         }
-                    }
-            } else {
-                // Fallback background
-                Color.black
-                    .ignoresSafeArea()
+                } else {
+                    // Fallback background
+                    Color.black
+                        .ignoresSafeArea()
+                }
             }
+            .ignoresSafeArea()
 
             // Amber gradient overlay from top to bottom
             VStack {
