@@ -975,34 +975,23 @@ struct AmbientModeView: View {
                     
                     // Single morphing container that expands/contracts
                     ZStack {
-                        // Morphing background with smooth transition
-                        if inputMode == .textInput {
-                            // Rectangle with fixed corner radius for text input
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
-                                .frame(
-                                    width: min(geometry.size.width - 80, 320),
-                                    height: textFieldHeight  // Dynamic height
-                                )
-                                .blur(radius: containerBlur) // Ambient container blur
-                                .glassEffect(.regular, in: .rect(cornerRadius: 20)) // Fixed corner radius glass
-                                .matchedGeometryEffect(id: "inputContainer", in: morphingNamespace)
-                                .allowsHitTesting(false)  // Glass background shouldn't block touches
-                        } else {
-                            // Circle for voice mode
-                            Circle()
-                                .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
-                                .frame(width: 64, height: 64)
-                                .blur(radius: containerBlur) // Ambient container blur
-                                .glassEffect() // Circle glass effect
-                                .matchedGeometryEffect(id: "inputContainer", in: morphingNamespace)
-                                .allowsHitTesting(false)  // Glass background shouldn't block touches
-                        }
+                        // Unified morphing background - always present, just changes shape
+                        RoundedRectangle(
+                            cornerRadius: inputMode == .textInput ? 20 : 32,
+                            style: .continuous
+                        )
+                        .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
+                        .frame(
+                            width: inputMode == .textInput ? min(geometry.size.width - 80, 320) : 64,
+                            height: inputMode == .textInput ? textFieldHeight : 64
+                        )
+                        .blur(radius: containerBlur) // Ambient container blur
+                        .glassEffect(.regular, in: .rect(cornerRadius: inputMode == .textInput ? 20 : 32))
+                        .allowsHitTesting(false)  // Glass background shouldn't block touches
                         
                         // Content that transitions inside the morphing container
                         ZStack {
                             // Voice mode content (stop/waveform icon)
-                            if !inputMode.isTextInput {
                                 Button {
                                     if inputMode == .listening && isRecording {
                                         handleMicrophoneTap()
@@ -1026,7 +1015,7 @@ struct AmbientModeView: View {
                                 .buttonStyle(.plain)
                                 .opacity(inputMode == .textInput ? 0 : 1)
                                 .scaleEffect(inputMode == .textInput ? 0.8 : 1)
-                            }
+                                .allowsHitTesting(!inputMode.isTextInput)
                             
                             // Text input mode content
                             if inputMode == .textInput {
@@ -1141,8 +1130,8 @@ struct AmbientModeView: View {
                     }
                     
                     // Morphing button - waveform when empty, submit when has text
-                    if inputMode == .textInput {
-                        Button {
+                    Button {
+                        if inputMode == .textInput {
                             if !keyboardText.isEmpty {
                                 // Submit the message
                                 // Removed blur wave for cleaner submission
@@ -1159,24 +1148,23 @@ struct AmbientModeView: View {
                                     startRecording()
                                 }
                             }
-                        } label: {
-                            Circle()
-                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
-                                .frame(width: 48, height: 48)
-                                .glassEffect()
-                                .overlay(
-                                    Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
-                                        .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
-                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                        .contentTransition(.symbolEffect(.replace))
-                                )
                         }
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                        .padding(.leading, 12)
+                    } label: {
+                        Circle()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                            .glassEffect()
+                            .overlay(
+                                Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
+                                    .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
+                                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                                    .contentTransition(.symbolEffect(.replace))
+                            )
                     }
+                    .opacity(inputMode == .textInput ? 1 : 0)
+                    .scaleEffect(inputMode == .textInput ? 1 : 0.01)
+                    .padding(.leading, inputMode == .textInput ? 12 : 0)
+                    .allowsHitTesting(inputMode == .textInput)
                     
                     Spacer()
                         .allowsHitTesting(false)  // Don't block touches
