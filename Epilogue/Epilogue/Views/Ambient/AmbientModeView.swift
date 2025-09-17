@@ -987,10 +987,6 @@ struct AmbientModeView: View {
                                 .blur(radius: containerBlur) // Ambient container blur
                                 .glassEffect(.regular, in: .rect(cornerRadius: 20)) // Fixed corner radius glass
                                 .matchedGeometryEffect(id: "inputContainer", in: morphingNamespace)
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                    removal: .scale(scale: 1.2).combined(with: .opacity)
-                                ))
                                 .allowsHitTesting(false)  // Glass background shouldn't block touches
                         } else {
                             // Circle for voice mode
@@ -1000,10 +996,6 @@ struct AmbientModeView: View {
                                 .blur(radius: containerBlur) // Ambient container blur
                                 .glassEffect() // Circle glass effect
                                 .matchedGeometryEffect(id: "inputContainer", in: morphingNamespace)
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 1.2).combined(with: .opacity),
-                                    removal: .scale(scale: 0.8).combined(with: .opacity)
-                                ))
                                 .allowsHitTesting(false)  // Glass background shouldn't block touches
                         }
                         
@@ -1033,8 +1025,8 @@ struct AmbientModeView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .opacity(inputMode == .textInput ? 0 : 1)
-                                .scaleEffect(inputMode == .textInput ? 0.5 : 1)
-                                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: inputMode)
+                                .scaleEffect(inputMode == .textInput ? 0.7 : 1)
+                                .animation(.easeInOut(duration: 0.3), value: inputMode)
                             }
                             
                             // Text input mode content
@@ -1075,8 +1067,8 @@ struct AmbientModeView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.5)
-                                    .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.15), value: inputMode)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.7)
+                                    .animation(.easeInOut(duration: 0.3).delay(0.2), value: inputMode)
                                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
                                     
                                     // Enhanced text field with ambient blur
@@ -1137,8 +1129,8 @@ struct AmbientModeView: View {
                                     }
                                     .frame(maxWidth: .infinity)  // Fill available space
                                     .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.8)
-                                    .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(0.2), value: inputMode)
+                                    .scaleEffect(inputMode == .textInput ? 1 : 0.85)
+                                    .animation(.easeInOut(duration: 0.3).delay(0.25), value: inputMode)
                                 }
                                 .padding(.leading, 12)  // Proper padding for camera icon
                                 .padding(.trailing, 12)
@@ -1150,7 +1142,7 @@ struct AmbientModeView: View {
                         // Start subtle idle breathing animation
                         startContainerBreathing()
                     }
-                    .animation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25), value: inputMode)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.9, blendDuration: 0.3), value: inputMode)
                     
                     // Morphing button - waveform when empty, submit when has text
                     if inputMode == .textInput {
@@ -1184,10 +1176,10 @@ struct AmbientModeView: View {
                                 )
                         }
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0).combined(with: .opacity).combined(with: .move(edge: .leading)),
-                            removal: .scale(scale: 0).combined(with: .opacity)
+                            insertion: .scale(scale: 0.7).combined(with: .opacity),
+                            removal: .scale(scale: 0.7).combined(with: .opacity)
                         ))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.85).delay(0.1), value: inputMode)
+                        .animation(.easeInOut(duration: 0.3).delay(0.3), value: inputMode)
                         .padding(.leading, 12)
                     }
                     
