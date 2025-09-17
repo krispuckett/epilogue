@@ -187,7 +187,7 @@ struct BookDetailView: View {
     // Progress editing states
     @State private var showingProgressSheet = false
     @State private var editingCurrentPage = ""
-    @State private var showingProgressEditor = false
+    // Removed showingProgressEditor - progress is now directly interactive via slider
     @State private var showingCompletionSheet = false
     
     // Status picker state
@@ -753,21 +753,15 @@ struct BookDetailView: View {
                 Text("Reading Timeline")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(textColor)
-                
+
                 Spacer()
-                
-                // Edit button
-                Button {
-                    showingProgressEditor = true
-                    SensoryFeedback.light()
-                } label: {
-                    Text("Edit")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(accentColor)
-                }
+
+                Text("Drag to adjust")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(textColor.opacity(0.5))
             }
             
-            // Ambient Reading Progress Timeline - Detailed View
+            // Ambient Reading Progress Timeline - Detailed View (now interactive!)
             AmbientReadingProgressView(
                 book: book,
                 width: 320,
@@ -775,10 +769,6 @@ struct BookDetailView: View {
                 colorPalette: colorPalette
             )
             .environmentObject(libraryViewModel)
-        }
-        .sheet(isPresented: $showingProgressEditor) {
-            AmbientProgressSheet(book: book, isPresented: $showingProgressEditor, colorPalette: colorPalette)
-                .environmentObject(libraryViewModel)
         }
     }
     

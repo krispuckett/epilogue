@@ -232,29 +232,29 @@ struct AmbientReadingProgressView: View {
                 Text("Reading Progress")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.8))
-                
+
                 Spacer()
-                
+
                 Text("Page \(pagesRead) of \(totalPages)")
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.6))
             }
-            
-            // Advanced timeline
+
+            // Interactive timeline with slider
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // Base track
                     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .fill(Color.white.opacity(0.05))
                         .frame(height: 8)
-                    
+
                     // Segment progress
                     HStack(spacing: 2) {
                         let segmentCount = 40
                         ForEach(0..<segmentCount, id: \.self) { segmentIndex in
                             let segmentProgress = Double(segmentIndex) / Double(segmentCount - 1)
                             let isActive = segmentProgress <= animatedProgress
-                            
+
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(
                                     isActive
@@ -287,7 +287,7 @@ struct AmbientReadingProgressView: View {
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-                    
+
                     // Add subtle glow effect
                     if animatedProgress > 0 {
                         RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
@@ -305,7 +305,33 @@ struct AmbientReadingProgressView: View {
                             .blur(radius: 6)
                             .opacity(0.6)
                     }
+
+                    // Interactive slider thumb
+                    Circle()
+                        .fill(primaryColor)
+                        .frame(width: 20, height: 20)
+                        .shadow(color: primaryColor.opacity(0.6), radius: 4)
+                        .offset(x: (geometry.size.width - 20) * animatedProgress)
                 }
+                .contentShape(Rectangle()) // Make entire area tappable
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let newProgress = min(max(0, value.location.x / geometry.size.width), 1.0)
+                            let newPage = Int(Double(totalPages) * newProgress)
+
+                            // Update progress immediately for smooth feedback
+                            withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.9)) {
+                                animatedProgress = newProgress
+                            }
+
+                            // Update the book's current page
+                            viewModel.updateCurrentPage(for: book, to: newPage)
+
+                            // Haptic feedback
+                            SensoryFeedback.selection()
+                        }
+                )
             }
             .frame(height: 24)
         }

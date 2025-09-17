@@ -1691,7 +1691,25 @@ class LibraryViewModel: ObservableObject {
             saveBooks()
         }
     }
-    
+
+    func updateCurrentPage(for book: Book, to newPage: Int) {
+        // Ensure page is within bounds
+        let pageCount = book.pageCount ?? 0
+        let validPage = min(max(0, newPage), pageCount)
+
+        if let index = books.firstIndex(where: { $0.id == book.id }) {
+            books[index].currentPage = validPage
+            saveBooks()
+
+            // Post notification for other views to update
+            NotificationCenter.default.post(
+                name: NSNotification.Name("BookProgressUpdated"),
+                object: nil,
+                userInfo: ["bookId": book.id, "currentPage": validPage]
+            )
+        }
+    }
+
     func updateBook(_ book: Book) {
         if let index = books.firstIndex(where: { $0.id == book.id }) {
             books[index] = book
