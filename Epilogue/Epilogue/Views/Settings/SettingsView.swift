@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 import SwiftData
 
 // Import models and utilities
@@ -169,6 +170,23 @@ struct SettingsView: View {
                     Text("Gandalf mode disables all API quotas for testing. Use responsibly!")
                 }
                 
+                // MARK: - Appearance
+                Section {
+                    NavigationLink {
+                        ThemeSelectionView()
+                    } label: {
+                        HStack {
+                            Label("Gradient Theme", systemImage: "paintbrush.pointed.fill")
+                                .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                            Spacer()
+                            Text(ThemeManager.shared.currentTheme.displayName)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Appearance")
+                }
+
                 // MARK: - Reading Preferences
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
@@ -178,9 +196,9 @@ struct SettingsView: View {
                             Text("\(Int(gradientIntensity * 100))%")
                                 .foregroundStyle(.secondary)
                         }
-                        
+
                         Slider(value: $gradientIntensity, in: 0...1)
-                            .tint(DesignSystem.Colors.primaryAccent)
+                            .tint(ThemeManager.shared.currentTheme.primaryAccent)
                     }
                     
                     Toggle(isOn: $enableAnimations) {
@@ -645,178 +663,141 @@ struct APIKeyEntrySheet: View {
 
 struct CreditsView: View {
     @State private var appeared = false
-    
+    @StateObject private var themeManager = ThemeManager.shared
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                // Hero Section with App Icon
-                VStack(spacing: 20) {
-                    // Animated App Icon
+        ZStack {
+            // Video Background with Gradient Overlay
+            VideoBackgroundView()
+
+            // Gradient overlay from transparent to subtle amber
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .clear, location: 0.3),
+                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.1), location: 0.6),
+                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.2), location: 0.8),
+                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.3), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            // Content
+            VStack(spacing: 0) {
+                Spacer()
+
+                // App Logo with liquid glass
+                VStack(spacing: 24) {
                     ZStack {
+                        // Glowing background
                         Circle()
-                            .fill(
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.3))
+                            .frame(width: 140, height: 140)
+                            .blur(radius: 40)
+                            .scaleEffect(appeared ? 1.2 : 0.8)
+
+                        // Glass icon container
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 56, weight: .medium))
+                            .foregroundStyle(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 1.0, green: 0.45, blue: 0.16),
-                                        Color(red: 0.95, green: 0.35, blue: 0.25)
+                                        DesignSystem.Colors.primaryAccent,
+                                        DesignSystem.Colors.primaryAccent.opacity(0.7)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
                             .frame(width: 120, height: 120)
-                            .shadow(color: Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.5), radius: 20)
+                            .glassEffect(in: .circle)
+                            .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.3), radius: 20, y: 10)
                             .scaleEffect(appeared ? 1.0 : 0.8)
                             .opacity(appeared ? 1.0 : 0)
-                        
-                        Image(systemName: "book.fill")
-                            .font(.system(size: 50, weight: .bold))
-                            .foregroundColor(.white)
-                            .rotationEffect(.degrees(appeared ? 0 : -10))
                     }
-                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1), value: appeared)
-                    
-                    VStack(spacing: 8) {
-                        Text("Epilogue")
-                            .font(.system(size: 48, weight: .bold, design: .serif))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.white, .white.opacity(0.9)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        
-                        Text("A thoughtful reading companion")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .kerning(0.5)
-                        
-                        Text("Version 1.0")
-                            .font(.system(size: 14, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.top, 4)
-                    }
-                }
-                .padding(.top, 40)
-                .padding(.bottom, 20)
-                
-                // Creator Section
-                VStack(spacing: 24) {
-                    Text("CREATED BY")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .kerning(2)
-                    
-                    VStack(spacing: 16) {
-                        // Profile image placeholder with gradient
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.3, green: 0.5, blue: 0.9),
-                                            Color(red: 0.5, green: 0.3, blue: 0.9)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 80, height: 80)
-                            
-                            Text("KP")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                        .shadow(color: .blue.opacity(0.3), radius: 15)
-                        
-                        VStack(spacing: 4) {
-                            Text("Kris Puckett")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            Text("iOS Developer & Book Enthusiast")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                    }
-                }
-                .padding(.vertical, 20)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(.white.opacity(0.1), lineWidth: 1)
-                        )
-                )
-                .padding(.horizontal)
-                
-                // Technologies Section
-                VStack(spacing: 20) {
-                    Text("POWERED BY")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .kerning(2)
-                    
+                    .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(0.2), value: appeared)
+
                     VStack(spacing: 12) {
-                        TechCard(
-                            icon: "swift",
-                            title: "SwiftUI & iOS 26",
-                            description: "Built with the latest technologies",
-                            color: .orange
-                        )
-                        
-                        TechCard(
-                            icon: "mic.fill",
-                            title: "WhisperKit",
-                            description: "On-device voice transcription",
-                            color: .blue
-                        )
-                        
-                        TechCard(
-                            icon: "brain",
-                            title: "Perplexity AI",
-                            description: "Intelligent reading companion",
-                            color: .purple
-                        )
-                        
-                        TechCard(
-                            icon: "icloud.fill",
-                            title: "CloudKit",
-                            description: "Seamless sync across devices",
-                            color: .cyan
-                        )
+                        Text("Epilogue")
+                            .font(.system(size: 52, weight: .bold, design: .serif))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+
+                        Text("A thoughtful reading companion")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .kerning(0.5)
                     }
+                    .opacity(appeared ? 1.0 : 0)
+                    .offset(y: appeared ? 0 : 20)
+                    .animation(.easeOut(duration: 0.6).delay(0.3), value: appeared)
                 }
-                .padding(.horizontal)
+
+                Spacer()
+                Spacer()
                 
-                // Special Thanks
-                VStack(spacing: 16) {
-                    Text("SPECIAL THANKS")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .kerning(2)
-                    
-                    Text("To all the beta testers, early adopters, and book lovers who helped shape Epilogue into what it is today.")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                    
-                    Text("Made with ❤️ for readers everywhere")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.top, 8)
+                // Credits with liquid glass
+                VStack(spacing: 20) {
+                    Text("Version 1.0")
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .kerning(1)
+
+                    HStack {
+                        Rectangle()
+                            .fill(.white.opacity(0.2))
+                            .frame(width: 40, height: 1)
+
+                        Text("by")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .kerning(1)
+
+                        Rectangle()
+                            .fill(.white.opacity(0.2))
+                            .frame(width: 40, height: 1)
+                    }
+
+                    Text("Kris Puckett")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .kerning(0.5)
                 }
                 .padding(.vertical, 32)
+                .padding(.horizontal, 48)
+                .glassEffect(in: .rect(cornerRadius: 24))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.2),
+                                    .white.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                }
+                .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 60)
+                .opacity(appeared ? 1.0 : 0)
+                .offset(y: appeared ? 0 : 30)
+                .animation(.easeOut(duration: 0.8).delay(0.5), value: appeared)
             }
-            .padding(.bottom, 40)
         }
-        .background(Color(red: 0.11, green: 0.11, blue: 0.118))
-        .navigationTitle("Credits")
+        .ignoresSafeArea()
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                // Empty to keep navigation clean
+            }
+        }
         .onAppear {
             withAnimation {
                 appeared = true
@@ -825,7 +806,77 @@ struct CreditsView: View {
     }
 }
 
-// Tech Card Component
+// MARK: - Video Background View
+
+struct VideoBackgroundView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+
+        // Get video URL - first try Bundle, then Downloads folder
+        var videoURL: URL?
+
+        // Try app bundle first
+        if let bundleURL = Bundle.main.url(forResource: "readEpilogue", withExtension: "mp4") {
+            videoURL = bundleURL
+        } else {
+            // Fallback to Downloads folder for development
+            let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+            videoURL = downloadsURL?.appendingPathComponent("readEpilogue.mp4")
+        }
+
+        guard let url = videoURL else {
+            print("⚠️ Video file not found")
+            // Return a gradient fallback
+            let gradientLayer = CAGradientLayer()
+            gradientLayer.colors = [
+                UIColor.black.cgColor,
+                UIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1).cgColor
+            ]
+            gradientLayer.frame = UIScreen.main.bounds
+            view.layer.addSublayer(gradientLayer)
+            return view
+        }
+
+        // Create video player
+        let player = AVPlayer(url: url)
+        let playerLayer = AVPlayerLayer(player: player)
+
+        // Configure player layer
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.frame = UIScreen.main.bounds
+        view.layer.addSublayer(playerLayer)
+
+        // Loop the video
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: player.currentItem,
+            queue: .main
+        ) { _ in
+            player.seek(to: .zero)
+            player.play()
+        }
+
+        // Start playing
+        player.play()
+        player.isMuted = true // Mute for background video
+
+        // Add a subtle dark overlay to ensure text readability
+        let overlayView = UIView(frame: UIScreen.main.bounds)
+        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        view.addSubview(overlayView)
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        // Update frame if needed
+        if let playerLayer = uiView.layer.sublayers?.first as? AVPlayerLayer {
+            playerLayer.frame = uiView.bounds
+        }
+    }
+}
+
+// Tech Card Component (keeping for potential future use)
 struct TechCard: View {
     let icon: String
     let title: String

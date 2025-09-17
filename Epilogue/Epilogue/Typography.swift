@@ -154,8 +154,10 @@ struct Note: Identifiable, Codable, Equatable {
     let author: String?
     let pageNumber: Int?
     let dateCreated: Date
-    
-    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID()) {
+    let ambientSessionId: UUID?  // Link to ambient session
+    let source: String?  // Source of the note (manual, ambient, etc.)
+
+    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil) {
         self.id = id
         self.type = type
         self.content = content
@@ -164,6 +166,8 @@ struct Note: Identifiable, Codable, Equatable {
         self.author = author
         self.pageNumber = pageNumber
         self.dateCreated = dateCreated
+        self.ambientSessionId = ambientSessionId
+        self.source = source
     }
     
     /// Check if this note is linked to a specific book

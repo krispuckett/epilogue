@@ -2948,35 +2948,39 @@ struct VoiceResponsiveBottomGradient: View {
 // MARK: - Ambient Chat Gradient (Fallback)
 
 struct AmbientChatGradientView: View {
+    @StateObject private var themeManager = ThemeManager.shared
+
     var body: some View {
         ZStack {
             // Deep black base
             Color.black
-            
-            // More prominent warm sunset gradient - top
+
+            let colors = themeManager.currentTheme.gradientColors
+
+            // Theme-aware gradient - top
             LinearGradient(
                 stops: [
-                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.7), location: 0.0),
-                    .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.5), location: 0.15),
-                    .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.3), location: 0.3),
+                    .init(color: colors[0].opacity(0.7), location: 0.0),
+                    .init(color: colors[1].opacity(0.5), location: 0.15),
+                    .init(color: colors[2].opacity(0.3), location: 0.3),
                     .init(color: Color.clear, location: 0.6)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            
-            // Bottom gradient for balance
+
+            // Theme-aware gradient - bottom
             LinearGradient(
                 stops: [
                     .init(color: Color.clear, location: 0.4),
-                    .init(color: Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.2), location: 0.7),
-                    .init(color: Color(red: 1.0, green: 0.45, blue: 0.2).opacity(0.35), location: 0.85),
-                    .init(color: DesignSystem.Colors.primaryAccent.opacity(0.5), location: 1.0)
+                    .init(color: colors[2].opacity(0.2), location: 0.7),
+                    .init(color: colors[1].opacity(0.35), location: 0.85),
+                    .init(color: colors[3].opacity(0.5), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            
+
         }
         .ignoresSafeArea()
     }

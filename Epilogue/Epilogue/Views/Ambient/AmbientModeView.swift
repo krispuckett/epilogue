@@ -13,6 +13,7 @@ struct ScrollingBookMessages: View {
     @State private var currentMessageIndex = 0
     @State private var opacity: Double = 1.0
     @State private var usedIndices: Set<Int> = []
+    @State private var cyclingTimer: Timer?
     
     let messages = [
         // Literary and bookish phrases
@@ -62,10 +63,14 @@ struct ScrollingBookMessages: View {
                 usedIndices.insert(currentMessageIndex)
                 startCycling()
             }
+            .onDisappear {
+                cyclingTimer?.invalidate()
+                cyclingTimer = nil
+            }
     }
     
     private func startCycling() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        cyclingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             withAnimation(.easeOut(duration: 0.3)) {
                 opacity = 0
             }
@@ -162,6 +167,7 @@ struct AmbientModeView: View {
     @State private var textFieldHeight: CGFloat = 44  // Track dynamic height, starts compact at single line
     @State private var lastCharacterCount: Int = 0
     @State private var breathingTimer: Timer?
+    @State private var showVisualIntelligenceCapture = false
     @Namespace private var morphingNamespace  // For smooth morphing animation
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
@@ -315,37 +321,9 @@ struct AmbientModeView: View {
         // Removed - moved above transcription bar
         .statusBarHidden(true)
         .fullScreenCover(isPresented: $showingSessionSummary, onDismiss: {
-            // This runs AFTER the fullScreenCover is fully dismissed
-            print("📖 Session summary dismissed")
-
-            // Navigate to BookView if we have a book
-            if let book = currentBookContext {
-                print("📚 Will navigate to book: \(book.title)")
-
-                // First, switch to library tab
-                NotificationCenter.default.post(
-                    name: Notification.Name("SwitchToLibraryTab"),
-                    object: nil
-                )
-
-                // Then dismiss ambient mode properly using the coordinator
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    EpilogueAmbientCoordinator.shared.dismiss()
-                }
-
-                // Finally, navigate to the book after ambient mode is dismissed
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("📚 Posting navigation to book: \(book.title)")
-                    NotificationCenter.default.post(
-                        name: Notification.Name("NavigateToBook"),
-                        object: book
-                    )
-                }
-            } else {
-                print("📖 No book context, just dismissing ambient mode")
-                // No book context, just dismiss ambient mode using coordinator
-                EpilogueAmbientCoordinator.shared.dismiss()
-            }
+            // Clean dismissal - coordinator handles everything
+            EpilogueAmbientCoordinator.shared.dismiss()
+            dismiss()
         }) {
             if let session = currentSession {
                 AmbientSessionSummaryView(
@@ -558,6 +536,19 @@ struct AmbientModeView: View {
                 image: capturedImage,
                 extractedText: extractedText,
                 onSave: saveHighlightedQuote
+            )
+        }
+        .sheet(isPresented: $showVisualIntelligenceCapture) {
+            AmbientTextCapture(
+                isPresented: $showVisualIntelligenceCapture,
+                bookContext: currentBookContext,
+                onQuoteSaved: { text, pageNumber in
+                    saveQuoteFromVisualIntelligence(text, pageNumber: pageNumber)
+                },
+                onQuestionAsked: { question in
+                    keyboardText = question
+                    sendTextMessage()
+                }
             )
         }
         .onChange(of: isRecording) { _, newValue in
@@ -913,9 +904,9 @@ struct AmbientModeView: View {
             // Removed invisible tap area that was blocking scrolling
             // Dismissal will be handled by scrollDismissesKeyboard instead
             
-            VStack(spacing: 16) { // ← Fixed spacing and order
+            VStack(spacing: 8) { // ← Tightened spacing between elements
                 // Removed Spacer that was expanding the VStack unnecessarily
-                
+
                 // Save indicator - positioned above everything else
                 if showSaveAnimation, let itemType = savedItemType {
                     HStack(spacing: 8) {
@@ -1068,14 +1059,11 @@ struct AmbientModeView: View {
                                 }
                                 
                                 HStack(spacing: 8) {
-                                    // Simple paste button - camera causing memory issues
+                                    // Camera button for Visual Intelligence capture
                                     Button {
-                                        // Just paste from clipboard for now
-                                        if let text = UIPasteboard.general.string {
-                                            keyboardText = text
-                                        }
+                                        showVisualIntelligenceCapture = true
                                     } label: {
-                                        Image(systemName: "doc.on.clipboard")
+                                        Image(systemName: "camera.viewfinder")
                                             .font(.system(size: 18, weight: .medium))
                                             .foregroundStyle(.white.opacity(0.7))
                                             .frame(width: 32, height: 32)
@@ -1214,7 +1202,7 @@ struct AmbientModeView: View {
             .allowsHitTesting(true)  // Ensure only actual controls are interactive
         }
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)  // Back to original padding
-        .padding(.bottom, inputMode == .textInput ? 18 : 36)  // Back to previous values
+        .padding(.bottom, inputMode == .textInput ? 12 : 24)  // Tightened spacing to keyboard
         
         // Long press for quick keyboard
         .onLongPressGesture(minimumDuration: 0.5) {
@@ -2587,7 +2575,61 @@ struct AmbientModeView: View {
         showQuoteHighlighter = false
         extractedText = ""
     }
-    
+
+    private func saveQuoteFromVisualIntelligence(_ text: String, pageNumber: Int?) {
+        // Create the captured quote
+        let capturedQuote = CapturedQuote(
+            text: text,
+            book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+            author: currentBookContext?.author,
+            pageNumber: pageNumber,
+            timestamp: Date(),
+            source: .manual
+        )
+
+        // Add to current session only (not to processor.detectedContent to avoid duplication)
+        if currentSession != nil {
+            if currentSession?.capturedQuotes == nil {
+                currentSession?.capturedQuotes = []
+            }
+            currentSession?.capturedQuotes?.append(capturedQuote)
+        }
+
+        // Add to messages
+        let pageInfo = pageNumber != nil ? "from page \(pageNumber!)" : ""
+        let message = UnifiedChatMessage(
+            content: "**Quote captured \(pageInfo)**\n\n\(text)",
+            isUser: false,
+            timestamp: Date(),
+            messageType: .quote(CapturedQuote(
+                text: text,
+                book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+                author: currentBookContext?.author,
+                pageNumber: pageNumber,
+                timestamp: Date(),
+                source: .manual
+            ))
+        )
+        messages.append(message)
+
+        // Show save animation
+        savedItemsCount += 1
+        savedItemType = "Quote"
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            showSaveAnimation = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation {
+                showSaveAnimation = false
+                savedItemType = nil
+            }
+        }
+
+        // Haptic feedback
+        SensoryFeedback.success()
+    }
+
     private func getAIResponse(for text: String) async {
         let aiService = AICompanionService.shared
         

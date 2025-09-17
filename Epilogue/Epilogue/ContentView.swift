@@ -15,6 +15,7 @@ struct ContentView: View {
     @StateObject private var onboardingCoordinator = OnboardingCoordinator()
     @StateObject private var libraryViewModel = LibraryViewModel()
     @StateObject private var notesViewModel = NotesViewModel()
+    @StateObject private var themeManager = ThemeManager.shared
 
     // MARK: - State
     @State private var selectedTab = 0
@@ -49,13 +50,16 @@ struct ContentView: View {
                 // Switch to library tab when navigating from ambient mode
                 selectedTab = 0
             }
+            .id(themeManager.currentTheme) // Force complete view recreation on theme change
     }
 
     // MARK: - Main Content
     private var mainContent: some View {
         ZStack(alignment: .bottom) {
-            DesignSystem.Colors.surfaceBackground
+            // Use subtle themed gradient like original amber
+            SubtleThemedBackground()
                 .ignoresSafeArea()
+                .id("background-\(themeManager.currentTheme.rawValue)") // Force complete refresh on theme change
 
             NavigationContainer(selectedTab: $selectedTab)
                 .safeAreaInset(edge: .bottom) {

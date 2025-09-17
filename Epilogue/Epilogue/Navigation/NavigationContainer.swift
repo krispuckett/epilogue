@@ -9,6 +9,7 @@ struct NavigationContainer: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     @EnvironmentObject var navigationCoordinator: NavigationCoordinator
+    @StateObject private var themeManager = ThemeManager.shared
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -20,7 +21,7 @@ struct NavigationContainer: View {
                     Text("Library")
                 } icon: {
                     Image("glass-book-open")
-                        .renderingMode(.original)
+                        .renderingMode(.template)
                 }
             }
             .tag(0)
@@ -33,7 +34,7 @@ struct NavigationContainer: View {
                     Text("Notes")
                 } icon: {
                     Image("glass-feather")
-                        .renderingMode(.original)
+                        .renderingMode(.template)
                 }
             }
             .tag(1)
@@ -44,12 +45,16 @@ struct NavigationContainer: View {
                     Text("Chat")
                 } icon: {
                     Image("glass-msgs")
-                        .renderingMode(.original)
+                        .renderingMode(.template)
                 }
             }
             .tag(2)
         }
-        .tint(DesignSystem.Colors.primaryAccent)
+        .tint(themeManager.currentTheme.primaryAccent)
+        .onAppear {
+            // Restore original tab bar with proper glass effect
+            setupTabBarAppearance()
+        }
         .environmentObject(libraryViewModel)
         .environmentObject(notesViewModel)
         .environmentObject(navigationCoordinator)
@@ -61,6 +66,31 @@ struct NavigationContainer: View {
         .onChange(of: navigationCoordinator.selectedTab) { _, newValue in
             syncFromNavigationCoordinator(newValue)
         }
+        .onChange(of: themeManager.currentTheme) { _, _ in
+            // Update tab bar colors when theme changes
+            updateTabBarAppearance()
+        }
+    }
+
+    private func setupTabBarAppearance() {
+        // Use default system appearance for proper blur
+        let appearance = UITabBar.appearance()
+        appearance.backgroundImage = nil
+        appearance.shadowImage = nil
+        appearance.isTranslucent = true
+
+        // Don't use UITabBarAppearance - let system handle the blur
+        appearance.backgroundColor = nil
+        appearance.barTintColor = nil
+
+        // Update tint color for selected items
+        appearance.tintColor = UIColor(themeManager.currentTheme.primaryAccent)
+        appearance.unselectedItemTintColor = UIColor.white.withAlphaComponent(0.5)
+    }
+
+    private func updateTabBarAppearance() {
+        // Just update the tint colors when theme changes
+        UITabBar.appearance().tintColor = UIColor(themeManager.currentTheme.primaryAccent)
     }
 
     private func syncWithNavigationCoordinator(_ tab: Int) {

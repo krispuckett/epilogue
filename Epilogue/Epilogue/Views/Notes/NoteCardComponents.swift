@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Preference key for card rect tracking
 private struct CardRectPreferenceKey: PreferenceKey {
@@ -20,6 +21,8 @@ struct NoteCard: View {
     @State private var cardRect: CGRect = .zero
     var onContextMenuRequest: ((Note, CGRect) -> Void)?
     @Environment(\.sizeCategory) var sizeCategory
+    @Environment(\.modelContext) private var modelContext
+    @State private var ambientSession: AmbientSession?
     
     init(note: Note, isSelectionMode: Bool = false, isSelected: Bool = false, onSelectionToggle: @escaping () -> Void = {}, openOptionsNoteId: Binding<UUID?> = .constant(nil), onContextMenuRequest: ((Note, CGRect) -> Void)? = nil) {
         self.note = note
@@ -33,9 +36,9 @@ struct NoteCard: View {
     var body: some View {
         ZStack {
             if note.type == .quote {
-                QuoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions)
+                QuoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions, ambientSession: ambientSession)
             } else {
-                RegularNoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions)
+                RegularNoteCard(note: note, isPressed: $isPressed, showingOptions: $showingOptions, ambientSession: ambientSession)
             }
             
             // Selection overlay - removed to prevent duplicate checkmarks
@@ -71,6 +74,9 @@ struct NoteCard: View {
         }
         .opacity(isSelectionMode && !isSelected ? 0.6 : 1.0)
         .animation(DesignSystem.Animation.springStandard, value: isSelected)
+        .onAppear {
+            loadAmbientSession()
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(isSelectionMode ? "Tap to select or deselect" : "Double tap to edit, long press for more options")
@@ -95,7 +101,21 @@ struct NoteCard: View {
         
         return label
     }
-    
+    private func loadAmbientSession() {
+        guard let sessionId = note.ambientSessionId else { return }
+
+        let fetchDescriptor = FetchDescriptor<AmbientSession>(
+            predicate: #Predicate { session in
+                session.id == sessionId
+            }
+        )
+
+        if let sessions = try? modelContext.fetch(fetchDescriptor),
+           let session = sessions.first {
+            self.ambientSession = session
+        }
+    }
+
     @EnvironmentObject var notesViewModel: NotesViewModel
 }
 
@@ -104,6 +124,7 @@ struct QuoteCard: View {
     let note: Note
     @Binding var isPressed: Bool
     @Binding var showingOptions: Bool
+    let ambientSession: AmbientSession?
     @EnvironmentObject var notesViewModel: NotesViewModel
     @Environment(\.sizeCategory) var sizeCategory
     @State private var showDate = false
@@ -185,6 +206,31 @@ struct QuoteCard: View {
                             .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
                     }
                 }
+
+                // Session pill for ambient quotes
+                if let session = ambientSession,
+                   let source = note.source,
+                   source == "ambient" {
+                    NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                        HStack(spacing: 6) {
+                            Text("SESSION")
+                                .font(.system(size: 10, weight: .semibold, design: .default))
+                                .kerning(1.0)
+
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundColor(DesignSystem.Colors.primaryAccent.opacity(0.7))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.top, 8)
+                }
             }
             
             // Date overlay that fades in on swipe
@@ -254,6 +300,7 @@ struct RegularNoteCard: View {
     let note: Note
     @Binding var isPressed: Bool
     @Binding var showingOptions: Bool
+    let ambientSession: AmbientSession?
     @EnvironmentObject var notesViewModel: NotesViewModel
     
     var body: some View {
@@ -313,8 +360,32 @@ struct RegularNoteCard: View {
                                 }
                             }
                         }
-                        
+
                         Spacer()
+
+                        // Session pill for ambient notes
+                        if let session = ambientSession,
+                           let source = note.source,
+                           source == "ambient" {
+                            NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                                HStack(spacing: 6) {
+                                    Text("SESSION")
+                                        .font(.system(size: 10, weight: .semibold, design: .default))
+                                        .kerning(1.0)
+
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 9, weight: .bold))
+                                }
+                                .foregroundColor(DesignSystem.Colors.primaryAccent.opacity(0.7))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
                 }
                 .padding(.top, 4)

@@ -4,19 +4,26 @@ import SwiftUI
 struct AmbientChatBackground: View {
     @Binding var audioLevel: Float
     @Binding var isListening: Bool
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var breathe = false
     @State private var morph = false
-    
+
     var body: some View {
-        BreathingAmberGradient(
-            breathe: breathe,
-            morph: morph
-        )
-        .onAppear {
-            startBreathingAnimations()
+        if themeManager.currentTheme == .amber {
+            // Use original amber gradient for perfect backwards compatibility
+            BreathingAmberGradient(
+                breathe: breathe,
+                morph: morph
+            )
+            .onAppear {
+                startBreathingAnimations()
+            }
+        } else {
+            // Use full themed gradient for ambient mode (more intense)
+            ThemedGradientBackground()
         }
     }
-    
+
     private func startBreathingAnimations() {
         // Slightly slower animations for better performance
         withAnimation(.easeInOut(duration: 5).repeatForever()) {

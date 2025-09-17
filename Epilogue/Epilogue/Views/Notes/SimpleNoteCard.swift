@@ -1,10 +1,13 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Simple Note Card for Award Winning Notes View
 struct SimpleNoteCard: View {
     let note: Note
     @Environment(\.sizeCategory) var sizeCategory
+    @Environment(\.modelContext) private var modelContext
     @State private var isPressed = false
+    @State private var ambientSession: AmbientSession?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -63,8 +66,32 @@ struct SimpleNoteCard: View {
                                 }
                             }
                         }
-                        
+
                         Spacer()
+
+                        // Session pill for ambient notes
+                        if let session = ambientSession,
+                           let source = note.source,
+                           source == "ambient" {
+                            NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                                HStack(spacing: 6) {
+                                    Text("SESSION")
+                                        .font(.system(size: 10, weight: .semibold, design: .default))
+                                        .kerning(1.0)
+
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 9, weight: .bold))
+                                }
+                                .foregroundColor(DesignSystem.Colors.primaryAccent.opacity(0.7))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
                 }
                 .padding(.top, 4)
@@ -79,6 +106,9 @@ struct SimpleNoteCard: View {
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(DesignSystem.Animation.springStandard, value: isPressed)
+        .onAppear {
+            loadAmbientSession()
+        }
         .onTapGesture {
             // Handle tap
         }
@@ -92,7 +122,21 @@ struct SimpleNoteCard: View {
             }
         })
     }
-    
+
+    private func loadAmbientSession() {
+        guard let sessionId = note.ambientSessionId else { return }
+
+        let fetchDescriptor = FetchDescriptor<AmbientSession>(
+            predicate: #Predicate { session in
+                session.id == sessionId
+            }
+        )
+
+        if let sessions = try? modelContext.fetch(fetchDescriptor),
+           let session = sessions.first {
+            self.ambientSession = session
+        }
+    }
 }
 
 // Press events already defined in HeroTransitionView

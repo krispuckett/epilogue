@@ -22,6 +22,7 @@ struct AmbientSessionSummaryView: View {
     @FocusState private var isPageFocused: Bool
     @State private var generatedInsight: String? = nil
     @State private var isGeneratingInsight = false
+    @State private var showingChat = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -120,9 +121,19 @@ struct AmbientSessionSummaryView: View {
                     }
                     hasInitializedExpanded = true
                 }
-                
+
                 // Generate AI insight for the session
                 generateAIInsight()
+            }
+            .fullScreenCover(isPresented: $showingChat) {
+                NavigationStack {
+                    UnifiedChatView(
+                        preSelectedBook: convertBookModelToBook(session.bookModel),
+                        startInVoiceMode: false,
+                        isAmbientMode: false
+                    )
+                    .environmentObject(libraryViewModel)
+                }
             }
         }
         .overlay {
@@ -322,8 +333,14 @@ struct AmbientSessionSummaryView: View {
     private func primaryInsightCard(question: CapturedQuestion) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: {
-                withAnimation(DesignSystem.Animation.springStandard) {
-                    isKeyInsightExpanded.toggle()
+                if isGeneratingInsight {
+                    // If analyzing, open chat view
+                    showingChat = true
+                } else {
+                    // Otherwise toggle expansion
+                    withAnimation(DesignSystem.Animation.springStandard) {
+                        isKeyInsightExpanded.toggle()
+                    }
                 }
                 SensoryFeedback.light()
             }) {
@@ -655,27 +672,27 @@ struct AmbientSessionSummaryView: View {
     private func findMostRelevantQuestion() -> CapturedQuestion? {
         guard !(session.capturedQuestions ?? []).isEmpty else { return nil }
         
-        // Strategy: Find the question with the longest, most substantive answer
-        // This is likely to be the most interesting/insightful one
+        // Strategy: Find the first question with a high-quality answer to maintain chronological order
+        // while still showing meaningful content
         let questionsWithAnswers = (session.capturedQuestions ?? []).filter { $0.answer != nil }
-        
+
         if questionsWithAnswers.isEmpty {
-            return (session.capturedQuestions ?? []).last // Return most recent if no answers
+            return (session.capturedQuestions ?? []).first // Return first question if no answers
         }
-        
-        // Sort by answer length and quality
-        let sorted = questionsWithAnswers.sorted { q1, q2 in
-            let answer1 = q1.answer ?? ""
-            let answer2 = q2.answer ?? ""
-            
-            // Prefer answers with more substance
-            let score1 = calculateAnswerQuality(answer1)
-            let score2 = calculateAnswerQuality(answer2)
-            
-            return score1 > score2
+
+        // Find the first question that meets quality threshold
+        for question in questionsWithAnswers {
+            let answer = question.answer ?? ""
+            let score = calculateAnswerQuality(answer)
+
+            // Return first question with high quality answer
+            if score > 300 {
+                return question
+            }
         }
-        
-        return sorted.first ?? (session.capturedQuestions ?? []).last
+
+        // If no high-quality answers, just return the first question with an answer
+        return questionsWithAnswers.first ?? (session.capturedQuestions ?? []).first
     }
     
     private func calculateAnswerQuality(_ answer: String) -> Int {
@@ -860,6 +877,11 @@ struct AmbientSessionSummaryView: View {
         }
         
         return "An important insight from your reading session."
+    }
+
+    private func convertBookModelToBook(_ bookModel: BookModel?) -> Book? {
+        guard let bookModel = bookModel else { return nil }
+        return libraryViewModel.books.first { $0.id == bookModel.id }
     }
 }
 

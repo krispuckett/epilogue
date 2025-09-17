@@ -8,8 +8,10 @@ public enum DesignSystem {
     
     // MARK: - Colors
     public enum Colors {
-        /// Primary brand color - Warm Amber
-        public static let primaryAccent = Color(red: 1.0, green: 0.55, blue: 0.26)
+        /// Primary brand color - Theme-aware
+        public static var primaryAccent: Color {
+            ThemeManager.shared.currentTheme.primaryAccent
+        }
         
         /// Text colors with semantic naming
         public static let textPrimary = Color.white
