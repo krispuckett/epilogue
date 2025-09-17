@@ -83,45 +83,112 @@ class AICompanionService: ObservableObject {
     
     func processMessage(_ message: String, bookContext: Book?, conversationHistory: [UnifiedChatMessage] = []) async throws -> String {
         isProcessing = true
-        defer { 
+        defer {
             Task { @MainActor in
                 self.isProcessing = false
             }
         }
-        
+
         // Set active book context for smart AI
         if let book = bookContext {
             await MainActor.run {
                 smartAI.setActiveBook(book.toBookModel())
             }
         }
-        
+
         // Build context from conversation history
         let contextualMessage = buildContextualMessage(
             message: message,
             bookContext: bookContext,
             history: conversationHistory
         )
-        
-        switch currentProvider {
-        case .smart:
-            // Use SmartEpilogueAI for intelligent routing
-            return await smartAI.smartQuery(contextualMessage)
-            
-        case .perplexity:
-            // Force Perplexity only
-            await MainActor.run {
-                smartAI.currentMode = .externalOnly
+
+        // Add retry logic with exponential backoff
+        var lastError: Error?
+        let maxRetries = 3
+        let baseDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+
+        for attempt in 0..<maxRetries {
+            do {
+                switch currentProvider {
+                case .smart:
+                    // Use SmartEpilogueAI for intelligent routing
+                    return await smartAI.smartQuery(contextualMessage)
+
+                case .perplexity:
+                    // Force Perplexity only
+                    await MainActor.run {
+                        smartAI.currentMode = .externalOnly
+                    }
+                    return await smartAI.smartQuery(contextualMessage)
+
+                case .appleIntelligence:
+                    // Force local Foundation Models only
+                    await MainActor.run {
+                        smartAI.currentMode = .localOnly
+                    }
+                    return await smartAI.smartQuery(contextualMessage)
+                }
+            } catch {
+                lastError = error
+
+                // Check if error is retryable
+                let isRetryable = isRetryableError(error)
+
+                if !isRetryable {
+                    // Don't retry for non-retryable errors
+                    throw error
+                }
+
+                // If not the last attempt, wait with exponential backoff
+                if attempt < maxRetries - 1 {
+                    let delay = baseDelay * UInt64(pow(2.0, Double(attempt)))
+                    try? await Task.sleep(nanoseconds: delay)
+
+                    #if DEBUG
+                    print("🔄 Retrying AI request (attempt \(attempt + 2)/\(maxRetries)) after \(Double(delay) / 1_000_000_000)s delay")
+                    #endif
+                }
             }
-            return await smartAI.smartQuery(contextualMessage)
-            
-        case .appleIntelligence:
-            // Force local Foundation Models only
-            await MainActor.run {
-                smartAI.currentMode = .localOnly
-            }
-            return await smartAI.smartQuery(contextualMessage)
         }
+
+        // If we've exhausted all retries, throw the last error
+        throw lastError ?? NSError(domain: "AICompanionService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed after \(maxRetries) attempts"])
+    }
+
+    private func isRetryableError(_ error: Error) -> Bool {
+        // Check for network errors that are worth retrying
+        let nsError = error as NSError
+
+        // Network-related errors
+        if nsError.domain == NSURLErrorDomain {
+            let retryableCodes = [
+                NSURLErrorTimedOut,
+                NSURLErrorNetworkConnectionLost,
+                NSURLErrorNotConnectedToInternet,
+                NSURLErrorCannotConnectToHost,
+                NSURLErrorCannotFindHost,
+                NSURLErrorDNSLookupFailed
+            ]
+            return retryableCodes.contains(nsError.code)
+        }
+
+        // HTTP status codes that are worth retrying
+        if let httpResponse = nsError.userInfo["HTTPResponse"] as? HTTPURLResponse {
+            let retryableStatusCodes = [408, 429, 500, 502, 503, 504] // Timeout, Rate limit, Server errors
+            return retryableStatusCodes.contains(httpResponse.statusCode)
+        }
+
+        // API-specific errors
+        let errorDescription = error.localizedDescription.lowercased()
+        if errorDescription.contains("rate limit") ||
+           errorDescription.contains("timeout") ||
+           errorDescription.contains("temporarily unavailable") ||
+           errorDescription.contains("connection") {
+            return true
+        }
+
+        return false
     }
     
     func streamMessage(_ message: String, bookContext: Book?, conversationHistory: [UnifiedChatMessage] = []) async throws -> AsyncThrowingStream<String, Error> {

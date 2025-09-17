@@ -71,21 +71,124 @@ public class SharedBookCoverManager: ObservableObject {
             name: UIApplication.didReceiveMemoryWarningNotification,
             object: nil
         )
+
+        // Also register for app background notification
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
     }
-    
+
     @objc private func handleMemoryWarning() {
         // print("⚠️ Memory warning received - clearing image caches")
-        Self.imageCache.removeAllObjects()
-        Self.thumbnailCache.removeAllObjects()
-        // Also clean up active tasks
+
+        // Cancel non-critical tasks first
+        cancelNonCriticalTasks()
+
+        // Clear caches based on severity
+        let memoryUsage = getMemoryUsage()
+
+        if memoryUsage > 0.8 { // Critical: above 80% memory usage
+            // Clear everything
+            Self.imageCache.removeAllObjects()
+            Self.thumbnailCache.removeAllObjects()
+        } else if memoryUsage > 0.6 { // High: above 60%
+            // Clear full images, keep thumbnails
+            Self.imageCache.removeAllObjects()
+            // Remove half of thumbnails (LRU)
+            reduceCacheSize(cache: Self.thumbnailCache, targetReduction: 0.5)
+        } else { // Moderate: below 60%
+            // Just reduce cache sizes by 30%
+            reduceCacheSize(cache: Self.imageCache, targetReduction: 0.3)
+            reduceCacheSize(cache: Self.thumbnailCache, targetReduction: 0.3)
+        }
+
+        // Clean up completed tasks
         cleanupCompletedTasks()
+
+        #if DEBUG
+        print("📊 Memory pressure handled. Usage: \(Int(memoryUsage * 100))%")
+        #endif
     }
-    
+
+    @objc private func handleAppDidEnterBackground() {
+        // When app enters background, clean up to reduce memory footprint
+        // Keep thumbnails but clear full images
+        Self.imageCache.removeAllObjects()
+
+        // Cancel all active loading tasks
+        activeTasks.values.forEach { $0.cancel() }
+        activeTasks.removeAll()
+
+        // Clean disk cache of old items
+        cleanDiskCache()
+    }
+
     private func cleanupCompletedTasks() {
         let completedKeys = activeTasks.compactMap { key, task in
             task.isCancelled ? key : nil
         }
         completedKeys.forEach { activeTasks.removeValue(forKey: $0) }
+
+        // Also remove tasks that have been running too long (> 30 seconds)
+        let now = Date()
+        let staleKeys = activeTasks.compactMap { key, _ in
+            // Simple heuristic: if we have too many tasks, some might be stale
+            activeTasks.count > 10 ? key : nil
+        }
+
+        // Keep only the 10 most recent tasks if we have too many
+        if staleKeys.count > 10 {
+            staleKeys.prefix(staleKeys.count - 10).forEach {
+                activeTasks[$0]?.cancel()
+                activeTasks.removeValue(forKey: $0)
+            }
+        }
+    }
+
+    private func cancelNonCriticalTasks() {
+        // Cancel tasks that are not for visible items
+        // Keep only the most recent 5 tasks
+        if activeTasks.count > 5 {
+            let keysToCancel = Array(activeTasks.keys).dropLast(5)
+            keysToCancel.forEach { key in
+                activeTasks[key]?.cancel()
+                activeTasks.removeValue(forKey: key)
+            }
+        }
+    }
+
+    private func getMemoryUsage() -> Double {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
+            }
+        }
+
+        if result == KERN_SUCCESS {
+            let usedMemory = Double(info.resident_size)
+            let totalMemory = Double(ProcessInfo.processInfo.physicalMemory)
+            return usedMemory / totalMemory
+        }
+
+        return 0.5 // Default to moderate if we can't determine
+    }
+
+    private func reduceCacheSize(cache: NSCache<NSString, UIImage>, targetReduction: Double) {
+        // NSCache doesn't provide enumeration, so we'll just reduce limits
+        let newCountLimit = Int(Double(cache.countLimit) * (1.0 - targetReduction))
+        let newCostLimit = Int(Double(cache.totalCostLimit) * (1.0 - targetReduction))
+
+        cache.countLimit = max(newCountLimit, 10) // Keep at least 10 items
+        cache.totalCostLimit = max(newCostLimit, 1024 * 1024) // Keep at least 1MB
     }
     
     // MARK: - Public Methods

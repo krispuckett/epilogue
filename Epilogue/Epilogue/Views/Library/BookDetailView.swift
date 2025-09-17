@@ -90,11 +90,17 @@ struct BookDetailView: View {
     @State private var hasAppeared = false
     @State private var contentLoaded = false
     @State private var delayedContentLoaded = false
+    @State private var summaryBlur: Double = 10
+    @State private var summaryOpacity: Double = 0
+    @State private var contextBlur: Double = 10
+    @State private var contextOpacity: Double = 0
     
-    // Enhanced animation states
-    @State private var coverScale: CGFloat = 0.9
+    // Enhanced animation states - using blur instead of scale
+    @State private var coverBlur: Double = 10
     @State private var coverOpacity: Double = 0
+    @State private var titleBlur: Double = 10
     @State private var titleOpacity: Double = 0
+    @State private var metadataBlur: Double = 10
     @State private var metadataOpacity: Double = 0
     
     // Dynamic gradient opacity based on scroll
@@ -254,32 +260,39 @@ struct BookDetailView: View {
                     
                     // Progressive content loading for better performance
                     if contentLoaded {
-                        // Summary section wrapped in padding container
-                        if let description = book.description {
-                            summarySection(description: description)
-                                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                                .padding(.top, 32)
-                                // Removed transition for performance
-                        }
-                        
-                        // Progress section
-                        if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
-                            progressSection
-                                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                                .padding(.top, 24)
-                                // Removed transition for performance
+                        Group {
+                            // Summary section wrapped in padding container
+                            if let description = book.description {
+                                summarySection(description: description)
+                                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                                    .padding(.top, 32)
+                                    .fixedSize(horizontal: false, vertical: true) // Prevent any horizontal expansion
+                                    .blur(radius: summaryBlur)
+                                    .opacity(summaryOpacity)
+                            }
+
+                            // Progress section
+                            if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
+                                progressSection
+                                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                                    .padding(.top, 24)
+                                    .blur(radius: summaryBlur)
+                                    .opacity(summaryOpacity)
+                            }
                         }
                     }
                     
                     // Delayed content for smooth initial load
                     if delayedContentLoaded {
-                        // Contextual content based on reading status
-                        contextualContentSections
-                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                            .padding(.top, 24)
-                            .padding(.bottom, 100) // Space for tab bar
-                            // Removed transition for performance
-                            // Removed scrollTransition to fix text stretching bug
+                        Group {
+                            // Contextual content based on reading status
+                            contextualContentSections
+                                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                                .padding(.top, 24)
+                                .padding(.bottom, 100) // Space for tab bar
+                                .blur(radius: contextBlur)
+                                .opacity(contextOpacity)
+                        }
                     }
                 }
             }
@@ -372,38 +385,47 @@ struct BookDetailView: View {
             // Enable animations immediately for smoother transition
             hasAppeared = true
             
-            // Start cover animation if image is already loaded
+            // Start cover blur-in animation if image is already loaded
             if coverImage != nil {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                    coverScale = 1.0
+                withAnimation(.easeOut(duration: 0.4)) {
+                    coverBlur = 0
                     coverOpacity = 1.0
                 }
             }
-            
-            // Title animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+
+            // Title blur-in animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    titleBlur = 0
                     titleOpacity = 1.0
                 }
             }
-            
-            // Metadata animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+
+            // Metadata blur-in animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    metadataBlur = 0
                     metadataOpacity = 1.0
                 }
             }
-            
-            // Progressive content loading for smoother performance
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
-                    contentLoaded = true
+
+            // Load content immediately to prevent layout shifts
+            contentLoaded = true
+            delayedContentLoaded = true
+
+            // Summary blur-in animation (after metadata)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    summaryBlur = 0
+                    summaryOpacity = 1.0
                 }
             }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
-                    delayedContentLoaded = true
+
+            // Context sections blur-in animation (last)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    contextBlur = 0
+                    contextOpacity = 1.0
                 }
             }
         }
@@ -426,9 +448,9 @@ struct BookDetailView: View {
                     // Store the actual displayed image
                     self.coverImage = uiImage
                     
-                    // Trigger smooth cover animation
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        coverScale = 1.0
+                    // Trigger smooth cover blur-in animation
+                    withAnimation(.easeOut(duration: 0.4)) {
+                        coverBlur = 0
                         coverOpacity = 1.0
                     }
                     
@@ -445,7 +467,7 @@ struct BookDetailView: View {
                 }
             )
             .accessibilityLabel("Book cover for \(book.title)")
-            .scaleEffect(coverScale)
+            .blur(radius: coverBlur)
             .opacity(coverOpacity)
             .shadow(color: Color.black.opacity(coverOpacity * 0.3), radius: 20 * coverOpacity, y: 10 * coverOpacity)
             .task(id: book.localId) {
@@ -459,6 +481,7 @@ struct BookDetailView: View {
                 .shadow(color: shadowColor, radius: 1, x: 0, y: 1)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                .blur(radius: titleBlur)
                 .opacity(titleOpacity)
             
             // Author(s) - Handle multiple authors by splitting on comma
@@ -487,6 +510,7 @@ struct BookDetailView: View {
             }
             .multilineTextAlignment(.center)
             .padding(.top, -8)
+            .blur(radius: metadataBlur)
             .opacity(metadataOpacity)
             
             // Status and page info
@@ -529,6 +553,7 @@ struct BookDetailView: View {
                 }
             }
             .padding(.top, 8)
+            .blur(radius: metadataBlur)
             .opacity(metadataOpacity)
             
             // Progress bar removed per user request
@@ -653,7 +678,8 @@ struct BookDetailView: View {
                 allQuotesSection
             }
         }
-        .animation(DesignSystem.Animation.easeStandard, value: book.readingStatus)
+        // Only animate status changes after initial load
+        .animation(hasAppeared ? DesignSystem.Animation.easeStandard : nil, value: book.readingStatus)
     }
     
     private func summarySection(description: String) -> some View {
@@ -680,6 +706,7 @@ struct BookDetailView: View {
                         .foregroundColor(textColor.opacity(0.85))
                         .lineSpacing(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true) // Prevent horizontal size changes
                         .transition(.opacity)
                 } else {
                     Text(description)
@@ -688,10 +715,12 @@ struct BookDetailView: View {
                         .lineSpacing(8)
                         .lineLimit(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true) // Prevent horizontal size changes
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: summaryExpanded)
+            // Only animate if the view has already appeared (not on initial load)
+            .animation(hasAppeared ? .easeInOut(duration: 0.2) : nil, value: summaryExpanded)
             
             // Read more/less button
             if description.count > 200 {
@@ -707,6 +736,7 @@ struct BookDetailView: View {
         }
         .padding(DesignSystem.Spacing.listItemPadding)
         .frame(maxWidth: .infinity)  // Fixed width from start
+        .fixedSize(horizontal: false, vertical: true) // Lock horizontal size
         .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
         // NO transition modifier
     }
