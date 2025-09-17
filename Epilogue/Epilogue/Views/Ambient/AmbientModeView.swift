@@ -1056,8 +1056,6 @@ struct AmbientModeView: View {
                                             .contentShape(Circle())
                                     }
                                     .buttonStyle(.plain)
-                                    .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.01)
                                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
                                     
                                     // Enhanced text field with ambient blur
@@ -1117,15 +1115,12 @@ struct AmbientModeView: View {
                                             }
                                     }
                                     .frame(maxWidth: .infinity)  // Fill available space
-                                    .opacity(inputMode == .textInput ? 1 : 0)
-                                    .scaleEffect(inputMode == .textInput ? 1 : 0.01)
                                 }
                                 .padding(.leading, 12)  // Proper padding for camera icon
                                 .padding(.trailing, 12)
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
                             .opacity(inputMode == .textInput ? 1 : 0)
-                            .scaleEffect(inputMode == .textInput ? 1 : 0.01)  // Start from invisible
                             .allowsHitTesting(inputMode == .textInput)
                             .animation(inputMode == .textInput ?
                                 .easeIn(duration: 0.15).delay(0.48) :  // Appear at 96% complete (0.48/0.5)
