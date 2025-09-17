@@ -1014,10 +1014,10 @@ struct AmbientModeView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .opacity(inputMode == .textInput ? 0 : 1)
-                                .scaleEffect(inputMode == .textInput ? 0.3 : 1)
+                                .scaleEffect(inputMode == .textInput ? 0.01 : 1)  // Start from invisible dot
                                 .animation(inputMode == .textInput ?
-                                    .easeOut(duration: 0.15) :
-                                    .easeIn(duration: 0.2).delay(0.3), value: inputMode)
+                                    .easeOut(duration: 0.1) :  // Disappear instantly when going to text
+                                    .easeIn(duration: 0.2).delay(0.5), value: inputMode)  // Appear after morph back
                                 .allowsHitTesting(!inputMode.isTextInput)
                             
                             // Text input mode content with orchestrated animations
@@ -1132,8 +1132,8 @@ struct AmbientModeView: View {
                                 removal: .opacity
                             ))
                             .animation(inputMode == .textInput ?
-                                .easeInOut(duration: 0.3).delay(0.4) :
-                                .easeOut(duration: 0.2),
+                                .easeIn(duration: 0.2).delay(0.55) :  // Appear at 90% of morph
+                                .easeOut(duration: 0.15),  // Disappear immediately
                                 value: inputMode
                             )
                         }
@@ -1176,12 +1176,12 @@ struct AmbientModeView: View {
                                 )
                         }
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0.3).combined(with: .opacity),
-                            removal: .scale(scale: 0.3).combined(with: .opacity)
+                            insertion: .scale(scale: 0.01).combined(with: .opacity),
+                            removal: .scale(scale: 0.01).combined(with: .opacity)
                         ))
                         .animation(inputMode == .textInput ?
-                            .easeIn(duration: 0.2).delay(0.5) :
-                            .easeOut(duration: 0.1), value: inputMode)
+                            .easeIn(duration: 0.15).delay(0.6) :  // Appear last
+                            .easeOut(duration: 0.1), value: inputMode)  // Disappear first
                         .padding(.leading, 12)
                     }
                     
