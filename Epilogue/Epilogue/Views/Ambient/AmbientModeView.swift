@@ -1019,9 +1019,8 @@ struct AmbientModeView: View {
                                 .scaleEffect(inputMode == .textInput ? 0.5 : 1)
                                 .allowsHitTesting(!inputMode.isTextInput)
                             
-                            // Text input mode content with orchestrated animations
+                            // Text input mode content - always present but with opacity control
                             Group {
-                                if inputMode == .textInput {
                                 // Camera feedback indicator
                                 if cameraJustUsed && !isProcessingImage {
                                     HStack(spacing: 6) {
@@ -1125,8 +1124,9 @@ struct AmbientModeView: View {
                                 .padding(.trailing, 12)
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
-                            }
                             .opacity(inputMode == .textInput ? 1 : 0)
+                            .scaleEffect(inputMode == .textInput ? 1 : 0.01)  // Start from invisible
+                            .allowsHitTesting(inputMode == .textInput)
                             .animation(inputMode == .textInput ?
                                 .easeIn(duration: 0.15).delay(0.48) :  // Appear at 96% complete (0.48/0.5)
                                 .easeOut(duration: 0.1),
