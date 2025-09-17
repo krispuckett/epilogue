@@ -110,9 +110,7 @@ struct AmbientSessionSummaryView: View {
                     }
                 }
             }
-            .safeAreaBar(edge: .bottom) {
-                minimalInputBar
-            }
+            // Removed .safeAreaBar to avoid competing backgrounds
             .onAppear {
                 // Auto-expand all questions on first load
                 if !hasInitializedExpanded {
@@ -141,6 +139,14 @@ struct AmbientSessionSummaryView: View {
                 commandPaletteOverlay
             }
         }
+        .overlay(alignment: .bottom) {
+            // Input bar as overlay to avoid background conflicts
+            minimalInputBar
+                .background(
+                    Color.black.opacity(0.01) // Nearly invisible background
+                        .ignoresSafeArea(edges: .bottom)
+                )
+        }
     }
     
     // MARK: - Book Gradient Background
@@ -163,7 +169,7 @@ struct AmbientSessionSummaryView: View {
             
             // Subtle darkening overlay for readability
             Color.black.opacity(0.2)
-                .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom safe area
+                .ignoresSafeArea() // Ignore all edges for smooth gradient
                 .allowsHitTesting(false)
         }
     }
