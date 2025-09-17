@@ -1126,8 +1126,8 @@ struct AmbientModeView: View {
                             }
                             .opacity(inputMode == .textInput ? 1 : 0)
                             .animation(inputMode == .textInput ?
-                                .easeIn(duration: 0.2).delay(0.35) :
-                                .easeOut(duration: 0.15),
+                                .easeIn(duration: 0.15).delay(0.48) :  // Appear at 96% complete (0.48/0.5)
+                                .easeOut(duration: 0.1),
                                 value: inputMode
                             )
                         }
@@ -1174,7 +1174,7 @@ struct AmbientModeView: View {
                             removal: .scale(scale: 0.01).combined(with: .opacity)
                         ))
                         .animation(inputMode == .textInput ?
-                            .easeIn(duration: 0.2).delay(0.4) :
+                            .easeIn(duration: 0.1).delay(0.5) :  // Appear AFTER text at 100% complete
                             .easeOut(duration: 0.1), value: inputMode)
                         .padding(.leading, 12)
                     }
