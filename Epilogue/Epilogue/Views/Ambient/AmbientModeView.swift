@@ -1010,14 +1010,14 @@ struct AmbientModeView: View {
                                         .font(.system(size: 28, weight: .medium, design: .rounded))
                                         .foregroundStyle(DesignSystem.Colors.primaryAccent)
                                         .frame(width: 64, height: 64)
-                                        .contentTransition(.interpolate)
+                                        .contentTransition(.symbolEffect(.replace))
                                 }
                                 .buttonStyle(.plain)
                                 .opacity(inputMode == .textInput ? 0 : 1)
-                                .scaleEffect(inputMode == .textInput ? 0.01 : 1)  // Start from invisible dot
+                                .scaleEffect(inputMode == .textInput ? 0.8 : 1)
                                 .animation(inputMode == .textInput ?
-                                    .easeOut(duration: 0.1) :  // Disappear instantly when going to text
-                                    .easeIn(duration: 0.2).delay(0.5), value: inputMode)  // Appear after morph back
+                                    .easeOut(duration: 0.15) :  // Fade out quickly
+                                    .easeIn(duration: 0.25).delay(0.4), value: inputMode)  // Fade in after morph
                                 .allowsHitTesting(!inputMode.isTextInput)
                             
                             // Text input mode content with orchestrated animations
@@ -1132,8 +1132,8 @@ struct AmbientModeView: View {
                                 removal: .opacity
                             ))
                             .animation(inputMode == .textInput ?
-                                .easeIn(duration: 0.2).delay(0.55) :  // Appear at 90% of morph
-                                .easeOut(duration: 0.15),  // Disappear immediately
+                                .easeIn(duration: 0.15).delay(0.5) :  // Appear at 99% of morph (0.5 of 0.6)
+                                .easeOut(duration: 0.1),  // Disappear instantly
                                 value: inputMode
                             )
                         }
@@ -1142,7 +1142,7 @@ struct AmbientModeView: View {
                         // Start subtle idle breathing animation
                         startContainerBreathing()
                     }
-                    .animation(.spring(response: 0.6, dampingFraction: 0.88, blendDuration: 0), value: inputMode)
+                    .animation(.spring(response: 0.55, dampingFraction: 0.9, blendDuration: 0), value: inputMode)
 
                     // Morphing button - waveform when empty, submit when has text
                     if inputMode == .textInput {
@@ -1180,8 +1180,8 @@ struct AmbientModeView: View {
                             removal: .scale(scale: 0.01).combined(with: .opacity)
                         ))
                         .animation(inputMode == .textInput ?
-                            .easeIn(duration: 0.15).delay(0.6) :  // Appear last
-                            .easeOut(duration: 0.1), value: inputMode)  // Disappear first
+                            .easeIn(duration: 0.15).delay(0.52) :  // Appear just after text
+                            .easeOut(duration: 0.08), value: inputMode)  // Disappear instantly
                         .padding(.leading, 12)
                     }
                     
