@@ -59,7 +59,7 @@ struct UniversalInputBar: View {
     }
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             // Main input bar - EXACT copy from UnifiedChatInputBar
             HStack(spacing: 0) {
                 // Command icon - amber accent

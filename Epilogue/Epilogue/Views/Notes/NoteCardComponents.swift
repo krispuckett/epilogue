@@ -130,6 +130,7 @@ struct QuoteCard: View {
     @State private var showDate = false
     @State private var tapCount = 0
     @State private var lastTapTime = Date()
+    @State private var showingSessionSummary = false
     
     var firstLetter: String {
         String(note.content.prefix(1))
@@ -211,7 +212,10 @@ struct QuoteCard: View {
                 if let session = ambientSession,
                    let source = note.source,
                    source == "ambient" {
-                    NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                    Button {
+                        showingSessionSummary = true
+                        SensoryFeedback.light()
+                    } label: {
                         HStack(spacing: 6) {
                             Text("SESSION")
                                 .font(.system(size: 10, weight: .semibold, design: .default))
@@ -256,6 +260,13 @@ struct QuoteCard: View {
         .animation(DesignSystem.Animation.easeStandard, value: showDate)
         .onTapGesture {
             handleTap()
+        }
+        .sheet(isPresented: $showingSessionSummary) {
+            if let session = ambientSession {
+                NavigationStack {
+                    AmbientSessionSummaryView(session: session, colorPalette: nil)
+                }
+            }
         }
     }
     
@@ -302,6 +313,7 @@ struct RegularNoteCard: View {
     @Binding var showingOptions: Bool
     let ambientSession: AmbientSession?
     @EnvironmentObject var notesViewModel: NotesViewModel
+    @State private var showingSessionSummary = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -367,7 +379,10 @@ struct RegularNoteCard: View {
                         if let session = ambientSession,
                            let source = note.source,
                            source == "ambient" {
-                            NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                            Button {
+                                showingSessionSummary = true
+                                SensoryFeedback.light()
+                            } label: {
                                 HStack(spacing: 6) {
                                     Text("SESSION")
                                         .font(.system(size: 10, weight: .semibold, design: .default))
@@ -403,6 +418,13 @@ struct RegularNoteCard: View {
         .onTapGesture(count: 2) {
             SensoryFeedback.medium()
             showingOptions = true
+        }
+        .sheet(isPresented: $showingSessionSummary) {
+            if let session = ambientSession {
+                NavigationStack {
+                    AmbientSessionSummaryView(session: session, colorPalette: nil)
+                }
+            }
         }
     }
 }

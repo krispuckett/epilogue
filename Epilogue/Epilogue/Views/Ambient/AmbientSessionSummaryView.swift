@@ -143,11 +143,20 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
-    // MARK: - Book Gradient Background
+    // MARK: - Book Gradient Background - EXACTLY LIKE LIBRARY VIEW
     private var minimalGradientBackground: some View {
-        // Simple black background for sheet - no gradient needed at bottom
-        Color.black
-            .ignoresSafeArea()
+        ZStack {
+            // Permanent ambient gradient background - EXACTLY LIKE LIBRARY VIEW
+            AmbientChatGradientView()
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+
+            // Subtle darkening overlay for better readability - EXACTLY LIKE LIBRARY VIEW
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+        }
     }
     
     // MARK: - Custom Navigation Bar (Removed - using native toolbar)
@@ -509,7 +518,7 @@ struct AmbientSessionSummaryView: View {
                 colorPalette: colorPalette,
                 isAmbientMode: true
             )
-            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
+            .padding(.horizontal, 10)
             .padding(.vertical, 16)
         }
     }

@@ -7,6 +7,7 @@ struct SimpleQuoteCard: View {
     @Environment(\.sizeCategory) var sizeCategory
     @State private var isPressed = false
     @State private var showDate = false
+    @State private var showingSessionSummary = false
     
     // Convenience initializer for backward compatibility
     init(note: Note, capturedQuote: CapturedQuote? = nil) {
@@ -35,15 +36,18 @@ struct SimpleQuoteCard: View {
                     Spacer()
                     
                     // Session pill for ambient quotes
-                    if let session = capturedQuote?.ambientSession, 
+                    if let session = capturedQuote?.ambientSession,
                        let source = capturedQuote?.source as? String,
                        source == "ambient" {
-                        NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                        Button {
+                            showingSessionSummary = true
+                            SensoryFeedback.light()
+                        } label: {
                             HStack(spacing: 6) {
                                 Text("SESSION")
                                     .font(.system(size: 10, weight: .semibold, design: .default))
                                     .kerning(1.0)
-                                
+
                                 Image(systemName: "arrow.right")
                                     .font(.system(size: 9, weight: .bold))
                             }
@@ -164,6 +168,13 @@ struct SimpleQuoteCard: View {
                 isPressed = false
             }
         })
+        .sheet(isPresented: $showingSessionSummary) {
+            if let session = capturedQuote?.ambientSession {
+                NavigationStack {
+                    AmbientSessionSummaryView(session: session, colorPalette: nil)
+                }
+            }
+        }
     }
     
     private func formatDate(_ date: Date) -> String {

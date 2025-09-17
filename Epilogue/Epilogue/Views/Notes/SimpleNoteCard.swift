@@ -8,6 +8,7 @@ struct SimpleNoteCard: View {
     @Environment(\.modelContext) private var modelContext
     @State private var isPressed = false
     @State private var ambientSession: AmbientSession?
+    @State private var showingSessionSummary = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -73,7 +74,10 @@ struct SimpleNoteCard: View {
                         if let session = ambientSession,
                            let source = note.source,
                            source == "ambient" {
-                            NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                            Button {
+                                showingSessionSummary = true
+                                SensoryFeedback.light()
+                            } label: {
                                 HStack(spacing: 6) {
                                     Text("SESSION")
                                         .font(.system(size: 10, weight: .semibold, design: .default))
@@ -121,6 +125,13 @@ struct SimpleNoteCard: View {
                 isPressed = false
             }
         })
+        .sheet(isPresented: $showingSessionSummary) {
+            if let session = ambientSession {
+                NavigationStack {
+                    AmbientSessionSummaryView(session: session, colorPalette: nil)
+                }
+            }
+        }
     }
 
     private func loadAmbientSession() {
