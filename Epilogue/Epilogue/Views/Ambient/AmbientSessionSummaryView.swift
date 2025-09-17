@@ -94,6 +94,13 @@ struct AmbientSessionSummaryView: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+
+                // Input bar overlay at bottom with proper material background
+                VStack {
+                    Spacer()
+                    minimalInputBar
+                        .background(.ultraThinMaterial)
+                }
             }
             .navigationTitle("Reading Session")
             .navigationBarTitleDisplayMode(.large)
@@ -109,9 +116,6 @@ struct AmbientSessionSummaryView: View {
                         }
                     }
                 }
-            }
-            .safeAreaBar(edge: .bottom) {
-                minimalInputBar
             }
             .onAppear {
                 // Auto-expand all questions on first load
