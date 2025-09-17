@@ -78,44 +78,39 @@ struct CreditsView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
 
-                    // Creator
-                    VStack(spacing: 2) {
-                        Text("by")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
-
-                        Text("Kris Puckett")
-                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white)
-                    }
-
                     // Thanks
                     Text("Thanks to beta testers, Perplexity, Apple,\nClaude Code, and readers everywhere.")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .lineSpacing(2)
+                        .padding(.top, 4)
 
-                    // Twitter Link
-                    Link(destination: URL(string: "https://twitter.com/krispuckett")!) {
+                    // Made with soul + Twitter Link
+                    HStack(spacing: 12) {
                         HStack(spacing: 4) {
-                            Image(systemName: "at")
-                                .font(.system(size: 12))
-                            Text("krispuckett")
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            Text("Made with soul in")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.7))
+
+                            Text("Denver, CO")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.9))
                         }
-                        .foregroundStyle(themeManager.currentTheme.primaryAccent)
-                    }
 
-                    // Made with soul
-                    HStack(spacing: 4) {
-                        Text("Made with soul in")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.7))
+                        Text("•")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.5))
 
-                        Text("Denver, CO")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.9))
+                        Link(destination: URL(string: "https://twitter.com/krispuckett")!) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "at")
+                                    .font(.system(size: 11))
+                                Text("krispuckett")
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            }
+                            .foregroundStyle(themeManager.currentTheme.primaryAccent)
+                        }
                     }
                     .padding(.top, 4)
                 }
