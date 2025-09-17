@@ -988,6 +988,8 @@ struct AmbientModeView: View {
                         .blur(radius: containerBlur) // Ambient container blur
                         .glassEffect(.regular, in: .rect(cornerRadius: inputMode == .textInput ? 20 : 32))
                         .allowsHitTesting(false)  // Glass background shouldn't block touches
+                        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: inputMode)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: textFieldHeight)
                         
                         // Content that transitions inside the morphing container
                         ZStack {
@@ -1136,7 +1138,6 @@ struct AmbientModeView: View {
                         // Start subtle idle breathing animation
                         startContainerBreathing()
                     }
-                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: inputMode)
 
                     // Morphing button - waveform when empty, submit when has text
                     if inputMode == .textInput {
