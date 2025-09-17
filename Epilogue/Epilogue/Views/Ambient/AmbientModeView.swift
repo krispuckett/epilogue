@@ -1020,7 +1020,7 @@ struct AmbientModeView: View {
                                 .allowsHitTesting(!inputMode.isTextInput)
                             
                             // Text input mode content - always present but with opacity control
-                            Group {
+                            VStack(spacing: 0) {
                                 // Camera feedback indicator
                                 if cameraJustUsed && !isProcessingImage {
                                     HStack(spacing: 6) {
@@ -1119,6 +1119,7 @@ struct AmbientModeView: View {
                                 .padding(.trailing, 12)
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
+                            .fixedSize(horizontal: false, vertical: true)  // Lock vertical size
                             .opacity(inputMode == .textInput ? 1 : 0)
                             .allowsHitTesting(inputMode == .textInput)
                             .animation(inputMode == .textInput ?
