@@ -145,27 +145,9 @@ struct AmbientSessionSummaryView: View {
     
     // MARK: - Book Gradient Background
     private var minimalGradientBackground: some View {
-        ZStack {
-            // Book-based gradient from colorPalette
-            if let palette = colorPalette {
-                BookAtmosphericGradientView(
-                    colorPalette: palette,
-                    intensity: 0.4, // Subtle but present
-                    audioLevel: 0
-                )
-                .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom to avoid conflict with safeAreaBar
-            } else {
-                // Fallback gradient
-                AmbientChatGradientView()
-                    .opacity(0.6)
-                    .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom to avoid conflict with safeAreaBar
-            }
-            
-            // Subtle darkening overlay for readability
-            Color.black.opacity(0.2)
-                .ignoresSafeArea(edges: [.top, .leading, .trailing]) // Don't ignore bottom safe area
-                .allowsHitTesting(false)
-        }
+        // Simple black background for sheet - no gradient needed at bottom
+        Color.black
+            .ignoresSafeArea()
     }
     
     // MARK: - Custom Navigation Bar (Removed - using native toolbar)
