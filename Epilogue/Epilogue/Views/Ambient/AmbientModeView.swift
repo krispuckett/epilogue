@@ -1035,7 +1035,6 @@ struct AmbientModeView: View {
                                     .padding(.vertical, 4)
                                     .background(Color.white.opacity(0.05))
                                     .cornerRadius(8)
-                                    .transition(.move(edge: .top).combined(with: .opacity))
                                     .animation(.easeInOut(duration: 0.3), value: cameraJustUsed)
                                     .padding(.bottom, 4)
                                 }
@@ -1165,10 +1164,7 @@ struct AmbientModeView: View {
                                         .contentTransition(.symbolEffect(.replace))
                                 )
                         }
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.01).combined(with: .opacity),
-                            removal: .scale(scale: 0.01).combined(with: .opacity)
-                        ))
+                        .transition(.opacity)
                         .animation(inputMode == .textInput ?
                             .easeIn(duration: 0.1).delay(0.5) :  // Appear AFTER text at 100% complete
                             .easeOut(duration: 0.1), value: inputMode)
