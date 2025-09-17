@@ -66,68 +66,68 @@ struct CreditsView: View {
                 Spacer()
 
                 // Compact Credits Card
-                VStack(spacing: 20) {
+                VStack(spacing: 12) {
                     // Title
-                    VStack(spacing: 6) {
+                    VStack(spacing: 4) {
                         Text("EPILOGUE")
-                            .font(.system(size: 28, weight: .bold, design: .monospaced))
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white)
 
                         Text("Your ambient reading companion")
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.8))
                     }
 
                     // Creator
-                    VStack(spacing: 4) {
+                    VStack(spacing: 2) {
                         Text("by")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.6))
 
                         Text("Kris Puckett")
-                            .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.white)
                     }
 
                     // Thanks
                     Text("Thanks to beta testers, Perplexity, Apple,\nClaude Code, and readers everywhere.")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
-                        .lineSpacing(4)
+                        .lineSpacing(2)
 
                     // Twitter Link
                     Link(destination: URL(string: "https://twitter.com/krispuckett")!) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 4) {
                             Image(systemName: "at")
-                                .font(.system(size: 14))
+                                .font(.system(size: 12))
                             Text("krispuckett")
-                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
                         }
                         .foregroundStyle(themeManager.currentTheme.primaryAccent)
                     }
-                    .padding(.top, 4)
 
                     // Made with soul
                     HStack(spacing: 4) {
                         Text("Made with soul in")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.7))
 
                         Text("Denver, CO")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.9))
                     }
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                 }
-                .padding(28)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
                 .frame(maxWidth: .infinity)
                 .glassEffect(
                     .regular.tint(Color.black.opacity(0.3)),
-                    in: RoundedRectangle(cornerRadius: 24)
+                    in: RoundedRectangle(cornerRadius: 20)
                 )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8) // Much closer to safe area
                 .opacity(contentOpacity)
             }
         }
