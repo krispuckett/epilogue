@@ -514,21 +514,9 @@ struct AmbientSessionSummaryView: View {
                 }
                 .padding(.bottom, 16)
             }
-            
-            // Universal Input Bar - matching UnifiedChatView
-            UniversalInputBar(
-                messageText: $continuationText,
-                showingCommandPalette: $showingCommandPalette,
-                isInputFocused: $isInputFocused,
-                context: .chat(book: session.book),
-                onSend: sendFollowUp,
-                onMicrophoneTap: handleMicrophoneTap,
-                isRecording: $isRecording,
-                colorPalette: colorPalette,
-                isAmbientMode: true
-            )
-            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-            .padding(.vertical, 16)
+
+            // Removed UniversalInputBar - not needed in reading session view
+            // This was causing the weird box at the bottom of the screen
         }
     }
     
