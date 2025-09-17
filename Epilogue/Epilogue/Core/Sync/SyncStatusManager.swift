@@ -125,7 +125,7 @@ final class SyncStatusManager: ObservableObject {
 }
 
 // MARK: - Sync Status View
-struct SyncStatusView: View {
+struct SyncStatusIndicatorView: View {
     @StateObject private var syncManager = SyncStatusManager.shared
     
     var body: some View {
@@ -208,7 +208,7 @@ struct SyncStatusView: View {
 }
 
 // MARK: - Detailed Sync Status Sheet
-struct DetailedSyncStatusSheet: View {
+struct DetailedSyncStatusView: View {
     @StateObject private var syncManager = SyncStatusManager.shared
     @Binding var isPresented: Bool
     
@@ -221,7 +221,7 @@ struct DetailedSyncStatusSheet: View {
                         .font(.headline)
                     
                     HStack {
-                        SyncStatusView()
+                        SyncStatusIndicatorView()
                         Spacer()
                         if syncManager.pendingChanges > 0 {
                             Text("\(syncManager.pendingChanges) pending")
