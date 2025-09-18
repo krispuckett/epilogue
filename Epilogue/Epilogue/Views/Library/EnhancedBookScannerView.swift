@@ -52,63 +52,41 @@ struct EnhancedBookScannerView: View {
                     
                     // Scanning guidance overlay
                     VStack(spacing: 20) {
-                        // Visual scanning frame - Simple and clean
+                        // Visual scanning frame - Elegant rounded design
                         RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
-                            .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 3)
-                            .frame(width: 280, height: 380)
-                            .overlay(
-                                // Corner markers
-                                Group {
-                                    // Top left
-                                    Path { path in
-                                        path.move(to: CGPoint(x: 0, y: 30))
-                                        path.addLine(to: CGPoint(x: 0, y: 0))
-                                        path.addLine(to: CGPoint(x: 30, y: 0))
-                                    }
-                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
-                                    .frame(width: 30, height: 30)
-                                    .position(x: 15, y: 15)
-                                    
-                                    // Top right
-                                    Path { path in
-                                        path.move(to: CGPoint(x: 0, y: 0))
-                                        path.addLine(to: CGPoint(x: 30, y: 0))
-                                        path.addLine(to: CGPoint(x: 30, y: 30))
-                                    }
-                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
-                                    .frame(width: 30, height: 30)
-                                    .position(x: 265, y: 15)
-                                    
-                                    // Bottom left
-                                    Path { path in
-                                        path.move(to: CGPoint(x: 0, y: 0))
-                                        path.addLine(to: CGPoint(x: 0, y: 30))
-                                        path.addLine(to: CGPoint(x: 30, y: 30))
-                                    }
-                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
-                                    .frame(width: 30, height: 30)
-                                    .position(x: 15, y: 365)
-                                    
-                                    // Bottom right
-                                    Path { path in
-                                        path.move(to: CGPoint(x: 30, y: 0))
-                                        path.addLine(to: CGPoint(x: 30, y: 30))
-                                        path.addLine(to: CGPoint(x: 0, y: 30))
-                                    }
-                                    .stroke(DesignSystem.Colors.primaryAccent, lineWidth: 4)
-                                    .frame(width: 30, height: 30)
-                                    .position(x: 265, y: 365)
-                                }
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        DesignSystem.Colors.primaryAccent,
+                                        DesignSystem.Colors.primaryAccent.opacity(0.7)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
                             )
+                            .frame(width: 280, height: 380)
+                            .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.3), radius: 10)
                         
-                        // Status text
-                        Text(detectionStatus)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                            .padding(.vertical, 12)
-                            .glassEffect()
-                            .clipShape(Capsule())
+                        // Status text with icon
+                        HStack(spacing: 10) {
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "viewfinder")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white)
+                            }
+
+                            Text(detectionStatus)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .glassEffect(in: Capsule())
                     }
                     
                     Spacer()
@@ -124,25 +102,38 @@ struct EnhancedBookScannerView: View {
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .glassEffect()
-                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                                .glassEffect(in: Capsule())
                         }
-                        
-                        // Manual search button
+
+                        // Manual search button with accent border
                         Button {
                             // Show search sheet directly
                             showBookSearch = true
                         } label: {
-                            HStack {
+                            HStack(spacing: 8) {
                                 Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16, weight: .medium))
                                 Text("Search")
                             }
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .glassEffect()
-                            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                            .glassEffect(in: Capsule())
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            colors: [
+                                                DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                                DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            }
                         }
                     }
                     .padding(.horizontal, DesignSystem.Spacing.listItemPadding)

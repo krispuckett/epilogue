@@ -26,7 +26,10 @@ class BookAdditionService {
         
         // Add to library
         libraryViewModel.addBook(book, overwriteIfExists: overwriteIfExists)
-        
+
+        // Trigger micro-interaction for first book added
+        MicroInteractionManager.shared.bookAdded(bookID: book.id)
+
         // Preload cover image
         if preloadCover, let coverURL = book.coverImageURL {
             #if DEBUG

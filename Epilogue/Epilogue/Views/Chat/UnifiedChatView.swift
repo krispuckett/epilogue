@@ -54,6 +54,7 @@ struct UnifiedChatView: View {
     // New AI Features
     @StateObject private var queueManager = OfflineQueueManager.shared
     @StateObject private var summaryGenerator = SessionSummaryGenerator.shared
+    @StateObject private var quotaManager = PerplexityQuotaManager.shared
     @State private var showingFollowUpSuggestions = false
     @State private var followUpSuggestions: [String] = []
     
@@ -228,6 +229,9 @@ struct UnifiedChatView: View {
                         handleSessionSummaryDismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $quotaManager.showQuotaExceededSheet) {
+                QuotaExceededView()
             }
     }
     
@@ -2895,7 +2899,7 @@ struct VoiceResponsiveBottomGradient: View {
                 )
                 .frame(height: gradientHeight(for: geometry.size.height))
                 .blur(radius: 20)
-                .opacity(isRecording ? 1.0 : 0.0)
+                .opacity(isRecording ? 1.0 : 0.001) // Pre-rendered at minimal opacity
                 .scaleEffect(y: 1.0 + Double(min(log10(1 + audioLevel * 9), 1.0)) * 0.6, anchor: .bottom) // More sensitive scale with log curve
                 .animation(.easeInOut(duration: 0.1), value: audioLevel)
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isRecording)

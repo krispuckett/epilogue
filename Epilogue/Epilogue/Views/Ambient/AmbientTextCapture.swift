@@ -85,37 +85,50 @@ struct AmbientTextCapture: View {
 
     // MARK: - Capture Prompt
     private var capturePrompt: some View {
-        VStack(spacing: 40) {
-            Image(systemName: "viewfinder")
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(
-                    LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .symbolEffect(.pulse)
+        ZStack {
+            // Ambient gradient background
+            AmbientChatGradientView()
+                .opacity(0.6)
+                .ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                Text("Ambient Intelligence")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+            // Darkening overlay for readability
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
 
-                Text("Capture and select text naturally")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
+            VStack(spacing: 40) {
+                // Refined viewfinder icon with amber accent
+                Image(systemName: "viewfinder")
+                    .font(.system(size: 64, weight: .light))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .symbolEffect(.pulse)
 
-            Button {
-                showingCamera = true
-                SensoryFeedbackHelper.impact(.medium)
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "camera")
-                    Text("Capture Page")
+                VStack(spacing: 16) {
+                    // Title using system font like session summary
+                    Text("Ambient Intelligence")
+                        .font(.system(size: 48, weight: .semibold))
+                        .foregroundStyle(Color.white)
+
+                    // Monospaced subheadline
+                    Text("CAPTURE AND SELECT TEXT NATURALLY")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .kerning(1.2)
+                        .foregroundStyle(Color.white.opacity(0.6))
                 }
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 16)
-                .glassEffect(in: .capsule)
+
+                Button {
+                    showingCamera = true
+                    SensoryFeedbackHelper.impact(.medium)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "camera")
+                        Text("Capture Page")
+                    }
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 16)
+                    .glassEffect(in: .capsule)
+                }
             }
         }
     }

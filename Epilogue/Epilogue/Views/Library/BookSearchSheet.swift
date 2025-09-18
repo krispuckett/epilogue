@@ -180,7 +180,7 @@ struct BookSearchSheet: View {
                 }
             }
             
-            Text("Searching for \"\(searchQuery)\"...")
+            Text(searchQuery.isEmpty ? "Searching..." : "Searching for \"\(searchQuery)\"...")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white.opacity(0.7))
         }

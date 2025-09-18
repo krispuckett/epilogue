@@ -71,10 +71,15 @@ struct UnifiedChatInputBar: View {
                     
                     // Action buttons
                     HStack(spacing: 8) {
-                        // Waveform toggle button (always shows waveform)
+                        // Waveform button - starts ambient mode
                         Button {
-                            print("🎤 UnifiedChatInputBar: Microphone button tapped")
-                            onMicrophoneTap()
+                            print("🎤 UnifiedChatInputBar: Starting ambient mode")
+                            // Start ambient reading mode with current book context
+                            if let book = currentBook {
+                                SimplifiedAmbientCoordinator.shared.openAmbientReading(with: book)
+                            } else {
+                                SimplifiedAmbientCoordinator.shared.openAmbientReading()
+                            }
                         } label: {
                             Image(systemName: "waveform")
                                 .font(.system(size: 18, weight: .medium))

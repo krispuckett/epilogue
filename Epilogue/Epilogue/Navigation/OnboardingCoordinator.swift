@@ -34,6 +34,9 @@ final class OnboardingCoordinator: ObservableObject {
         hasCompletedOnboarding = true
         showOnboarding = false
 
+        // Trigger micro-interactions for first-time guidance
+        MicroInteractionManager.shared.onboardingCompleted()
+
         // Trigger any post-onboarding setup
         Task {
             await performPostOnboardingSetup()

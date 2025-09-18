@@ -304,6 +304,9 @@ struct BookDetailView: View {
         .onAppear {
             // Set the current detail book in the view model
             libraryViewModel.currentDetailBook = book
+
+            // Trigger micro-interaction for ambient icon animation
+            MicroInteractionManager.shared.enteredBookView()
         }
         .onDisappear {
             // Clear the current detail book when leaving

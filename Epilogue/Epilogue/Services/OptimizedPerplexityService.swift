@@ -126,7 +126,7 @@ class OptimizedPerplexityService: ObservableObject {
                     continuation.finish()
                     return
                 }
-                
+
                 do {
                     // Check cache first
                     let cacheKey = generateCacheKey(query: query, bookContext: bookContext)
@@ -142,7 +142,28 @@ class OptimizedPerplexityService: ObservableObject {
                         continuation.finish()
                         return
                     }
-                    
+
+                    // Check daily quota for TestFlight
+                    if !PerplexityQuotaManager.shared.canAskQuestion {
+                        logger.warning("⚠️ Daily quota exceeded")
+                        await MainActor.run {
+                            PerplexityQuotaManager.shared.showQuotaExceededSheet = true
+                        }
+                        throw PerplexityError.rateLimitExceeded(
+                            remaining: 0,
+                            resetTime: PerplexityQuotaManager.shared.nextResetTime
+                        )
+                    }
+
+                    // Track question usage
+                    let quotaAllowed = PerplexityQuotaManager.shared.trackQuestionUsage()
+                    if !quotaAllowed {
+                        throw PerplexityError.rateLimitExceeded(
+                            remaining: 0,
+                            resetTime: PerplexityQuotaManager.shared.nextResetTime
+                        )
+                    }
+
                     // Check rate limits
                     if await rateLimiter.shouldQueue() {
                         logger.info("⏳ Queueing request due to rate limits")

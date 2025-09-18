@@ -132,11 +132,12 @@ struct OptimizedGridItem: View {
     let onChangeCover: (Book) -> Void
     var isDraggable: Bool = false
     var isBeingDragged: Bool = false
-    
+
     @State private var isPressed = false
     @State private var imageLoaded = false
     @State private var isHoldingForReorder = false
-    
+    @StateObject private var microInteractionManager = MicroInteractionManager.shared
+
     var body: some View {
         NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
             ZStack {
@@ -157,6 +158,7 @@ struct OptimizedGridItem: View {
         .scaleEffect(isPressed ? 0.97 : 1.0)
         // Only animate press, not initial load
         .animation(isPressed ? DesignSystem.Animation.springStandard : nil, value: isPressed)
+        .shakeEffect(trigger: microInteractionManager.shouldShowShake(for: book.localId.uuidString))  // Add shake animation
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity) { pressing in
             isPressed = pressing
             if pressing {

@@ -5,7 +5,8 @@ struct EnhancedQuickActionsBar: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     @ObservedObject private var voiceManager = VoiceRecognitionManager.shared
-    
+    @StateObject private var microInteractionManager = MicroInteractionManager.shared
+
     // Gesture states
     @State private var showRadialMenu = false
     @State private var waveformGlow = false
@@ -126,6 +127,10 @@ struct EnhancedQuickActionsBar: View {
                 .scaleEffect(waveformScale)
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
+                .modifier(BlurToAmberAnimation(
+                    isActive: microInteractionManager.showAmbientIconAnimation &&
+                             libraryViewModel.currentDetailBook != nil  // Only animate in BookDetailView
+                ))
         }
         .scaleEffect(waveformScale)
         .onTapGesture {

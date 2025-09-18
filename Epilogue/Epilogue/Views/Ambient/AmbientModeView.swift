@@ -112,7 +112,8 @@ struct AmbientModeView: View {
     @StateObject private var processor = TrueAmbientProcessor.shared
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var bookDetector = AmbientBookDetector.shared
-    
+    @StateObject private var microInteractionManager = MicroInteractionManager.shared
+
     // Namespace for matched geometry morphing animation
     @Namespace private var buttonMorphNamespace
     
@@ -172,8 +173,8 @@ struct AmbientModeView: View {
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
     
-    // Smooth gradient transitions
-    @State private var gradientOpacity: Double = 0
+    // Smooth gradient transitions - start visible
+    @State private var gradientOpacity: Double = 1.0  // Start visible immediately
     @State private var lastBookId: UUID? = nil
     
     // Inline editing states
@@ -263,9 +264,17 @@ struct AmbientModeView: View {
             gradientBackground
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .edgesIgnoringSafeArea(.all)
-            
+
             // Main scroll content
             mainScrollContent
+
+            // Double-tap hint pill (shows only once, above the stop button)
+            VStack {
+                Spacer()
+                DoubleTapHintPill()
+                    .padding(.bottom, 140)  // Position above the stop button
+            }
+            .zIndex(100)  // Ensure it's on top
         }
         // Double tap gesture to show keyboard
         .onTapGesture(count: 2) {
@@ -341,21 +350,29 @@ struct AmbientModeView: View {
             }
         }
         .onAppear {
+            // Trigger micro-interaction for double-tap hint
+            MicroInteractionManager.shared.enteredAmbientMode()
+
             // Check if we have an initial book from the coordinator
             if let initialBook = EpilogueAmbientCoordinator.shared.initialBook {
                 currentBookContext = initialBook
                 lastDetectedBookId = initialBook.localId
                 print("📚 Starting ambient mode with book: \(initialBook.title)")
-                
-                // Extract colors for the book
-                Task {
+
+                // Check cache synchronously first for instant load
+                Task { @MainActor in
+                    if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: initialBook.localId.uuidString) {
+                        print("✅ Instant cache hit for: \(initialBook.title)")
+                        self.colorPalette = cachedPalette
+                    }
+                    // Then fetch if needed (this will also check cache)
                     await extractColorsForBook(initialBook)
                 }
-                
+
                 // Clear the initial book from coordinator after using it
                 EpilogueAmbientCoordinator.shared.initialBook = nil
             }
-            
+
             startAmbientExperience()
             setupKeyboardObservers()
             
@@ -363,11 +380,8 @@ struct AmbientModeView: View {
             if let firstAIResponse = messages.first(where: { !$0.isUser }) {
                 expandedMessageIds.insert(firstAIResponse.id)
             }
-            
-            // Smooth gradient fade in on load
-            withAnimation(.easeInOut(duration: 1.5).delay(0.3)) {
-                gradientOpacity = 1.0
-            }
+
+            // Gradient already visible (starts at 1.0)
         }
         .onChange(of: inputMode) { _, newMode in
             // Handle focus changes when switching modes
@@ -491,16 +505,16 @@ struct AmbientModeView: View {
         .onReceive(bookDetector.$detectedBook) { book in
             // Smooth gradient transition when book changes
             if book?.localId != lastBookId {
-                withAnimation(.easeOut(duration: 0.4)) {
-                    gradientOpacity = 0.3 // Fade to low opacity
+                withAnimation(.easeOut(duration: 0.2)) {
+                    gradientOpacity = 0.7 // Keep mostly visible
                 }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     handleBookDetection(book)
                     lastBookId = book?.localId
-                    
-                    // Fade back in with new colors
-                    withAnimation(.easeIn(duration: 0.8)) {
+
+                    // Fade back to full quickly
+                    withAnimation(.easeIn(duration: 0.3)) {
                         gradientOpacity = 1.0
                     }
                 }
@@ -886,14 +900,15 @@ struct AmbientModeView: View {
     // MARK: - Minimal Welcome View
     private var minimalWelcomeView: some View {
         VStack(spacing: 20) {
-            Text("Listening...")
+            Text("Ambient Reading")
                 .font(.system(size: 26, weight: .regular))
                 .foregroundStyle(.white.opacity(0.9))
-            
-            Text("Just start talking about what you're reading")
+
+            Text("What are you reading today? Just say the book title and lose yourself in the pages.")
                 .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
         }
     }
     
@@ -1120,9 +1135,11 @@ struct AmbientModeView: View {
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
                             .opacity(inputMode == .textInput ? 1 : 0)
+                            .blur(radius: inputMode == .textInput ? 0 : 8)  // Add blur transition
+                            .scaleEffect(inputMode == .textInput ? 1 : 0.95)  // Slight scale for depth
                             .allowsHitTesting(inputMode == .textInput)
                             .animation(inputMode == .textInput ?
-                                .easeIn(duration: 0.15).delay(0.48) :  // Appear at 96% complete (0.48/0.5)
+                                .easeOut(duration: 0.25).delay(0.35) :  // Smoother easeOut
                                 .easeOut(duration: 0.1),
                                 value: inputMode
                             )
@@ -1182,7 +1199,7 @@ struct AmbientModeView: View {
             .allowsHitTesting(true)  // Ensure only actual controls are interactive
         }
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)  // Back to original padding
-        .padding(.bottom, inputMode == .textInput ? 12 : 24)  // Tightened spacing to keyboard
+        .padding(.bottom, inputMode == .textInput ? 1 : 24)  // Just 1pt above keyboard in text mode
         
         // Long press for quick keyboard
         .onLongPressGesture(minimumDuration: 0.5) {
@@ -3118,8 +3135,10 @@ struct AmbientModeView: View {
                 showingSessionSummary = true
                 logger.info("📊 Showing session summary with \((session.capturedQuestions ?? []).count) questions, \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes")
             } else {
-                // No meaningful content - just dismiss
-                logger.info("📊 No meaningful content in session, dismissing directly")
+                // No meaningful content - delete the empty session
+                logger.info("📊 No meaningful content in session, deleting empty session and dismissing")
+                modelContext.delete(session)
+                try? modelContext.save()
                 EpilogueAmbientCoordinator.shared.dismiss()
             }
         } else {

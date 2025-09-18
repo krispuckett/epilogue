@@ -56,35 +56,30 @@ struct SettingsView: View {
 
                 // MARK: - AI Assistant
                 Section {
-                    Picker("AI Provider", selection: $aiProvider) {
-                        Label("Apple Intelligence", systemImage: "apple.logo")
-                            .tag("apple")
+                    HStack {
                         Label {
-                            HStack {
-                                PerplexityLogoDetailed(size: 16)
-                                Text("Perplexity")
-                            }
+                            Text("AI Provider")
                         } icon: {
-                            EmptyView()
+                            PerplexityLogoDetailed(size: 20)
                         }
-                        .tag("perplexity")
+                        Spacer()
+                        Text("Perplexity")
+                            .foregroundStyle(.secondary)
                     }
 
-                    if aiProvider == "perplexity" {
-                        Toggle(isOn: Binding(
-                            get: { perplexityModel == "sonar-pro" },
-                            set: { perplexityModel = $0 ? "sonar-pro" : "sonar" }
-                        )) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Use Sonar Pro")
-                                    .font(.subheadline)
-                                Text("More advanced reasoning")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                    Toggle(isOn: Binding(
+                        get: { perplexityModel == "sonar-pro" },
+                        set: { perplexityModel = $0 ? "sonar-pro" : "sonar" }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Use Sonar Pro")
+                                .font(.subheadline)
+                            Text("More advanced reasoning")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .tint(ThemeManager.shared.currentTheme.primaryAccent)
                     }
+                    .tint(ThemeManager.shared.currentTheme.primaryAccent)
                 } header: {
                     Text("AI Assistant")
                 }
@@ -376,32 +371,79 @@ struct SettingsView: View {
 
     private func deleteAllData() {
         Task {
-            // Delete all books
-            let bookDescriptor = FetchDescriptor<BookModel>()
-            let books = try? modelContext.fetch(bookDescriptor)
-            books?.forEach { modelContext.delete($0) }
+            do {
+                // Delete all books (this should cascade to sessions)
+                let bookDescriptor = FetchDescriptor<BookModel>()
+                let books = try modelContext.fetch(bookDescriptor)
+                books.forEach { modelContext.delete($0) }
 
-            // Delete all notes
-            let noteDescriptor = FetchDescriptor<CapturedNote>()
-            let notes = try? modelContext.fetch(noteDescriptor)
-            notes?.forEach { modelContext.delete($0) }
+                // Delete all ambient sessions
+                let sessionDescriptor = FetchDescriptor<AmbientSession>()
+                let sessions = try modelContext.fetch(sessionDescriptor)
+                sessions.forEach { modelContext.delete($0) }
 
-            // Delete all quotes
-            let quoteDescriptor = FetchDescriptor<CapturedQuote>()
-            let quotes = try? modelContext.fetch(quoteDescriptor)
-            quotes?.forEach { modelContext.delete($0) }
+                // Delete all notes
+                let noteDescriptor = FetchDescriptor<CapturedNote>()
+                let notes = try modelContext.fetch(noteDescriptor)
+                notes.forEach { modelContext.delete($0) }
 
-            // Save context
-            try? modelContext.save()
+                // Delete all quotes
+                let quoteDescriptor = FetchDescriptor<CapturedQuote>()
+                let quotes = try modelContext.fetch(quoteDescriptor)
+                quotes.forEach { modelContext.delete($0) }
 
-            // Reset settings
-            UserDefaults.standard.removeObject(forKey: "defaultCaptureType")
-            UserDefaults.standard.removeObject(forKey: "aiProvider")
-            UserDefaults.standard.removeObject(forKey: "perplexityModel")
-            UserDefaults.standard.removeObject(forKey: "gandalfMode")
+                // Delete all questions
+                let questionDescriptor = FetchDescriptor<CapturedQuestion>()
+                let questions = try modelContext.fetch(questionDescriptor)
+                questions.forEach { modelContext.delete($0) }
 
-            await MainActor.run {
-                dismiss()
+                // Delete all queued questions
+                let queuedDescriptor = FetchDescriptor<QueuedQuestion>()
+                let queuedQuestions = try modelContext.fetch(queuedDescriptor)
+                queuedQuestions.forEach { modelContext.delete($0) }
+
+                // Save context - this is critical!
+                try modelContext.save()
+
+                // Clear ALL UserDefaults for complete reset
+                if let bundleID = Bundle.main.bundleIdentifier {
+                    UserDefaults.standard.removePersistentDomain(forName: bundleID)
+                }
+
+                // Also clear specific keys that might be stored elsewhere
+                UserDefaults.standard.removeObject(forKey: "defaultCaptureType")
+                UserDefaults.standard.removeObject(forKey: "aiProvider")
+                UserDefaults.standard.removeObject(forKey: "perplexityModel")
+                UserDefaults.standard.removeObject(forKey: "gandalfMode")
+                UserDefaults.standard.removeObject(forKey: "realTimeQuestions")
+                UserDefaults.standard.removeObject(forKey: "audioFeedback")
+                UserDefaults.standard.removeObject(forKey: "showLiveTranscriptionBubble")
+                UserDefaults.standard.removeObject(forKey: "gradientIntensity")
+                UserDefaults.standard.removeObject(forKey: "enableAnimations")
+
+                // Clear Perplexity quota tracking
+                UserDefaults.standard.removeObject(forKey: "perplexity_questions_used_today")
+                UserDefaults.standard.removeObject(forKey: "perplexity_quota_last_reset")
+
+                // Force synchronize
+                UserDefaults.standard.synchronize()
+
+                print("✅ All data deleted successfully")
+
+                await MainActor.run {
+                    // Show success feedback
+                    SensoryFeedback.success()
+
+                    // Dismiss after a brief delay to let user see the action completed
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        dismiss()
+                    }
+                }
+            } catch {
+                print("❌ Error deleting data: \(error)")
+                await MainActor.run {
+                    SensoryFeedback.error()
+                }
             }
         }
     }

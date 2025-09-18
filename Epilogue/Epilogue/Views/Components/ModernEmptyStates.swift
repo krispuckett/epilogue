@@ -36,6 +36,7 @@ struct ModernEmptyStates {
                         .glassEffect(.regular, in: .rect(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
+                .modifier(AnimatedBorderButton())  // Add micro-interaction animation
                 
                 Button(action: importAction) {
                     Label("Import", systemImage: "square.and.arrow.down")

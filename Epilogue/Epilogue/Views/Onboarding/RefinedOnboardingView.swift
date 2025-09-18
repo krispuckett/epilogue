@@ -25,7 +25,7 @@ struct RefinedOnboardingView: View {
         OnboardingPageData(
             icon: "glass-msgs",  // Using glass-msgs for ambient mode (chat/voice)
             title: "Ambient Mode",
-            subtitle: "Get lost in your book, not your phone.",
+            subtitle: "Get lost in your book,\nnot your phone.",
             description: "Hit the waveform button and start talking. Epilogue listens while you read - no interaction needed.",
             gradientColors: [
                 Color(red: 0.2, green: 0.6, blue: 0.9),  // Ocean blue
@@ -260,6 +260,7 @@ struct OnboardingPageContent: View {
                         .font(.system(size: 14, weight: .medium, design: .monospaced))
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .tracking(2)
+                        .multilineTextAlignment(.center)
                         .offset(y: textOffset)
                     
                     // Description - clean sans-serif

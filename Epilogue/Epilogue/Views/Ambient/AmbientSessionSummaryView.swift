@@ -23,7 +23,8 @@ struct AmbientSessionSummaryView: View {
     @State private var generatedInsight: String? = nil
     @State private var isGeneratingInsight = false
     @State private var showingChat = false
-    
+    @StateObject private var quotaManager = PerplexityQuotaManager.shared
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
@@ -134,6 +135,9 @@ struct AmbientSessionSummaryView: View {
                     )
                     .environmentObject(libraryViewModel)
                 }
+            }
+            .sheet(isPresented: $quotaManager.showQuotaExceededSheet) {
+                QuotaExceededView()
             }
         }
         .overlay {
