@@ -164,10 +164,10 @@ struct CommandParser {
         print("CommandParser: Available books count: \(books.count)")
         print("CommandParser: Available notes count: \(notes.count)")
         
-        // FIRST: Check for @book mentions
+        // FIRST: Check for @book mentions OR intelligent book context
         if input.contains("@") {
             let (cleanText, mentionedBook) = BookMentionParser.extractBookContext(from: input, books: books)
-            
+
             if let book = mentionedBook {
                 // Determine intent type with book context
                 if lowercased.contains("note") || lowercased.contains("thought") {
@@ -177,6 +177,19 @@ struct CommandParser {
                 }
                 // Default to note with book
                 return .createNoteWithBook(text: cleanText, book: book)
+            }
+        }
+
+        // NEW: Smart book context parsing - "note about [book]" or "quote from [book]"
+        let smartBookContext = extractSmartBookContext(from: input, books: books)
+        if let (contextType, text, book) = smartBookContext {
+            switch contextType {
+            case "note":
+                return .createNoteWithBook(text: text, book: book)
+            case "quote":
+                return .createQuoteWithBook(text: text, book: book)
+            default:
+                break
             }
         }
         
@@ -645,6 +658,66 @@ struct CommandParser {
     private static func containsActionKeywords(_ text: String) -> Bool {
         let actionKeywords = ["add", "new", "create", "quote", "note", "thought"]
         return actionKeywords.contains { text.contains($0) }
+    }
+
+    // Extract smart book context from natural language
+    private static func extractSmartBookContext(from input: String, books: [Book]) -> (type: String, text: String, book: Book)? {
+        let lowercased = input.lowercased()
+
+        // Patterns: "note about [book]", "quote from [book]", "thought on [book]"
+        let patterns = [
+            ("note about ", "note"),
+            ("note on ", "note"),
+            ("thought about ", "note"),
+            ("thought on ", "note"),
+            ("idea about ", "note"),
+            ("quote from ", "quote"),
+            ("passage from ", "quote"),
+            ("line from ", "quote")
+        ]
+
+        for (pattern, type) in patterns {
+            if let range = lowercased.range(of: pattern) {
+                let afterPattern = String(input[range.upperBound...])
+
+                // Try to match with book titles
+                for book in books {
+                    let bookTitle = book.title.lowercased()
+                    if afterPattern.lowercased().contains(bookTitle) {
+                        // Extract the actual note/quote content
+                        var content = input
+
+                        // Remove the pattern and book reference
+                        if let bookRange = afterPattern.lowercased().range(of: bookTitle) {
+                            let beforeBook = String(afterPattern[..<bookRange.lowerBound])
+                            let afterBook = String(afterPattern[bookRange.upperBound...])
+
+                            // If there's a colon or dash after book title, content follows
+                            if afterBook.trimmingCharacters(in: .whitespaces).first == ":" ||
+                               afterBook.trimmingCharacters(in: .whitespaces).first == "-" {
+                                content = String(afterBook.dropFirst()).trimmingCharacters(in: .whitespaces)
+                                if content.first == ":" || content.first == "-" {
+                                    content = String(content.dropFirst()).trimmingCharacters(in: .whitespaces)
+                                }
+                            } else if !beforeBook.trimmingCharacters(in: .whitespaces).isEmpty {
+                                // Content might be before the book reference
+                                content = beforeBook.trimmingCharacters(in: .whitespaces)
+                            } else {
+                                // Just use the whole input minus the pattern
+                                content = afterPattern.replacingOccurrences(of: book.title, with: "", options: .caseInsensitive)
+                                    .trimmingCharacters(in: .whitespaces)
+                            }
+                        }
+
+                        if !content.isEmpty {
+                            return (type, content, book)
+                        }
+                    }
+                }
+            }
+        }
+
+        return nil
     }
     
     // Check if text matches quote format: "content" - author

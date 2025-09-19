@@ -64,35 +64,74 @@ struct EpilogueApp: App {
     private func setupModelContainer() async {
         // Clear image caches on app launch (temporary for debugging)
         DisplayedImageStore.clearAllCaches()
-        
+
         // Create Application Support directory if it doesn't exist to prevent CoreData warnings
         createApplicationSupportDirectoryIfNeeded()
-        
+
+        // Check if we should clean the database due to repeated failures
+        if DataRecovery.shouldAttemptRecovery() {
+            DataRecovery.cleanSwiftDataStore()
+        }
+
         let schema = Schema([
-            // ChatThread.self,  // Removed - old chat system
-            // ThreadedChatMessage.self,  // Removed - old chat system
-            // ColorPaletteModel.self,  // Removed - no longer exists
             BookModel.self,
             CapturedNote.self,
             CapturedQuote.self,
             CapturedQuestion.self,
             AmbientSession.self,
-            QueuedQuestion.self  // New offline queue model
+            QueuedQuestion.self
         ])
-        let modelConfiguration = ModelConfiguration(
-            schema: schema, 
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic  // Enable CloudKit sync
-        )
-        
+
+        // First, try with CloudKit (preferred for sync)
         do {
-            modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let cloudKitConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .automatic  // Enable CloudKit sync
+            )
+            modelContainer = try ModelContainer(for: schema, configurations: [cloudKitConfig])
+            DataRecovery.recordInitializationSuccess()
+            print("✅ ModelContainer initialized with CloudKit sync enabled")
+            return
         } catch {
-            #if DEBUG
-            print("Failed to create ModelContainer: \(error)")
-            #endif
-            // Create a basic container as fallback
-            modelContainer = try? ModelContainer(for: schema)
+            print("⚠️ CloudKit initialization failed: \(error)")
+            // Only record as failure if it's not a network issue
+            if !error.localizedDescription.contains("network") {
+                DataRecovery.recordInitializationFailure()
+            }
+        }
+
+        // Fallback: Try local storage without CloudKit
+        do {
+            let localConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .none  // No CloudKit, but data persists locally
+            )
+            modelContainer = try ModelContainer(for: schema, configurations: [localConfig])
+            DataRecovery.recordInitializationSuccess()
+            print("⚠️ ModelContainer initialized WITHOUT CloudKit (local only)")
+            print("ℹ️ Data will not sync across devices")
+            return
+        } catch {
+            print("❌ Local initialization also failed: \(error)")
+            DataRecovery.recordInitializationFailure()
+        }
+
+        // Last resort: In-memory only
+        do {
+            let memoryConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: true
+            )
+            modelContainer = try ModelContainer(for: schema, configurations: [memoryConfig])
+            print("⚠️ ModelContainer initialized in-memory only (data won't persist)")
+            print("⚠️ Please use 'Delete All Data' in Settings to fix persistent storage")
+        } catch {
+            print("❌ Fatal: Could not initialize ModelContainer: \(error)")
+            // Clean the store and ask user to restart
+            DataRecovery.cleanSwiftDataStore()
+            fatalError("Database error. Please restart the app.")
         }
     }
     

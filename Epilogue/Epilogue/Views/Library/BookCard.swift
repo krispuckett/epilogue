@@ -25,8 +25,8 @@ struct BookCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Book cover - using thumbnail for grid view with library flag
-            Group {
+            // Book cover with Currently Reading indicator
+            ZStack(alignment: .topTrailing) {
                 // DEBUG: Log the book details
                 let _ = print("🎴 BookCard rendering book:")
                 let _ = print("   Title: \(book.title)")
@@ -45,6 +45,12 @@ struct BookCard: View {
                     isLibraryView: true
                 )
                 .accessibilityHidden(true) // Hide decorative image from VoiceOver
+
+                // Currently Reading indicator
+                if book.readingStatus == .currentlyReading {
+                    CurrentlyReadingBadge()
+                        .padding(8)
+                }
             }
             
             // Title and author
@@ -307,6 +313,56 @@ struct CircularProgressView: View {
                 Text("\(Int(progress * 100))%")
                     .font(.system(size: 24, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white)
+            }
+        }
+    }
+}
+
+// MARK: - Currently Reading Badge
+struct CurrentlyReadingBadge: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        ZStack {
+            // Glass background
+            Circle()
+                .fill(.black.opacity(0.3))
+                .frame(width: 36, height: 36)
+                .glassEffect(in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.2),
+                                    Color.white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+
+            // Bookmark icon
+            Image(systemName: "bookmark.fill")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            DesignSystem.Colors.primaryAccent,
+                            DesignSystem.Colors.primaryAccent.opacity(0.8)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .scaleEffect(isAnimating ? 1.1 : 1.0)
+                .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.4), radius: 4)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                isAnimating = true
             }
         }
     }

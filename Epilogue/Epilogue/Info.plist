@@ -4,8 +4,6 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Epilogue uses the camera to scan book covers and ISBNs for quick library additions</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Epilogue accesses your photos to let you set custom book covers</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Epilogue uses the microphone to record voice notes about your reading</string>
 	<key>UIBackgroundModes</key>

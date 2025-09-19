@@ -205,8 +205,10 @@ final class SentryCrashReporting: CrashReportingService {
 
     func startTransaction(name: String, operation: String) -> Transaction? {
         #if !DEBUG
+        // Sentry disabled for now - return mock transaction
         // let transaction = SentrySDK.startTransaction(name: name, operation: operation)
         // return SentryTransaction(transaction: transaction)
+        return MockTransaction(name: name, operation: operation)
         #else
         return MockTransaction(name: name, operation: operation)
         #endif

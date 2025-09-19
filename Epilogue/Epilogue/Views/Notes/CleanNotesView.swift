@@ -5,7 +5,8 @@ struct CleanNotesView: View {
     @EnvironmentObject private var notesViewModel: NotesViewModel
     @EnvironmentObject private var libraryViewModel: LibraryViewModel
     @Environment(\.modelContext) private var modelContext
-    
+    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
+
     @Query(sort: \CapturedNote.timestamp, order: .reverse) private var capturedNotes: [CapturedNote]
     @Query(sort: \CapturedQuote.timestamp, order: .reverse) private var capturedQuotes: [CapturedQuote]
     
@@ -250,6 +251,38 @@ struct CleanNotesView: View {
             }
                 .navigationTitle("Notes")
                 .navigationBarTitleDisplayMode(.large)
+            .onReceive(navigationCoordinator.$highlightedNoteID) { noteID in
+                if let noteID = noteID {
+                    // Find and scroll to the note
+                    if let note = capturedNotes.first(where: { $0.id == noteID }) {
+                        // Show edit sheet for the note
+                        editingNote = note
+                        editedText = note.content ?? ""
+                        showEditSheet = true
+
+                        // Clear the navigation flag
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            navigationCoordinator.highlightedNoteID = nil
+                        }
+                    }
+                }
+            }
+            .onReceive(navigationCoordinator.$highlightedQuoteID) { quoteID in
+                if let quoteID = quoteID {
+                    // Find and scroll to the quote
+                    if let quote = capturedQuotes.first(where: { $0.id == quoteID }) {
+                        // Show edit sheet for the quote
+                        editingQuote = quote
+                        editedText = quote.text ?? ""
+                        showEditSheet = true
+
+                        // Clear the navigation flag
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            navigationCoordinator.highlightedQuoteID = nil
+                        }
+                    }
+                }
+            }
             .toolbar {
                 // Push content to the right
                 ToolbarSpacer(.flexible)

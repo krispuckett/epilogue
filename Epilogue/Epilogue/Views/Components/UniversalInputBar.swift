@@ -7,6 +7,7 @@ enum InputContext {
     case notes
     case bookDetail(book: Book)
     case quickActions
+    case bookNote(book: Book)  // New context for adding notes from BookView
     
     var placeholderText: String {
         switch self {
@@ -23,7 +24,9 @@ enum InputContext {
         case .bookDetail(let book):
             return "Add quote or note from \(book.title)..."
         case .quickActions:
-            return "Search, add books, or capture thoughts..."
+            return "Search, Add Note, Add Book..."
+        case .bookNote(let book):
+            return "Add your quick note or quote..."
         }
     }
 }
@@ -62,21 +65,25 @@ struct UniversalInputBar: View {
         HStack(spacing: 8) {
             // Main input bar - EXACT copy from UnifiedChatInputBar
             HStack(spacing: 0) {
-                // Command icon - amber accent
-                Image(systemName: "command")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                    .frame(height: 36)
-                    .padding(.leading, 12)
-                    .padding(.trailing, 8)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if let onCommandTap = onCommandTap {
-                            onCommandTap()
-                        } else {
-                            showingCommandPalette = true
+                // Command icon - amber accent (hide for bookNote context)
+                if case .bookNote = context {
+                    // No command icon for book note context
+                } else {
+                    Image(systemName: "book.pages.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .frame(height: 36)
+                        .padding(.leading, 12)
+                        .padding(.trailing, 8)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let onCommandTap = onCommandTap {
+                                onCommandTap()
+                            } else {
+                                showingCommandPalette = true
+                            }
                         }
-                    }
+                }
                 
                 // Text input with amber theme
                 ZStack(alignment: .leading) {
@@ -95,8 +102,8 @@ struct UniversalInputBar: View {
                         .focused($isInputFocused)
                         .lineLimit(1...5)
                         .fixedSize(horizontal: false, vertical: true)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled(false)
                         .onSubmit {
                             if !messageText.isEmpty {
                                 onSend()
@@ -105,7 +112,13 @@ struct UniversalInputBar: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                
+                .padding(.leading, {
+                    if case .bookNote = context {
+                        return 12
+                    }
+                    return 0
+                }()) // Extra padding when no command icon
+
                 // Removed - send button is now integrated with waveform button
                 Spacer()
                     .frame(width: 12)
@@ -118,31 +131,70 @@ struct UniversalInputBar: View {
                     .allowsHitTesting(false)
             }
             
-            // Morphing button - waveform when empty, submit when has text
-            Button {
-                if !messageText.isEmpty {
-                    // Submit the message
+            // Morphing button - context aware
+            if case .bookNote = context {
+                // For bookNote context: always show arrow.up, no waveform
+                Button {
+                    onSend() // Always send, even if empty (will be handled upstream)
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                            .frame(width: 44, height: 44)
+                            .glassEffect()
+
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    }
+                }
+                .buttonStyle(.plain)
+                .opacity(messageText.isEmpty ? 0.6 : 1.0) // Dimmed when empty
+            } else if case .quickActions = context {
+                // For quick actions (library command palette): always show arrow.up
+                Button {
                     onSend()
-                } else {
-                    // Trigger microphone/voice input
-                    onMicrophoneTap()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                            .frame(width: 44, height: 44)
+                            .glassEffect()
+
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    }
                 }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
-                        .frame(width: 44, height: 44)
-                        .glassEffect()
-                    
-                    Image(systemName: messageText.isEmpty ? "waveform" : "arrow.up")
-                        .font(.system(size: 18, weight: messageText.isEmpty ? .medium : .semibold))
-                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                        .contentTransition(.symbolEffect(.replace))
-                        .scaleEffect(isRecording && messageText.isEmpty ? 1.1 : 1.0)
-                        .animation(DesignSystem.Animation.easeQuick, value: isRecording)
+                .buttonStyle(.plain)
+                .opacity(messageText.isEmpty ? 0.6 : 1.0) // Dimmed when empty
+            } else {
+                // Default behavior: waveform when empty, submit when has text
+                Button {
+                    if !messageText.isEmpty {
+                        // Submit the message
+                        onSend()
+                    } else {
+                        // Trigger microphone/voice input
+                        onMicrophoneTap()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
+                            .frame(width: 44, height: 44)
+                            .glassEffect()
+
+                        Image(systemName: messageText.isEmpty ? "waveform" : "arrow.up")
+                            .font(.system(size: 18, weight: messageText.isEmpty ? .medium : .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                            .contentTransition(.symbolEffect(.replace))
+                            .scaleEffect(isRecording && messageText.isEmpty ? 1.1 : 1.0)
+                            .animation(DesignSystem.Animation.easeQuick, value: isRecording)
+                    }
                 }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .animation(DesignSystem.Animation.springStandard, value: messageText.isEmpty)
     }

@@ -74,9 +74,11 @@ struct BookDetailView: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @State private var selectedSection: BookSection = .notes
     @Namespace private var sectionAnimation
-    
-    // Chat integration - DISABLED (ChatThread removed)
-    // @Query private var threads: [ChatThread]
+
+    // SwiftData queries for notes and quotes
+    @Query private var allCapturedNotes: [CapturedNote]
+    @Query private var allCapturedQuotes: [CapturedQuote]
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     // @State private var bookThread: ChatThread?
@@ -636,6 +638,9 @@ struct BookDetailView: View {
     @ViewBuilder
     private var contextualContentSections: some View {
         VStack(spacing: 32) {
+            // Always show Notes section (persistent)
+            notesSection
+
             // Content based on reading status
             if book.readingStatus == .currentlyReading {
                 // Currently Reading sections
@@ -775,8 +780,97 @@ struct BookDetailView: View {
         }
     }
     
+    // MARK: - Notes Section (Persistent)
+    @ViewBuilder
+    private var notesSection: some View {
+        // Filter notes for this specific book
+        let bookNotesCaptured = allCapturedNotes.filter { note in
+            note.book?.localId == book.localId.uuidString
+        }
+
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with add button
+            HStack {
+                Image(systemName: "note.text")
+                    .font(.system(size: 16))
+                    .foregroundStyle(accentColor)
+                    .symbolRenderingMode(.hierarchical)
+
+                Text("Notes")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(textColor)
+
+                Spacer()
+
+                // Quick add note button
+                Button {
+                    SensoryFeedback.light()
+                    // Open command palette with book note context
+                    NotificationCenter.default.post(
+                        name: Notification.Name("ShowCommandInput"),
+                        object: ["bookNote": true]
+                    )
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(accentColor)
+                }
+            }
+
+            if bookNotesCaptured.isEmpty {
+                // Empty state
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 32))
+                            .foregroundStyle(accentColor.opacity(0.5))
+
+                        Text("No notes yet")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(textColor.opacity(0.5))
+
+                        Text("Tap + to add your first note")
+                            .font(.system(size: 12))
+                            .foregroundStyle(textColor.opacity(0.4))
+                    }
+                    .padding(.vertical, 20)
+                    Spacer()
+                }
+            } else {
+                // Compact note cards
+                VStack(spacing: 12) {
+                    ForEach(bookNotesCaptured.prefix(3)) { note in
+                        CompactNoteCard(note: note, accentColor: accentColor)
+                    }
+
+                    if bookNotesCaptured.count > 3 {
+                        Button {
+                            // Navigate to all notes
+                            selectedSection = .notes
+                        } label: {
+                            HStack {
+                                Text("View all \(bookNotesCaptured.count) notes")
+                                    .font(.system(size: 14, weight: .medium))
+
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(accentColor)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(DesignSystem.Spacing.listItemPadding)
+        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+    }
+
     // MARK: - Contextual Sections for Currently Reading
-    
+
     @ViewBuilder
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1327,8 +1421,8 @@ struct BookDetailView: View {
             }
         }
     }
-    
-    private var notesSection: some View {
+
+    private var oldNotesSection_Disabled: some View {
         VStack(spacing: 16) {
             if bookNotes.isEmpty {
                 emptyStateView(

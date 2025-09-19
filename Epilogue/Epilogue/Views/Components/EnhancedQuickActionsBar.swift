@@ -82,7 +82,18 @@ struct EnhancedQuickActionsBar: View {
     private var plusButton: some View {
         Button {
             SensoryFeedback.medium()
-            NotificationCenter.default.post(name: Notification.Name("ShowCommandInput"), object: nil)
+            // If we're viewing a book, open with book note context
+            if libraryViewModel.currentDetailBook != nil {
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowCommandInput"),
+                    object: ["bookNote": true]
+                )
+            } else {
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowCommandInput"),
+                    object: nil
+                )
+            }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .medium))

@@ -38,6 +38,7 @@ struct ThemeSelectionView: View {
                             ) {
                                 selectTheme(theme)
                             }
+                            .id(theme)  // Improve view recycling
                         }
                     }
                     .padding(.horizontal)
@@ -86,14 +87,15 @@ struct ThemeSelectionView: View {
     // MARK: - Theme Preview Card
     private var themePreviewCard: some View {
         VStack(spacing: 16) {
-            // Live preview
-            RoundedRectangle(cornerRadius: 24)
-                .fill(.black)
-                .overlay {
-                    ThemePreviewGradient(theme: selectedTheme)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                }
-                .overlay {
+            // Live preview with proper corner radius
+            ZStack {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color.black)
+
+                ThemePreviewGradient(theme: selectedTheme)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+            .overlay {
                     VStack {
                         Spacer()
                         HStack {
@@ -118,10 +120,11 @@ struct ThemeSelectionView: View {
                             )
                         }
                     }
-                }
-                .frame(height: 200)
-                .padding(.horizontal)
-                .shadow(radius: 20)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+            .frame(height: 200)
+            .padding(.horizontal)
+            .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         }
     }
 
@@ -200,7 +203,7 @@ struct ThemeCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(isSelected ? 1.02 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .animation(isSelected ? .spring(response: 0.3, dampingFraction: 0.8) : nil, value: isSelected)
     }
 }
 

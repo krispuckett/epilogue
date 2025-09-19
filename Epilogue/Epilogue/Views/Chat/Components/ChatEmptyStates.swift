@@ -53,15 +53,16 @@ struct InitialEmptyStateView: View {
                         .foregroundStyle(DesignSystem.Colors.textTertiary)
                         .multilineTextAlignment(.center)
                 } else {
-                    Text("Welcome to your reading companion")
+                    Text("Chat with your books")
                         .font(.system(size: 24, weight: .semibold, design: .serif))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
-                    
-                    Text("Let's explore your library together")
+
+                    Text("Ask questions about your reading, explore themes across books, or get personalized recommendations")
                         .font(.system(size: 16))
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
                 }
             }
             .opacity(contentOpacity)

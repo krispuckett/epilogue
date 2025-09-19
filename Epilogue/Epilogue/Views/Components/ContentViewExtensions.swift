@@ -13,6 +13,17 @@ struct CommandInputOverlay: View {
     let modelContext: ModelContext
     @FocusState.Binding var isInputFocused: Bool
 
+    // Determine the input context based on current state
+    private func determineInputContext() -> InputContext {
+        // Check if we're in book detail view and opening for notes
+        if let currentBook = libraryViewModel.currentDetailBook,
+           appStateCoordinator.isBookNoteContext {
+            return .bookNote(book: currentBook)
+        }
+        // Default to quick actions
+        return .quickActions
+    }
+
     var body: some View {
         if appStateCoordinator.showingCommandInput {
             ZStack(alignment: .bottom) {
@@ -46,7 +57,7 @@ struct CommandInputOverlay: View {
                         messageText: $appStateCoordinator.commandText,
                         showingCommandPalette: .constant(false),
                         isInputFocused: $isInputFocused,
-                        context: .quickActions,
+                        context: determineInputContext(),
                         onSend: {
                             processInlineCommand()
                         },
@@ -87,12 +98,23 @@ struct CommandInputOverlay: View {
 
         logger.debug("Processing command: '\(trimmedText)'")
 
+        // Get current book context if we're viewing a book
+        let currentBook = libraryViewModel.currentDetailBook
+
+        // Enhance command with smart context detection
+        let enhancedCommand = SmartNoteContextService.shared.enhanceCommand(
+            trimmedText,
+            library: libraryViewModel.books,
+            currentBook: currentBook
+        )
+
         let processor = CommandProcessingManager(
             modelContext: modelContext,
             libraryViewModel: libraryViewModel,
-            notesViewModel: notesViewModel
+            notesViewModel: notesViewModel,
+            bookContext: currentBook  // Pass the current book context
         )
-        processor.processInlineCommand(trimmedText)
+        processor.processInlineCommand(enhancedCommand)
 
         SensoryFeedback.success()
 

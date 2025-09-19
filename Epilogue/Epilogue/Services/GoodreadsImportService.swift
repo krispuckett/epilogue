@@ -461,14 +461,16 @@ class GoodreadsImportService: ObservableObject {
             }
             
             processedCount += batch.count
-            
+
+            // Calculate batch time for adaptive delay
+            let batchTime = Date().timeIntervalSince(batchStart)
+
             #if DEBUG
             // Log progress
-            let batchTime = Date().timeIntervalSince(batchStart)
             print("📚 Batch \(index + 1)/\(totalBatches): \(batch.count) books in \(String(format: "%.1f", batchTime))s")
             print("   Cache hits: \(batchResult.cacheHits), API calls: \(batchResult.apiCalls)")
             #endif
-            
+
             // Adaptive delay between batches
             if index < batches.count - 1 {
                 let delay = calculateAdaptiveDelay(

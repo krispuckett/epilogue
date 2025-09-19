@@ -11,15 +11,17 @@ class CommandProcessingManager: ObservableObject {
     private let modelContext: ModelContext
     private let libraryViewModel: LibraryViewModel
     private let notesViewModel: NotesViewModel
-    
+    private let bookContext: Book?  // Optional book context for notes
+
     // MARK: - Batch Book Queue
     @Published var pendingBookSearches: [String] = []
     @Published var isProcessingBatchBooks = false
-    
-    init(modelContext: ModelContext, libraryViewModel: LibraryViewModel, notesViewModel: NotesViewModel) {
+
+    init(modelContext: ModelContext, libraryViewModel: LibraryViewModel, notesViewModel: NotesViewModel, bookContext: Book? = nil) {
         self.modelContext = modelContext
         self.libraryViewModel = libraryViewModel
         self.notesViewModel = notesViewModel
+        self.bookContext = bookContext
     }
     
     // MARK: - Command Processing
@@ -34,7 +36,7 @@ class CommandProcessingManager: ObservableObject {
                 var author: String? = nil
                 var bookTitle: String? = nil
                 var pageNumber: Int? = nil
-                
+
                 if let attr = attribution {
                     let parts = attr.split(separator: "|||").map { String($0) }
                     if parts.count >= 1 {
@@ -47,11 +49,21 @@ class CommandProcessingManager: ObservableObject {
                         pageNumber = Int(parts[pageIdx + 1])
                     }
                 }
-                
-                createQuote(content: content, author: author, bookTitle: bookTitle, pageNumber: pageNumber)
+
+                // If we have book context, use it
+                if let book = bookContext {
+                    createQuoteWithBook(content: content, book: book)
+                } else {
+                    createQuote(content: content, author: author, bookTitle: bookTitle, pageNumber: pageNumber)
+                }
                 
             case .createNote(let text):
-                createNote(content: text)
+                // If we have book context, create note with book
+                if let book = bookContext {
+                    createNoteWithBook(content: text, book: book)
+                } else {
+                    createNote(content: text)
+                }
                 
             case .searchLibrary(let query):
                 searchBooks(query: query)

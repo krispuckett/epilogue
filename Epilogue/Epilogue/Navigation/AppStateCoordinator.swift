@@ -24,6 +24,7 @@ final class AppStateCoordinator: ObservableObject {
 
     // MARK: - Command Input State
     @Published var commandText = ""
+    @Published var isBookNoteContext = false  // Track if we're opening input for book notes
 
     // MARK: - Weak References to Prevent Cycles
     weak var libraryViewModel: LibraryViewModel?
@@ -63,8 +64,9 @@ final class AppStateCoordinator: ObservableObject {
         showToast("Adding \(titles.count) books to library...")
     }
 
-    func openCommandInput() {
-        logger.debug("Opening command input")
+    func openCommandInput(bookNoteContext: Bool = false) {
+        logger.debug("Opening command input, bookNote: \(bookNoteContext)")
+        isBookNoteContext = bookNoteContext
         showingCommandInput = true
         HapticManager.shared.commandPaletteOpen()
     }
@@ -74,6 +76,7 @@ final class AppStateCoordinator: ObservableObject {
         showingCommandInput = false
         commandText = ""
         showingLibraryCommandPalette = false
+        isBookNoteContext = false  // Reset context
     }
 
     // MARK: - Private Methods
@@ -104,10 +107,22 @@ final class AppStateCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Show command input
+        // Show command input with optional custom prompt
         NotificationCenter.default.publisher(for: Notification.Name("ShowCommandInput"))
-            .sink { [weak self] _ in
-                self?.openCommandInput()
+            .sink { [weak self] notification in
+                var isBookNote = false
+                if let data = notification.object as? [String: Any] {
+                    if let prompt = data["prompt"] as? String {
+                        // Custom prompt for specific context
+                        self?.commandText = data["text"] as? String ?? ""
+                    }
+                    // Check if this is for book notes
+                    isBookNote = data["bookNote"] as? Bool ?? false
+                } else if let text = notification.object as? String {
+                    // Simple string passed
+                    self?.commandText = text
+                }
+                self?.openCommandInput(bookNoteContext: isBookNote)
             }
             .store(in: &cancellables)
 

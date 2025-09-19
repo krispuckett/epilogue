@@ -60,7 +60,9 @@ struct SettingsView: View {
                         Label {
                             Text("AI Provider")
                         } icon: {
+                            // Cache the logo to reduce re-renders
                             PerplexityLogoDetailed(size: 20)
+                                .drawingGroup()  // Flatten view hierarchy
                         }
                         Spacer()
                         Text("Perplexity")
@@ -88,9 +90,11 @@ struct SettingsView: View {
                 Section {
                     Toggle("Real-time Questions", isOn: $realTimeQuestions)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                        .id("realtime")  // Stable identity
 
                     Toggle("Audio Responses", isOn: $audioFeedback)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                        .id("audio")  // Stable identity
 
                     Picker("Default Capture", selection: $defaultCaptureType) {
                         Label("Quote", systemImage: "quote.opening")
@@ -103,6 +107,7 @@ struct SettingsView: View {
 
                     Toggle("Show Live Transcription", isOn: $showLiveTranscriptionBubble)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                        .id("transcription")  // Stable identity
                 } header: {
                     Text("Ambient Mode")
                 }
@@ -149,6 +154,7 @@ struct SettingsView: View {
                         exportData()
                     } label: {
                         Label("Export All Data", systemImage: "square.and.arrow.up")
+                            .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                     }
 
                     Button(role: .destructive) {
@@ -405,12 +411,8 @@ struct SettingsView: View {
                 // Save context - this is critical!
                 try modelContext.save()
 
-                // Clear ALL UserDefaults for complete reset
-                if let bundleID = Bundle.main.bundleIdentifier {
-                    UserDefaults.standard.removePersistentDomain(forName: bundleID)
-                }
-
-                // Also clear specific keys that might be stored elsewhere
+                // Clear only app-specific UserDefaults, not system ones
+                // DON'T use removePersistentDomain as it can break SwiftData
                 UserDefaults.standard.removeObject(forKey: "defaultCaptureType")
                 UserDefaults.standard.removeObject(forKey: "aiProvider")
                 UserDefaults.standard.removeObject(forKey: "perplexityModel")
@@ -420,10 +422,15 @@ struct SettingsView: View {
                 UserDefaults.standard.removeObject(forKey: "showLiveTranscriptionBubble")
                 UserDefaults.standard.removeObject(forKey: "gradientIntensity")
                 UserDefaults.standard.removeObject(forKey: "enableAnimations")
+                UserDefaults.standard.removeObject(forKey: "developerModeUnlocked")
+                UserDefaults.standard.removeObject(forKey: "versionTapCount")
 
                 // Clear Perplexity quota tracking
                 UserDefaults.standard.removeObject(forKey: "perplexity_questions_used_today")
                 UserDefaults.standard.removeObject(forKey: "perplexity_quota_last_reset")
+
+                // Clean SwiftData store files for fresh start
+                DataRecovery.cleanSwiftDataStore()
 
                 // Force synchronize
                 UserDefaults.standard.synchronize()

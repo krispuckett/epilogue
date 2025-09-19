@@ -47,44 +47,59 @@ struct QuickActionsSheet: View {
         }
     }
     
-    let quickCommands = [
-        Command(
-            icon: "mic.circle",
-            title: "Ambient Reading",
-            description: "Start voice-powered reading session",
-            action: .ambientReading
-        ),
-        Command(
-            icon: "note.text",
-            title: "New Note",
-            description: "Capture a thought or idea",
-            action: .newNote
-        ),
-        Command(
-            icon: "quote.opening",
-            title: "New Quote",
-            description: "Save a meaningful passage",
-            action: .newQuote
-        ),
-        Command(
-            icon: "plus.circle",
-            title: "Add Book",
-            description: "Add a book to your library",
-            action: .addBook
-        ),
-        Command(
-            icon: "camera",
-            title: "Scan Book Cover",
-            description: "Add book by scanning its cover",
-            action: .scanBook
-        ),
-        Command(
-            icon: "magnifyingglass",
-            title: "Search for Book",
-            description: "Find and add books to your library",
-            action: .search
-        )
-    ]
+    // Dynamic commands based on context
+    var quickCommands: [Command] {
+        var commands = [
+            Command(
+                icon: "note.text",
+                title: "New Note",
+                description: libraryViewModel.currentDetailBook != nil ?
+                    "Add note to \(libraryViewModel.currentDetailBook!.title)" :
+                    "Capture a thought or idea",
+                action: .newNote
+            ),
+            Command(
+                icon: "mic.circle",
+                title: "Ambient Reading",
+                description: "Start voice-powered reading session",
+                action: .ambientReading
+            ),
+            Command(
+                icon: "quote.opening",
+                title: "New Quote",
+                description: libraryViewModel.currentDetailBook != nil ?
+                    "Save quote from \(libraryViewModel.currentDetailBook!.title)" :
+                    "Save a meaningful passage",
+                action: .newQuote
+            ),
+            Command(
+                icon: "plus.circle",
+                title: "Add Book",
+                description: "Add a book to your library",
+                action: .addBook
+            ),
+            Command(
+                icon: "camera",
+                title: "Scan Book Cover",
+                description: "Add book by scanning its cover",
+                action: .scanBook
+            ),
+            Command(
+                icon: "magnifyingglass",
+                title: "Search for Book",
+                description: "Find and add books to your library",
+                action: .search
+            )
+        ]
+
+        // If we're in a book context, prioritize note taking
+        if libraryViewModel.currentDetailBook != nil {
+            // Move note to top
+            return commands
+        }
+
+        return commands
+    }
     
     private var filteredCommands: [Command] {
         if searchText.isEmpty {

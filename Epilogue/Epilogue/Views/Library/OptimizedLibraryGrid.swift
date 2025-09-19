@@ -43,33 +43,34 @@ struct OptimizedLibraryGrid: View {
                                     isDraggable: viewModel.isReorderMode,
                                     isBeingDragged: draggedBook?.id == book.id
                                 )
-                                .opacity(draggedBook?.id == book.id ? 0.01 : 1)
-                                .scaleEffect(targetIndex == index && draggedBook != nil ? 1.05 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: targetIndex)
-                                .draggable(book) {
-                                    DragPreview(book: book, viewModel: viewModel)
-                                        .onAppear {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                                draggedBook = book
-                                            }
-                                        }
-                                }
-                                .dropDestination(for: Book.self) { items, location in
-                                    guard let droppedBook = items.first,
-                                          let fromIndex = books.firstIndex(where: { $0.id == droppedBook.id }),
-                                          let toIndex = books.firstIndex(where: { $0.id == book.id }) else {
-                                        return false
-                                    }
-                                    
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex)
-                                    }
-                                    return true
-                                } isTargeted: { isTargeted in
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        targetIndex = isTargeted ? index : nil
-                                    }
-                                }
+                                // Drag and drop disabled to prevent bugs
+                                // .opacity(draggedBook?.id == book.id ? 0.01 : 1)
+                                // .scaleEffect(targetIndex == index && draggedBook != nil ? 1.05 : 1.0)
+                                // .animation(.spring(response: 0.3, dampingFraction: 0.7), value: targetIndex)
+                                // .draggable(book) {
+                                //     DragPreview(book: book, viewModel: viewModel)
+                                //         .onAppear {
+                                //             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                //                 draggedBook = book
+                                //             }
+                                //         }
+                                // }
+                                // .dropDestination(for: Book.self) { items, location in
+                                //     guard let droppedBook = items.first,
+                                //           let fromIndex = books.firstIndex(where: { $0.id == droppedBook.id }),
+                                //           let toIndex = books.firstIndex(where: { $0.id == book.id }) else {
+                                //         return false
+                                //     }
+                                //
+                                //     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                //         viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex)
+                                //     }
+                                //     return true
+                                // } isTargeted: { isTargeted in
+                                //     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                //         targetIndex = isTargeted ? index : nil
+                                //     }
+                                // }
                             }
                         }
                         .id(book.localId)
@@ -145,14 +146,13 @@ struct OptimizedGridItem: View {
                 BookCard(book: book)
                     .environmentObject(viewModel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                
-                // Highlight overlay
-                if highlightedBookId == book.localId {
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                        .stroke(Color.orange, lineWidth: 3)
-                        // Animation only when highlight changes
-                        .animation(highlightedBookId != nil ? DesignSystem.Animation.easeStandard : nil, value: highlightedBookId)
-                }
+
+                // Highlight overlay - disabled to prevent orange border bug
+                // if highlightedBookId == book.localId {
+                //     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
+                //         .stroke(Color.orange, lineWidth: 3)
+                //         .animation(highlightedBookId != nil ? DesignSystem.Animation.easeStandard : nil, value: highlightedBookId)
+                // }
             }
         }
         .scaleEffect(isPressed ? 0.97 : 1.0)

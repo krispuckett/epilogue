@@ -17,6 +17,7 @@ struct LibraryView: View {
     @State private var scrollToBookId: UUID? = nil
     @State private var navigateToBookDetail: Bool = false
     @State private var selectedBookForNavigation: Book? = nil
+    @State private var pendingBookSearchQuery: String = ""
     // Removed scroll tracking - not needed
     @State private var settingsButtonPressed = false
     @State private var visibleBookIDs: Set<UUID> = []
@@ -268,10 +269,11 @@ struct LibraryView: View {
     @ViewBuilder
     private var bookSearchSheet: some View {
         BookSearchSheet(
-            searchQuery: "",
+            searchQuery: pendingBookSearchQuery,
             onBookSelected: { book in
                 viewModel.addBook(book)
                 appState.showingBookSearch = false
+                pendingBookSearchQuery = ""  // Reset after use
             }
         )
     }
@@ -384,7 +386,13 @@ struct LibraryView: View {
                 navigateToBookDetail = true
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
+            // Capture the search query if provided
+            if let query = notification.object as? String {
+                pendingBookSearchQuery = query
+            } else {
+                pendingBookSearchQuery = ""
+            }
             appState.showingBookSearch = true
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowEnhancedBookScanner"))) { _ in
@@ -1688,6 +1696,15 @@ class LibraryViewModel: ObservableObject {
     func updateBookProgress(_ book: Book, currentPage: Int) {
         if let index = books.firstIndex(where: { $0.id == book.id }) {
             books[index].currentPage = currentPage
+
+            // Auto-mark as Read when hitting 100% progress
+            if let pageCount = books[index].pageCount,
+               pageCount > 0,
+               currentPage >= pageCount {
+                books[index].readingStatus = .read
+                SensoryFeedback.success()
+            }
+
             saveBooks()
         }
     }

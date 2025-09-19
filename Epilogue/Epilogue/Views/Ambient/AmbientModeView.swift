@@ -741,10 +741,12 @@ struct AmbientModeView: View {
                     }
                     
                     if !hasRealContent {
-                        if currentBookContext == nil && !isRecording {
-                            // Simplified welcome
+                        if currentBookContext == nil {
+                            // Simplified welcome - show even when recording
                             minimalWelcomeView
                                 .padding(.top, 34) // ← Reduced from 50 to 34
+                                .opacity(isRecording ? 0.7 : 1.0) // Slightly dim when recording
+                                .animation(.easeInOut(duration: 0.3), value: isRecording)
                         }
                     }
                     
