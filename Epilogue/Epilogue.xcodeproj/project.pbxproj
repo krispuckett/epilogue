@@ -315,7 +315,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Epilogue/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Epilogue - Ambient Reading";
+				INFOPLIST_KEY_CFBundleDisplayName = Epilogue;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Epilogue uses your camera to scan book covers and ISBNs for quick library additions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Epilogue uses your microphone for voice commands and dictation to quickly add books, notes, and quotes.";
@@ -360,7 +360,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Epilogue/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Epilogue - Ambient Reading";
+				INFOPLIST_KEY_CFBundleDisplayName = Epilogue;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Epilogue uses your camera to scan book covers and ISBNs for quick library additions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Epilogue uses your microphone for voice commands and dictation to quickly add books, notes, and quotes.";

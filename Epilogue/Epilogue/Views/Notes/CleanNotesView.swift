@@ -931,6 +931,7 @@ private struct NoteCardView: View {
     let note: Note
     let capturedNote: CapturedNote?
     @State private var showDate = false
+    @State private var showingSessionSummary = false
     
     private var dateHeader: some View {
         HStack {
@@ -947,12 +948,14 @@ private struct NoteCardView: View {
             
             // Session pill for ambient notes - shows with date on tap
             if let session = capturedNote?.ambientSession, (capturedNote?.source as? String) == "ambient" {
-                NavigationLink(destination: AmbientSessionSummaryView(session: session, colorPalette: nil)) {
+                Button {
+                    showingSessionSummary = true
+                } label: {
                     HStack(spacing: 6) {
                         Text("SESSION")
                             .font(.system(size: 10, weight: .semibold, design: .default))
                             .kerning(1.0)
-                        
+
                         Image(systemName: "arrow.right")
                             .font(.system(size: 9, weight: .bold))
                     }
@@ -1044,6 +1047,13 @@ private struct NoteCardView: View {
                 showDate.toggle()
             }
             SensoryFeedback.light()
+        }
+        .sheet(isPresented: $showingSessionSummary) {
+            if let session = capturedNote?.ambientSession {
+                NavigationStack {
+                    AmbientSessionSummaryView(session: session, colorPalette: nil)
+                }
+            }
         }
     }
     

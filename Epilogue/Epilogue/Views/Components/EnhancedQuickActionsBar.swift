@@ -14,6 +14,7 @@ struct EnhancedQuickActionsBar: View {
     @State private var lastTapTime: Date = .distantPast
     @State private var capturedContent: [String] = []
     @State private var showRecentCaptures = false
+    @State private var showAdvancedIntent = false
     @GestureState private var isLongPressing = false
     @GestureState private var dragOffset: CGSize = .zero
     
@@ -26,43 +27,45 @@ struct EnhancedQuickActionsBar: View {
     
     var body: some View {
         ZStack {
-            // Main bar
-            HStack(spacing: 0) {
-                // Plus button for command palette
-                plusButton
-                
-                Divider()
-                    .frame(height: 20)
-                    .background(Color.white.opacity(0.2))
-                    .padding(.horizontal, 4)
-                
-                // Enhanced waveform button with gestures
-                waveformButton
+            HStack(spacing: 16) {
+                // Main bar only (orb moved to tab navigation)
+                HStack(spacing: 0) {
+                    // Plus button for command palette
+                    plusButton
+
+                    Divider()
+                        .frame(height: 20)
+                        .background(Color.white.opacity(0.2))
+                        .padding(.horizontal, 8)
+
+                    // Ambient Metal shader button (no orb container)
+                    ambientShaderButton
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .glassEffect(in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.2),
+                                    Color.white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .glassEffect(in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.2),
-                                Color.white.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.5
-                    )
-            }
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-            
+
             // Radial book menu overlay
             if showRadialMenu {
                 radialBookMenu
             }
-            
+
             // Recent captures overlay
             if showRecentCaptures {
                 recentCapturesView
@@ -82,18 +85,8 @@ struct EnhancedQuickActionsBar: View {
     private var plusButton: some View {
         Button {
             SensoryFeedback.medium()
-            // If we're viewing a book, open with book note context
-            if libraryViewModel.currentDetailBook != nil {
-                NotificationCenter.default.post(
-                    name: Notification.Name("ShowCommandInput"),
-                    object: ["bookNote": true]
-                )
-            } else {
-                NotificationCenter.default.post(
-                    name: Notification.Name("ShowCommandInput"),
-                    object: nil
-                )
-            }
+            // Show the advanced intent
+            showAdvancedIntent = true
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .medium))
@@ -101,10 +94,34 @@ struct EnhancedQuickActionsBar: View {
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
         }
+        .sheet(isPresented: $showAdvancedIntent) {
+            AdvancedCommandIntent(isPresented: $showAdvancedIntent)
+                .environmentObject(libraryViewModel)
+                .environmentObject(notesViewModel)
+        }
     }
     
-    // MARK: - Enhanced Waveform Button
-    private var waveformButton: some View {
+    // MARK: - Ambient Shader Button (Metal shader, no orb)
+    private var ambientShaderButton: some View {
+        Button {
+            SensoryFeedback.light()
+            // Open ambient mode
+            if let currentBook = libraryViewModel.currentDetailBook {
+                SimplifiedAmbientCoordinator.shared.openAmbientReading(with: currentBook)
+            } else {
+                SimplifiedAmbientCoordinator.shared.openAmbientReading()
+            }
+        } label: {
+            // Just the Metal shader, no container
+            AmbientOrbButton(size: 36) {
+                // Action handled by parent button
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: - Voice Input Button (waveform for voice commands)
+    private var voiceInputButton: some View {
         ZStack {
             // Glow effect when active
             if waveformGlow {
@@ -145,8 +162,8 @@ struct EnhancedQuickActionsBar: View {
         }
         .scaleEffect(waveformScale)
         .onTapGesture {
-            print("🎯 DEBUG: Waveform tap detected directly")
-            handleTapGesture()
+            print("🎤 DEBUG: Voice button tap detected")
+            handleVoiceInput()
         }
         .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.7), trigger: waveformGlow)
     }
@@ -169,10 +186,10 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func handleSingleTap() {
-        print("🎯 DEBUG: Waveform single tap detected")
+        print("🎯 DEBUG: Ambient orb tap detected")
         SensoryFeedback.light()
         startGlowAnimation()
-        
+
         // Check if we're viewing a specific book
         if let currentBook = libraryViewModel.currentDetailBook {
             print("📚 Opening ambient mode with book: \(currentBook.title)")
@@ -181,6 +198,15 @@ struct EnhancedQuickActionsBar: View {
             print("🎯 DEBUG: Opening generic ambient mode")
             SimplifiedAmbientCoordinator.shared.openAmbientReading()
         }
+    }
+
+    private func handleVoiceInput() {
+        print("🎤 Starting voice input for commands")
+        SensoryFeedback.light()
+        startGlowAnimation()
+
+        // Start voice recognition for commands
+        NotificationCenter.default.post(name: Notification.Name("StartVoiceCommand"), object: nil)
     }
     
     private func handleDoubleTap() {

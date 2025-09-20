@@ -10,6 +10,7 @@ public class EpilogueAmbientCoordinator: ObservableObject {
     @Published var isActive = false
     @Published var preSelectedBook: Book?
     @Published var initialBook: Book?  // Book to start with when launched from BookDetailView
+    @Published var initialQuestion: String?  // Initial question to ask when launching
     
     private init() {}
     
@@ -79,25 +80,30 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Open ambient reading - optionally with a pre-selected book
-    func openAmbientReading(with book: Book? = nil) {
+    /// Open ambient reading - optionally with a pre-selected book and initial question
+    func openAmbientReading(with book: Book? = nil, initialQuestion: String? = nil) {
         logger.info("🎙️ Opening ambient reading via SimplifiedAmbientCoordinator")
         print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientReading() called")
-        
+
         // Set initial book context if provided
         if let book = book {
             currentBook = book
             logger.info("📚 Starting ambient mode with book: \(book.title)")
         }
-        
+
+        if let question = initialQuestion {
+            logger.info("❓ Starting with question: \(question)")
+        }
+
         // Haptic feedback
         HapticManager.shared.voiceModeStart()
-        
+
         // Use EpilogueAmbientCoordinator which ContentView observes
         // This will present the NEW AmbientModeView
         withAnimation(DesignSystem.Animation.springStandard) {
             EpilogueAmbientCoordinator.shared.isActive = true
             EpilogueAmbientCoordinator.shared.initialBook = book
+            EpilogueAmbientCoordinator.shared.initialQuestion = initialQuestion
             print("🎙️ DEBUG: isPresented set to true, initial book: \(book?.title ?? "none")")
         }
     }

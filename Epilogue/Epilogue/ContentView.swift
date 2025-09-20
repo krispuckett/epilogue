@@ -62,18 +62,15 @@ struct ContentView: View {
                 .id("background-\(themeManager.currentTheme.rawValue)") // Force complete refresh on theme change
 
             NavigationContainer(selectedTab: $selectedTab)
-                .safeAreaInset(edge: .bottom) {
-                    if !appStateCoordinator.showingCommandInput && !notesViewModel.isEditingNote {
-                        EnhancedQuickActionsBar()
-                            .environmentObject(libraryViewModel)
-                            .environmentObject(notesViewModel)
-                            .padding(.bottom, 56)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .scale(scale: 0.8).combined(with: .opacity)
-                            ))
-                    }
-                }
+
+            // Enhanced Quick Actions Bar with Metal shader - centered
+            VStack {
+                Spacer()
+                EnhancedQuickActionsBar()
+                    .environmentObject(libraryViewModel)
+                    .environmentObject(notesViewModel)
+                    .padding(.bottom, 54) // Just 4px above tab bar (50px tab height + 4px)
+            }
         }
         .overlay(alignment: .bottom) {
             CommandInputOverlay(
@@ -84,6 +81,7 @@ struct ContentView: View {
                 isInputFocused: $isInputFocused
             )
         }
+        
     }
 
     // MARK: - Initial Setup

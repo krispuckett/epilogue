@@ -337,33 +337,41 @@ struct NotesView: View {
         }
     }
     
-    // MARK: - Main Grid View (Simplified)
-    var mainGridView: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 16) {
-                        filterPillsHeader
-                        notesGridContent
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 80)
+    private var scrollableContent: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    filterPillsHeader
+                    notesGridContent
                 }
-                .onChange(of: scrollToNoteId) { _, noteId in
-                    if let noteId = noteId {
-                        withAnimation(SmoothAnimationType.smooth.animation) {
-                            proxy.scrollTo(noteId, anchor: .center)
-                        }
-                        Task {
-                            try? await Task.sleep(nanoseconds: 500_000_000)
-                            scrollToNoteId = nil
-                        }
+                .padding(.top, 8)
+                .padding(.bottom, 80)
+            }
+            .onChange(of: scrollToNoteId) { _, noteId in
+                if let noteId = noteId {
+                    withAnimation(SmoothAnimationType.smooth.animation) {
+                        proxy.scrollTo(noteId, anchor: .center)
+                    }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        scrollToNoteId = nil
                     }
                 }
             }
-            
+        }
+    }
+
+    // MARK: - Main Grid View (Simplified)
+    var mainGridView: some View {
+        ZStack {
+            // Background
+            Color.black
+                .ignoresSafeArea()
+
+            // Main content
+            scrollableContent
+
+            // Overlay
             contextMenuOverlay
         }
         .navigationTitle("Notes")
@@ -387,29 +395,6 @@ struct NotesView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 addNoteToolbarButton
-            }
-        }
-        .sheet(isPresented: $showingAddNote) {
-            IntelligentCommandPalette(
-                isPresented: $showingAddNote,
-                commandText: $addNoteCommandText
-            )
-            .environmentObject(notesViewModel)
-            .environmentObject(libraryViewModel)
-        }
-        .sheet(item: $noteToEdit) { note in
-            IntelligentCommandPalette(
-                isPresented: .constant(true),
-                commandText: Binding(
-                    get: { formatNoteForEditing(note) ?? "" },
-                    set: { editNoteCommandText = $0 }
-                )
-            )
-            .environmentObject(notesViewModel)
-            .environmentObject(libraryViewModel)
-            .onDisappear {
-                noteToEdit = nil
-                notesViewModel.isEditingNote = false
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in

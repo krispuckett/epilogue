@@ -180,7 +180,13 @@ struct AmbientModeView: View {
     // Inline editing states
     @State private var editingMessageId: UUID? = nil
     @State private var editingMessageType: UnifiedChatMessage.MessageType? = nil
-    
+
+    // Onboarding states
+    @State private var showOnboarding = true
+    @State private var onboardingOpacity: Double = 0.0
+    @State private var onboardingTimer: Timer?
+    @AppStorage("ambientModeOnboardingShown") private var onboardingShownCount: Int = 0
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
@@ -275,9 +281,43 @@ struct AmbientModeView: View {
                     .padding(.bottom, 140)  // Position above the stop button
             }
             .zIndex(100)  // Ensure it's on top
+
+            // Onboarding text overlay - only show when there's no empty state visible
+            if showOnboarding && onboardingShownCount < 5 && !messages.isEmpty {
+                VStack(spacing: 0) {
+                    Spacer()
+
+                    VStack(spacing: 28) {
+                        Text("Ambient Reading")
+                            .font(.system(size: 32, weight: .regular, design: .default))
+                            .foregroundStyle(.white)
+                            .tracking(0.5)
+
+                        Text("What are you reading today? Just say the\nbook title and lose yourself in the pages.")
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.65))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(4)
+                    }
+                    .padding(.horizontal, 40)
+
+                    Spacer()
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(onboardingOpacity)
+                .animation(.easeInOut(duration: 0.8), value: onboardingOpacity)
+                .allowsHitTesting(false)
+                .zIndex(200)
+            }
         }
         // Double tap gesture to show keyboard
         .onTapGesture(count: 2) {
+            // Hide onboarding immediately on interaction
+            if showOnboarding {
+                fadeOutOnboarding()
+            }
+
             // Double tap anywhere to show keyboard
             if inputMode != .textInput {
                 if isRecording {
@@ -382,6 +422,25 @@ struct AmbientModeView: View {
             }
 
             // Gradient already visible (starts at 1.0)
+
+            // Handle onboarding
+            if onboardingShownCount < 5 {
+                showOnboarding = true
+                // Fade in after a brief delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeIn(duration: 1.0)) {
+                        onboardingOpacity = 1.0
+                    }
+                }
+
+                // Start timer to fade out after 20 seconds
+                onboardingTimer = Timer.scheduledTimer(withTimeInterval: 20.0, repeats: false) { _ in
+                    fadeOutOnboarding()
+                }
+
+                // Increment shown count
+                onboardingShownCount += 1
+            }
         }
         .onChange(of: inputMode) { _, newMode in
             // Handle focus changes when switching modes
@@ -1884,6 +1943,19 @@ struct AmbientModeView: View {
         }
     }
     
+    private func fadeOutOnboarding() {
+        onboardingTimer?.invalidate()
+        onboardingTimer = nil
+
+        withAnimation(.easeOut(duration: 0.8)) {
+            onboardingOpacity = 0.0
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            showOnboarding = false
+        }
+    }
+
     private func startAmbientExperience() {
         // Record when the session actually starts
         sessionStartTime = Date()
@@ -2287,7 +2359,12 @@ struct AmbientModeView: View {
     
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
-        
+
+        // Hide onboarding on first interaction
+        if showOnboarding {
+            fadeOutOnboarding()
+        }
+
         let message = UnifiedChatMessage(
             content: messageText,
             isUser: true,

@@ -42,7 +42,7 @@ struct NavigationContainer: View {
             ChatViewWrapper()
             .tabItem {
                 Label {
-                    Text("Chat")
+                    Text("Sessions")
                 } icon: {
                     Image("glass-msgs")
                         .renderingMode(.template)
@@ -83,9 +83,9 @@ struct NavigationContainer: View {
         appearance.backgroundColor = nil
         appearance.barTintColor = nil
 
-        // Update tint color for selected items
+        // Update tint color for selected items - using accent/secondary like in experiment
         appearance.tintColor = UIColor(themeManager.currentTheme.primaryAccent)
-        appearance.unselectedItemTintColor = UIColor.white.withAlphaComponent(0.5)
+        appearance.unselectedItemTintColor = UIColor.secondaryLabel
     }
 
     private func updateTabBarAppearance() {

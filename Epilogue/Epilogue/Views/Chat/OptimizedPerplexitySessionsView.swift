@@ -18,7 +18,7 @@ struct OptimizedPerplexitySessionsView: View {
     var body: some View {
         NavigationStack {
             mainContent
-                .navigationTitle("Chat")
+                .navigationTitle("Sessions")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {

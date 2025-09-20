@@ -85,19 +85,19 @@ public enum GradientTheme: String, CaseIterable, Codable {
         case .amber:
             return Color(red: 1.0, green: 0.55, blue: 0.26)  // Original amber
         case .ocean:
-            return Color(red: 0.0, green: 0.58, blue: 0.71)  // Deep ocean teal
+            return Color(red: 0.05, green: 0.65, blue: 0.82)  // Bright ocean teal
         case .forest:
-            return Color(red: 0.27, green: 0.53, blue: 0.36) // Forest green
+            return Color(red: 0.34, green: 0.62, blue: 0.42) // Vibrant forest green
         case .sunset:
-            return Color(red: 0.94, green: 0.42, blue: 0.48) // Sunset coral
+            return Color(red: 0.98, green: 0.45, blue: 0.52) // Bright sunset coral
         case .midnight:
-            return Color(red: 0.17, green: 0.24, blue: 0.61) // Midnight blue
+            return Color(red: 0.22, green: 0.32, blue: 0.72) // Electric midnight blue
         case .volcanic:
-            return Color(red: 0.89, green: 0.29, blue: 0.15) // Volcanic orange
+            return Color(red: 0.95, green: 0.35, blue: 0.18) // Bright volcanic orange
         case .aurora:
-            return Color(red: 0.40, green: 0.93, blue: 0.71) // Aurora green
+            return Color(red: 0.45, green: 0.95, blue: 0.75) // Bright aurora mint
         case .nebula:
-            return Color(red: 0.58, green: 0.29, blue: 0.92) // Nebula purple
+            return Color(red: 0.65, green: 0.35, blue: 0.95) // Bright nebula purple
         }
     }
 
@@ -114,52 +114,52 @@ public enum GradientTheme: String, CaseIterable, Codable {
             ]
         case .ocean:
             return [
-                Color(red: 0.0, green: 0.58, blue: 0.71),
-                Color(red: 0.0, green: 0.48, blue: 0.65),
-                Color(red: 0.0, green: 0.38, blue: 0.58),
-                Color(red: 0.0, green: 0.28, blue: 0.45)
+                Color(red: 0.05, green: 0.65, blue: 0.82),  // Brighter teal
+                Color(red: 0.02, green: 0.52, blue: 0.75),  // Deep ocean blue
+                Color(red: 0.0, green: 0.42, blue: 0.68),   // Rich marine
+                Color(red: 0.0, green: 0.32, blue: 0.55)    // Dark depth
             ]
         case .forest:
             return [
-                Color(red: 0.27, green: 0.53, blue: 0.36),
-                Color(red: 0.22, green: 0.45, blue: 0.31),
-                Color(red: 0.17, green: 0.37, blue: 0.26),
-                Color(red: 0.12, green: 0.29, blue: 0.21)
+                Color(red: 0.34, green: 0.62, blue: 0.42),  // Fresh spring green
+                Color(red: 0.28, green: 0.54, blue: 0.38),  // Vibrant forest
+                Color(red: 0.20, green: 0.45, blue: 0.32),  // Deep emerald
+                Color(red: 0.14, green: 0.35, blue: 0.25)   // Dark forest floor
             ]
         case .sunset:
             return [
-                Color(red: 0.94, green: 0.42, blue: 0.48),
-                Color(red: 0.95, green: 0.51, blue: 0.38),
-                Color(red: 0.96, green: 0.60, blue: 0.42),
-                Color(red: 0.89, green: 0.35, blue: 0.51)
+                Color(red: 0.98, green: 0.45, blue: 0.52),  // Bright coral pink
+                Color(red: 0.96, green: 0.58, blue: 0.42),  // Golden peach
+                Color(red: 0.94, green: 0.68, blue: 0.48),  // Warm apricot
+                Color(red: 0.92, green: 0.38, blue: 0.58)   // Magenta blush
             ]
         case .midnight:
             return [
-                Color(red: 0.17, green: 0.24, blue: 0.61),
-                Color(red: 0.12, green: 0.18, blue: 0.51),
-                Color(red: 0.07, green: 0.12, blue: 0.41),
-                Color(red: 0.02, green: 0.06, blue: 0.31)
+                Color(red: 0.22, green: 0.32, blue: 0.72),  // Electric indigo
+                Color(red: 0.15, green: 0.25, blue: 0.62),  // Royal blue
+                Color(red: 0.08, green: 0.18, blue: 0.52),  // Deep sapphire
+                Color(red: 0.03, green: 0.08, blue: 0.38)   // Midnight abyss
             ]
         case .volcanic:
             return [
-                Color(red: 0.89, green: 0.29, blue: 0.15),
-                Color(red: 0.85, green: 0.20, blue: 0.10),
-                Color(red: 0.75, green: 0.15, blue: 0.08),
-                Color(red: 0.65, green: 0.10, blue: 0.05)
+                Color(red: 0.95, green: 0.35, blue: 0.18),  // Bright lava orange
+                Color(red: 0.88, green: 0.25, blue: 0.12),  // Molten core
+                Color(red: 0.78, green: 0.18, blue: 0.08),  // Deep magma
+                Color(red: 0.68, green: 0.12, blue: 0.05)   // Volcanic ash
             ]
         case .aurora:
             return [
-                Color(red: 0.40, green: 0.93, blue: 0.71),
-                Color(red: 0.30, green: 0.85, blue: 0.85),
-                Color(red: 0.50, green: 0.70, blue: 0.95),
-                Color(red: 0.60, green: 0.55, blue: 0.90)
+                Color(red: 0.45, green: 0.95, blue: 0.75),  // Bright mint
+                Color(red: 0.35, green: 0.88, blue: 0.88),  // Arctic cyan
+                Color(red: 0.55, green: 0.75, blue: 0.98),  // Sky blue
+                Color(red: 0.65, green: 0.60, blue: 0.95)   // Lavender glow
             ]
         case .nebula:
             return [
-                Color(red: 0.58, green: 0.29, blue: 0.92),
-                Color(red: 0.48, green: 0.25, blue: 0.85),
-                Color(red: 0.38, green: 0.20, blue: 0.75),
-                Color(red: 0.28, green: 0.15, blue: 0.65)
+                Color(red: 0.65, green: 0.35, blue: 0.95),  // Bright cosmic purple
+                Color(red: 0.55, green: 0.28, blue: 0.88),  // Electric violet
+                Color(red: 0.42, green: 0.22, blue: 0.78),  // Deep purple
+                Color(red: 0.32, green: 0.18, blue: 0.68)   // Dark nebula
             ]
         }
     }

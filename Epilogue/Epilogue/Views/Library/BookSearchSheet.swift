@@ -9,12 +9,14 @@ struct BookSearchSheet: View {
     var mode: Mode = .add
     @Environment(\.dismiss) private var dismiss
     @StateObject private var booksService = GoogleBooksService()
+    @StateObject private var trendingService = TrendingBooksService.shared
     @State private var searchResults: [Book] = []
     @State private var isLoading = true
     @State private var searchError: String?
     @State private var refinedSearchQuery: String = ""
     @State private var hasAutoSearched = false
     @FocusState private var isSearchFocused: Bool
+    @State private var selectedFilter: TrendingBooksService.TrendingFilter = .currentYear
     
     var body: some View {
         NavigationStack {
@@ -30,7 +32,13 @@ struct BookSearchSheet: View {
                         } else if let error = searchError {
                             errorView(error: error)
                         } else if searchResults.isEmpty {
-                            emptyStateView
+                            // Show bestsellers when no search results and no query
+                            if searchQuery.isEmpty && refinedSearchQuery.isEmpty {
+                                bestsellersView
+                                    .padding(.top, 24)
+                            } else {
+                                emptyStateView
+                            }
                         } else {
                             resultsView
                                 .padding(.top, 24)
@@ -57,11 +65,13 @@ struct BookSearchSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(32)
-        .presentationBackground(.black.opacity(0.95))
+        .presentationBackground(.clear)
         .onAppear {
             print("📚 BookSearchSheet appeared with query: '\(searchQuery)'")
             refinedSearchQuery = searchQuery
             if searchQuery.isEmpty {
+                // Start not loading to show bestsellers immediately
+                isLoading = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { isSearchFocused = true }
             }
         }
@@ -73,11 +83,20 @@ struct BookSearchSheet: View {
         }
     }
     
-    // MARK: - Ambient Gradient Background
+    // MARK: - Ambient Gradient Background - MATCHING AMBIENT SESSION SUMMARY
     private var ambientGradientBackground: some View {
-        // Simple dark background for modal sheets
-        Color.black.opacity(0.95)
-            .ignoresSafeArea()
+        ZStack {
+            // Permanent ambient gradient background - EXACTLY LIKE SESSION SUMMARY
+            AmbientChatGradientView()
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+
+            // Subtle darkening overlay for better readability
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+        }
     }
     
     // MARK: - Search Input Bar (Bottom)
@@ -96,7 +115,7 @@ struct BookSearchSheet: View {
                 // Text input
                 ZStack(alignment: .leading) {
                     if refinedSearchQuery.isEmpty {
-                        Text("Search for books...")
+                        Text("Search for books")
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                             .font(.system(size: 16))
                             .lineLimit(1)
@@ -180,7 +199,7 @@ struct BookSearchSheet: View {
                 }
             }
             
-            Text(searchQuery.isEmpty ? "Searching..." : "Searching for \"\(searchQuery)\"...")
+            Text(searchQuery.isEmpty ? "Searching" : "Searching for \"\(searchQuery)\"")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white.opacity(0.7))
         }
@@ -209,6 +228,150 @@ struct BookSearchSheet: View {
         .padding(.top, 80)
     }
     
+    // MARK: - Bestsellers View
+    private var bestsellersView: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Header with Filter
+            HStack {
+                Text("TRENDING BOOKS")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .tracking(1.2)
+
+                Spacer()
+
+                // Filter Menu
+                Menu {
+                    ForEach(TrendingBooksService.TrendingFilter.allCases, id: \.self) { filter in
+                        Button(action: {
+                            selectedFilter = filter
+                            Task {
+                                await trendingService.fetchTrendingBooks(for: filter)
+                            }
+                        }) {
+                            Label(filter.rawValue, systemImage: filter.icon)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: selectedFilter.icon)
+                            .font(.caption)
+                        Text(selectedFilter.rawValue)
+                            .font(.caption)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .glassEffect(.regular, in: Capsule())
+                }
+            }
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+
+            // Loading or Grid
+            if trendingService.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(DesignSystem.Colors.primaryAccent)
+                        .frame(height: 150)
+                    Spacer()
+                }
+            } else if !trendingService.trendingBooks.isEmpty {
+                // Grid of dynamic trending books
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 20) {
+                    ForEach(trendingService.trendingBooks, id: \.id) { book in
+                        BestsellerBookCard(book: book) {
+                            onBookSelected(book)
+                            dismiss()
+                        }
+                    }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            } else {
+                // Fallback to static books if service hasn't loaded yet
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 20) {
+                    ForEach(bestsellerBooks, id: \.id) { book in
+                        BestsellerBookCard(book: book) {
+                            onBookSelected(book)
+                            dismiss()
+                        }
+                    }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            }
+        }
+        .task {
+            // Load trending books if not already loaded
+            if trendingService.trendingBooks.isEmpty {
+                await trendingService.fetchTrendingBooks(for: selectedFilter)
+            }
+        }
+    }
+
+    // Current bestsellers - 2025 with Google Books URLs
+    private var bestsellerBooks: [Book] {
+        [
+            Book(
+                id: "onyx-storm-2025",
+                title: "Onyx Storm",
+                author: "Rebecca Yarros",
+                publishedYear: "2025",
+                coverImageURL: "https://books.google.com/books/content?id=8u3PEAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                isbn: "9781649375025"
+            ),
+            Book(
+                id: "the-women-2024",
+                title: "The Women",
+                author: "Kristin Hannah",
+                publishedYear: "2024",
+                coverImageURL: "https://books.google.com/books/content?id=7pXEEAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                isbn: "9781250178633"
+            ),
+            Book(
+                id: "funny-story-2024",
+                title: "Funny Story",
+                author: "Emily Henry",
+                publishedYear: "2024",
+                coverImageURL: "https://books.google.com/books/content?id=rIPJEAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                isbn: "9780593441282"
+            ),
+            Book(
+                id: "the-housemaid-2024",
+                title: "The Housemaid",
+                author: "Freida McFadden",
+                publishedYear: "2024",
+                coverImageURL: "https://books.google.com/books/content?id=DFy8EAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                isbn: "9781538742570"
+            ),
+            Book(
+                id: "just-for-the-summer-2024",
+                title: "Just for the Summer",
+                author: "Abby Jimenez",
+                publishedYear: "2024",
+                coverImageURL: "https://books.google.com/books/content?id=PZPJEAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                isbn: "9781538704431"
+            ),
+            Book(
+                id: "the-god-of-the-woods-2024",
+                title: "The God of the Woods",
+                author: "Liz Moore",
+                publishedYear: "2024",
+                coverImageURL: "https://books.google.com/books/content?id=2zXOEAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                isbn: "9780593449738"
+            )
+        ]
+    }
+
     // MARK: - Empty State View (Minimal Design)
     private var emptyStateView: some View {
         VStack {
@@ -302,12 +465,13 @@ struct BookSearchSheet: View {
         isLoading = true
         searchError = nil
         
+        // Use enhanced service ranking for better results
         // Call searchBooks which updates the service's searchResults property
         await booksService.searchBooks(query: query)
-        
+
         // Get the results from the service
         searchResults = booksService.searchResults
-        print("📖 Found \(searchResults.count) results for: '\(query)'")
+        print("📖 Found \(searchResults.count) ranked results for: '\(query)'")
         
         if searchResults.isEmpty {
             // Try spell correction
@@ -322,7 +486,7 @@ struct BookSearchSheet: View {
         // Check for errors
         if let error = booksService.errorMessage {
             searchError = error
-            print("❌ Search error: \(error)")
+            print("❌ Search error:  (error)")
         }
         
         isLoading = false
@@ -625,5 +789,102 @@ struct BookSearchResultCard: View {
     
     private var cardBorderColor: Color {
         isPressed ? DesignSystem.Colors.primaryAccent.opacity(0.3) : Color.white.opacity(0.1)
+    }
+}
+
+// MARK: - Bestseller Book Card
+struct BestsellerBookCard: View {
+    let book: Book
+    let onAdd: () -> Void
+    @State private var isAdding = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Book cover with add button overlay
+            ZStack(alignment: .topTrailing) {
+                // Book cover
+                if let coverURL = book.coverImageURL {
+                    AsyncImage(url: URL(string: coverURL)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 100, height: 150)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white.opacity(0.05))
+                            .frame(width: 100, height: 150)
+                            .overlay {
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(Color.white.opacity(0.2))
+                            }
+                    }
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.05))
+                        .frame(width: 100, height: 150)
+                        .overlay {
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(Color.white.opacity(0.2))
+                        }
+                }
+
+                // Add button with glass effect
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        isAdding = true
+                    }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onAdd()
+
+                    // Reset after animation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isAdding = false
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
+                            .frame(width: 32, height: 32)
+                            .glassEffect(.regular, in: Circle())
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(
+                                        DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                        lineWidth: 0.5
+                                    )
+                            }
+
+                        Image(systemName: isAdding ? "checkmark" : "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                }
+                .offset(x: 6, y: -6)
+                .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 4, y: 2)
+            }
+
+            // Title
+            Text(book.title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: 100)
+                .padding(.top, 8)
+
+            // Author
+            Text(book.author)
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.5))
+                .lineLimit(1)
+                .frame(width: 100)
+                .padding(.top, 2)
+        }
+        .scaleEffect(isAdding ? 0.95 : 1.0)
+        .animation(.spring(response: 0.3), value: isAdding)
     }
 }

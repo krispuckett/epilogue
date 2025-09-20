@@ -262,6 +262,11 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }
     }
 
+    // MARK: - Trending (Current Year)
+    private static var trendingCache: (year: Int, books: [Book], timestamp: Date)?
+    
+    // Removed trending fetch from service for safety; UI fallbacks remain.
+
     // Fetch a single raw GoogleBookItem by ISBN (used for language checks)
     func fetchRawByISBN(_ isbn: String) async -> GoogleBookItem? {
         let query = "isbn:\(isbn)"

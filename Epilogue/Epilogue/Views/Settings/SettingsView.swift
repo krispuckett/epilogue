@@ -24,6 +24,7 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
 
     // Get app version
     private var appVersion: String {
@@ -52,6 +53,19 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Appearance")
+                }
+
+                // MARK: - Library Management
+                Section {
+                    NavigationLink {
+                        CleanGoodreadsImportView()
+                            .environmentObject(libraryViewModel)
+                    } label: {
+                        Label("Import from Goodreads", systemImage: "books.vertical.fill")
+                            .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                    }
+                } header: {
+                    Text("Library")
                 }
 
                 // MARK: - AI Assistant

@@ -65,7 +65,7 @@ struct MinimalSessionsView: View {
                 }
             }
         }
-        .navigationTitle("Chat")
+        .navigationTitle("Sessions")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
         .fullScreenCover(isPresented: $showingNewChat) {
