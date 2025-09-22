@@ -315,40 +315,51 @@ struct AmbientReadingProgressView: View {
                         .scaleEffect(isDragging ? 1.1 : 1.0)
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging)
                         .offset(x: (geometry.size.width - 28) * animatedProgress)
+                        .gesture(
+                            DragGesture(minimumDistance: 5)
+                                .onChanged { value in
+                                    // Only respond to horizontal drags
+                                    // Check if the drag is more horizontal than vertical
+                                    let horizontalAmount = abs(value.translation.width)
+                                    let verticalAmount = abs(value.translation.height)
+
+                                    // Ignore if the drag is more vertical than horizontal
+                                    guard horizontalAmount > verticalAmount * 1.5 else {
+                                        return
+                                    }
+
+                                    // Set dragging state
+                                    if !isDragging {
+                                        isDragging = true
+                                        SensoryFeedback.impact(.light)
+                                    }
+
+                                    // Calculate new progress based on drag translation
+                                    let dragLocation = animatedProgress * geometry.size.width + value.translation.width
+                                    let newProgress = min(max(0, dragLocation / geometry.size.width), 1.0)
+                                    let newPage = Int(Double(totalPages) * newProgress)
+
+                                    // Update progress immediately for smooth feedback
+                                    withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.9)) {
+                                        animatedProgress = newProgress
+                                    }
+
+                                    // Update the book's current page
+                                    viewModel.updateCurrentPage(for: book, to: newPage)
+
+                                    // Subtle haptic on significant changes
+                                    let progressDiff = abs(newProgress - progress)
+                                    if progressDiff > 0.05 {
+                                        SensoryFeedback.selection()
+                                    }
+                                }
+                                .onEnded { _ in
+                                    // Release dragging state
+                                    isDragging = false
+                                    SensoryFeedback.impact(.light)
+                                }
+                        )
                 }
-                .contentShape(Rectangle()) // Make entire area tappable
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            // Set dragging state
-                            if !isDragging {
-                                isDragging = true
-                                SensoryFeedback.impact(.light)
-                            }
-
-                            let newProgress = min(max(0, value.location.x / geometry.size.width), 1.0)
-                            let newPage = Int(Double(totalPages) * newProgress)
-
-                            // Update progress immediately for smooth feedback
-                            withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.9)) {
-                                animatedProgress = newProgress
-                            }
-
-                            // Update the book's current page
-                            viewModel.updateCurrentPage(for: book, to: newPage)
-
-                            // Subtle haptic on significant changes
-                            let progressDiff = abs(newProgress - progress)
-                            if progressDiff > 0.05 {
-                                SensoryFeedback.selection()
-                            }
-                        }
-                        .onEnded { _ in
-                            // Release dragging state
-                            isDragging = false
-                            SensoryFeedback.impact(.light)
-                        }
-                )
             }
             .frame(height: 24)
         }

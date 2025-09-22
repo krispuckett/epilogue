@@ -141,10 +141,8 @@ struct ThemeSelectionView: View {
     private func applyTheme() {
         themeManager.setTheme(selectedTheme)
 
-        // Force immediate dismiss to trigger view refresh
-        DispatchQueue.main.async {
-            dismiss()
-        }
+        // Don't dismiss - just apply the theme
+        // The user can navigate back when ready
     }
 }
 

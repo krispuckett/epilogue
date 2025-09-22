@@ -121,16 +121,15 @@ struct BookSearchSheet: View {
                             .lineLimit(1)
                     }
                     
-                    TextField("", text: $refinedSearchQuery, axis: .vertical)
+                    TextField("", text: $refinedSearchQuery)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
                         .foregroundStyle(.white)
                         .accentColor(DesignSystem.Colors.primaryAccent)
                         .focused($isSearchFocused)
-                        .lineLimit(1...5)
-                        .fixedSize(horizontal: false, vertical: true)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                        .submitLabel(.search)
                         .onSubmit {
                             if !refinedSearchQuery.isEmpty {
                                 performSearchWithQuery(refinedSearchQuery)
@@ -199,7 +198,9 @@ struct BookSearchSheet: View {
                 }
             }
             
-            Text(searchQuery.isEmpty ? "Searching" : "Searching for \"\(searchQuery)\"")
+            Text(refinedSearchQuery.isEmpty ?
+                 (searchQuery.isEmpty ? "Searching..." : "Searching for \"\(searchQuery)\"...") :
+                 "Searching for \"\(refinedSearchQuery)\"...")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white.opacity(0.7))
         }
@@ -376,16 +377,16 @@ struct BookSearchSheet: View {
     private var emptyStateView: some View {
         VStack {
             Spacer()
-            
+
             VStack(spacing: 24) {
-                // Only show "no results" if they actually searched for something
-                if !searchQuery.isEmpty {
+                // Show appropriate message based on search state
+                if !searchQuery.isEmpty || !refinedSearchQuery.isEmpty {
                     VStack(spacing: 12) {
                         Text("No results found")
                             .font(.system(size: 32, weight: .semibold, design: .default))
                             .foregroundStyle(.white)
-                        
-                        Text("for \"\(searchQuery)\"")
+
+                        Text("for \"\(refinedSearchQuery.isEmpty ? searchQuery : refinedSearchQuery)\"")
                             .font(.system(size: 18, weight: .regular))
                             .foregroundStyle(.white.opacity(0.6))
                     }
