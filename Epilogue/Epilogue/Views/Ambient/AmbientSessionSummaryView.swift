@@ -13,7 +13,6 @@ struct AmbientSessionSummaryView: View {
     @State private var isProcessingFollowUp = false
     @State private var additionalMessages: [UnifiedChatMessage] = []
     @FocusState private var isInputFocused: Bool
-    @State private var showingCommandPalette = false
     @State private var isRecording = false
     @State private var contentOffset: CGFloat = 0
     @State private var isKeyInsightExpanded = false
@@ -23,6 +22,9 @@ struct AmbientSessionSummaryView: View {
     @State private var generatedInsight: String? = nil
     @State private var isGeneratingInsight = false
     @State private var showingChat = false
+    @State private var showingAmbientMode = false
+    @State private var textFieldHeight: CGFloat = 44
+    @State private var showQuickActions = false
     @StateObject private var quotaManager = PerplexityQuotaManager.shared
 
     @Environment(\.dismiss) private var dismiss
@@ -139,10 +141,11 @@ struct AmbientSessionSummaryView: View {
             .sheet(isPresented: $quotaManager.showQuotaExceededSheet) {
                 QuotaExceededView()
             }
-        }
-        .overlay {
-            if showingCommandPalette {
-                commandPaletteOverlay
+            .fullScreenCover(isPresented: $showingAmbientMode) {
+                NavigationStack {
+                    AmbientModeView()
+                        .environmentObject(libraryViewModel)
+                }
             }
         }
     }
@@ -510,41 +513,181 @@ struct AmbientSessionSummaryView: View {
                 .padding(.bottom, 16)
             }
             
-            // Universal Input Bar - matching UnifiedChatView
-            UniversalInputBar(
-                messageText: $continuationText,
-                showingCommandPalette: $showingCommandPalette,
-                isInputFocused: $isInputFocused,
-                context: .chat(book: session.book),
-                onSend: sendFollowUp,
-                onMicrophoneTap: handleMicrophoneTap,
-                isRecording: $isRecording,
-                colorPalette: colorPalette,
-                isAmbientMode: true
-            )
-            .padding(.horizontal, 10)
-            .padding(.vertical, 16)
-        }
-    }
-    
-    // MARK: - Command Palette Overlay
-    private var commandPaletteOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    showingCommandPalette = false
+            // Input bar with proper layout
+            HStack(spacing: 12) {
+                // Glass input container that expands
+                VStack(spacing: 0) {
+                    // Main input row
+                    HStack(spacing: 12) {
+                        // Plus button that expands to show quick actions
+                        Button {
+                            if !showQuickActions {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showQuickActions = true
+                                }
+                                isInputFocused = true
+                            } else {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                    showQuickActions = false
+                                }
+                            }
+                            SensoryFeedback.light()
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .frame(width: 36, height: 36)
+                                .contentShape(Circle())
+                                .rotationEffect(.degrees(showQuickActions ? 45 : 0))
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showQuickActions)
+                        }
+
+                        // Text input field
+                        VStack(spacing: 0) {
+                            HStack {
+                                if showQuickActions {
+                                    // Active text field when expanded
+                                    TextField("Continue the conversation...", text: $continuationText, axis: .vertical)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 17))
+                                        .foregroundStyle(.white)
+                                        .tint(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                        .lineLimit(1...5)
+                                        .focused($isInputFocused)
+                                        .onSubmit {
+                                            if !continuationText.isEmpty {
+                                                sendFollowUp()
+                                            }
+                                        }
+                                } else {
+                                    // Clean input field
+                                    TextField("Continue the conversation...", text: $continuationText, axis: .vertical)
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 17))
+                                        .foregroundStyle(.white)
+                                        .tint(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                        .lineLimit(1...3)
+                                        .focused($isInputFocused)
+                                        .onSubmit {
+                                            if !continuationText.isEmpty {
+                                                sendFollowUp()
+                                            }
+                                        }
+                                }
+
+                                Spacer()
+                            }
+                        }
+
+                        // Right side buttons
+                        HStack(spacing: 14) {
+                            // Submit button when there's text
+                            if !continuationText.isEmpty {
+                                Button {
+                                    sendFollowUp()
+                                } label: {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
+                                            .frame(width: 36, height: 36)
+                                            .glassEffect(in: Circle())
+                                            .overlay {
+                                                Circle()
+                                                    .strokeBorder(
+                                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3),
+                                                        lineWidth: 0.5
+                                                    )
+                                            }
+
+                                        Image(systemName: "arrow.up")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                            }
+
+                            // Ambient orb
+                            Button {
+                                reopenAmbientMode()
+                            } label: {
+                                AmbientOrbButton(size: 36) {
+                                    // Action handled by parent
+                                }
+                                .allowsHitTesting(false)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+
+                    // Quick actions (only when expanded)
+                    if showQuickActions {
+                        VStack(spacing: 0) {
+                            Divider()
+                                .background(Color.white.opacity(0.1))
+
+                            VStack(spacing: 0) {
+                                // Ask About Books
+                                QuickActionRow(
+                                    icon: "bubble.left.and.bubble.right",
+                                    title: "Ask About Books",
+                                    subtitle: "Get insights from your library",
+                                    warmAmber: Color(red: 1.0, green: 0.549, blue: 0.259),
+                                    action: {
+                                        continuationText = "What themes connect across my reading?"
+                                        showQuickActions = false
+                                        sendFollowUp()
+                                    }
+                                )
+
+                                // Reading Insights
+                                QuickActionRow(
+                                    icon: "lightbulb",
+                                    title: "Reading Insights",
+                                    subtitle: "Discover patterns in your notes",
+                                    warmAmber: Color(red: 1.0, green: 0.549, blue: 0.259),
+                                    action: {
+                                        continuationText = "What patterns do you see in my notes and highlights?"
+                                        showQuickActions = false
+                                        sendFollowUp()
+                                    }
+                                )
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                    }
                 }
-            
-            ChatCommandPalette(
-                isPresented: $showingCommandPalette,
-                selectedBook: .constant(session.book),
-                commandText: $continuationText
-            )
-            .environmentObject(libraryViewModel)
-            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-            .padding(.bottom, 100)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.white.opacity(0.001))
+                )
+                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.25),
+                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                .shadow(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15), radius: 16, y: 6)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showQuickActions)
     }
     
     // MARK: - Helper Functions
@@ -878,6 +1021,11 @@ struct AmbientSessionSummaryView: View {
         guard let bookModel = bookModel else { return nil }
         return libraryViewModel.books.first { $0.id == bookModel.id }
     }
+
+    private func reopenAmbientMode() {
+        showingAmbientMode = true
+    }
+
 }
 
 // MARK: - Minimal Thread View
@@ -1137,5 +1285,102 @@ struct MinimalMessageView: View {
         } catch {
             return AttributedString(formattedText)
         }
+    }
+}
+
+// MARK: - Session Quick Actions Menu (Direct actions, no input field)
+struct SessionQuickActionsMenu: View {
+    @Binding var isPresented: Bool
+    let onTextSubmit: (String) -> Void
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @StateObject private var themeManager = ThemeManager.shared
+
+    var body: some View {
+        VStack {
+            Spacer()
+
+            // Position menu above the input field (with proper spacing)
+            VStack(spacing: 0) {
+                // Quick actions
+                VStack(spacing: 0) {
+                    // Ask About Books
+                    Button {
+                        onTextSubmit("What themes connect across my reading?")
+                        isPresented = false
+                    } label: {
+                        HStack(spacing: 16) {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .font(.system(size: 22))
+                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                .frame(width: 32)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Ask About Books")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Text("Get insights from your library")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white.opacity(0.3))
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+
+                    // Reading Insights
+                    Button {
+                        onTextSubmit("What patterns do you see in my notes and highlights?")
+                        isPresented = false
+                    } label: {
+                        HStack(spacing: 16) {
+                            Image(systemName: "lightbulb")
+                                .font(.system(size: 22))
+                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                .frame(width: 32)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Reading Insights")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Text("Discover patterns in your notes")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white.opacity(0.3))
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.001))
+            )
+            .glassEffect(.regular, in: .rect(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+            .frame(maxWidth: 340)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100) // Position above the input field
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isPresented)
     }
 }

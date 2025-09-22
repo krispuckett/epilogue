@@ -188,6 +188,7 @@ struct AmbientModeView: View {
     @AppStorage("ambientModeOnboardingShown") private var onboardingShownCount: Int = 0
 
     @Environment(\.dismiss) private var dismiss
+    @State private var isPresentedModally = false
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
@@ -697,6 +698,23 @@ struct AmbientModeView: View {
             if showingBookStrip {
                 bookStripOverlay
             }
+        }
+        .toolbar {
+            // Add Done button when presented modally (from session summary)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isPresentedModally {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .onAppear {
+            // Check if we're presented modally
+            // When opened from session summary, we're in a NavigationStack
+            isPresentedModally = true
         }
     }
     
@@ -1211,37 +1229,58 @@ struct AmbientModeView: View {
                         startContainerBreathing()
                     }
 
-                    // Morphing button - waveform when empty, submit when has text
+                    // Morphing button - ambient orb when empty, submit arrow when has text
                     if inputMode == .textInput {
-                        Button {
-                            if !keyboardText.isEmpty {
-                                // Submit the message
-                                // Removed blur wave for cleaner submission
-                                sendTextMessage()
-                            } else {
-                                // Return to voice mode
-                                isKeyboardFocused = false
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
-                                    keyboardText = ""
-                                    textFieldHeight = 44  // Reset to compact height
-                                    inputMode = .listening
+                        ZStack {
+                            // Ambient orb when no text
+                            if keyboardText.isEmpty {
+                                Button {
+                                    // Return to voice mode
+                                    isKeyboardFocused = false
+                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
+                                        keyboardText = ""
+                                        textFieldHeight = 44  // Reset to compact height
+                                        inputMode = .listening
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                        startRecording()
+                                    }
+                                } label: {
+                                    AmbientOrbButton(size: 48) {
+                                        // Action handled by parent button
+                                    }
+                                    .allowsHitTesting(false)
                                 }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                    startRecording()
-                                }
+                                .transition(.scale.combined(with: .opacity))
                             }
-                        } label: {
-                            Circle()
-                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
-                                .frame(width: 48, height: 48)
-                                .glassEffect()
-                                .overlay(
-                                    Image(systemName: keyboardText.isEmpty ? "waveform" : "arrow.up")
-                                        .font(.system(size: 20, weight: keyboardText.isEmpty ? .medium : .semibold, design: .rounded))
-                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                        .contentTransition(.symbolEffect(.replace))
-                                )
+
+                            // Submit arrow when text exists - with liquid glass
+                            if !keyboardText.isEmpty {
+                                Button {
+                                    sendTextMessage()
+                                } label: {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
+                                            .frame(width: 48, height: 48)
+                                            .glassEffect(in: Circle())
+                                            .overlay {
+                                                Circle()
+                                                    .strokeBorder(
+                                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3),
+                                                        lineWidth: 0.5
+                                                    )
+                                            }
+
+                                        Image(systemName: "arrow.up")
+                                            .font(.system(size: 20, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                            }
                         }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardText.isEmpty)
                         .transition(.opacity)
                         .animation(inputMode == .textInput ?
                             .easeIn(duration: 0.1).delay(0.5) :  // Appear AFTER text at 100% complete
