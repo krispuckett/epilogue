@@ -58,33 +58,19 @@ struct AdvancedOnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Add black background for all screens EXCEPT shader
-            if currentPage < pages.count {
-                if pages[currentPage].type != .shaderScreen {
-                    Color.black
-                        .ignoresSafeArea()
-                } else {
-                    // For shader screen, use clear color to allow full transparency
-                    Color.clear
-                        .ignoresSafeArea()
+            // Black background base for all screens
+            Color.black
+                .ignoresSafeArea(.all)
+            
+            // TabView for swipe navigation
+            TabView(selection: $currentPage) {
+                ForEach(pages.indices, id: \.self) { index in
+                    pageContent(for: pages[index])
+                        .tag(index)
                 }
             }
-
-            // Current page content with polished transitions
-            if currentPage < pages.count {
-                pageContent(for: pages[currentPage])
-                    .id(currentPage) // Force view recreation for smooth transitions
-                    .transition(.asymmetric(
-                        insertion: AnyTransition.scale(scale: 0.95, anchor: .center)
-                            .combined(with: .opacity)
-                            .combined(with: .move(edge: .trailing)),
-                        removal: AnyTransition.scale(scale: 1.05, anchor: .center)
-                            .combined(with: .opacity)
-                            .combined(with: .move(edge: .leading))
-                    ))
-                    .zIndex(Double(currentPage)) // Proper layering during transitions
-                    .animation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0), value: currentPage)
-            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            .animation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0), value: currentPage)
         }
         .opacity(viewOpacity)
         .onAppear {
@@ -109,45 +95,9 @@ struct AdvancedOnboardingView: View {
     @ViewBuilder
     private func shaderWelcomeScreen(page: OnboardingPage) -> some View {
         ZStack {
-            // Top amber gradient
-            VStack {
-                LinearGradient(
-                    stops: [
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.3), location: 0.0),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.2), location: 0.15),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.1), location: 0.3),
-                        .init(color: Color.clear, location: 0.6),
-                        .init(color: Color.clear, location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: UIScreen.main.bounds.height * 0.5)
-                .blur(radius: 50)
-                .ignoresSafeArea()
-
-                Spacer()
-            }
-
-            // Bottom amber gradient
-            VStack {
-                Spacer()
-
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.clear, location: 0.0),
-                        .init(color: Color.clear, location: 0.3),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.15), location: 0.6),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.25), location: 0.85),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.35), location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: UIScreen.main.bounds.height * 0.5)
-                .blur(radius: 50)
-                .ignoresSafeArea()
-            }
+            // Use the same gradient approach as LibraryView
+            AmbientChatGradientView()
+                .opacity(0.5)
 
             VStack(spacing: 40) {
                 Spacer()
@@ -185,44 +135,52 @@ struct AdvancedOnboardingView: View {
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                         .padding(.horizontal, 40)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer()
+                
+                // Progress indicator - moved above button
+                VStack(spacing: 20) {
+                    PageIndicator(currentPage: currentPage, pageCount: pages.count)
+                        .opacity(showButton ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.9), value: showButton)
+                    
+                    // Continue button - closer to safe area
+                    Button {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
+                            pageTransition = true
+                            if currentPage < pages.count - 1 {
+                                currentPage += 1
+                            } else {
+                                completeOnboarding()
+                            }
 
-                // Continue button - matching other navigation buttons
-                Button {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                        pageTransition = true
-                        if currentPage < pages.count - 1 {
-                            currentPage += 1
-                        } else {
-                            completeOnboarding()
+                            // Reset states for next page
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                showContent = false
+                                showButton = false
+                                pageTransition = false
+                            }
                         }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Get Started")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
 
-                        // Reset states for next page
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            showContent = false
-                            showButton = false
-                            pageTransition = false
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
                         }
+                        .padding(.horizontal, 30)
+                        .frame(height: 50)
+                        .glassEffect(in: Capsule())
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Text("Get Started")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
-
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 30)
-                    .frame(height: 50)
-                    .glassEffect(in: Capsule())
+                    .opacity(showButton ? 1 : 0)
+                    .offset(y: showButton ? 0 : 20)
                 }
-                .opacity(showButton ? 1 : 0)
-                .offset(y: showButton ? 0 : 20)
-                .padding(.bottom, 60)
+                .padding(.bottom, 40)
             }
             .onAppear {
                 // Staggered animations for smooth entrance
@@ -233,12 +191,6 @@ struct AdvancedOnboardingView: View {
                     showButton = true
                 }
             }
-
-            // Progress indicator at bottom
-            PageIndicator(currentPage: currentPage, pageCount: pages.count)
-                .padding(.bottom, 30)
-                .opacity(showButton ? 1 : 0)
-                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.9), value: showButton)
         }
     }
 
@@ -246,24 +198,9 @@ struct AdvancedOnboardingView: View {
     @ViewBuilder
     private func videoScreen(page: OnboardingPage) -> some View {
         ZStack {
-            // Amber gradient at bottom for depth
-            VStack {
-                Spacer()
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.clear, location: 0.0),
-                        .init(color: Color.clear, location: 0.3),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.1), location: 0.6),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.2), location: 0.85),
-                        .init(color: themeManager.currentTheme.primaryAccent.opacity(0.25), location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: UIScreen.main.bounds.height * 0.5)
-                .blur(radius: 40)
-                .ignoresSafeArea()
-            }
+            // Use the same gradient approach as LibraryView
+            AmbientChatGradientView()
+                .opacity(0.4)
 
             VStack(spacing: 0) {
                 // Reduced top spacing - video closer to top
@@ -373,14 +310,55 @@ struct AdvancedOnboardingView: View {
 
                 Spacer()
 
-                // Navigation buttons - moved down
-                HStack {
-                    // Back button with animation
-                    if currentPage > 0 {
+                // Progress indicator and navigation
+                VStack(spacing: 20) {
+                    // Progress indicator - moved above buttons
+                    PageIndicator(currentPage: currentPage, pageCount: pages.count)
+                        .opacity(showButton ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: showButton)
+
+                    // Navigation buttons
+                    HStack {
+                        // Back button with animation
+                        if currentPage > 0 {
+                            Button {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
+                                    pageTransition = true
+                                    currentPage -= 1
+
+                                    // Reset states
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        showContent = false
+                                        showButton = false
+                                        pageTransition = false
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .frame(width: 50, height: 50)
+                                    .glassEffect(.regular, in: Circle())
+                            }
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .leading).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                            .opacity(showButton ? 1 : 0)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: showButton)
+                        }
+
+                        Spacer()
+
+                        // Continue button with animation
                         Button {
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
                                 pageTransition = true
-                                currentPage -= 1
+                                if currentPage < pages.count - 1 {
+                                    currentPage += 1
+                                } else {
+                                    completeOnboarding()
+                                }
 
                                 // Reset states
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -390,68 +368,29 @@ struct AdvancedOnboardingView: View {
                                 }
                             }
                         } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .frame(width: 50, height: 50)
-                                .glassEffect(.regular, in: Circle())
+                            HStack(spacing: 8) {
+                                Text(currentPage == pages.count - 1 ? "Get Started" : "Continue")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(.white)
+
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 30)
+                            .frame(height: 50)
+                            .glassEffect(.regular, in: Capsule())
                         }
                         .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
                         .opacity(showButton ? 1 : 0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: showButton)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: showButton)
                     }
-
-                    Spacer()
-
-                    // Continue button with animation
-                    Button {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                            pageTransition = true
-                            if currentPage < pages.count - 1 {
-                                currentPage += 1
-                            } else {
-                                completeOnboarding()
-                            }
-
-                            // Reset states
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                showContent = false
-                                showButton = false
-                                pageTransition = false
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(currentPage == pages.count - 1 ? "Get Started" : "Continue")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
-
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.horizontal, 30)
-                        .frame(height: 50)
-                        .glassEffect(.regular, in: Capsule())
-                    }
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .trailing).combined(with: .opacity)
-                    ))
-                    .opacity(showButton ? 1 : 0)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: showButton)
+                    .padding(.horizontal, 30)
                 }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 50) // More space at bottom
-
-                // Progress indicator with animation
-                PageIndicator(currentPage: currentPage, pageCount: pages.count)
-                    .padding(.bottom, 30)
-                    .opacity(showButton ? 1 : 0)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: showButton)
+                .padding(.bottom, 40)
             }
         }
     }

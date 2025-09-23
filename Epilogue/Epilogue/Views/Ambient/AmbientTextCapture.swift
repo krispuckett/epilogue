@@ -223,7 +223,7 @@ struct AmbientTextCapture: View {
                     .padding(.bottom, 40)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(response: 0.3), value: !selectedText.isEmpty)
+                .animation(.spring(response: 0.2, dampingFraction: 0.8), value: !selectedText.isEmpty)
             }
         }
     }
@@ -427,6 +427,9 @@ struct FixedLiveTextView: UIViewRepresentable {
         // Store references
         context.coordinator.interaction = interaction
         context.coordinator.parent = self
+        
+        // Start monitoring for selection
+        context.coordinator.startMonitoring()
 
         // Start analysis
         isAnalyzing = true
@@ -469,32 +472,22 @@ struct FixedLiveTextView: UIViewRepresentable {
     class Coordinator: NSObject, ImageAnalysisInteractionDelegate {
         var parent: FixedLiveTextView?
         var interaction: ImageAnalysisInteraction?
-
-        // MARK: - ImageAnalysisInteractionDelegate
-        // Use delegate methods instead of polling - MUCH more efficient
-
-        func interaction(_ interaction: ImageAnalysisInteraction, shouldBeginAt point: CGPoint, for interactionType: ImageAnalysisInteraction.InteractionTypes) -> Bool {
-            return true
-        }
-
-        func interaction(_ interaction: ImageAnalysisInteraction, didUpdateHighlightedRanges highlightedRanges: [Range<String.Index>]?) {
-            // Called when selection changes
-            updateSelection()
-        }
-
-        func interactionDidEnd(_ interaction: ImageAnalysisInteraction) {
-            // Clear selection when interaction ends
-            DispatchQueue.main.async { [weak self] in
-                self?.parent?.selectedText = ""
+        private var selectionTimer: Timer?
+        
+        func startMonitoring() {
+            // Start a timer to check selection periodically as backup
+            selectionTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+                self?.checkSelectionStatus()
             }
         }
-
-        private func updateSelection() {
-            guard let interaction = self.interaction else { return }
-
+        
+        private func checkSelectionStatus() {
+            guard let interaction = interaction else { return }
+            
             if interaction.hasActiveTextSelection {
                 let text = interaction.selectedText
-                if !text.isEmpty && text != self.parent?.selectedText {
+                if !text.isEmpty && text != parent?.selectedText {
+                    print("⏱️ Timer detected selection: \(text)")
                     DispatchQueue.main.async { [weak self] in
                         self?.parent?.selectedText = text
                     }
@@ -502,8 +495,56 @@ struct FixedLiveTextView: UIViewRepresentable {
             }
         }
 
+        // MARK: - ImageAnalysisInteractionDelegate
+        // Use delegate methods instead of polling - MUCH more efficient
+
+        func interaction(_ interaction: ImageAnalysisInteraction, shouldBeginAt point: CGPoint, for interactionType: ImageAnalysisInteraction.InteractionTypes) -> Bool {
+            print("🔍 Text selection interaction starting")
+            return true
+        }
+
+        func interaction(_ interaction: ImageAnalysisInteraction, didUpdateHighlightedRanges highlightedRanges: [Range<String.Index>]?) {
+            // Called when selection changes
+            print("📝 Selection updated, checking text...")
+            updateSelection()
+        }
+        
+        // Implement textSelectionDidChange which is more reliable
+        func textSelectionDidChange(_ interaction: ImageAnalysisInteraction) {
+            print("✏️ Text selection changed")
+            updateSelection()
+        }
+
+        func interactionDidEnd(_ interaction: ImageAnalysisInteraction) {
+            // Don't clear selection immediately - let user interact with buttons
+            print("🔚 Interaction ended")
+        }
+
+        private func updateSelection() {
+            guard let interaction = self.interaction else { return }
+
+            if interaction.hasActiveTextSelection {
+                let text = interaction.selectedText
+                print("📋 Selected text: \(text)")
+                if !text.isEmpty {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.parent?.selectedText = text
+                    }
+                }
+            } else {
+                // Only clear if there's truly no selection
+                DispatchQueue.main.async { [weak self] in
+                    if self?.parent?.selectedText != "" {
+                        print("🧹 Clearing selection")
+                        self?.parent?.selectedText = ""
+                    }
+                }
+            }
+        }
+
         deinit {
             // Clean up references (delegate cleanup happens automatically)
+            selectionTimer?.invalidate()
             interaction = nil
             parent = nil
         }

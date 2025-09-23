@@ -72,7 +72,9 @@ struct RefinedOnboardingView: View {
                         ForEach(0..<pages.count, id: \.self) { index in
                             OnboardingPageContent(
                                 page: pages[index],
-                                geometry: geometry
+                                geometry: geometry,
+                                pageIndex: index,
+                                currentPage: currentPage
                             )
                             .tag(index)
                         }
@@ -228,9 +230,12 @@ struct RefinedOnboardingView: View {
 struct OnboardingPageContent: View {
     let page: OnboardingPageData
     let geometry: GeometryProxy
+    let pageIndex: Int
+    let currentPage: Int
     
-    @State private var iconOpacity: Double = 0
-    @State private var textOffset: CGFloat = 20
+    private var isCurrentPage: Bool {
+        pageIndex == currentPage
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -245,7 +250,9 @@ struct OnboardingPageContent: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 150, height: 150)  // Even larger
                     .foregroundStyle(.white)
-                    .opacity(iconOpacity)
+                    .opacity(isCurrentPage ? 1 : 0)
+                    .scaleEffect(isCurrentPage ? 1 : 0.8)
+                    .animation(.easeOut(duration: 0.4), value: isCurrentPage)
                 
                 // Typography matching note cards
                 VStack(spacing: 20) {
@@ -253,7 +260,9 @@ struct OnboardingPageContent: View {
                     Text(page.title)
                         .font(.system(size: 38, weight: .regular, design: .default))
                         .foregroundStyle(.white)
-                        .offset(y: textOffset)
+                        .opacity(isCurrentPage ? 1 : 0)
+                        .offset(y: isCurrentPage ? 0 : 20)
+                        .animation(.easeOut(duration: 0.5).delay(0.1), value: isCurrentPage)
                     
                     // Subtitle - monospaced like metadata on note cards
                     Text(page.subtitle.uppercased())
@@ -261,7 +270,9 @@ struct OnboardingPageContent: View {
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .tracking(2)
                         .multilineTextAlignment(.center)
-                        .offset(y: textOffset)
+                        .opacity(isCurrentPage ? 1 : 0)
+                        .offset(y: isCurrentPage ? 0 : 20)
+                        .animation(.easeOut(duration: 0.5).delay(0.15), value: isCurrentPage)
                     
                     // Description - clean sans-serif
                     Text(page.description)
@@ -271,19 +282,15 @@ struct OnboardingPageContent: View {
                         .lineSpacing(8)
                         .frame(maxWidth: min(geometry.size.width * 0.85, 380))
                         .padding(.top, 8)
-                        .offset(y: textOffset)
+                        .opacity(isCurrentPage ? 1 : 0)
+                        .offset(y: isCurrentPage ? 0 : 20)
+                        .animation(.easeOut(duration: 0.5).delay(0.2), value: isCurrentPage)
                 }
             }
             .padding(.horizontal, 30)
             
             Spacer()
             Spacer() // Extra spacer to center content vertically
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6)) {
-                iconOpacity = 1
-                textOffset = 0
-            }
         }
     }
 }
