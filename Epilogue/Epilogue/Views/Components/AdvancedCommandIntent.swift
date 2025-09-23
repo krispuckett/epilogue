@@ -1,13 +1,17 @@
 import SwiftUI
 
-// MARK: - Advanced Command Intent with NLP - Perplexity Style
+// MARK: - Advanced Command Intent - Clean Input Card Style
 struct AdvancedCommandIntent: View {
     @Binding var isPresented: Bool
     @State private var inputText = ""
+    @State private var showAddBookPopover = false
+    @State private var showRealInput = false
     @FocusState private var isInputFocused: Bool
 
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
+
+    private let warmAmber = Color(red: 1.0, green: 0.75, blue: 0.35)
 
     // Advanced NLP-based suggestions
     private var intelligentSuggestions: [(text: String, action: () -> Void)] {
@@ -147,273 +151,124 @@ struct AdvancedCommandIntent: View {
 
         // Default suggestion if nothing specific matched
         if suggestions.isEmpty {
-            suggestions.append((
-                text: "Search",
-                action: {
-                    performSearch(query: inputText)
-                }
-            ))
+            // Check if this looks like a book title (doesn't match any commands)
+            let lowercasedInput = inputText.lowercased()
+            let bookExists = libraryViewModel.books.contains { book in
+                book.title.lowercased().contains(lowercasedInput) ||
+                book.author.lowercased().contains(lowercasedInput)
+            }
+
+            if !bookExists && !inputText.isEmpty {
+                // Suggest searching for this as a new book
+                suggestions.append((
+                    text: "Search for book",
+                    action: {
+                        searchForBook(query: inputText)
+                    }
+                ))
+            } else {
+                suggestions.append((
+                    text: "Search",
+                    action: {
+                        performSearch(query: inputText)
+                    }
+                ))
+            }
         }
 
         return Array(suggestions.prefix(3)) // Limit to 3 suggestions
     }
 
     var body: some View {
-        ZStack {
-            // Gradient background matching themes
-            VStack {
-                LinearGradient(
-                    colors: [
-                        DesignSystem.Colors.primaryAccent.opacity(0.15),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 120)
-
-                Spacer()
-            }
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Drag indicator
-                Capsule()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: 36, height: 5)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
-
-                // Main container - ultra minimal Perplexity style
-                VStack(spacing: 12) {
-                // Quick actions as pills - only when empty
-                if inputText.isEmpty {
-                    HStack(spacing: 12) {
-                        // Add book pill
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "book.fill")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-
-                                Text("Add book")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.9))
-                            }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 11)
-                            .background(
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(0.12),
-                                                Color.white.opacity(0.06)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            )
-                            .glassEffect(.regular, in: Capsule())
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(0.25),
-                                                Color.white.opacity(0.1)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 0.5
-                                    )
-                            }
-                            .shadow(color: Color.white.opacity(0.05), radius: 8, y: 2)
-                        }
-                        .buttonStyle(.plain)
-
-                        // Scan pill
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-
-                                Text("Scan")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.9))
-                            }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 11)
-                            .background(
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(0.12),
-                                                Color.white.opacity(0.06)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            )
-                            .glassEffect(.regular, in: Capsule())
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(0.25),
-                                                Color.white.opacity(0.1)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 0.5
-                                    )
-                            }
-                            .shadow(color: Color.white.opacity(0.05), radius: 8, y: 2)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    }
+        VStack(spacing: 16) {
+            // Card with text display - NO INPUT FIELD VISIBLE
+            HStack(spacing: 12) {
+                // Plus button
+                Button {
+                    SensoryFeedback.light()
+                    showAddBookPopover.toggle()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showAddBookPopover, arrowEdge: .top) {
+                    addBookPopover
                 }
 
-                // Intelligent suggestions - amber tinted glass pills
-                if !inputText.isEmpty && !intelligentSuggestions.isEmpty {
-                    HStack(spacing: 8) {
-                        ForEach(Array(intelligentSuggestions.enumerated()), id: \.offset) { _, suggestion in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                suggestion.action()
-                            } label: {
-                                Text(suggestion.text)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.white)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        Capsule()
-                                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.08))
-                                    )
-                                    .glassEffect(.regular, in: Capsule())
-                                    .overlay {
-                                        Capsule()
-                                            .strokeBorder(
-                                                DesignSystem.Colors.primaryAccent.opacity(0.3),
-                                                lineWidth: 0.5
-                                            )
-                                    }
-                                    .fixedSize(horizontal: true, vertical: false)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 4)
-                }
-
-                Spacer(minLength: 4)
-
-                // Clean input field at BOTTOM with liquid glass and persistent button
-                HStack(spacing: 12) {
-                    // Text input with glass background - matching ambient session
-                    HStack(spacing: 0) {
-                        TextField("", text: $inputText, prompt: Text("What's on your mind?")
-                            .foregroundStyle(Color.white.opacity(0.4)), axis: .vertical)
+                // Just show the text - NO TextField visible
+                HStack(spacing: 2) {
+                    if inputText.isEmpty {
+                        Text("Ask anything...")
                             .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(Color.white)
-                            .textFieldStyle(.plain)
-                            .focused($isInputFocused)
-                            .lineLimit(1...3)
-                            .tint(DesignSystem.Colors.primaryAccent)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .onSubmit {
-                                if !inputText.isEmpty {
-                                    handleSubmit()
-                                }
-                            }
+                            .foregroundStyle(.white.opacity(0.5))
 
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: .infinity)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24)
-                            .strokeBorder(
-                                isInputFocused ?
-                                DesignSystem.Colors.primaryAccent.opacity(0.2) :
-                                Color.white.opacity(0.08),
-                                lineWidth: 0.5
-                            )
+                        // Blinking cursor after placeholder
+                        Rectangle()
+                            .fill(warmAmber)
+                            .frame(width: 2, height: 20)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: true)
+                    } else {
+                        Text(inputText)
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+
+                        // Cursor at end of text
+                        Rectangle()
+                            .fill(warmAmber)
+                            .frame(width: 2, height: 20)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: true)
                     }
 
-                    // Submit button - persistent orb outside field
-                    Button {
-                        if !inputText.isEmpty {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            handleSubmit()
-                        } else {
-                            isInputFocused = true
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    inputText.isEmpty ?
-                                    DesignSystem.Colors.primaryAccent.opacity(0.2) :
-                                    DesignSystem.Colors.primaryAccent
-                                )
-                                .frame(width: 40, height: 40)
-                                .glassEffect(.regular, in: Circle())
-                                .overlay {
-                                    Circle()
-                                        .strokeBorder(
-                                            DesignSystem.Colors.primaryAccent.opacity(0.3),
-                                            lineWidth: 0.5
-                                        )
-                                }
-
-                            Image(systemName: inputText.isEmpty ? "magnifyingglass" : "arrow.up")
-                                .font(.system(size: 18, weight: inputText.isEmpty ? .medium : .semibold))
-                                .foregroundStyle(
-                                    inputText.isEmpty ?
-                                    DesignSystem.Colors.primaryAccent.opacity(0.8) :
-                                    .white
-                                )
-                                .contentTransition(.symbolEffect(.replace))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .animation(.interactiveSpring(response: 0.3), value: inputText.isEmpty)
+                    Spacer()
                 }
-                .padding(.horizontal, 20)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // This would trigger keyboard but we keep it looking like text
+                    isInputFocused = true
+                }
+
+                // NO MICROPHONE - REMOVED COMPLETELY
+
+                // Ambient orb only
+                Button {
+                    startAmbientMode()
+                } label: {
+                    AmbientOrbButton(size: 36) {
+                        // Action handled by parent
+                    }
+                    .allowsHitTesting(false)
+                }
+                .buttonStyle(.plain)
             }
-                .padding(.bottom, 8)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .glassEffect(in: RoundedRectangle(cornerRadius: 28))
+            .padding(.horizontal, 20)
+
+            // Hidden TextField for actual input - completely invisible
+            TextField("", text: $inputText)
+                .focused($isInputFocused)
+                .opacity(0.0001) // Invisible but functional
+                .frame(height: 1)
+                .onSubmit {
+                    handleSubmit()
+                    isInputFocused = false
+                }
+
+
+
+            Spacer(minLength: 20)
         }
-        .presentationDetents([.height(180)])
-        .presentationDragIndicator(.hidden) // We have our own
-        .presentationCornerRadius(32)
-        .presentationBackground(Color.clear)
+        .padding(.bottom, 8)
+        .presentationDetents([.height(120)])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color.clear) // NO BACKGROUND - let glass effect work
         .interactiveDismissDisabled(false)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -500,7 +355,31 @@ struct AdvancedCommandIntent: View {
         if let firstSuggestion = intelligentSuggestions.first {
             firstSuggestion.action()
         } else {
-            performSearch(query: trimmed)
+            // Default behavior: search for the text as a book title
+            searchForBook(query: trimmed)
+        }
+    }
+
+    private func searchForBook(query: String) {
+        // Check if the book exists in library first
+        let lowercasedQuery = query.lowercased()
+        let bookExists = libraryViewModel.books.contains { book in
+            book.title.lowercased().contains(lowercasedQuery) ||
+            book.author.lowercased().contains(lowercasedQuery)
+        }
+
+        if !bookExists {
+            // Book not in library, open book search with the query
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowBookSearch"),
+                    object: query  // Pass the query string directly
+                )
+            }
+        } else {
+            // Book exists, perform regular search/filter
+            performSearch(query: query)
         }
     }
 
@@ -510,7 +389,7 @@ struct AdvancedCommandIntent: View {
             // Pass the title as search query
             NotificationCenter.default.post(
                 name: Notification.Name("ShowBookSearch"),
-                object: ["query": title]
+                object: title  // Changed to pass string directly, matching what LibraryView expects
             )
         }
     }
@@ -594,6 +473,60 @@ struct AdvancedCommandIntent: View {
         isInputFocused = false
         withAnimation(.interactiveSpring(response: 0.3)) {
             isPresented = false
+        }
+    }
+
+    // MARK: - Add Book Popover - Proper iOS 26 Context Menu Style
+    private var addBookPopover: some View {
+        VStack(spacing: 0) {
+            Button(action: {
+                showAddBookPopover = false
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+                }
+            }) {
+                Label("Add Book", systemImage: "book")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            Button(action: {
+                showAddBookPopover = false
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+                }
+            }) {
+                Label("Scan Cover", systemImage: "camera")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(width: 200)
+        .glassEffect(in: .rect(cornerRadius: 12))
+        .preferredColorScheme(.dark)
+    }
+
+
+    // MARK: - Ambient Mode
+    private func startAmbientMode() {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if !inputText.isEmpty {
+                // Start with the question
+                SimplifiedAmbientCoordinator.shared.openAmbientReading(initialQuestion: inputText)
+            } else if let currentBook = libraryViewModel.currentDetailBook {
+                SimplifiedAmbientCoordinator.shared.openAmbientReading(with: currentBook)
+            } else {
+                SimplifiedAmbientCoordinator.shared.openAmbientReading()
+            }
         }
     }
 }

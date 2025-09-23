@@ -9,6 +9,7 @@ struct LibraryView: View {
     @StateObject private var appState = AppStateManager.shared
     // Removed searchText - no longer needed
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
+    @AppStorage("libraryReadFilter") private var readFilter: ReadFilter = .all
     @Namespace private var viewModeAnimation
     @Namespace private var listTransition
     @State private var showingCoverPicker = false
@@ -26,6 +27,8 @@ struct LibraryView: View {
     @StateObject private var googleBooksService = GoogleBooksService()
     @State private var isRefreshing = false
     @Namespace private var settingsTransition
+    @State private var showingBookAddedToast = false
+    @State private var toastMessage = ""
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -35,10 +38,43 @@ struct LibraryView: View {
     enum ViewMode: String {
         case grid, list
     }
+
+    enum ReadFilter: String, CaseIterable {
+        case all = "All Books"
+        case reading = "Currently Reading"
+        case unread = "Unread"
+        case read = "Finished"
+    }
     
-    // Return all books since we removed search
+    // Filter books based on read status and prioritize currently reading
     private var filteredBooks: [Book] {
-        return viewModel.books
+        var books = viewModel.books
+
+        // Apply read status filter
+        switch readFilter {
+        case .all:
+            break
+        case .reading:
+            books = books.filter { $0.readingStatus == .currentlyReading }
+        case .unread:
+            books = books.filter { $0.readingStatus == .wantToRead }
+        case .read:
+            books = books.filter { $0.readingStatus == .read }
+        }
+
+        // Sort to put currently reading books first
+        books.sort { book1, book2 in
+            // Currently reading books come first
+            if book1.readingStatus == .currentlyReading && book2.readingStatus != .currentlyReading {
+                return true
+            } else if book1.readingStatus != .currentlyReading && book2.readingStatus == .currentlyReading {
+                return false
+            }
+            // Then sort by date added (most recent first)
+            return book1.dateAdded > book2.dateAdded
+        }
+
+        return books
     }
     
     // Helper function to change book cover
@@ -180,6 +216,20 @@ struct LibraryView: View {
                     }
                 }
                 
+                // Read status filter
+                Section {
+                    Picker("Filter", selection: $readFilter.animation(DesignSystem.Animation.springStandard)) {
+                        ForEach(ReadFilter.allCases, id: \.self) { filter in
+                            Label(filter.rawValue, systemImage: filterIcon(for: filter))
+                                .tag(filter)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .onChange(of: readFilter) { _, _ in
+                        SensoryFeedback.light()
+                    }
+                }
+
                 // Reorder option (only in grid mode) - separate section
                 if viewMode == .grid {
                     Section {
@@ -283,11 +333,6 @@ struct LibraryView: View {
         EnhancedBookScannerView { book in
             viewModel.addBook(book)
             appState.showingEnhancedScanner = false
-            
-            NotificationCenter.default.post(
-                name: Notification.Name("ShowGlassToast"),
-                object: ["message": "Added \"\(book.title)\" to library"]
-            )
         }
     }
     
@@ -401,6 +446,16 @@ struct LibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowGoodreadsImport"))) { _ in
             appState.showingGoodreadsImport = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookAddedToast"))) { notification in
+            if let userInfo = notification.object as? [String: String],
+               let message = userInfo["message"] {
+                toastMessage = message
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showingBookAddedToast = true
+                }
+            }
+        }
+        .modifier(GlassToastModifier(isShowing: $showingBookAddedToast, message: toastMessage))
         #if DEBUG
         .onAppear {
             startPerformanceMonitoring()
@@ -1042,6 +1097,19 @@ private func statusColor(for status: ReadingStatus) -> Color {
     }
 }
 
+private func filterIcon(for filter: LibraryView.ReadFilter) -> String {
+    switch filter {
+    case .all:
+        return "books.vertical"
+    case .reading:
+        return "book.circle"
+    case .unread:
+        return "book.closed"
+    case .read:
+        return "checkmark.circle"
+    }
+}
+
 #Preview {
     NavigationStack {
         LibraryView()
@@ -1526,7 +1594,7 @@ class LibraryViewModel: ObservableObject {
         }
         print("  📊 Book data - Rating: \(book.userRating ?? 0), Status: \(book.readingStatus.rawValue)")
         print("  📝 Notes: \(book.userNotes?.prefix(50) ?? "None")")
-        
+
         // Check if book already exists
         if let existingIndex = books.firstIndex(where: { $0.id == book.id }) {
             if overwriteIfExists {
@@ -1541,6 +1609,12 @@ class LibraryViewModel: ObservableObject {
                 saveBooks()
                 // Don't reload during import - causes race conditions
                 // loadBooks()
+
+                // Show success toast for updated book
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowBookAddedToast"),
+                    object: ["message": "Updated \"\(book.title)\""]
+                )
                 print("  ✅ Book updated with new data")
                 return
             } else {
@@ -1560,12 +1634,18 @@ class LibraryViewModel: ObservableObject {
         books.append(newBook)
         print("  📝 New count after adding: \(books.count)")
         print("  ✅ Preserved data - Rating: \(newBook.userRating ?? 0), Status: \(newBook.readingStatus.rawValue)")
-        
+
         saveBooks()
-        
+
         // Verify it was saved
         loadBooks()
         print("  ✅ Book saved. Library now has \(books.count) books")
+
+        // Show success toast for new book
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowBookAddedToast"),
+            object: ["message": "Added \"\(book.title)\" to library"]
+        )
         
         // Verify the saved book has the correct data
         if let savedBook = books.first(where: { $0.id == book.id }) {

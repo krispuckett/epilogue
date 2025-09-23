@@ -133,40 +133,50 @@ struct OptimizedPerplexitySessionsView: View {
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(false)
             
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
-                    if isSearching {
-                        searchBar
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .top).combined(with: .opacity),
-                                removal: .move(edge: .top).combined(with: .opacity)
-                            ))
-                    }
-                    
-                    // Keep LazyVStack for sticky headers but optimize content
-                    ForEach(Array(filteredSessions.enumerated()), id: \.0) { index, group in
-                        Section {
-                            ForEach(group.sessions) { session in
-                                OptimizedSessionRow(
-                                    session: session,
-                                    onTap: {
-                                        selectedSession = session
-                                    }
+            if sessions.isEmpty {
+                ModernEmptyStates.noSessions
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, 100)
+            } else if !filteredSessions.isEmpty || !isSearching {
+                ScrollView {
+                    LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
+                        if isSearching {
+                            searchBar
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .move(edge: .top).combined(with: .opacity)
+                                ))
+                        }
+                        
+                        // Keep LazyVStack for sticky headers but optimize content
+                        ForEach(Array(filteredSessions.enumerated()), id: \.0) { index, group in
+                            Section {
+                                ForEach(group.sessions) { session in
+                                    OptimizedSessionRow(
+                                        session: session,
+                                        onTap: {
+                                            selectedSession = session
+                                        }
+                                    )
+                                }
+                            } header: {
+                                OptimizedStickyHeader(
+                                    dateLabel: group.date,
+                                    sessionCount: group.sessions.count
                                 )
+                                .id(group.date)
                             }
-                        } header: {
-                            OptimizedStickyHeader(
-                                dateLabel: group.date,
-                                sessionCount: group.sessions.count
-                            )
-                            .id(group.date)
                         }
                     }
+                    .padding(.bottom, 100)
                 }
-                .padding(.bottom, 100)
+                .coordinateSpace(name: "scroll")
+                .scrollIndicators(.hidden)
+            } else {
+                ModernEmptyStates.noSearchResults(searchText: searchText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, 100)
             }
-            .coordinateSpace(name: "scroll")
-            .scrollIndicators(.hidden)
         }
     }
     

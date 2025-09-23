@@ -700,21 +700,14 @@ struct AmbientModeView: View {
             }
         }
         .toolbar {
-            // Add Done button when presented modally (from session summary)
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if isPresentedModally {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.white)
-                }
-            }
+            // Remove Done button - the close (X) button handles dismissal
         }
         .onAppear {
-            // Check if we're presented modally
-            // When opened from session summary, we're in a NavigationStack
-            isPresentedModally = true
+            // Don't set isPresentedModally - let the close button handle dismissal
+            isPresentedModally = false
+
+            // Load existing session context if continuing from a previous session
+            loadExistingSessionIfAvailable()
         }
     }
     
@@ -1092,21 +1085,26 @@ struct AmbientModeView: View {
                                     if inputMode == .listening && isRecording {
                                         handleMicrophoneTap()
                                     } else if inputMode == .paused {
-                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
-                                            inputMode = .textInput
-                                        }
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                            isKeyboardFocused = true
-                                        }
+                                        // When paused, restart recording
+                                        inputMode = .listening
+                                        handleMicrophoneTap()
                                     } else {
                                         handleMicrophoneTap()
                                     }
                                 } label: {
-                                    Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
-                                        .font(.system(size: 28, weight: .medium, design: .rounded))
-                                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                                        .frame(width: 64, height: 64)
-                                        .contentTransition(.symbolEffect(.replace))
+                                    if !isRecording && inputMode != .textInput {
+                                        // Use ambient orb when not recording and not in text mode
+                                        MetalShaderView(isPressed: .constant(false), size: CGSize(width: 64, height: 64))
+                                            .frame(width: 64, height: 64)
+                                            .clipShape(Circle())
+                                    } else {
+                                        // Use system icons for recording and keyboard mode
+                                        Image(systemName: inputMode == .paused ? "keyboard" : (isRecording ? "stop.fill" : "waveform"))
+                                            .font(.system(size: 28, weight: .medium, design: .rounded))
+                                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                                            .frame(width: 64, height: 64)
+                                            .contentTransition(.symbolEffect(.replace))
+                                    }
                                 }
                                 .buttonStyle(.plain)
                                 .opacity(inputMode == .textInput ? 0 : 1)
@@ -3337,23 +3335,75 @@ struct AmbientModeView: View {
         }
     }
     
+    private func loadExistingSessionIfAvailable() {
+        // Check if we're continuing from an existing session
+        if let existingSession = EpilogueAmbientCoordinator.shared.existingSession {
+            print("📖 Loading existing session with \((existingSession.capturedQuestions ?? []).count) questions")
+
+            // Load the book context
+            if let bookModel = existingSession.bookModel {
+                // Convert BookModel to Book
+                if let book = libraryViewModel.books.first(where: { $0.id == bookModel.id }) {
+                    currentBookContext = book
+                    bookDetector.setCurrentBook(book)
+
+                    // Load color palette
+                    Task {
+                        await extractColorsForBook(book)
+                    }
+                }
+            }
+
+            // Load conversation history into messages
+            for question in existingSession.capturedQuestions ?? [] {
+                if let content = question.content {
+                    // Add the question
+                    let questionMessage = UnifiedChatMessage(
+                        content: content,
+                        isUser: true,
+                        timestamp: question.timestamp ?? Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(questionMessage)
+
+                    // Add the answer if available
+                    if let answer = question.answer {
+                        let answerMessage = UnifiedChatMessage(
+                            content: answer,
+                            isUser: false,
+                            timestamp: Date(timeInterval: 1, since: question.timestamp ?? Date()),
+                            bookContext: currentBookContext
+                        )
+                        messages.append(answerMessage)
+                    }
+                }
+            }
+
+            // Continue the same session
+            currentSession = existingSession
+            currentSession?.startTime = Date() // Update start time for this continuation
+
+            print("✅ Loaded \(messages.count) messages from previous session")
+        }
+    }
+
     private func startNewSessionForBook(_ book: Book) {
         // Set the book context in the detector
         bookDetector.setCurrentBook(book)
-        
+
         // Create a fresh session for the new book
         let newSession = AmbientSession()
         newSession.startTime = Date()
         newSession.bookModel = BookModel(from: book)
         modelContext.insert(newSession)
         currentSession = newSession
-        
+
         // Clear the detected content from previous book
         processor.detectedContent.removeAll()
-        
+
         // Reset counts
         savedItemsCount = 0
-        
+
         do {
             try modelContext.save()
             print("📚 Started new session for book: \(book.title)")

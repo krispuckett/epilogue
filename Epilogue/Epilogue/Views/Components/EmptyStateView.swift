@@ -91,6 +91,14 @@ extension EmptyStateView {
             message: "Try adjusting your search terms or filters."
         )
     }
+    
+    static var noSessions: EmptyStateView {
+        EmptyStateView(
+            icon: "bubble.left.and.bubble.right",
+            title: "No Sessions Yet",
+            message: "Start an ambient reading session to capture your thoughts and reflections as you explore your books."
+        )
+    }
 }
 
 // MARK: - Preview

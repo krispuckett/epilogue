@@ -14,7 +14,7 @@ struct EnhancedQuickActionsBar: View {
     @State private var lastTapTime: Date = .distantPast
     @State private var capturedContent: [String] = []
     @State private var showRecentCaptures = false
-    @State private var showAdvancedIntent = false
+    @State private var showCommandPalette = false
     @GestureState private var isLongPressing = false
     @GestureState private var dragOffset: CGSize = .zero
     
@@ -71,6 +71,18 @@ struct EnhancedQuickActionsBar: View {
                 recentCapturesView
             }
         }
+        .fullScreenCover(isPresented: $showCommandPalette) {
+            LiquidCommandPaletteV2(
+                isPresented: $showCommandPalette,
+                context: libraryViewModel.currentDetailBook != nil ?
+                    .bookDetail(libraryViewModel.currentDetailBook!) : .library
+            ) { result in
+                handleCommandResult(result)
+            }
+            .environmentObject(libraryViewModel)
+            .environmentObject(notesViewModel)
+            .presentationBackground(Color.clear)
+        }
         .onReceive(voiceManager.$currentAmplitude) { amplitude in
             if voiceManager.isListening {
                 withAnimation(DesignSystem.Animation.easeStandard) {
@@ -78,26 +90,20 @@ struct EnhancedQuickActionsBar: View {
                 }
             }
         }
-        // Removed ambientManager observer as it no longer exists
     }
     
     // MARK: - Plus Button
     private var plusButton: some View {
         Button {
             SensoryFeedback.medium()
-            // Show the advanced intent
-            showAdvancedIntent = true
+            // Show the liquid command palette
+            showCommandPalette = true
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
-        }
-        .sheet(isPresented: $showAdvancedIntent) {
-            AdvancedCommandIntent(isPresented: $showAdvancedIntent)
-                .environmentObject(libraryViewModel)
-                .environmentObject(notesViewModel)
         }
     }
     
@@ -349,7 +355,48 @@ struct EnhancedQuickActionsBar: View {
     }
     
     // MARK: - Helper Functions
-    
+
+    private func handleCommandResult(_ result: LiquidCommandPaletteV2.CommandResult) {
+        switch result {
+        case .note(let text):
+            // Create a new note with book context if available
+            var noteData: [String: Any] = ["content": text]
+            if let currentBook = libraryViewModel.currentDetailBook {
+                noteData["bookId"] = currentBook.id
+                noteData["bookTitle"] = currentBook.title
+                noteData["bookAuthor"] = currentBook.author
+            }
+            NotificationCenter.default.post(
+                name: Notification.Name("CreateNewNote"),
+                object: noteData
+            )
+        case .quote(let text, let attribution):
+            // Save a quote with book context if available
+            var quoteData: [String: Any] = ["quote": text, "attribution": attribution ?? ""]
+            if let currentBook = libraryViewModel.currentDetailBook {
+                quoteData["bookId"] = currentBook.id
+                quoteData["bookTitle"] = currentBook.title
+                quoteData["bookAuthor"] = currentBook.author
+            }
+            NotificationCenter.default.post(
+                name: Notification.Name("SaveQuote"),
+                object: quoteData
+            )
+        case .bookAdded(let book):
+            // Book was added
+            libraryViewModel.addBook(book)
+        case .search(let query):
+            // Perform search
+            NotificationCenter.default.post(
+                name: Notification.Name("PerformSearch"),
+                object: ["query": query]
+            )
+        case .cancel:
+            // Cancelled, do nothing
+            break
+        }
+    }
+
     private func startGlowAnimation() {
         withAnimation(DesignSystem.Animation.easeStandard) {
             waveformGlow = true
@@ -468,7 +515,7 @@ extension EnhancedQuickActionsBar {
     ZStack {
         DesignSystem.Colors.surfaceBackground
             .ignoresSafeArea()
-        
+
         VStack {
             Spacer()
             EnhancedQuickActionsBar()

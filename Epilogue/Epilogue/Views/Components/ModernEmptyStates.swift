@@ -33,10 +33,24 @@ struct ModernEmptyStates {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                        .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
-                .modifier(AnimatedBorderButton())  // Add micro-interaction animation
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
                 
                 Button(action: importAction) {
                     Label("Import", systemImage: "square.and.arrow.down")
@@ -69,11 +83,12 @@ struct ModernEmptyStates {
     // MARK: - Sessions Empty State (gradient handled by parent view)
     static var noSessions: some View {
         ContentUnavailableView {
-            Label("No Reading Sessions", systemImage: "clock.arrow.circlepath")
+            Label("No Sessions Yet", systemImage: "bubble.left.and.bubble.right")
                 .foregroundStyle(.white)
         } description: {
-            Text("Your reading sessions will appear here once you start tracking")
+            Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
                 .foregroundStyle(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
         }
     }
     

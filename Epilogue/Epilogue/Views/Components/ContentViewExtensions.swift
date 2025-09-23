@@ -231,26 +231,37 @@ struct GlassToastModifier: ViewModifier {
     let message: String
 
     func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .top) {
-                if isShowing {
+        ZStack {
+            content
+
+            if isShowing {
+                VStack {
+                    // Toast positioned at the top
                     Text(message)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white)
                         .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         .padding(.vertical, 12)
-                        .glassEffect()
+                        .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.2)))
                         .clipShape(Capsule())
-                        .padding(.top, 50)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                withAnimation {
-                                    isShowing = false
-                                }
-                            }
+                        .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
+                        .padding(.horizontal)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity),
+                            removal: .move(edge: .top).combined(with: .opacity)
+                        ))
+
+                    Spacer()
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isShowing = false
                         }
+                    }
                 }
             }
+        }
     }
 }

@@ -20,7 +20,7 @@ struct NavigationContainer: View {
                 Label {
                     Text("Library")
                 } icon: {
-                    Image("glass-book-open")
+                    Image(themeManager.currentTheme.libraryIcon)
                         .renderingMode(.template)
                 }
             }
@@ -33,7 +33,7 @@ struct NavigationContainer: View {
                 Label {
                     Text("Notes")
                 } icon: {
-                    Image("glass-feather")
+                    Image(themeManager.currentTheme.notesIcon)
                         .renderingMode(.template)
                 }
             }
@@ -44,7 +44,7 @@ struct NavigationContainer: View {
                 Label {
                     Text("Sessions")
                 } icon: {
-                    Image("glass-msgs")
+                    Image(themeManager.currentTheme.sessionsIcon)
                         .renderingMode(.template)
                 }
             }
@@ -83,14 +83,16 @@ struct NavigationContainer: View {
         appearance.backgroundColor = nil
         appearance.barTintColor = nil
 
-        // Update tint color for selected items - using accent/secondary like in experiment
+        // Use the theme's primary accent color for active icons
         appearance.tintColor = UIColor(themeManager.currentTheme.primaryAccent)
-        appearance.unselectedItemTintColor = UIColor.secondaryLabel
+        // Revert to fixed inactive gray for consistency with prior look
+        appearance.unselectedItemTintColor = UIColor(white: 0.5, alpha: 1.0)
     }
 
     private func updateTabBarAppearance() {
-        // Just update the tint colors when theme changes
+        // Update colors based on current theme
         UITabBar.appearance().tintColor = UIColor(themeManager.currentTheme.primaryAccent)
+        UITabBar.appearance().unselectedItemTintColor = UIColor(white: 0.5, alpha: 1.0)
     }
 
     private func syncWithNavigationCoordinator(_ tab: Int) {

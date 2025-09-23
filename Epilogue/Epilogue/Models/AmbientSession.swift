@@ -11,7 +11,8 @@ final class AmbientSession {
     var bookModel: BookModel?
     var currentChapter: Int?
     var currentPage: Int?
-    
+    var generatedInsight: String?  // Cache the AI-generated insight
+
     // Transient property for Book
     @Transient var book: Book? {
         // Convert BookModel to Book if needed

@@ -15,6 +15,7 @@ struct AmbientReadingProgressView: View {
     @State private var progressDots: [ProgressDot] = []
     @State private var hasAppeared: Bool = false
     @State private var isDragging: Bool = false
+    @State private var dragStartProgress: Double = 0
     
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -67,12 +68,12 @@ struct AmbientReadingProgressView: View {
                 }
                 
                 withAnimation(.easeInOut(duration: 2.5).delay(0.6)) {
-                    glowIntensity = progress * 1.2
+                    glowIntensity = progress * 1.5 + 0.2  // More pronounced glow formula
                 }
             } else {
                 animatedProgress = progress
                 showMilestones = true
-                glowIntensity = progress * 1.2
+                glowIntensity = progress * 1.5 + 0.2  // More pronounced glow formula
             }
         }
         .onChange(of: progress) { _, newProgress in
@@ -124,22 +125,24 @@ struct AmbientReadingProgressView: View {
     @ViewBuilder
     private var heroProgressDisplay: some View {
         ZStack {
-            // Ambient background glow
+            // Ambient background glow - more pronounced as progress increases but fixed size
             Circle()
                 .fill(
                     RadialGradient(
                         colors: [
-                            primaryColor.opacity(glowIntensity * 0.3),
-                            secondaryColor.opacity(glowIntensity * 0.2),
+                            primaryColor.opacity(glowIntensity * 0.2 * (1 + animatedProgress * 2)),  // Intensifies with progress
+                            secondaryColor.opacity(glowIntensity * 0.15 * (1 + animatedProgress * 1.5)),
+                            accentColor.opacity(glowIntensity * 0.1 * animatedProgress * 2),  // Only appears with progress
                             Color.clear
                         ],
                         center: .center,
-                        startRadius: 40,
-                        endRadius: 120
+                        startRadius: 20,  // Fixed start radius
+                        endRadius: 140  // Fixed end radius
                     )
                 )
-                .frame(width: 240, height: 240)
-                .blur(radius: 8)
+                .frame(width: 280, height: 280)  // Fixed size - no growth
+                .blur(radius: 6)  // Fixed blur for consistency
+                .opacity(0.6 + 0.4 * animatedProgress)  // Use opacity to show progress instead of size
             
             // Floating progress ring
             ZStack {
@@ -148,23 +151,24 @@ struct AmbientReadingProgressView: View {
                     .stroke(Color.white.opacity(0.10), lineWidth: 3)
                     .frame(width: 120, height: 120)
                 
-                // Animated progress ring
+                // Animated progress ring - more vibrant but fixed thickness
                 Circle()
                     .trim(from: 0, to: animatedProgress)
                     .stroke(
                         LinearGradient(
                             colors: [
-                                secondaryColor,
-                                primaryColor,
-                                accentColor
+                                secondaryColor.opacity(0.6 + 0.4 * animatedProgress),  // More opaque with progress
+                                primaryColor.opacity(0.8 + 0.2 * animatedProgress),
+                                accentColor.opacity(0.7 + 0.3 * animatedProgress)  // Brighter accent with progress
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)  // Fixed thickness
                     )
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
+                    .shadow(color: primaryColor.opacity(0.3 * animatedProgress), radius: 4, x: 0, y: 0)  // Add glow shadow instead
                     .shadow(
                         color: primaryColor.opacity(0.6),
                         radius: 4,
@@ -316,49 +320,56 @@ struct AmbientReadingProgressView: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isDragging)
                         .offset(x: (geometry.size.width - 28) * animatedProgress)
                         .gesture(
-                            DragGesture(minimumDistance: 5)
+                            DragGesture(minimumDistance: 1)
                                 .onChanged { value in
-                                    // Only respond to horizontal drags
-                                    // Check if the drag is more horizontal than vertical
-                                    let horizontalAmount = abs(value.translation.width)
-                                    let verticalAmount = abs(value.translation.height)
-
-                                    // Ignore if the drag is more vertical than horizontal
-                                    guard horizontalAmount > verticalAmount * 1.5 else {
-                                        return
-                                    }
-
-                                    // Set dragging state
+                                    // Set dragging state and store initial progress on first drag
                                     if !isDragging {
                                         isDragging = true
+                                        dragStartProgress = animatedProgress
                                         SensoryFeedback.impact(.light)
                                     }
 
-                                    // Calculate new progress based on drag translation
-                                    let dragLocation = animatedProgress * geometry.size.width + value.translation.width
-                                    let newProgress = min(max(0, dragLocation / geometry.size.width), 1.0)
+                                    // Calculate new progress based on drag translation from start position
+                                    let dragOffset = value.translation.width / geometry.size.width
+                                    let newProgress = min(max(0, dragStartProgress + dragOffset), 1.0)
                                     let newPage = Int(Double(totalPages) * newProgress)
 
-                                    // Update progress immediately for smooth feedback
-                                    withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.9)) {
-                                        animatedProgress = newProgress
-                                    }
+                                    // Update progress immediately without animation for instant feedback
+                                    animatedProgress = newProgress
 
                                     // Update the book's current page
                                     viewModel.updateCurrentPage(for: book, to: newPage)
 
-                                    // Subtle haptic on significant changes
-                                    let progressDiff = abs(newProgress - progress)
-                                    if progressDiff > 0.05 {
+                                    // Subtle haptic on 5% intervals
+                                    let oldInterval = Int(progress * 20)
+                                    let newInterval = Int(newProgress * 20)
+                                    if oldInterval != newInterval {
                                         SensoryFeedback.selection()
                                     }
                                 }
                                 .onEnded { _ in
-                                    // Release dragging state
-                                    isDragging = false
+                                    // Release dragging state with smooth animation
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        isDragging = false
+                                    }
                                     SensoryFeedback.impact(.light)
                                 }
                         )
+                }
+                // Add tap gesture to the entire track area
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    // Calculate progress from tap location
+                    let tapProgress = min(max(0, location.x / geometry.size.width), 1.0)
+
+                    // Update progress instantly
+                    animatedProgress = tapProgress
+
+                    // Update the book's current page
+                    let newPage = Int(Double(totalPages) * tapProgress)
+                    viewModel.updateCurrentPage(for: book, to: newPage)
+
+                    SensoryFeedback.impact(.medium)
                 }
             }
             .frame(height: 24)
@@ -405,18 +416,18 @@ struct AmbientReadingProgressView: View {
         if !reduceMotion {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
                 animatedProgress = newProgress
-                glowIntensity = newProgress * 1.2
-                
+                glowIntensity = newProgress * 1.5 + 0.2  // More pronounced glow formula
+
                 // Timeline scroll effect
                 timelineOffset = -10
             }
-            
+
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8).delay(0.2)) {
                 timelineOffset = 0
             }
         } else {
             animatedProgress = newProgress
-            glowIntensity = newProgress * 1.2
+            glowIntensity = newProgress * 1.5 + 0.2  // More pronounced glow formula
         }
         
         updateProgressDots()

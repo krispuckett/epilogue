@@ -116,9 +116,12 @@ struct OnboardingWrapper: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: $coordinator.showOnboarding) {
-                RefinedOnboardingView {
+                AdvancedOnboardingView {
                     coordinator.completeOnboarding()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowOnboarding"))) { _ in
+                coordinator.resetOnboarding()
             }
     }
 }

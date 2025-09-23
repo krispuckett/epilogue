@@ -54,6 +54,7 @@ struct MetalShaderView: UIViewRepresentable {
         mtkView.isOpaque = false
         mtkView.backgroundColor = .clear
         mtkView.layer.backgroundColor = UIColor.clear.cgColor
+        mtkView.layer.isOpaque = false
         mtkView.colorPixelFormat = .bgra8Unorm_srgb
         mtkView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
 
@@ -191,23 +192,23 @@ class OrbMetalRenderer: NSObject {
 
                 float ds = smoothstep(0.0, 0.02, d);
 
-                // Use theme color passed from Swift with enhanced saturation
-                float3 exactColor = themeColor; // Will be #FF8C42 (1.0, 0.549, 0.259) for amber
-                // Boost saturation for more vibrant amber
-                exactColor = mix(exactColor, float3(1.0, 0.4, 0.1), 0.3); // Push toward pure amber
-                float intensity = (1.0 + iter * 0.6); // Higher intensity range
+                // Enhanced #FF8C42 amber - exact values
+                float3 exactColor = mix(themeColor, float3(1.0, 0.549, 0.259), 0.7); // 70% toward exact #FF8C42
+                exactColor.r *= 1.1; // Boost red channel
+                exactColor.g *= 0.9; // Reduce green to match #8C
+                float intensity = (1.5 + iter * 0.8); // Brighter aurora lines
                 float3 color = exactColor * intensity;
 
                 float invd = 1.0 / max(d, 0.001);
                 pp += (ds - 1.0) * color;
-                bloom += clamp(invd * 1.5, 0.0, 350.0) * color; // Increased bloom brightness
+                bloom += clamp(invd * 0.3, 0.0, 350.0) * color; // Reduced bloom intensity for sharper lines
             }
 
             pp *= 1.0 / float(ITERATIONS);
-            bloom = bloom / (bloom + 2e4);
+            bloom = bloom / (bloom + 5e4); // Less bloom spread
 
             // Only apply color to the aurora lines, not the background
-            float3 color = (-pp + bloom * 6.0); // Increased bloom for more vibrant lines
+            float3 color = (-pp + bloom * 1.5); // Dramatically reduced bloom multiplier for sharp lines
 
             // Don't boost everything - just the lines
             color = max(color, 0.0); // Remove negative values that create background
@@ -221,16 +222,24 @@ class OrbMetalRenderer: NSObject {
             // Press animation
             color *= pressBoost;
 
-            // Calculate alpha based ONLY on aurora brightness
+            // Calculate alpha based on aurora brightness
             float luminance = dot(color, float3(0.299, 0.587, 0.114));
+            float contentAlpha = smoothstep(0.0, 0.1, luminance);
 
-            // No radial mask - let the aurora define its own shape
-            // Alpha is purely based on how bright the aurora is
-            float alpha = smoothstep(0.0, 0.1, luminance);
+            // Tighter circular mask with less spread
+            float2 center = uv - 0.5;
+            float dist = length(center);
+            float circleMask = 1.0 - smoothstep(0.25, 0.4, dist); // Tighter bounds
+
+            // Combine with content alpha
+            float alpha = circleMask * contentAlpha;
+
+            // Sharper alpha cutoff for cleaner edges
+            alpha = smoothstep(0.01, 0.1, alpha) * alpha;
             alpha = clamp(alpha, 0.0, 1.0);
 
-            // Premultiply alpha for correct blending
-            return float4(color * alpha, alpha);
+            // Standard blending (not premultiplied)
+            return float4(color, alpha);
         }
         """
 
@@ -244,11 +253,11 @@ class OrbMetalRenderer: NSObject {
             pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb
 
-            // Correct alpha blending for premultiplied alpha
+            // Standard alpha blending (not premultiplied)
             pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
             pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
             pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+            pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
             pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
 
             pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
@@ -273,7 +282,7 @@ class OrbMetalRenderer: NSObject {
             return
         }
 
-        // Ensure clear to transparent
+        // Clear to fully transparent
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].storeAction = .store

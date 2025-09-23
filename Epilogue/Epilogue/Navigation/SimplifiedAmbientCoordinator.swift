@@ -6,11 +6,12 @@ import OSLog
 @MainActor
 public class EpilogueAmbientCoordinator: ObservableObject {
     static let shared = EpilogueAmbientCoordinator()
-    
+
     @Published var isActive = false
     @Published var preSelectedBook: Book?
     @Published var initialBook: Book?  // Book to start with when launched from BookDetailView
     @Published var initialQuestion: String?  // Initial question to ask when launching
+    @Published var existingSession: AmbientSession?  // Existing session to continue from
     
     private init() {}
     
@@ -67,9 +68,10 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     
     @Published var isPresented = false
     @Published var currentBook: Book?
-    
+    @Published var existingSession: AmbientSession?
+
     // MARK: - Private Properties
-    
+
     private let logger = Logger(subsystem: "com.epilogue.app", category: "SimplifiedAmbient")
     
     // MARK: - Initialization
@@ -80,8 +82,8 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Open ambient reading - optionally with a pre-selected book and initial question
-    func openAmbientReading(with book: Book? = nil, initialQuestion: String? = nil) {
+    /// Open ambient reading - optionally with a pre-selected book, initial question, or existing session
+    func openAmbientReading(with book: Book? = nil, initialQuestion: String? = nil, existingSession: AmbientSession? = nil) {
         logger.info("🎙️ Opening ambient reading via SimplifiedAmbientCoordinator")
         print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientReading() called")
 
@@ -95,6 +97,12 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
             logger.info("❓ Starting with question: \(question)")
         }
 
+        // Store existing session for context continuation
+        if let session = existingSession {
+            self.existingSession = session
+            logger.info("📖 Continuing from previous session with \((session.capturedQuestions ?? []).count) questions")
+        }
+
         // Haptic feedback
         HapticManager.shared.voiceModeStart()
 
@@ -104,6 +112,7 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
             EpilogueAmbientCoordinator.shared.isActive = true
             EpilogueAmbientCoordinator.shared.initialBook = book
             EpilogueAmbientCoordinator.shared.initialQuestion = initialQuestion
+            EpilogueAmbientCoordinator.shared.existingSession = existingSession
             print("🎙️ DEBUG: isPresented set to true, initial book: \(book?.title ?? "none")")
         }
     }
@@ -111,18 +120,19 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     /// Close ambient reading
     func closeAmbientReading() {
         logger.info("Closing ambient reading")
-        
+
         // Light haptic feedback
         SensoryFeedback.light()
-        
+
         // Dismiss
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             isPresented = false
         }
-        
+
         // Clear state after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.currentBook = nil
+            self.existingSession = nil
         }
     }
     

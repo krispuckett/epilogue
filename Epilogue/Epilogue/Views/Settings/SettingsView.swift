@@ -220,6 +220,23 @@ struct SettingsView: View {
                     } label: {
                         Text("Credits")
                     }
+
+                    Button {
+                        // Replay onboarding
+                        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+
+                        // Post notification to trigger onboarding
+                        NotificationCenter.default.post(name: Notification.Name("ShowOnboarding"), object: nil)
+
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text("Replay Onboarding")
+                            Spacer()
+                            Image(systemName: "play.circle")
+                                .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                        }
+                    }
                 } header: {
                     Text("About")
                 }

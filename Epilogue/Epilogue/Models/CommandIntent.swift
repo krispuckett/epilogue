@@ -268,16 +268,16 @@ struct CommandParser {
             return .existingNote(note: matchedNote)
         }
         
-        // Phase 3: Smart Quote Detection (check quotes BEFORE notes!)
-        if isLikelyQuote(input: trimmed) {
-            print("CommandParser: Detected quote pattern")
-            return .createQuote(text: input)
-        }
-        
-        // Phase 4: Note Detection (check after quotes)
+        // Phase 3: Note Detection (check notes FIRST - most common use case)
         if isLikelyNote(input: trimmed) {
             print("CommandParser: Detected note pattern")
             return .createNote(text: input)
+        }
+        
+        // Phase 4: Smart Quote Detection (check quotes after notes)
+        if isLikelyQuote(input: trimmed) {
+            print("CommandParser: Detected quote pattern")
+            return .createQuote(text: input)
         }
         
         // Phase 5: Smart Book Title Detection - Check for "by" pattern first
@@ -512,10 +512,23 @@ struct CommandParser {
         
         // Informal language patterns that suggest notes
         let notePatterns = ["i think", "i want", "i feel", "i believe", "i need", "i wish", "i love", "i hate", 
-                          "remember", "todo", "need to", "should", "must", "don't forget", "my thoughts", "my opinion"]
+                          "remember", "todo", "need to", "should", "must", "don't forget", "my thoughts", "my opinion",
+                          "these books", "this book", "these stories", "this story", "gives me", "makes me", 
+                          "helps me", "reminds me", "teaches me", "shows me", "tells me"]
         for pattern in notePatterns {
             if lowercased.contains(pattern) {
                 return true
+            }
+        }
+        
+        // Personal reflections about books are notes
+        if lowercased.contains("book") || lowercased.contains("story") || lowercased.contains("novel") {
+            // If it contains personal pronouns or feelings, it's a note about books, not a book title
+            let personalIndicators = ["me ", "my ", "i ", "gives", "makes", "helps", "reminds", "teaches", "feels"]
+            for indicator in personalIndicators {
+                if lowercased.contains(indicator) {
+                    return true
+                }
             }
         }
         

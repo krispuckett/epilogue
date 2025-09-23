@@ -382,13 +382,22 @@ struct BookSearchSheet: View {
                 // Show appropriate message based on search state
                 if !searchQuery.isEmpty || !refinedSearchQuery.isEmpty {
                     VStack(spacing: 12) {
-                        Text("No results found")
-                            .font(.system(size: 32, weight: .semibold, design: .default))
-                            .foregroundStyle(.white)
+                        // Dynamic message based on search progress
+                        if isLoading {
+                            Text("Searching...")
+                                .font(.system(size: 32, weight: .semibold, design: .default))
+                                .foregroundStyle(.white)
+                        } else {
+                            Text("Searching for")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.6))
 
-                        Text("for \"\(refinedSearchQuery.isEmpty ? searchQuery : refinedSearchQuery)\"")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.6))
+                            Text("\"\(refinedSearchQuery.isEmpty ? searchQuery : refinedSearchQuery)\"")
+                                .font(.system(size: 28, weight: .semibold, design: .default))
+                                .foregroundStyle(.white)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                 }
                 

@@ -86,19 +86,40 @@ class SmartNoteContextService {
 
     /// Enhance command with detected book context
     func enhanceCommand(_ text: String, library: [Book], currentBook: Book?) -> String {
-        // If we're viewing a book, always use that context
-        if let currentBook = currentBook {
-            // Check if text seems related to the book
-            let lowercased = text.lowercased()
-            let bookWords = currentBook.title.lowercased().split(separator: " ")
+        let lowercased = text.lowercased()
 
+        // Don't enhance if it's already a command or looks like a book title
+        if lowercased.starts(with: "add") ||
+           lowercased.starts(with: "search") ||
+           lowercased.starts(with: "find") ||
+           lowercased.starts(with: "quote") ||
+           lowercased.starts(with: "note") ||
+           lowercased.contains(" by ") {  // Likely a book title with author
+            return text
+        }
+
+        // Check if text is likely just a book title (not in library)
+        let bookExists = library.contains { book in
+            book.title.lowercased() == lowercased ||
+            book.title.lowercased().contains(lowercased) ||
+            lowercased.contains(book.title.lowercased())
+        }
+
+        // If it doesn't match any existing book and doesn't look like a note, return as-is
+        // This allows it to be treated as a potential book search
+        if !bookExists && !isNoteIntent(text) && !text.contains("\"") {
+            return text  // Let CommandParser handle it as potential book search
+        }
+
+        // If we're viewing a book, add context for notes
+        if let currentBook = currentBook {
             // If the text doesn't mention another book, assume it's about current book
             let mentionsOtherBook = library.contains { otherBook in
                 otherBook.localId != currentBook.localId &&
                 lowercased.contains(otherBook.title.lowercased())
             }
 
-            if !mentionsOtherBook {
+            if !mentionsOtherBook && isNoteIntent(text) {
                 // Add book context if it's a note
                 if lowercased.starts(with: "note") {
                     return text // Already has note prefix
@@ -108,11 +129,13 @@ class SmartNoteContextService {
             }
         }
 
-        // Try to detect book context from the text
-        if let detectedBook = detectBookContext(from: text, library: library) {
-            // Add book context
-            if !text.lowercased().starts(with: "note") {
-                return "note about \(detectedBook.title): \(text)"
+        // Try to detect book context from the text for notes
+        if isNoteIntent(text) {
+            if let detectedBook = detectBookContext(from: text, library: library) {
+                // Add book context
+                if !text.lowercased().starts(with: "note") {
+                    return "note about \(detectedBook.title): \(text)"
+                }
             }
         }
 

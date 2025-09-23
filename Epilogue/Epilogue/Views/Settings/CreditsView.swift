@@ -44,6 +44,7 @@ struct CreditsView: View {
             }
             .ignoresSafeArea()
 
+
             // Amber gradient overlay from top to bottom
             VStack {
                 Spacer()

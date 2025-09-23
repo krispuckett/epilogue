@@ -77,9 +77,16 @@ struct MinimalSessionsView: View {
     
     // MARK: - Empty State
     private var emptyState: some View {
-        ModernEmptyStates.noSessions
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.top, 100)
+        ContentUnavailableView {
+            Label("No Sessions Yet", systemImage: "bubble.left.and.bubble.right")
+                .foregroundStyle(.white)
+        } description: {
+            Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
+                .foregroundStyle(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 100)
     }
     
     // MARK: - Sessions List

@@ -131,17 +131,53 @@ struct UnifiedQuickActionCard: View {
                             }
                         }
 
-                        // Right side buttons
-                        HStack(spacing: 14) {
-                            // In Notes tab, always show up arrow. Otherwise show submit/orb
-                            if navigationCoordinator.selectedTab == .notes {
-                                // Always show liquid glass up arrow in Notes tab
+                        // Right side buttons - Morphing between ambient orb and submit
+                        if navigationCoordinator.selectedTab == .notes {
+                            // Always show liquid glass up arrow in Notes tab
+                            Button {
+                                processInput()
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(themeManager.currentTheme.primaryAccent.opacity(0.1))
+                                        .frame(width: 36, height: 36)
+                                        .glassEffect(in: Circle())
+                                        .overlay {
+                                            Circle()
+                                                .strokeBorder(
+                                                    themeManager.currentTheme.primaryAccent.opacity(0.3),
+                                                    lineWidth: 0.5
+                                                )
+                                        }
+
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(themeManager.currentTheme.primaryAccent)
+                                }
+                            }
+                        } else {
+                            // Morphing between ambient orb and submit button
+                            ZStack {
+                                // Ambient orb - shown when no text
+                                Button {
+                                    startAmbientMode()
+                                } label: {
+                                    AmbientOrbButton(size: 36) {
+                                        // Action handled by parent
+                                    }
+                                    .allowsHitTesting(false)
+                                }
+                                .opacity(searchText.isEmpty ? 1 : 0)
+                                .scaleEffect(searchText.isEmpty ? 1 : 0.8)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: searchText.isEmpty)
+
+                                // Submit button - shown when text exists
                                 Button {
                                     processInput()
                                 } label: {
                                     ZStack {
                                         Circle()
-                                            .fill(themeManager.currentTheme.primaryAccent.opacity(0.1))
+                                            .fill(themeManager.currentTheme.primaryAccent.opacity(0.15))
                                             .frame(width: 36, height: 36)
                                             .glassEffect(in: Circle())
                                             .overlay {
@@ -153,46 +189,13 @@ struct UnifiedQuickActionCard: View {
                                             }
 
                                         Image(systemName: "arrow.up")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundStyle(themeManager.currentTheme.primaryAccent)
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(.white)
                                     }
                                 }
-                            } else {
-                                // Submit button when there's text - with liquid glass
-                                if shouldShowSubmitButton {
-                                    Button {
-                                        processInput()
-                                    } label: {
-                                        ZStack {
-                                            Circle()
-                                                .fill(themeManager.currentTheme.primaryAccent.opacity(0.15))
-                                                .frame(width: 36, height: 36)
-                                                .glassEffect(in: Circle())
-                                                .overlay {
-                                                    Circle()
-                                                        .strokeBorder(
-                                                            themeManager.currentTheme.primaryAccent.opacity(0.3),
-                                                            lineWidth: 0.5
-                                                        )
-                                                }
-
-                                            Image(systemName: "arrow.up")
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundStyle(.white)
-                                        }
-                                    }
-                                    .transition(.scale.combined(with: .opacity))
-                                }
-
-                                // Ambient orb (always shown except in Notes tab)
-                                Button {
-                                    startAmbientMode()
-                                } label: {
-                                    AmbientOrbButton(size: 36) {
-                                        // Action handled by parent
-                                    }
-                                    .allowsHitTesting(false)
-                                }
+                                .opacity(searchText.isEmpty ? 0 : 1)
+                                .scaleEffect(searchText.isEmpty ? 0.8 : 1)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: !searchText.isEmpty)
                             }
                         }
                     }

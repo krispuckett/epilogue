@@ -19,6 +19,7 @@ struct ContentView: View {
 
     // MARK: - State
     @State private var selectedTab = 0
+    @State private var showQuickActionCard = false
     @FocusState private var isInputFocused: Bool
 
     // MARK: - Environment
@@ -59,17 +60,33 @@ struct ContentView: View {
             // Use subtle themed gradient like original amber
             SubtleThemedBackground()
                 .ignoresSafeArea()
-                .id("background-\(themeManager.currentTheme.rawValue)") // Force complete refresh on theme change
 
             NavigationContainer(selectedTab: $selectedTab)
 
-            // Enhanced Quick Actions Bar with Metal shader - centered
-            VStack {
-                Spacer()
-                EnhancedQuickActionsBar()
+            // Action bar hidden when card is shown
+            if !showQuickActionCard {
+                VStack {
+                    Spacer()
+                    SimpleActionBar(showCard: $showQuickActionCard)
+                        .environmentObject(libraryViewModel)
+                        .padding(.bottom, 54)
+                }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
+            }
+
+            // Input card overlay when plus is tapped
+            if showQuickActionCard {
+                UnifiedQuickActionCard(isPresented: $showQuickActionCard)
                     .environmentObject(libraryViewModel)
                     .environmentObject(notesViewModel)
-                    .padding(.bottom, 54) // Just 4px above tab bar (50px tab height + 4px)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showQuickActionCard)
             }
         }
         .overlay(alignment: .bottom) {

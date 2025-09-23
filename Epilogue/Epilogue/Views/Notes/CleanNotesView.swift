@@ -29,6 +29,10 @@ struct CleanNotesView: View {
     @State private var scrollOffset: CGFloat = 0
     @Namespace private var animation
     
+    // Toast notification state
+    @State private var toastMessage = ""
+    @State private var showingToast = false
+    
     enum FilterType: String, CaseIterable {
         case all = "All"
         case notes = "Notes"
@@ -248,6 +252,46 @@ struct CleanNotesView: View {
                     }
                 }
                 .coordinateSpace(name: "scroll")
+                
+                // Toast overlay
+                if showingToast {
+                    VStack {
+                        Spacer()
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                            
+                            Text(toastMessage)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
+                        .glassEffect(in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                            DesignSystem.Colors.primaryAccent.opacity(0.1)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        }
+                        .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.95).combined(with: .opacity)
+                        ))
+                        .padding(.bottom, 100)
+                    }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingToast)
+                }
             }
                 .navigationTitle("Notes")
                 .navigationBarTitleDisplayMode(.large)
@@ -281,6 +325,32 @@ struct CleanNotesView: View {
                             navigationCoordinator.highlightedQuoteID = nil
                         }
                     }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { notification in
+                if let data = notification.object as? [String: Any],
+                   let content = data["content"] as? String {
+                    let bookId = data["bookId"] as? String
+                    let bookTitle = data["bookTitle"] as? String
+                    let bookAuthor = data["bookAuthor"] as? String
+                    createNote(content: content, bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
+                if let data = notification.object as? [String: Any],
+                   let quote = data["quote"] as? String {
+                    let attribution = data["attribution"] as? String
+                    let bookId = data["bookId"] as? String
+                    let bookTitle = data["bookTitle"] as? String
+                    let bookAuthor = data["bookAuthor"] as? String
+                    createQuote(content: quote, attribution: attribution?.isEmpty ?? true ? nil : attribution, 
+                               bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowToastMessage"))) { notification in
+                if let data = notification.object as? [String: String],
+                   let message = data["message"] {
+                    showToast(message: message)
                 }
             }
             .toolbar {
@@ -665,9 +735,16 @@ struct CleanNotesView: View {
     }
     
     private var emptyState: some View {
-        ModernEmptyStates.noNotes
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.top, 100)
+        ContentUnavailableView {
+            Label("No Notes Yet", systemImage: "note.text")
+                .foregroundStyle(.white)
+        } description: {
+            Text("Start capturing your thoughts, quotes, and questions from your reading journey")
+                .foregroundStyle(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 100)
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -827,6 +904,78 @@ struct CleanNotesView: View {
         }
         
         SensoryFeedback.light()
+    }
+    
+    // MARK: - Note/Quote Creation
+    
+    private func createNote(content: String, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
+        // Create BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let bookId = bookId, let bookTitle = bookTitle {
+            // Find existing book in library
+            if let existingBook = libraryViewModel.books.first(where: { $0.id == bookId }) {
+                bookModel = BookModel(from: existingBook)
+                modelContext.insert(bookModel!)
+            }
+        }
+        
+        let capturedNote = CapturedNote(content: content, book: bookModel)
+        modelContext.insert(capturedNote)
+        
+        do {
+            try modelContext.save()
+            let message = bookTitle != nil ? "Note saved to \(bookTitle!)" : "Note saved successfully"
+            showToast(message: message)
+            SensoryFeedback.success()
+        } catch {
+            print("Failed to save note: \(error)")
+        }
+    }
+    
+    private func createQuote(content: String, attribution: String?, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
+        // Create BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let bookId = bookId, let bookTitle = bookTitle {
+            // Find existing book in library
+            if let existingBook = libraryViewModel.books.first(where: { $0.id == bookId }) {
+                bookModel = BookModel(from: existingBook)
+                modelContext.insert(bookModel!)
+            }
+        }
+        
+        let capturedQuote = CapturedQuote(
+            text: content,
+            book: bookModel,
+            author: attribution,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        
+        modelContext.insert(capturedQuote)
+        
+        do {
+            try modelContext.save()
+            let message = bookTitle != nil ? "Quote saved to \(bookTitle!)" : "Quote saved successfully"
+            showToast(message: message)
+            SensoryFeedback.success()
+        } catch {
+            print("Failed to save quote: \(error)")
+        }
+    }
+    
+    // MARK: - Toast
+    
+    private func showToast(message: String) {
+        toastMessage = message
+        showingToast = true
+        
+        // Auto-hide after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation {
+                showingToast = false
+            }
+        }
     }
 }
 

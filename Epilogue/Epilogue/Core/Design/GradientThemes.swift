@@ -79,6 +79,70 @@ public enum GradientTheme: String, CaseIterable, Codable {
         }
     }
 
+    // MARK: - Themed Tab Bar Icons
+    var libraryIcon: String {
+        switch self {
+        case .amber:
+            return "glass-book-open"  // Warm amber book
+        case .ocean:
+            return "glass-book-open"  // Could be custom ocean-themed book icon
+        case .forest:
+            return "glass-book-open"  // Could be forest-themed book icon
+        case .sunset:
+            return "glass-book-open"  // Could be sunset-themed book icon
+        case .midnight:
+            return "glass-book-open"  // Could be midnight-themed book icon
+        case .volcanic:
+            return "glass-book-open"  // Could be volcanic-themed book icon
+        case .aurora:
+            return "glass-book-open"  // Could be aurora-themed book icon
+        case .nebula:
+            return "glass-book-open"  // Could be nebula-themed book icon
+        }
+    }
+
+    var notesIcon: String {
+        switch self {
+        case .amber:
+            return "glass-feather"
+        case .ocean:
+            return "glass-feather"
+        case .forest:
+            return "glass-feather"
+        case .sunset:
+            return "glass-feather"
+        case .midnight:
+            return "glass-feather"
+        case .volcanic:
+            return "glass-feather"
+        case .aurora:
+            return "glass-feather"
+        case .nebula:
+            return "glass-feather"
+        }
+    }
+
+    var sessionsIcon: String {
+        switch self {
+        case .amber:
+            return "glass-msgs"
+        case .ocean:
+            return "glass-msgs"
+        case .forest:
+            return "glass-msgs"
+        case .sunset:
+            return "glass-msgs"
+        case .midnight:
+            return "glass-msgs"
+        case .volcanic:
+            return "glass-msgs"
+        case .aurora:
+            return "glass-msgs"
+        case .nebula:
+            return "glass-msgs"
+        }
+    }
+
     // MARK: - Color Palette
     var primaryAccent: Color {
         switch self {
@@ -121,45 +185,45 @@ public enum GradientTheme: String, CaseIterable, Codable {
             ]
         case .forest:
             return [
-                Color(red: 0.34, green: 0.62, blue: 0.42),  // Fresh spring green
-                Color(red: 0.28, green: 0.54, blue: 0.38),  // Vibrant forest
-                Color(red: 0.20, green: 0.45, blue: 0.32),  // Deep emerald
-                Color(red: 0.14, green: 0.35, blue: 0.25)   // Dark forest floor
+                Color(red: 0.20, green: 0.35, blue: 0.28),  // Sage green
+                Color(red: 0.25, green: 0.42, blue: 0.32),  // Forest canopy
+                Color(red: 0.18, green: 0.38, blue: 0.35),  // Deep teal forest
+                Color(red: 0.22, green: 0.45, blue: 0.38)   // Misty pine
             ]
         case .sunset:
             return [
-                Color(red: 0.98, green: 0.45, blue: 0.52),  // Bright coral pink
-                Color(red: 0.96, green: 0.58, blue: 0.42),  // Golden peach
-                Color(red: 0.94, green: 0.68, blue: 0.48),  // Warm apricot
-                Color(red: 0.92, green: 0.38, blue: 0.58)   // Magenta blush
+                Color(red: 0.85, green: 0.45, blue: 0.38),  // Dusty coral
+                Color(red: 0.78, green: 0.38, blue: 0.45),  // Soft rose
+                Color(red: 0.72, green: 0.42, blue: 0.52),  // Lavender pink
+                Color(red: 0.65, green: 0.35, blue: 0.48)   // Plum dusk
             ]
         case .midnight:
             return [
-                Color(red: 0.22, green: 0.32, blue: 0.72),  // Electric indigo
-                Color(red: 0.15, green: 0.25, blue: 0.62),  // Royal blue
-                Color(red: 0.08, green: 0.18, blue: 0.52),  // Deep sapphire
-                Color(red: 0.03, green: 0.08, blue: 0.38)   // Midnight abyss
+                Color(red: 0.10, green: 0.12, blue: 0.25),  // Deep navy
+                Color(red: 0.08, green: 0.15, blue: 0.32),  // Midnight blue
+                Color(red: 0.12, green: 0.18, blue: 0.38),  // Royal indigo
+                Color(red: 0.06, green: 0.10, blue: 0.28)   // Dark sapphire
             ]
         case .volcanic:
             return [
-                Color(red: 0.95, green: 0.35, blue: 0.18),  // Bright lava orange
-                Color(red: 0.88, green: 0.25, blue: 0.12),  // Molten core
-                Color(red: 0.78, green: 0.18, blue: 0.08),  // Deep magma
-                Color(red: 0.68, green: 0.12, blue: 0.05)   // Volcanic ash
+                Color(red: 0.65, green: 0.25, blue: 0.15),  // Burnt sienna
+                Color(red: 0.58, green: 0.20, blue: 0.18),  // Deep terracotta
+                Color(red: 0.52, green: 0.18, blue: 0.12),  // Rust
+                Color(red: 0.45, green: 0.15, blue: 0.10)   // Dark amber
             ]
         case .aurora:
             return [
-                Color(red: 0.45, green: 0.95, blue: 0.75),  // Bright mint
-                Color(red: 0.35, green: 0.88, blue: 0.88),  // Arctic cyan
-                Color(red: 0.55, green: 0.75, blue: 0.98),  // Sky blue
-                Color(red: 0.65, green: 0.60, blue: 0.95)   // Lavender glow
+                Color(red: 0.15, green: 0.35, blue: 0.42),  // Deep teal
+                Color(red: 0.20, green: 0.45, blue: 0.52),  // Arctic blue
+                Color(red: 0.25, green: 0.52, blue: 0.58),  // Glacial cyan
+                Color(red: 0.18, green: 0.42, blue: 0.48)   // Northern waters
             ]
         case .nebula:
             return [
-                Color(red: 0.65, green: 0.35, blue: 0.95),  // Bright cosmic purple
-                Color(red: 0.55, green: 0.28, blue: 0.88),  // Electric violet
-                Color(red: 0.42, green: 0.22, blue: 0.78),  // Deep purple
-                Color(red: 0.32, green: 0.18, blue: 0.68)   // Dark nebula
+                Color(red: 0.35, green: 0.25, blue: 0.45),  // Mystic purple
+                Color(red: 0.42, green: 0.28, blue: 0.52),  // Cosmic violet
+                Color(red: 0.38, green: 0.22, blue: 0.48),  // Deep lavender
+                Color(red: 0.32, green: 0.20, blue: 0.42)   // Royal purple
             ]
         }
     }
@@ -220,14 +284,8 @@ public class ThemeManager: ObservableObject {
     func setTheme(_ theme: GradientTheme) {
         currentTheme = theme
 
-        // Force immediate UI update
-        objectWillChange.send()
-
         // Haptic feedback for theme change
         HapticManager.shared.mediumTap()
-
-        // Post notification for views to refresh
-        NotificationCenter.default.post(name: Notification.Name("ThemeChanged"), object: theme)
     }
 }
 

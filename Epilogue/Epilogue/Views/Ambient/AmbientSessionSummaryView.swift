@@ -21,7 +21,7 @@ struct AmbientSessionSummaryView: View {
     @FocusState private var isPageFocused: Bool
     @State private var generatedInsight: String? = nil
     @State private var isGeneratingInsight = false
-    @State private var showingChat = false
+    // Removed showingChat - not needed
     @State private var showingAmbientMode = false
     @State private var textFieldHeight: CGFloat = 44
     @State private var showQuickActions = false
@@ -125,17 +125,12 @@ struct AmbientSessionSummaryView: View {
                     hasInitializedExpanded = true
                 }
 
-                // Generate AI insight for the session
-                generateAIInsight()
-            }
-            .fullScreenCover(isPresented: $showingChat) {
-                NavigationStack {
-                    UnifiedChatView(
-                        preSelectedBook: convertBookModelToBook(session.bookModel),
-                        startInVoiceMode: false,
-                        isAmbientMode: false
-                    )
-                    .environmentObject(libraryViewModel)
+                // Load cached insight or generate if needed
+                if let cachedInsight = session.generatedInsight {
+                    generatedInsight = cachedInsight
+                } else {
+                    // Only generate if we don't have a cached insight
+                    generateAIInsight()
                 }
             }
             .sheet(isPresented: $quotaManager.showQuotaExceededSheet) {
@@ -331,14 +326,9 @@ struct AmbientSessionSummaryView: View {
     private func primaryInsightCard(question: CapturedQuestion) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: {
-                if isGeneratingInsight {
-                    // If analyzing, open chat view
-                    showingChat = true
-                } else {
-                    // Otherwise toggle expansion
-                    withAnimation(DesignSystem.Animation.springStandard) {
-                        isKeyInsightExpanded.toggle()
-                    }
+                // Just toggle expansion - don't open chat view
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    isKeyInsightExpanded.toggle()
                 }
                 SensoryFeedback.light()
             }) {
@@ -864,29 +854,61 @@ struct AmbientSessionSummaryView: View {
     
     private func generateAIInsight() {
         guard generatedInsight == nil && !isGeneratingInsight else { return }
-        
+
         isGeneratingInsight = true
-        
+
+        // Add a timeout to prevent infinite "Analyzing session..."
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 second timeout
+            await MainActor.run {
+                if self.isGeneratingInsight && self.generatedInsight == nil {
+                    // If still analyzing after 3 seconds, use fallback
+                    self.isGeneratingInsight = false
+                    let insight: String
+                    if let firstQuestion = self.findMostRelevantQuestion() {
+                        if let answer = firstQuestion.answer {
+                            insight = self.extractKeyInsight(from: answer, question: firstQuestion.content ?? "")
+                        } else {
+                            insight = self.createInsightFromSession()
+                        }
+                    } else {
+                        insight = self.createInsightFromSession()
+                    }
+                    self.generatedInsight = insight
+                    self.session.generatedInsight = insight  // Cache in session
+                }
+            }
+        }
+
         Task {
             do {
+                // Skip AI generation if no questions available
+                guard !(session.capturedQuestions ?? []).isEmpty else {
+                    await MainActor.run {
+                        self.generatedInsight = createInsightFromSession()
+                        self.isGeneratingInsight = false
+                    }
+                    return
+                }
+
                 // Prepare session context
                 var context = "Reading session analysis:\n"
-                
+
                 // Add book context
                 if let book = session.book {
                     context += "Book: \(book.title) by \(book.author)\n"
                 }
-                
+
                 // Add session metrics
                 let duration = Int((session.endTime ?? Date()).timeIntervalSince(session.startTime ?? Date())) / 60
                 context += "Duration: \(duration) minutes\n"
                 context += "Questions asked: \((session.capturedQuestions ?? []).count)\n"
-                
+
                 // Add questions and answers
                 if !(session.capturedQuestions ?? []).isEmpty {
                     context += "\nKey questions discussed:\n"
                     for (index, question) in (session.capturedQuestions ?? []).prefix(3).enumerated() {
-                        context += "\(index + 1). \(question.content)\n"
+                        context += "\(index + 1). \(question.content ?? "")\n"
                         if let answer = question.answer {
                             // Include first sentence of answer for context
                             let firstSentence = answer.components(separatedBy: ". ").first ?? answer
@@ -894,7 +916,7 @@ struct AmbientSessionSummaryView: View {
                         }
                     }
                 }
-                
+
                 // Add quotes if available
                 if !(session.capturedQuotes ?? []).isEmpty {
                     context += "\nQuotes captured: \((session.capturedQuotes ?? []).count)\n"
@@ -902,28 +924,28 @@ struct AmbientSessionSummaryView: View {
                         context += "Sample: \"\((firstQuote.text ?? "").prefix(50))...\"\n"
                     }
                 }
-                
+
                 // Add notes if available
                 if !(session.capturedNotes ?? []).isEmpty {
                     context += "Notes taken: \((session.capturedNotes ?? []).count)\n"
                 }
-                
+
                 // Generate insight prompt
                 let prompt = """
                 Based on this reading session, provide ONE profound, concise insight (maximum 20 words) that captures the essence of what was explored or learned.
-                
+
                 The insight should:
                 - Be thought-provoking and meaningful
                 - Reflect the themes or ideas discussed
                 - Not just repeat a question or fact
                 - Feel like a valuable takeaway
-                
+
                 Context:
                 \(context)
-                
+
                 Respond with ONLY the insight, no introduction or explanation.
                 """
-                
+
                 // Try Foundation Models first (free and fast)
                 if AICompanionService.shared.currentProvider == .appleIntelligence {
                     let response = try await AICompanionService.shared.processMessage(
@@ -931,9 +953,11 @@ struct AmbientSessionSummaryView: View {
                         bookContext: session.book,
                         conversationHistory: []
                     )
-                    
+
                     await MainActor.run {
-                        self.generatedInsight = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let insight = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        self.generatedInsight = insight
+                        self.session.generatedInsight = insight  // Cache in session
                         self.isGeneratingInsight = false
                     }
                 } else {
@@ -942,21 +966,57 @@ struct AmbientSessionSummaryView: View {
                         message: prompt,
                         bookContext: session.book
                     )
-                    
+
                     await MainActor.run {
-                        self.generatedInsight = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let insight = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        self.generatedInsight = insight
+                        self.session.generatedInsight = insight  // Cache in session
                         self.isGeneratingInsight = false
                     }
                 }
             } catch {
                 // Fallback to extracted insight
                 await MainActor.run {
+                    let insight: String
+                    if let firstQuestion = self.findMostRelevantQuestion() {
+                        if let answer = firstQuestion.answer {
+                            insight = self.extractKeyInsight(from: answer, question: firstQuestion.content ?? "")
+                        } else {
+                            insight = self.createInsightFromSession()
+                        }
+                    } else {
+                        insight = self.createInsightFromSession()
+                    }
+                    self.generatedInsight = insight
+                    self.session.generatedInsight = insight  // Cache in session
                     self.isGeneratingInsight = false
-                    // Will use the fallback extractKeyInsight method
                 }
                 print("Failed to generate AI insight: \(error)")
             }
         }
+    }
+
+    private func createInsightFromSession() -> String {
+        // Create a meaningful insight based on session data
+        if let book = session.book {
+            let questionsCount = (session.capturedQuestions ?? []).count
+            let quotesCount = (session.capturedQuotes ?? []).count
+            let notesCount = (session.capturedNotes ?? []).count
+
+            if questionsCount > 0 && quotesCount > 0 {
+                return "Deep exploration of \(book.title) through questions and passages"
+            } else if questionsCount > 0 {
+                return "Thoughtful inquiry into the themes of \(book.title)"
+            } else if quotesCount > 0 {
+                return "Meaningful passages captured from \(book.title)"
+            } else if notesCount > 0 {
+                return "Personal reflections on \(book.title)"
+            } else {
+                return "Reading journey through \(book.title)"
+            }
+        }
+
+        return "A thoughtful reading session"
     }
     
     private func extractKeyInsight(from answer: String, question: String) -> String {
@@ -1023,7 +1083,17 @@ struct AmbientSessionSummaryView: View {
     }
 
     private func reopenAmbientMode() {
-        showingAmbientMode = true
+        // Open ambient mode with existing session context
+        if let book = convertBookModelToBook(session.bookModel) {
+            SimplifiedAmbientCoordinator.shared.openAmbientReading(
+                with: book,
+                existingSession: session
+            )
+        } else {
+            SimplifiedAmbientCoordinator.shared.openAmbientReading(
+                existingSession: session
+            )
+        }
     }
 
 }
