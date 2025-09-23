@@ -58,9 +58,16 @@ struct AdvancedOnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Black background base for all screens
-            Color.black
+            // Permanent ambient gradient background - exactly like LibraryView
+            AmbientChatGradientView()
+                .opacity(0.4)
                 .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+            
+            // Subtle darkening overlay for better readability - exactly like LibraryView
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
             
             // TabView for swipe navigation
             TabView(selection: $currentPage) {
@@ -94,12 +101,7 @@ struct AdvancedOnboardingView: View {
     // MARK: - Welcome Screen with Shader
     @ViewBuilder
     private func shaderWelcomeScreen(page: OnboardingPage) -> some View {
-        ZStack {
-            // Use the same gradient approach as LibraryView
-            AmbientChatGradientView()
-                .opacity(0.5)
-
-            VStack(spacing: 40) {
+        VStack(spacing: 40) {
                 Spacer()
 
                 // Larger Metal shader with smooth entrance
@@ -192,17 +194,11 @@ struct AdvancedOnboardingView: View {
                 }
             }
         }
-    }
 
     // MARK: - Video Screen with Text
     @ViewBuilder
     private func videoScreen(page: OnboardingPage) -> some View {
-        ZStack {
-            // Use the same gradient approach as LibraryView
-            AmbientChatGradientView()
-                .opacity(0.4)
-
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // Reduced top spacing - video closer to top
                 Spacer()
                     .frame(height: 50)
@@ -393,7 +389,6 @@ struct AdvancedOnboardingView: View {
                 .padding(.bottom, 40)
             }
         }
-    }
 
     private func completeOnboarding() {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
