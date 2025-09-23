@@ -7,10 +7,10 @@ struct AdvancedOnboardingView: View {
 
     @State private var currentPage = 0
     @State private var player: AVPlayer?
-    @State private var showContent = false
-    @State private var showButton = false
+    @State private var pageAnimationComplete = false
     @State private var viewOpacity: Double = 0
     @State private var pageTransition: Bool = false
+    @State private var pageVisibility: [Int: Bool] = [:]
     @StateObject private var themeManager = ThemeManager.shared
 
     private let pages = [
@@ -72,7 +72,7 @@ struct AdvancedOnboardingView: View {
             // TabView for swipe navigation
             TabView(selection: $currentPage) {
                 ForEach(pages.indices, id: \.self) { index in
-                    pageContent(for: pages[index])
+                    pageContent(for: pages[index], index: index)
                         .tag(index)
                 }
             }
@@ -88,19 +88,19 @@ struct AdvancedOnboardingView: View {
     }
 
     @ViewBuilder
-    private func pageContent(for page: OnboardingPage) -> some View {
+    private func pageContent(for page: OnboardingPage, index: Int) -> some View {
         switch page.type {
         case .shaderScreen:
-            shaderWelcomeScreen(page: page)
+            shaderWelcomeScreen(page: page, index: index)
         case .video:
-            videoScreen(page: page)
+            videoScreen(page: page, index: index)
         }
     }
 
 
     // MARK: - Welcome Screen with Shader
     @ViewBuilder
-    private func shaderWelcomeScreen(page: OnboardingPage) -> some View {
+    private func shaderWelcomeScreen(page: OnboardingPage, index: Int) -> some View {
         VStack(spacing: 40) {
                 Spacer()
 
@@ -111,13 +111,14 @@ struct AdvancedOnboardingView: View {
                         MetalShaderView(isPressed: .constant(false), size: CGSize(width: 200, height: 200))
                             .allowsHitTesting(false)
                     )
-                    .scaleEffect(showContent ? 1 : 0.5)
-                    .opacity(showContent ? 1 : 0)
+                    .scaleEffect(currentPage == index ? 1 : 0.5)
+                    .opacity(currentPage == index ? 1 : 0)
                     .rotation3DEffect(
-                        .degrees(showContent ? 0 : 30),
+                        .degrees(currentPage == index ? 0 : 30),
                         axis: (x: 0, y: 1, z: 0),
                         perspective: 0.5
                     )
+                    .animation(.spring(response: 0.8, dampingFraction: 0.75), value: currentPage)
 
                 // Content
                 VStack(spacing: 20) {
@@ -145,24 +146,16 @@ struct AdvancedOnboardingView: View {
                 // Progress indicator - moved above button
                 VStack(spacing: 20) {
                     PageIndicator(currentPage: currentPage, pageCount: pages.count)
-                        .opacity(showButton ? 1 : 0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.9), value: showButton)
+                        .opacity(currentPage == index ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.9), value: currentPage)
                     
                     // Continue button - closer to safe area
                     Button {
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                            pageTransition = true
                             if currentPage < pages.count - 1 {
                                 currentPage += 1
                             } else {
                                 completeOnboarding()
-                            }
-
-                            // Reset states for next page
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                showContent = false
-                                showButton = false
-                                pageTransition = false
                             }
                         }
                     } label: {
@@ -179,25 +172,18 @@ struct AdvancedOnboardingView: View {
                         .frame(height: 50)
                         .glassEffect(in: Capsule())
                     }
-                    .opacity(showButton ? 1 : 0)
-                    .offset(y: showButton ? 0 : 20)
+                    .opacity(currentPage == index ? 1 : 0)
+                    .offset(y: currentPage == index ? 0 : 20)
+                    .animation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.8), value: currentPage)
                 }
                 .padding(.bottom, 40)
             }
-            .onAppear {
-                // Staggered animations for smooth entrance
-                withAnimation(.spring(response: 0.8, dampingFraction: 0.75).delay(0.2)) {
-                    showContent = true
-                }
-                withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.8)) {
-                    showButton = true
-                }
-            }
+            .animation(.spring(response: 0.6, dampingFraction: 0.85), value: currentPage)
         }
 
     // MARK: - Video Screen with Text
     @ViewBuilder
-    private func videoScreen(page: OnboardingPage) -> some View {
+    private func videoScreen(page: OnboardingPage, index: Int) -> some View {
         VStack(spacing: 0) {
                 // Reduced top spacing - video closer to top
                 Spacer()
@@ -215,36 +201,28 @@ struct AdvancedOnboardingView: View {
                             .padding(.horizontal, 30) // Less padding for larger video
                             .shadow(color: .black.opacity(0.4), radius: 30, y: 15)
                             .disabled(true)
-                            .scaleEffect(showContent ? 1 : 0.9)
-                            .opacity(showContent ? 1 : 0)
-                            .offset(y: showContent ? 0 : 50)
-                            .blur(radius: showContent ? 0 : 5)
+                            .scaleEffect(currentPage == index ? 1 : 0.9)
+                            .opacity(currentPage == index ? 1 : 0)
+                            .offset(y: currentPage == index ? 0 : 50)
+                            .blur(radius: currentPage == index ? 0 : 5)
                             .onAppear {
-                                // Reset and animate for smooth entrance
-                                showContent = false
-                                showButton = false
-
-                                withAnimation(.spring(response: 0.9, dampingFraction: 0.75).delay(0.1)) {
-                                    showContent = true
-                                }
-                                withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.6)) {
-                                    showButton = true
-                                }
-                                let newPlayer = AVPlayer(url: videoURL)
-                                newPlayer.isMuted = false
-                                newPlayer.play()
-                                newPlayer.actionAtItemEnd = .none
-
-                                NotificationCenter.default.addObserver(
-                                    forName: .AVPlayerItemDidPlayToEndTime,
-                                    object: newPlayer.currentItem,
-                                    queue: .main
-                                ) { _ in
-                                    newPlayer.seek(to: .zero)
+                                if currentPage == index {
+                                    let newPlayer = AVPlayer(url: videoURL)
+                                    newPlayer.isMuted = false
                                     newPlayer.play()
-                                }
+                                    newPlayer.actionAtItemEnd = .none
 
-                                self.player = newPlayer
+                                    NotificationCenter.default.addObserver(
+                                        forName: .AVPlayerItemDidPlayToEndTime,
+                                        object: newPlayer.currentItem,
+                                        queue: .main
+                                    ) { _ in
+                                        newPlayer.seek(to: .zero)
+                                        newPlayer.play()
+                                    }
+
+                                    self.player = newPlayer
+                                }
                             }
                     } else {
                         RoundedRectangle(cornerRadius: 20)
@@ -275,17 +253,17 @@ struct AdvancedOnboardingView: View {
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
-                        .opacity(showButton ? 1 : 0)
-                        .offset(y: showButton ? 0 : 20)
+                        .opacity(currentPage == index ? 1 : 0)
+                        .offset(y: currentPage == index ? 0 : 20)
 
                     if !page.subtitle.isEmpty {
                         Text(page.subtitle.uppercased())
                             .font(.system(size: 13, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.6))
                             .tracking(1.5)
-                            .opacity(showButton ? 1 : 0)
-                            .offset(y: showButton ? 0 : 15)
-                            .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.05), value: showButton)
+                            .opacity(currentPage == index ? 1 : 0)
+                            .offset(y: currentPage == index ? 0 : 15)
+                            .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.05), value: currentPage)
                     }
 
                     Text(page.description)
@@ -295,9 +273,9 @@ struct AdvancedOnboardingView: View {
                         .lineSpacing(3)
                         .padding(.horizontal, 40)
                         .padding(.top, 4)
-                        .opacity(showButton ? 1 : 0)
-                        .offset(y: showButton ? 0 : 10)
-                        .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.1), value: showButton)
+                        .opacity(currentPage == index ? 1 : 0)
+                        .offset(y: currentPage == index ? 0 : 10)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.1), value: currentPage)
                 }
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -310,8 +288,8 @@ struct AdvancedOnboardingView: View {
                 VStack(spacing: 20) {
                     // Progress indicator - moved above buttons
                     PageIndicator(currentPage: currentPage, pageCount: pages.count)
-                        .opacity(showButton ? 1 : 0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: showButton)
+                        .opacity(currentPage == index ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: currentPage)
 
                     // Navigation buttons
                     HStack {
@@ -319,15 +297,7 @@ struct AdvancedOnboardingView: View {
                         if currentPage > 0 {
                             Button {
                                 withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                                    pageTransition = true
                                     currentPage -= 1
-
-                                    // Reset states
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        showContent = false
-                                        showButton = false
-                                        pageTransition = false
-                                    }
                                 }
                             } label: {
                                 Image(systemName: "chevron.left")
@@ -340,8 +310,8 @@ struct AdvancedOnboardingView: View {
                                 insertion: .move(edge: .leading).combined(with: .opacity),
                                 removal: .move(edge: .leading).combined(with: .opacity)
                             ))
-                            .opacity(showButton ? 1 : 0)
-                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: showButton)
+                            .opacity(currentPage == index ? 1 : 0)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: currentPage)
                         }
 
                         Spacer()
@@ -349,18 +319,10 @@ struct AdvancedOnboardingView: View {
                         // Continue button with animation
                         Button {
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                                pageTransition = true
                                 if currentPage < pages.count - 1 {
                                     currentPage += 1
                                 } else {
                                     completeOnboarding()
-                                }
-
-                                // Reset states
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    showContent = false
-                                    showButton = false
-                                    pageTransition = false
                                 }
                             }
                         } label: {
@@ -381,8 +343,8 @@ struct AdvancedOnboardingView: View {
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
-                        .opacity(showButton ? 1 : 0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: showButton)
+                        .opacity(currentPage == index ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: currentPage)
                     }
                     .padding(.horizontal, 30)
                 }
@@ -391,14 +353,10 @@ struct AdvancedOnboardingView: View {
         }
 
     private func completeOnboarding() {
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-            showContent = false
-            showButton = false
-        }
-        withAnimation(.easeOut(duration: 0.4).delay(0.2)) {
+        withAnimation(.easeOut(duration: 0.4)) {
             viewOpacity = 0
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             onComplete()
         }
     }
