@@ -143,13 +143,12 @@ struct AdvancedOnboardingView: View {
 
                 Spacer()
                 
-                // Progress indicator - moved above button
-                VStack(spacing: 20) {
+                // Progress indicator and button - consistent with video screens
+                VStack(spacing: 16) {
                     PageIndicator(currentPage: currentPage, pageCount: pages.count)
                         .opacity(currentPage == index ? 1 : 0)
                         .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.9), value: currentPage)
                     
-                    // Continue button - closer to safe area
                     Button {
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
                             if currentPage < pages.count - 1 {
@@ -168,15 +167,16 @@ struct AdvancedOnboardingView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
-                        .padding(.horizontal, 30)
-                        .frame(height: 50)
-                        .glassEffect(in: Capsule())
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .glassEffect(.regular, in: Capsule())
+                        .padding(.horizontal, 40)
                     }
                     .opacity(currentPage == index ? 1 : 0)
                     .offset(y: currentPage == index ? 0 : 20)
                     .animation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.8), value: currentPage)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 60)
             }
             .animation(.spring(response: 0.6, dampingFraction: 0.85), value: currentPage)
         }
@@ -184,10 +184,30 @@ struct AdvancedOnboardingView: View {
     // MARK: - Video Screen with Text
     @ViewBuilder
     private func videoScreen(page: OnboardingPage, index: Int) -> some View {
-        VStack(spacing: 0) {
-                // Reduced top spacing - video closer to top
-                Spacer()
-                    .frame(height: 50)
+        ZStack {
+            VStack(spacing: 0) {
+                // Top toolbar area with back button
+                HStack {
+                    if currentPage > 0 {
+                        Button {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
+                                currentPage -= 1
+                            }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .frame(width: 44, height: 44)
+                                .glassEffect(.regular, in: Circle())
+                        }
+                        .opacity(currentPage == index ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: currentPage)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
 
                 // Animated video container
                 Group {
@@ -197,6 +217,7 @@ struct AdvancedOnboardingView: View {
                         VideoPlayer(player: player ?? AVPlayer(url: videoURL))
                             .aspectRatio(9.0/16.0, contentMode: .fit)
                             .frame(height: UIScreen.main.bounds.height * 0.55) // Larger video
+                            .background(Color.clear)
                             .cornerRadius(24)
                             .padding(.horizontal, 30) // Less padding for larger video
                             .shadow(color: .black.opacity(0.4), radius: 30, y: 15)
@@ -283,72 +304,46 @@ struct AdvancedOnboardingView: View {
                 ))
 
                 Spacer()
-
-                // Progress indicator and navigation
-                VStack(spacing: 20) {
-                    // Progress indicator - moved above buttons
+            }
+            
+            // Fixed position continue button and progress indicator
+            VStack {
+                Spacer()
+                
+                VStack(spacing: 16) {
+                    // Progress indicator
                     PageIndicator(currentPage: currentPage, pageCount: pages.count)
                         .opacity(currentPage == index ? 1 : 0)
                         .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: currentPage)
-
-                    // Navigation buttons
-                    HStack {
-                        // Back button with animation
-                        if currentPage > 0 {
-                            Button {
-                                withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                                    currentPage -= 1
-                                }
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.7))
-                                    .frame(width: 50, height: 50)
-                                    .glassEffect(.regular, in: Circle())
+                    
+                    // Continue button - centered
+                    Button {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
+                            if currentPage < pages.count - 1 {
+                                currentPage += 1
+                            } else {
+                                completeOnboarding()
                             }
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .leading).combined(with: .opacity),
-                                removal: .move(edge: .leading).combined(with: .opacity)
-                            ))
-                            .opacity(currentPage == index ? 1 : 0)
-                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: currentPage)
                         }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(currentPage == pages.count - 1 ? "Get Started" : "Continue")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
 
-                        Spacer()
-
-                        // Continue button with animation
-                        Button {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
-                                if currentPage < pages.count - 1 {
-                                    currentPage += 1
-                                } else {
-                                    completeOnboarding()
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text(currentPage == pages.count - 1 ? "Get Started" : "Continue")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundStyle(.white)
-
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white)
-                            }
-                            .padding(.horizontal, 30)
-                            .frame(height: 50)
-                            .glassEffect(.regular, in: Capsule())
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
                         }
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
-                        .opacity(currentPage == index ? 1 : 0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: currentPage)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .glassEffect(.regular, in: Capsule())
+                        .padding(.horizontal, 40)
                     }
-                    .padding(.horizontal, 30)
+                    .opacity(currentPage == index ? 1 : 0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: currentPage)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 60)
             }
         }
 
