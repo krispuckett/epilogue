@@ -346,6 +346,7 @@ struct AdvancedOnboardingView: View {
                 .padding(.bottom, 60)
             }
         }
+    }
 
     private func completeOnboarding() {
         withAnimation(.easeOut(duration: 0.4)) {
