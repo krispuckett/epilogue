@@ -140,7 +140,7 @@ struct UnifiedQuickActionCard: View {
                                 ZStack {
                                     Circle()
                                         .fill(themeManager.currentTheme.primaryAccent.opacity(0.1))
-                                        .frame(width: 36, height: 36)
+                                        .frame(width: 32, height: 32)
                                         .glassEffect(in: Circle())
                                         .overlay {
                                             Circle()
@@ -178,7 +178,7 @@ struct UnifiedQuickActionCard: View {
                                     ZStack {
                                         Circle()
                                             .fill(themeManager.currentTheme.primaryAccent.opacity(0.15))
-                                            .frame(width: 36, height: 36)
+                                            .frame(width: 32, height: 32)
                                             .glassEffect(in: Circle())
                                             .overlay {
                                                 Circle()
@@ -330,17 +330,29 @@ struct UnifiedQuickActionCard: View {
     }
 
     private var placeholderText: String {
-        switch navigationCoordinator.selectedTab {
-        case .library:
-            if libraryViewModel.currentDetailBook != nil {
-                return "Add a note, quote, or question about this book..."
-            } else {
-                return "Add a book, search your library, or ask a question..."
+        // Shorter placeholder when collapsed, longer when expanded
+        if !isExpanded {
+            switch navigationCoordinator.selectedTab {
+            case .library:
+                return "Ask, capture, or type..."
+            case .notes:
+                return "Create a note, add a quote..."
+            case .chat:
+                return "Ask about your books..."
             }
-        case .notes:
-            return "Create a note, add a quote, or search your thoughts..."
-        case .chat:
-            return "Ask about your books, notes, or reading insights..."
+        } else {
+            switch navigationCoordinator.selectedTab {
+            case .library:
+                if libraryViewModel.currentDetailBook != nil {
+                    return "Add a note, quote, or question about this book..."
+                } else {
+                    return "Add a book, search your library, or ask a question..."
+                }
+            case .notes:
+                return "Create a note, add a quote, or search your thoughts..."
+            case .chat:
+                return "Ask about your books, notes, or reading insights..."
+            }
         }
     }
 

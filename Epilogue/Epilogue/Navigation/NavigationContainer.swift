@@ -20,8 +20,8 @@ struct NavigationContainer: View {
                 Label {
                     Text("Library")
                 } icon: {
-                    Image(themeManager.currentTheme.libraryIcon)
-                        .renderingMode(.template)
+                    Image(selectedTab == 0 ? "book-active" : "book-inactive")
+                        .renderingMode(.original)
                 }
             }
             .tag(0)
@@ -33,8 +33,8 @@ struct NavigationContainer: View {
                 Label {
                     Text("Notes")
                 } icon: {
-                    Image(themeManager.currentTheme.notesIcon)
-                        .renderingMode(.template)
+                    Image(selectedTab == 1 ? "feather-active" : "feather-inactive")
+                        .renderingMode(.original)
                 }
             }
             .tag(1)
@@ -44,13 +44,13 @@ struct NavigationContainer: View {
                 Label {
                     Text("Sessions")
                 } icon: {
-                    Image(themeManager.currentTheme.sessionsIcon)
-                        .renderingMode(.template)
+                    Image(selectedTab == 2 ? "msgs-active" : "msgs-inactive")
+                        .renderingMode(.original)
                 }
             }
             .tag(2)
         }
-        .tint(themeManager.currentTheme.primaryAccent)
+        // Don't apply tint since we're using original rendering mode
         .onAppear {
             // Restore original tab bar with proper glass effect
             setupTabBarAppearance()
@@ -83,16 +83,15 @@ struct NavigationContainer: View {
         appearance.backgroundColor = nil
         appearance.barTintColor = nil
 
-        // Use the theme's primary accent color for active icons
-        appearance.tintColor = UIColor(themeManager.currentTheme.primaryAccent)
-        // Revert to fixed inactive gray for consistency with prior look
-        appearance.unselectedItemTintColor = UIColor(white: 0.5, alpha: 1.0)
+        // Don't set tint colors since we're using original rendering for PDF icons
+        appearance.tintColor = nil
+        appearance.unselectedItemTintColor = nil
     }
 
     private func updateTabBarAppearance() {
-        // Update colors based on current theme
-        UITabBar.appearance().tintColor = UIColor(themeManager.currentTheme.primaryAccent)
-        UITabBar.appearance().unselectedItemTintColor = UIColor(white: 0.5, alpha: 1.0)
+        // Don't override icon colors for PDFs with original rendering
+        UITabBar.appearance().tintColor = nil
+        UITabBar.appearance().unselectedItemTintColor = nil
     }
 
     private func syncWithNavigationCoordinator(_ tab: Int) {
