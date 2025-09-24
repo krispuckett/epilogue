@@ -175,17 +175,11 @@ struct AmbientReadingProgressView: View {
                         y: 2
                     )
                 
-                // Center progress display
-                VStack(spacing: 4) {
-                    Text("\(Int(animatedProgress * 100))")
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color.white)
-                        .contentTransition(.numericText())
-                    
-                    Text("%")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-                }
+                // Center progress display - single line
+                Text("\(Int(animatedProgress * 100))%")
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.white)
+                    .contentTransition(.numericText())
             }
         }
     }

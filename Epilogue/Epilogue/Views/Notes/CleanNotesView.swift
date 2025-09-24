@@ -328,12 +328,17 @@ struct CleanNotesView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { notification in
+                print("📝 CleanNotesView: Received CreateNewNote notification")
                 if let data = notification.object as? [String: Any],
                    let content = data["content"] as? String {
+                    print("📝 Note content: \(content)")
                     let bookId = data["bookId"] as? String
                     let bookTitle = data["bookTitle"] as? String
                     let bookAuthor = data["bookAuthor"] as? String
+                    print("📝 Book context: ID=\(bookId ?? "nil"), Title=\(bookTitle ?? "nil"), Author=\(bookAuthor ?? "nil")")
                     createNote(content: content, bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
+                } else {
+                    print("❌ Failed to parse notification data")
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
@@ -909,11 +914,21 @@ struct CleanNotesView: View {
     // MARK: - Note/Quote Creation
     
     private func createNote(content: String, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
-        // Create BookModel if we have book context
+        // Find or create BookModel if we have book context
         var bookModel: BookModel? = nil
         if let bookId = bookId, let bookTitle = bookTitle {
-            // Find existing book in library
-            if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
+            // First, try to find an existing BookModel in SwiftData
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { book in
+                    book.localId == bookId
+                }
+            )
+            
+            if let existingBookModel = try? modelContext.fetch(descriptor).first {
+                // Use the existing BookModel from SwiftData
+                bookModel = existingBookModel
+            } else if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
+                // Create a new BookModel from the library book
                 bookModel = BookModel(from: existingBook)
                 modelContext.insert(bookModel!)
             }
@@ -924,21 +939,36 @@ struct CleanNotesView: View {
         
         do {
             try modelContext.save()
+            print("✅ Note saved successfully to SwiftData")
             let message = bookTitle != nil ? "Note saved to \(bookTitle!)" : "Note saved successfully"
             showToast(message: message)
             SensoryFeedback.success()
         } catch {
-            print("Failed to save note: \(error)")
+            print("❌ Failed to save note: \(error)")
+            print("❌ Error details: \(error.localizedDescription)")
+            // Show error toast to user
+            showToast("Failed to save note")
         }
     }
     
     private func createQuote(content: String, attribution: String?, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
-        // Create BookModel if we have book context
+        // Find or create BookModel if we have book context
         var bookModel: BookModel? = nil
         
         // First try to find existing book by ID
         if let bookId = bookId {
-            if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
+            // Try to find an existing BookModel in SwiftData
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { book in
+                    book.localId == bookId
+                }
+            )
+            
+            if let existingBookModel = try? modelContext.fetch(descriptor).first {
+                // Use the existing BookModel from SwiftData
+                bookModel = existingBookModel
+            } else if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
+                // Create a new BookModel from the library book
                 bookModel = BookModel(from: existingBook)
                 modelContext.insert(bookModel!)
             }
@@ -947,12 +977,23 @@ struct CleanNotesView: View {
         // If no bookModel yet but we have bookTitle, create a minimal BookModel
         // This handles quotes with book attribution but no selected book from library
         if bookModel == nil && bookTitle != nil {
-            bookModel = BookModel(
-                id: UUID().uuidString, // Generate a unique ID for quotes without library books
-                title: bookTitle!,
-                author: bookAuthor ?? attribution ?? "Unknown"
+            // First check if a BookModel with this title already exists
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { book in
+                    book.title == bookTitle!
+                }
             )
-            modelContext.insert(bookModel!)
+            
+            if let existingBookModel = try? modelContext.fetch(descriptor).first {
+                bookModel = existingBookModel
+            } else {
+                bookModel = BookModel(
+                    id: UUID().uuidString, // Generate a unique ID for quotes without library books
+                    title: bookTitle!,
+                    author: bookAuthor ?? attribution ?? "Unknown"
+                )
+                modelContext.insert(bookModel!)
+            }
         }
         
         let capturedQuote = CapturedQuote(
@@ -973,6 +1014,8 @@ struct CleanNotesView: View {
             SensoryFeedback.success()
         } catch {
             print("Failed to save quote: \(error)")
+            // Show error toast to user
+            showToast("Failed to save quote")
         }
     }
     

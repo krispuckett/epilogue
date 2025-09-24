@@ -20,6 +20,10 @@ struct UnifiedQuickActionCard: View {
     @State private var showRecentBooks = false
     @State private var showNotesSearch = false
     @State private var selectedBookContext: Book? = nil
+    
+    // Toast notification state
+    @State private var showingToast = false
+    @State private var toastMessage = ""
 
     var body: some View {
         ZStack {
@@ -40,7 +44,7 @@ struct UnifiedQuickActionCard: View {
                 // The actual card - matching reference screenshot style
                 VStack(spacing: 0) {
                     // Main input row
-                    HStack(spacing: 16) { // Increased spacing for better balance
+                    HStack(spacing: 12) {
                         // Plus/X button with rotation animation
                         Button {
                             if !isExpanded {
@@ -50,9 +54,9 @@ struct UnifiedQuickActionCard: View {
                             }
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 22, weight: .regular)) // Slightly larger
+                                .font(.system(size: 20, weight: .regular))
                                 .foregroundStyle(.white.opacity(0.7))
-                                .frame(width: 44, height: 44) // Larger touch target
+                                .frame(width: 36, height: 36)
                                 .contentShape(Circle())
                                 .rotationEffect(.degrees(isExpanded ? 45 : 0)) // Rotate to X
                                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
@@ -113,12 +117,12 @@ struct UnifiedQuickActionCard: View {
                                     }
                                 } else {
                                     // Clean input field matching ambient mode
-                                    TextField(placeholderText, text: $searchText)
+                                    TextField(placeholderText, text: $searchText, axis: .vertical)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 17, weight: .regular))
                                     .foregroundStyle(.white)
                                     .tint(themeManager.currentTheme.primaryAccent)
-                                    .lineLimit(1)  // Single line when collapsed
+                                    .lineLimit(1...3)  // Allow multi-line even when collapsed
                                     .focused($isFocused)
                                     .onSubmit {
                                         if !searchText.isEmpty {
@@ -140,7 +144,7 @@ struct UnifiedQuickActionCard: View {
                                 ZStack {
                                     Circle()
                                         .fill(themeManager.currentTheme.primaryAccent.opacity(0.1))
-                                        .frame(width: 32, height: 32)
+                                        .frame(width: 36, height: 36)
                                         .glassEffect(in: Circle())
                                         .overlay {
                                             Circle()
@@ -178,7 +182,7 @@ struct UnifiedQuickActionCard: View {
                                     ZStack {
                                         Circle()
                                             .fill(themeManager.currentTheme.primaryAccent.opacity(0.15))
-                                            .frame(width: 32, height: 32)
+                                            .frame(width: 36, height: 36)
                                             .glassEffect(in: Circle())
                                             .overlay {
                                                 Circle()
@@ -200,7 +204,7 @@ struct UnifiedQuickActionCard: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, isExpanded ? 14 : 18) // More padding when collapsed for height
+                    .padding(.vertical, 10) // Reduced padding to make it less tall
 
                     // Quick actions (only when expanded) - context aware
                     if isExpanded {
@@ -253,8 +257,48 @@ struct UnifiedQuickActionCard: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20) // Closer to bottom since action bar is hidden
             }
+            
+            // Glass Toast Overlay
+            if showingToast {
+                VStack {
+                    Spacer()
+                    
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(themeManager.currentTheme.primaryAccent)
+                        
+                        Text(toastMessage)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .fill(Color.white.opacity(0.001))
+                    )
+                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(
+                                themeManager.currentTheme.primaryAccent.opacity(0.3),
+                                lineWidth: 1
+                            )
+                    }
+                    .shadow(color: themeManager.currentTheme.primaryAccent.opacity(0.15), radius: 20, y: 8)
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        )
+                    )
+                }
+                .padding(.bottom, 100) // Above tab bar
+            }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingToast)
         .onAppear {
             // Focus immediately when appearing
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -265,6 +309,7 @@ struct UnifiedQuickActionCard: View {
             BookSearchSheet(searchQuery: searchText) { book in
                 libraryViewModel.addBook(book)
                 showBookSearch = false
+                showToast("Book added to library")
             }
         }
         .sheet(isPresented: $showBookScanner) {
@@ -290,6 +335,7 @@ struct UnifiedQuickActionCard: View {
                     notesViewModel.addNote(quote)
                     SensoryFeedback.success()
                     showTextCapture = false
+                    showToast("Quote captured")
                 },
                 onQuestionAsked: { question in
                     // Handle question - could trigger AI chat
@@ -756,6 +802,8 @@ struct UnifiedQuickActionCard: View {
     }
 
     private func createNote(_ text: String) {
+        print("📝 UnifiedQuickActionCard: Creating note with text: \(text)")
+        
         // Use selected book context if available, otherwise current detail book
         let book = selectedBookContext ?? libraryViewModel.currentDetailBook
         
@@ -769,14 +817,23 @@ struct UnifiedQuickActionCard: View {
             noteData["bookId"] = book.localId.uuidString
             noteData["bookTitle"] = book.title
             noteData["bookAuthor"] = book.author
+            print("📝 Note has book context: \(book.title)")
+        } else {
+            print("📝 Note has no book context")
         }
         
-        NotificationCenter.default.post(
-            name: Notification.Name("CreateNewNote"),
-            object: noteData
-        )
+        print("📝 Posting CreateNewNote notification with data: \(noteData)")
+        
+        // Post the notification with a small delay to ensure the view is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(
+                name: Notification.Name("CreateNewNote"),
+                object: noteData
+            )
+        }
         
         SensoryFeedback.success()
+        showToast("Note saved")
     }
 
     private func createQuote(_ text: String) {
@@ -795,12 +852,16 @@ struct UnifiedQuickActionCard: View {
             quoteData["bookAuthor"] = book.author
         }
         
-        NotificationCenter.default.post(
-            name: Notification.Name("SaveQuote"),
-            object: quoteData
-        )
+        // Post the notification with a small delay to ensure the view is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(
+                name: Notification.Name("SaveQuote"),
+                object: quoteData
+            )
+        }
         
         SensoryFeedback.success()
+        showToast("Quote saved")
     }
     
     private func createQuoteWithAttribution(text: String, author: String?, bookTitle: String?) {
@@ -831,12 +892,16 @@ struct UnifiedQuickActionCard: View {
             // Just use the author for attribution
         }
         
-        NotificationCenter.default.post(
-            name: Notification.Name("SaveQuote"),
-            object: quoteData
-        )
+        // Post the notification with a small delay to ensure the view is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(
+                name: Notification.Name("SaveQuote"),
+                object: quoteData
+            )
+        }
         
         SensoryFeedback.success()
+        showToast("Quote saved")
     }
 
     private func startAmbientMode() {
@@ -846,6 +911,22 @@ struct UnifiedQuickActionCard: View {
             SimplifiedAmbientCoordinator.shared.openAmbientReading()
         }
         collapseCard()
+    }
+    
+    // MARK: - Toast Functions
+    private func showToast(_ message: String) {
+        toastMessage = message
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            showingToast = true
+        }
+        
+        // Auto-dismiss after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showingToast = false
+            }
+        }
     }
 }
 
