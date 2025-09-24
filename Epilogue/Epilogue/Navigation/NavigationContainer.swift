@@ -22,6 +22,9 @@ struct NavigationContainer: View {
                 } icon: {
                     Image(selectedTab == 0 ? "book-active" : "book-inactive")
                         .renderingMode(.original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
                 }
             }
             .tag(0)
@@ -35,6 +38,9 @@ struct NavigationContainer: View {
                 } icon: {
                     Image(selectedTab == 1 ? "feather-active" : "feather-inactive")
                         .renderingMode(.original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
                 }
             }
             .tag(1)
@@ -46,6 +52,9 @@ struct NavigationContainer: View {
                 } icon: {
                     Image(selectedTab == 2 ? "msgs-active" : "msgs-inactive")
                         .renderingMode(.original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
                 }
             }
             .tag(2)
