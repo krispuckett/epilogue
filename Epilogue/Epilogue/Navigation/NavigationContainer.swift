@@ -17,15 +17,9 @@ struct NavigationContainer: View {
                 LibraryView()
             }
             .tabItem {
-                Label {
-                    Text("Library")
-                } icon: {
-                    Image(selectedTab == 0 ? "book-active" : "book-inactive")
-                        .renderingMode(.original)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                }
+                Image(selectedTab == 0 ? "book-active" : "book-inactive")
+                    .renderingMode(.original)
+                Text("Library")
             }
             .tag(0)
 
@@ -33,29 +27,17 @@ struct NavigationContainer: View {
                 CleanNotesView()
             }
             .tabItem {
-                Label {
-                    Text("Notes")
-                } icon: {
-                    Image(selectedTab == 1 ? "feather-active" : "feather-inactive")
-                        .renderingMode(.original)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                }
+                Image(selectedTab == 1 ? "feather-active" : "feather-inactive")
+                    .renderingMode(.original)
+                Text("Notes")
             }
             .tag(1)
 
             ChatViewWrapper()
             .tabItem {
-                Label {
-                    Text("Sessions")
-                } icon: {
-                    Image(selectedTab == 2 ? "msgs-active" : "msgs-inactive")
-                        .renderingMode(.original)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                }
+                Image(selectedTab == 2 ? "msgs-active" : "msgs-inactive")
+                    .renderingMode(.original)
+                Text("Sessions")
             }
             .tag(2)
         }
