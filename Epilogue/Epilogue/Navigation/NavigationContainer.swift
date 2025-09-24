@@ -41,7 +41,8 @@ struct NavigationContainer: View {
             }
             .tag(2)
         }
-        // Don't apply tint since we're using original rendering mode
+        // Apply tint for text labels only (icons use original rendering)
+        .tint(themeManager.currentTheme.primaryAccent)
         .onAppear {
             // Restore original tab bar with proper glass effect
             setupTabBarAppearance()
@@ -74,15 +75,15 @@ struct NavigationContainer: View {
         appearance.backgroundColor = nil
         appearance.barTintColor = nil
 
-        // Don't set tint colors since we're using original rendering for PDF icons
-        appearance.tintColor = nil
-        appearance.unselectedItemTintColor = nil
+        // Set tint color for text labels (icons preserve their original colors)
+        appearance.tintColor = UIColor(themeManager.currentTheme.primaryAccent)
+        appearance.unselectedItemTintColor = UIColor(white: 0.5, alpha: 1.0)
     }
 
     private func updateTabBarAppearance() {
-        // Don't override icon colors for PDFs with original rendering
-        UITabBar.appearance().tintColor = nil
-        UITabBar.appearance().unselectedItemTintColor = nil
+        // Update text colors while preserving icon colors
+        UITabBar.appearance().tintColor = UIColor(themeManager.currentTheme.primaryAccent)
+        UITabBar.appearance().unselectedItemTintColor = UIColor(white: 0.5, alpha: 1.0)
     }
 
     private func syncWithNavigationCoordinator(_ tab: Int) {
