@@ -2959,27 +2959,27 @@ struct AmbientChatGradientView: View {
             // Deep black base
             Color.black
 
-            let colors = themeManager.currentTheme.gradientColors
+            let colors = themeManager.currentTheme.gradientColors.map { enhanceColor($0) }
 
-            // Theme-aware gradient - top
+            // Theme-aware gradient - top (more vibrant)
             LinearGradient(
                 stops: [
-                    .init(color: colors[0].opacity(0.7), location: 0.0),
-                    .init(color: colors[1].opacity(0.5), location: 0.15),
-                    .init(color: colors[2].opacity(0.3), location: 0.3),
+                    .init(color: colors[0].opacity(0.85), location: 0.0),
+                    .init(color: colors[1].opacity(0.65), location: 0.15),
+                    .init(color: colors[2].opacity(0.45), location: 0.3),
                     .init(color: Color.clear, location: 0.6)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            // Theme-aware gradient - bottom
+            // Theme-aware gradient - bottom (more vibrant)
             LinearGradient(
                 stops: [
                     .init(color: Color.clear, location: 0.4),
-                    .init(color: colors[2].opacity(0.2), location: 0.7),
-                    .init(color: colors[1].opacity(0.35), location: 0.85),
-                    .init(color: colors[3].opacity(0.5), location: 1.0)
+                    .init(color: colors[2].opacity(0.35), location: 0.7),
+                    .init(color: colors[1].opacity(0.5), location: 0.85),
+                    .init(color: colors[3].opacity(0.65), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -2987,6 +2987,23 @@ struct AmbientChatGradientView: View {
 
         }
         .ignoresSafeArea()
+    }
+    
+    /// Enhance color - same as ambient chat for consistency
+    private func enhanceColor(_ color: Color) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // Boost vibrancy and ensure minimum brightness
+        saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
+        brightness = max(brightness, 0.4)         // Minimum brightness
+        
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
 }
 

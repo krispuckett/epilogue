@@ -84,6 +84,11 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 // Try without quotes for more results
                 queries.append("intitle:\(cleanTitle) inauthor:\(cleanAuthor)")
                 
+                // Special case for known popular books
+                if cleanTitle.lowercased().contains("hobbit") && cleanAuthor.lowercased().contains("tolkien") {
+                    queries.insert("intitle:\"The Hobbit\" inauthor:\"J.R.R. Tolkien\"", at: 0)
+                }
+                
                 // Try with just first word of title and full author (handles subtitle variations)
                 let firstWord = cleanTitle.split(separator: " ").first ?? ""
                 if !firstWord.isEmpty {
@@ -99,6 +104,13 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             
             // Fallback to just title
             queries.append("intitle:\"\(cleanTitle)\"")
+            
+            // Special handling for popular books without author
+            if cleanTitle.lowercased() == "the hobbit" || cleanTitle.lowercased() == "hobbit" {
+                queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\"", at: 0)
+                queries.insert("intitle:\"The Hobbit\" inauthor:\"J.R.R. Tolkien\"", at: 0)
+            }
+            
             queries.append(cleanTitle)
             
             // If we have a year, add a query with year
@@ -312,6 +324,25 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 }
             }
             
+            // Special handling for specific popular books
+            let authorLower = volumeInfo.authors?.joined(separator: " ").lowercased() ?? ""
+            
+            // The Hobbit - strong preference for Tolkien editions
+            if originalQuery.lowercased().contains("hobbit") {
+                if authorLower.contains("tolkien") || authorLower.contains("j.r.r") {
+                    score += 200  // Massive boost for authentic Tolkien editions
+                } else {
+                    score -= 150  // Penalize non-Tolkien versions
+                }
+                // Extra boost for popular publishers
+                if let publisher = volumeInfo.publisher?.lowercased() {
+                    if publisher.contains("houghton") || publisher.contains("harper") || 
+                       publisher.contains("ballantine") || publisher.contains("mariner") {
+                        score += 50
+                    }
+                }
+            }
+            
             // Title match scoring
             let titleLower = volumeInfo.title.lowercased()
             
@@ -451,12 +482,30 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 "cliff", "analysis", "workbook", "teacher",
                 "illustrated", "graphic", "companion", "annotated",
                 "movie tie-in", "calendar", "journal", "notebook",
-                "coloring", "colouring"
+                "coloring", "colouring", "quickread", "condensed",
+                "abridged", "adapted", "retold", "simplified"
             ]
             
             for term in unwantedTerms {
                 if titleLower.contains(term) {
-                    score -= 30
+                    score -= 50  // Increased penalty from -30 to -50
+                }
+            }
+            
+            // Heavily penalize SparkNotes and similar
+            if titleLower.contains("sparknotes") || 
+               titleLower.contains("cliffnotes") ||
+               titleLower.contains("cliff notes") ||
+               titleLower.contains("study guide") {
+                score -= 200  // Massive penalty for study guides
+            }
+            
+            // Specifically penalize known study guide authors
+            let studyGuideAuthors = ["sparknotes", "cliffnotes", "shmoop", "gradesaver", 
+                                   "bookrags", "course hero", "litcharts"]
+            for sgAuthor in studyGuideAuthors {
+                if authorLower.contains(sgAuthor) {
+                    score -= 300  // Huge penalty for study guide publishers as authors
                 }
             }
             

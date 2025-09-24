@@ -569,35 +569,9 @@ struct AmbientSessionSummaryView: View {
                             }
                         }
 
-                        // Right side buttons
-                        HStack(spacing: 14) {
-                            // Submit button when there's text
-                            if !continuationText.isEmpty {
-                                Button {
-                                    sendFollowUp()
-                                } label: {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
-                                            .frame(width: 36, height: 36)
-                                            .glassEffect(in: Circle())
-                                            .overlay {
-                                                Circle()
-                                                    .strokeBorder(
-                                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3),
-                                                        lineWidth: 0.5
-                                                    )
-                                            }
-
-                                        Image(systemName: "arrow.up")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                    }
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                            }
-
-                            // Ambient orb
+                        // Right side buttons - Morphing between ambient orb and submit
+                        ZStack {
+                            // Ambient orb - shown when no text
                             Button {
                                 reopenAmbientMode()
                             } label: {
@@ -606,6 +580,35 @@ struct AmbientSessionSummaryView: View {
                                 }
                                 .allowsHitTesting(false)
                             }
+                            .opacity(continuationText.isEmpty ? 1 : 0)
+                            .scaleEffect(continuationText.isEmpty ? 1 : 0.8)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: continuationText.isEmpty)
+
+                            // Submit button - shown when text exists
+                            Button {
+                                sendFollowUp()
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
+                                        .frame(width: 36, height: 36)
+                                        .glassEffect(in: Circle())
+                                        .overlay {
+                                            Circle()
+                                                .strokeBorder(
+                                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3),
+                                                    lineWidth: 0.5
+                                                )
+                                        }
+
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .opacity(continuationText.isEmpty ? 0 : 1)
+                            .scaleEffect(continuationText.isEmpty ? 0.8 : 1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: !continuationText.isEmpty)
                         }
                     }
                     .padding(.horizontal, 20)

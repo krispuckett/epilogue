@@ -32,8 +32,8 @@ struct AdvancedOnboardingView: View {
         ),
         OnboardingPage(
             type: .video,
-            videoName: "readEpilogue", // Still using placeholder until you add this video
-            videoExtension: "mp4",
+            videoName: "onboarding_capture",
+            videoExtension: "mov",
             title: "Capture Instantly",
             subtitle: "YOUR THOUGHTS, ONE TAP AWAY",
             description: "The plus button is always there. Quote something beautiful, note an insight, or ask a question."
@@ -48,11 +48,11 @@ struct AdvancedOnboardingView: View {
         ),
         OnboardingPage(
             type: .video,
-            videoName: "readEpilogue", // Still using placeholder until you add this video
-            videoExtension: "mp4",
-            title: "Smart Notes",
-            subtitle: "Never lose a thought or quote",
-            description: "Every capture is automatically organized by book and session."
+            videoName: "onboarding_session",
+            videoExtension: "mov",
+            title: "Your Reading Sessions",
+            subtitle: "Every conversation preserved",
+            description: "Review your thoughts, explore AI insights, and see your reading journey unfold over time."
         )
     ]
 
@@ -137,8 +137,9 @@ struct AdvancedOnboardingView: View {
                         .foregroundStyle(.white.opacity(0.9))
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
-                        .padding(.horizontal, 40)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 30)
+                        .minimumScaleFactor(0.9)
+                        .lineLimit(4)
                 }
 
                 Spacer()
@@ -213,14 +214,25 @@ struct AdvancedOnboardingView: View {
                     if let videoName = page.videoName,
                        let videoExt = page.videoExtension,
                        let videoURL = Bundle.main.url(forResource: videoName, withExtension: videoExt) {
-                        VideoPlayer(player: player ?? AVPlayer(url: videoURL))
-                            .aspectRatio(9.0/16.0, contentMode: .fit)
-                            .frame(height: UIScreen.main.bounds.height * 0.45) // Smaller to make room for text
-                            .cornerRadius(24)
-                            .padding(.horizontal, 30)
-                            .padding(.top, 10) // Small padding from back button
-                            .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
-                            .disabled(true)
+                        ZStack {
+                            VideoPlayer(player: player ?? AVPlayer(url: videoURL))
+                                .aspectRatio(9.0/16.0, contentMode: .fit)
+                                .frame(height: UIScreen.main.bounds.height * 0.52) // Larger video
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .disabled(true)
+                            
+                            // Animated frame overlay
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                .frame(height: UIScreen.main.bounds.height * 0.52)
+                                .aspectRatio(9.0/16.0, contentMode: .fit)
+                                .scaleEffect(currentPage == index ? 1.0 : 1.1)
+                                .opacity(currentPage == index ? 1 : 0)
+                                .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.3), value: currentPage)
+                        }
+                        .padding(.horizontal, 25)
+                        .padding(.top, 15)
+                        .shadow(color: .black.opacity(0.3), radius: 30, y: 15)
                             .scaleEffect(currentPage == index ? 1 : 0.9)
                             .opacity(currentPage == index ? 1 : 0)
                             .offset(y: currentPage == index ? 0 : 50)
@@ -263,9 +275,9 @@ struct AdvancedOnboardingView: View {
                 }
                 .transition(.scale.combined(with: .opacity))
 
-                // Spacing between video and text
+                // Reduced spacing due to larger video
                 Spacer()
-                    .frame(height: 20)
+                    .frame(height: 15)
 
                 // Text content with entrance animation
                 VStack(spacing: 10) {
@@ -287,12 +299,14 @@ struct AdvancedOnboardingView: View {
                     }
 
                     Text(page.description)
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, 30)
                         .padding(.top, 4)
+                        .minimumScaleFactor(0.9)
+                        .lineLimit(3)
                         .opacity(currentPage == index ? 1 : 0)
                         .offset(y: currentPage == index ? 0 : 10)
                         .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.1), value: currentPage)

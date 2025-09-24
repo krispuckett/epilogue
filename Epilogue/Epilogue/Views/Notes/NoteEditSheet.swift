@@ -55,6 +55,12 @@ struct NoteEditSheet: View {
         .interactiveDismissDisabled()
         .onAppear {
             isTextFocused = true
+            // Set editing state to hide action bar
+            notesViewModel.isEditingNote = true
+        }
+        .onDisappear {
+            // Clear editing state to show action bar again
+            notesViewModel.isEditingNote = false
         }
         .sensoryFeedback(.impact(weight: .light), trigger: isTextFocused)
         .toolbar {

@@ -8,7 +8,7 @@ struct BookSearchSheet: View {
     let onBookSelected: (Book) -> Void
     var mode: Mode = .add
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var booksService = GoogleBooksService()
+    @StateObject private var booksService = EnhancedGoogleBooksService()
     @StateObject private var trendingService = TrendingBooksService.shared
     @State private var searchResults: [Book] = []
     @State private var isLoading = true
@@ -476,19 +476,15 @@ struct BookSearchSheet: View {
         searchError = nil
         
         // Use enhanced service ranking for better results
-        // Call searchBooks which updates the service's searchResults property
-        await booksService.searchBooks(query: query)
-
-        // Get the results from the service
-        searchResults = booksService.searchResults
+        // Use the enhanced searchBooksWithRanking method for better results
+        searchResults = await booksService.searchBooksWithRanking(query: query)
         print("📖 Found \(searchResults.count) ranked results for: '\(query)'")
         
         if searchResults.isEmpty {
             // Try spell correction
             if let correctedQuery = spellCorrect(query), correctedQuery != query {
                 print("🔤 Trying spell correction: '\(correctedQuery)'")
-                await booksService.searchBooks(query: correctedQuery)
-                searchResults = booksService.searchResults
+                searchResults = await booksService.searchBooksWithRanking(query: correctedQuery)
                 print("📖 Found \(searchResults.count) results after correction")
             }
         }
