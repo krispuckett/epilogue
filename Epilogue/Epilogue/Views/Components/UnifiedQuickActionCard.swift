@@ -921,8 +921,8 @@ struct UnifiedQuickActionCard: View {
             showingToast = true
         }
         
-        // Auto-dismiss after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        // Auto-dismiss after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 showingToast = false
             }

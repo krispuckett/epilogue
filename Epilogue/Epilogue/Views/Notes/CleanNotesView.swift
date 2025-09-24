@@ -947,7 +947,7 @@ struct CleanNotesView: View {
             print("❌ Failed to save note: \(error)")
             print("❌ Error details: \(error.localizedDescription)")
             // Show error toast to user
-            showToast("Failed to save note")
+            showToast(message: "Failed to save note")
         }
     }
     
@@ -1015,7 +1015,7 @@ struct CleanNotesView: View {
         } catch {
             print("Failed to save quote: \(error)")
             // Show error toast to user
-            showToast("Failed to save quote")
+            showToast(message: "Failed to save quote")
         }
     }
     
