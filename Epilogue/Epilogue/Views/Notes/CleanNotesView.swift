@@ -913,7 +913,7 @@ struct CleanNotesView: View {
         var bookModel: BookModel? = nil
         if let bookId = bookId, let bookTitle = bookTitle {
             // Find existing book in library
-            if let existingBook = libraryViewModel.books.first(where: { $0.id == bookId }) {
+            if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
                 bookModel = BookModel(from: existingBook)
                 modelContext.insert(bookModel!)
             }
@@ -935,12 +935,24 @@ struct CleanNotesView: View {
     private func createQuote(content: String, attribution: String?, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
         // Create BookModel if we have book context
         var bookModel: BookModel? = nil
-        if let bookId = bookId, let bookTitle = bookTitle {
-            // Find existing book in library
-            if let existingBook = libraryViewModel.books.first(where: { $0.id == bookId }) {
+        
+        // First try to find existing book by ID
+        if let bookId = bookId {
+            if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
                 bookModel = BookModel(from: existingBook)
                 modelContext.insert(bookModel!)
             }
+        }
+        
+        // If no bookModel yet but we have bookTitle, create a minimal BookModel
+        // This handles quotes with book attribution but no selected book from library
+        if bookModel == nil && bookTitle != nil {
+            bookModel = BookModel(
+                id: UUID().uuidString, // Generate a unique ID for quotes without library books
+                title: bookTitle!,
+                author: bookAuthor ?? attribution ?? "Unknown"
+            )
+            modelContext.insert(bookModel!)
         }
         
         let capturedQuote = CapturedQuote(

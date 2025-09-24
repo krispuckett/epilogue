@@ -167,16 +167,15 @@ struct AdvancedOnboardingView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .glassEffect(.regular, in: Capsule())
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, 30)
+                        .frame(height: 50)
+                        .glassEffect(in: Capsule())
                     }
                     .opacity(currentPage == index ? 1 : 0)
                     .offset(y: currentPage == index ? 0 : 20)
                     .animation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.8), value: currentPage)
                 }
-                .padding(.bottom, 60)
+                .padding(.bottom, 40)
             }
             .animation(.spring(response: 0.6, dampingFraction: 0.85), value: currentPage)
         }
@@ -207,20 +206,20 @@ struct AdvancedOnboardingView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 10)
+                .padding(.top, 0) // Position right at safe area
 
-                // Animated video container
+                // Animated video container positioned right below safe area
                 Group {
                     if let videoName = page.videoName,
                        let videoExt = page.videoExtension,
                        let videoURL = Bundle.main.url(forResource: videoName, withExtension: videoExt) {
                         VideoPlayer(player: player ?? AVPlayer(url: videoURL))
                             .aspectRatio(9.0/16.0, contentMode: .fit)
-                            .frame(height: UIScreen.main.bounds.height * 0.55) // Larger video
-                            .background(Color.clear)
+                            .frame(height: UIScreen.main.bounds.height * 0.45) // Smaller to make room for text
                             .cornerRadius(24)
-                            .padding(.horizontal, 30) // Less padding for larger video
-                            .shadow(color: .black.opacity(0.4), radius: 30, y: 15)
+                            .padding(.horizontal, 30)
+                            .padding(.top, 10) // Small padding from back button
+                            .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
                             .disabled(true)
                             .scaleEffect(currentPage == index ? 1 : 0.9)
                             .opacity(currentPage == index ? 1 : 0)
@@ -264,9 +263,9 @@ struct AdvancedOnboardingView: View {
                 }
                 .transition(.scale.combined(with: .opacity))
 
-                // Reduced spacing between video and text
+                // Spacing between video and text
                 Spacer()
-                    .frame(height: 30)
+                    .frame(height: 20)
 
                 // Text content with entrance animation
                 VStack(spacing: 10) {
@@ -335,15 +334,14 @@ struct AdvancedOnboardingView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
+                        .padding(.horizontal, 30)
+                        .frame(height: 50)
                         .glassEffect(.regular, in: Capsule())
-                        .padding(.horizontal, 40)
                     }
                     .opacity(currentPage == index ? 1 : 0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: currentPage)
                 }
-                .padding(.bottom, 60)
+                .padding(.bottom, 40)
             }
         }
     }

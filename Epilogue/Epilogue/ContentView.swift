@@ -63,8 +63,8 @@ struct ContentView: View {
 
             NavigationContainer(selectedTab: $selectedTab)
 
-            // Action bar hidden when card is shown
-            if !showQuickActionCard {
+            // Action bar hidden when card is shown or when editing note
+            if !showQuickActionCard && !notesViewModel.isEditingNote {
                 VStack {
                     Spacer()
                     SimpleActionBar(showCard: $showQuickActionCard)

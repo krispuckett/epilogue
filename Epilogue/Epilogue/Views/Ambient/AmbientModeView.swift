@@ -5,6 +5,8 @@ import OSLog
 import UIKit
 import Vision
 import PhotosUI
+import AVFoundation
+import Speech
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
@@ -1683,19 +1685,50 @@ struct AmbientModeView: View {
     private func saveQuoteToSwiftData(_ content: AmbientProcessedContent) -> CapturedQuote? {
         // Clean the quote text - remove common prefixes
         var quoteText = content.text
+        let lowercased = quoteText.lowercased()
+        
+        // Extended list of quote introduction patterns
         let prefixesToRemove = [
             "i love this quote.",
             "i love this quote",
+            "i like this quote.",
+            "i like this quote",
+            "this is my favorite quote",
+            "my favorite quote",
+            "favorite quote",
+            "great quote",
+            "this quote",
+            "here's a quote",
+            "here is a quote",
             "quote...",
             "quote:",
             "quote "
         ]
         
+        // Remove prefixes
         for prefix in prefixesToRemove {
-            if quoteText.lowercased().hasPrefix(prefix) {
+            if lowercased.hasPrefix(prefix) {
                 quoteText = String(quoteText.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Remove common separators after the prefix
+                if quoteText.starts(with: ":") || quoteText.starts(with: "-") || quoteText.starts(with: ".") {
+                    quoteText = String(quoteText.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
                 break
             }
+        }
+        
+        // Special handling for famous quotes that might be referenced
+        // For example: "All we have to do is decide what to do with the time given to us"
+        // This is Gandalf from LOTR - detect and add attribution if known
+        let gandalfQuotes = [
+            "all we have to do is decide what to do with the time given to us",
+            "all we have to decide is what to do with the time that is given us"
+        ]
+        
+        if gandalfQuotes.contains(lowercased.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            // This is a Gandalf quote from LOTR
+            // Note: We'll handle attribution later in the save process
         }
         
         // CRITICAL: Remove quotation marks for proper formatting
@@ -1763,10 +1796,19 @@ struct AmbientModeView: View {
             }
         }
         
+        // Detect attribution for known quotes
+        var quoteAuthor = currentBookContext?.author
+        let cleanedQuote = quoteText.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check for Gandalf quotes from LOTR
+        if gandalfQuotes.contains(cleanedQuote) && currentBookContext?.title.lowercased().contains("lord of the rings") == true {
+            quoteAuthor = "Gandalf"
+        }
+        
         let capturedQuote = CapturedQuote(
             text: quoteText,
             book: bookModel,
-            author: currentBookContext?.author,
+            author: quoteAuthor,
             pageNumber: nil,
             timestamp: content.timestamp,
             source: .ambient
@@ -1994,38 +2036,77 @@ struct AmbientModeView: View {
     }
 
     private func startAmbientExperience() {
-        // Record when the session actually starts
-        sessionStartTime = Date()
-        
-        // Create the session at the START
-        let session = AmbientSession(book: currentBookContext)
-        session.startTime = sessionStartTime! // Use the actual start time
-        currentSession = session
-        modelContext.insert(session)
-        
-        // Save the session immediately so relationships can be established
-        do {
-            try modelContext.save()
-            print("✅ Initial session created and saved")
-        } catch {
-            print("❌ Failed to save initial session: \(error)")
-        }
-        
-        // CRITICAL: Set the model context and session for the processor
-        // These are now managed internally by TrueAmbientProcessor
-        // processor.setModelContext(modelContext)
-        // processor.setCurrentSession(session)
-        // processor.startSession()
-        
-        // Update library for book detection
-        bookDetector.updateLibrary(libraryViewModel.books)
-        
-        // Set initial input mode
-        inputMode = .listening
-        
-        // Auto-start recording after short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            handleMicrophoneTap()
+        // Check permissions FIRST before creating session
+        Task {
+            // Check microphone permission
+            let micAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+            let finalMicAuthorized = micAuthorized ? true : await AVAudioApplication.requestRecordPermission()
+            
+            // Check speech recognition permission  
+            let speechStatus = await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { status in
+                    continuation.resume(returning: status)
+                }
+            }
+            
+            guard finalMicAuthorized && speechStatus == .authorized else {
+                // Just log and return - no UI
+                print("❌ Permissions denied - Mic: \(finalMicAuthorized), Speech: \(speechStatus == .authorized)")
+                return
+            }
+            
+            // Whisper will be loaded when needed by VoiceRecognitionManager
+            // The voice manager handles model loading internally
+            
+            // NOW we can create the session
+            await MainActor.run {
+                // Record when the session actually starts
+                sessionStartTime = Date()
+                
+                // Create the session at the START
+                let session = AmbientSession(book: currentBookContext)
+                session.startTime = sessionStartTime! // Use the actual start time
+                currentSession = session
+                modelContext.insert(session)
+                
+                // Save the session immediately so relationships can be established
+                do {
+                    try modelContext.save()
+                    print("✅ Initial session created and saved")
+                } catch {
+                    print("❌ Failed to save initial session: \(error)")
+                }
+                
+                // Start book cover fade timer - fade after 10 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    withAnimation(.easeOut(duration: 2.0)) {
+                        showBookCover = false
+                    }
+                }
+                
+                processor.startSession()
+                
+                // Fade in onboarding text
+                if showOnboarding {
+                    onboardingOpacity = 1.0
+                    
+                    // Start timer to fade out after 4 seconds  
+                    onboardingTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
+                        fadeOutOnboarding()
+                    }
+                }
+                
+                // Session is now active
+                // isSessionActive = true // This property doesn't exist anymore
+                
+                // Start container breathing effect
+                startContainerBreathing()
+                
+                // Auto-start recording after short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    handleMicrophoneTap()
+                }
+            }
         }
     }
     
@@ -2038,6 +2119,15 @@ struct AmbientModeView: View {
     }
     
     private func startRecording() {
+        // Quick permission check before starting
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        guard micStatus == .authorized else {
+            print("❌ Microphone permission not authorized")
+            return
+        }
+        
+        // VoiceRecognitionManager handles Whisper loading internally
+        
         isRecording = true
         
         // Don't collapse messages when recording starts
@@ -3274,14 +3364,36 @@ struct AmbientModeView: View {
         // Just set the end time
         session.endTime = Date()
         
+        // Validate session has content before saving
+        let hasQuotes = (session.capturedQuotes ?? []).count > 0
+        let hasNotes = (session.capturedNotes ?? []).count > 0
+        let hasQuestions = (session.capturedQuestions ?? []).count > 0
+        let hasContent = hasQuotes || hasNotes || hasQuestions
+        
         print("📊 Finalizing session with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
         
-        // Save final state
-        do {
-            try modelContext.save()
-            print("✅ Session finalized in SwiftData")
-        } catch {
-            print("❌ Failed to finalize session: \(error)")
+        // Only save if there's actual content
+        if hasContent {
+            do {
+                // Force save context to ensure all relationships are persisted
+                if modelContext.hasChanges {
+                    try modelContext.save()
+                    print("✅ Session finalized in SwiftData with content")
+                } else {
+                    print("⚠️ No changes to save in model context")
+                    // Force a save anyway to ensure persistence
+                    session.endTime = Date() // Touch the session
+                    try modelContext.save()
+                }
+            } catch {
+                print("❌ Failed to finalize session: \(error)")
+                // Try using safe save extension
+                modelContext.safeSave()
+            }
+        } else {
+            print("⚠️ Session is empty, removing from context")
+            modelContext.delete(session)
+            try? modelContext.save()
         }
         
         // End processor session in background

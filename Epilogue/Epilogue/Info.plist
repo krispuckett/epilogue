@@ -6,6 +6,8 @@
 	<string>Epilogue uses the camera to scan book covers and ISBNs for quick library additions</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Epilogue uses the microphone to record voice notes about your reading</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Epilogue uses speech recognition to transcribe your voice notes and thoughts about books</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

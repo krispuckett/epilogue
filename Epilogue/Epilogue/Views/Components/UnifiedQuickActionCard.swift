@@ -40,7 +40,7 @@ struct UnifiedQuickActionCard: View {
                 // The actual card - matching reference screenshot style
                 VStack(spacing: 0) {
                     // Main input row
-                    HStack(spacing: 12) {
+                    HStack(spacing: 16) { // Increased spacing for better balance
                         // Plus/X button with rotation animation
                         Button {
                             if !isExpanded {
@@ -50,9 +50,9 @@ struct UnifiedQuickActionCard: View {
                             }
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .regular))
+                                .font(.system(size: 22, weight: .regular)) // Slightly larger
                                 .foregroundStyle(.white.opacity(0.7))
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44) // Larger touch target
                                 .contentShape(Circle())
                                 .rotationEffect(.degrees(isExpanded ? 45 : 0)) // Rotate to X
                                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
@@ -112,13 +112,13 @@ struct UnifiedQuickActionCard: View {
                                         processInput()
                                     }
                                 } else {
-                                    // Clean input field that looks like placeholder
-                                    TextField(placeholderText, text: $searchText, axis: .vertical)
+                                    // Clean input field matching ambient mode
+                                    TextField(placeholderText, text: $searchText)
                                     .textFieldStyle(.plain)
-                                    .font(.system(size: 17))
+                                    .font(.system(size: 17, weight: .regular))
                                     .foregroundStyle(.white)
                                     .tint(themeManager.currentTheme.primaryAccent)
-                                    .lineLimit(1...3)  // Allow some expansion when collapsed
+                                    .lineLimit(1)  // Single line when collapsed
                                     .focused($isFocused)
                                     .onSubmit {
                                         if !searchText.isEmpty {
@@ -200,7 +200,7 @@ struct UnifiedQuickActionCard: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, isExpanded ? 14 : 18) // More padding when collapsed for height
 
                     // Quick actions (only when expanded) - context aware
                     if isExpanded {
@@ -228,28 +228,28 @@ struct UnifiedQuickActionCard: View {
                         ))
                     }
                 }
-                // Glass effect matching ambient mode
+                // Glass effect matching ambient mode with more pronounced rounded corners
                 .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: isExpanded ? 24 : 32, style: .continuous)
                         .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
                 )
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
-                .clipShape(RoundedRectangle(cornerRadius: 20)) // CLIP CONTENT TO CARD BOUNDS
+                .glassEffect(.regular, in: .rect(cornerRadius: isExpanded ? 24 : 32))
+                .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 24 : 32, style: .continuous)) // CLIP CONTENT TO CARD BOUNDS
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: isExpanded ? 24 : 32, style: .continuous)
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    themeManager.currentTheme.primaryAccent.opacity(0.25),
-                                    themeManager.currentTheme.primaryAccent.opacity(0.1)
+                                    themeManager.currentTheme.primaryAccent.opacity(0.2),
+                                    themeManager.currentTheme.primaryAccent.opacity(0.05)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 0.5
+                            lineWidth: 1
                         )
                 }
-                .shadow(color: themeManager.currentTheme.primaryAccent.opacity(0.15), radius: 16, y: 6)
+                .shadow(color: themeManager.currentTheme.primaryAccent.opacity(0.1), radius: 20, y: 8)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20) // Closer to bottom since action bar is hidden
             }
@@ -469,35 +469,136 @@ struct UnifiedQuickActionCard: View {
         SensoryFeedback.light()
     }
 
+    // Helper function to parse quotes with attribution
+    private func parseQuoteWithAttribution(_ text: String) -> (quote: String, author: String?, book: String?)? {
+        // Common patterns for quotes with attribution:
+        // "Quote" - Author
+        // "Quote" — Author  
+        // "Quote" - Author, Book
+        // "Quote" ~ Author
+        // Quote - Author (without quotes)
+        
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Pattern 1: Quoted text with dash separator  
+        let quotePattern = "^[\"\\u{201C}](.+?)[\"\\u{201D}]?\\s*[-—~]\\s*(.+)$"
+        if let quoteMatch = trimmed.range(of: quotePattern, options: .regularExpression) {
+            let fullMatch = String(trimmed[quoteMatch])
+            let components = fullMatch.components(separatedBy: CharacterSet(charactersIn: "-—~"))
+            if components.count >= 2 {
+                var quote = components[0].trimmingCharacters(in: .whitespaces)
+                // Remove quotes manually
+                let smartQuoteOpen = "\u{201C}" // "
+                let smartQuoteClose = "\u{201D}" // "
+                if quote.hasPrefix("\"") { quote.removeFirst() }
+                if quote.hasSuffix("\"") { quote.removeLast() }
+                if quote.hasPrefix(smartQuoteOpen) { quote.removeFirst() }
+                if quote.hasSuffix(smartQuoteClose) { quote.removeLast() }
+                quote = quote.trimmingCharacters(in: .whitespaces)
+                let attribution = components[1].trimmingCharacters(in: .whitespaces)
+                
+                // Check if attribution contains book info (comma separated)
+                if attribution.contains(",") {
+                    let parts = attribution.split(separator: ",", maxSplits: 1)
+                    let author = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                    let book = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                    return (quote: quote, author: author, book: book)
+                } else {
+                    return (quote: quote, author: attribution, book: nil)
+                }
+            }
+        }
+        
+        // Pattern 2: Non-quoted text with clear attribution pattern
+        if trimmed.contains(" - ") || trimmed.contains(" — ") || trimmed.contains(" ~ ") {
+            let separators = CharacterSet(charactersIn: "-—~")
+            let components = trimmed.components(separatedBy: separators)
+            if components.count >= 2 {
+                let quote = components[0].trimmingCharacters(in: .whitespaces)
+                let attribution = components[1].trimmingCharacters(in: .whitespaces)
+                
+                // Check if attribution contains book info
+                if attribution.contains(",") {
+                    let parts = attribution.split(separator: ",", maxSplits: 1)
+                    let author = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                    let book = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                    return (quote: quote, author: author, book: book)
+                } else {
+                    return (quote: quote, author: attribution, book: nil)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
     private func processInput() {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        // Parse command
-        if trimmed.hasPrefix("note:") || trimmed.hasPrefix("n:") {
-            let noteContent = trimmed.replacingOccurrences(of: "note:", with: "")
-                             .replacingOccurrences(of: "n:", with: "")
-                             .trimmingCharacters(in: .whitespaces)
-            createNote(noteContent)
-        } else if trimmed.hasPrefix("\"") {
+        // ULTRA-INTELLIGENT INTENT DETECTION
+        // We anticipate what users mean, not just what they type
+        
+        // 1. Smart Quote Detection (multiple patterns)
+        if let parsedQuote = parseQuoteWithAttribution(trimmed) {
+            createQuoteWithAttribution(
+                text: parsedQuote.quote,
+                author: parsedQuote.author,
+                bookTitle: parsedQuote.book
+            )
+        }
+        // Quoted text - obvious quote intent
+        else if trimmed.hasPrefix("\"") || trimmed.hasPrefix("\u{201C}") || 
+                trimmed.hasPrefix("'") || trimmed.hasPrefix("\u{2018}") {
             createQuote(trimmed)
-        } else if trimmed.lowercased().contains("book") || trimmed.lowercased().contains("add") {
-            // Book search
+        }
+        // Common quote-like phrases
+        else if isLikelyQuote(trimmed) {
+            createQuote(trimmed)
+        }
+        
+        // 2. Book Search (only very explicit intents)
+        else if isBookSearchIntent(trimmed) {
             showBookSearch = true
-        } else {
-            // Default to note - check if we're in notes tab
-            if navigationCoordinator.selectedTab == .notes {
-                // Always create a note in notes tab
-                createNote(trimmed)
-            } else if trimmed.contains("?") {
-                // Question - could trigger AI
-                createNote(trimmed)
+        }
+        
+        // 3. Questions and Thoughts
+        else if trimmed.hasSuffix("?") {
+            // Questions - could trigger AI assistant
+            if shouldTriggerAI(trimmed) {
+                // Future: Trigger AI
+                createNote(trimmed) // For now, save as note
             } else {
-                // Default to note
                 createNote(trimmed)
             }
         }
-
+        
+        // 4. Reading Progress Updates
+        else if isReadingProgress(trimmed) {
+            // Extract page number and update progress
+            if let pageNumber = extractPageNumber(trimmed) {
+                updateReadingProgress(pageNumber: pageNumber)
+                createNote(trimmed) // Also save as note for history
+            } else {
+                createNote(trimmed)
+            }
+        }
+        
+        // 5. Ambient Mode Triggers
+        else if trimmed.lowercased().contains("ambient") || 
+                trimmed.lowercased() == "start reading" ||
+                trimmed.lowercased() == "reading mode" {
+            startAmbientMode()
+            return // Don't save as note
+        }
+        
+        // 6. Default: Smart Note Creation
+        else {
+            // Everything else becomes a note
+            // This is the safest default - never lose user content
+            createNote(trimmed)
+        }
+        
         // Collapse the card and dismiss completely after processing
         collapseCard()
 
@@ -515,34 +616,214 @@ struct UnifiedQuickActionCard: View {
             isExpanded = false
         }
     }
+    
+    // Helper to detect book search intent more accurately
+    private func isBookSearchIntent(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        
+        // Explicit book commands
+        let bookCommands = [
+            "add book", "add a book", "add new book",
+            "search book", "search for book", "search books",
+            "find book", "find a book", "find books",
+            "new book", "get book", "lookup book"
+        ]
+        
+        for command in bookCommands {
+            if lowercased.hasPrefix(command) {
+                return true
+            }
+        }
+        
+        // ISBN patterns
+        if text.range(of: #"^\d{10}$|^\d{13}$|^978\d{10}$"#, options: .regularExpression) != nil {
+            return true
+        }
+        
+        return false
+    }
+    
+    // Detect if text is likely a quote (without explicit quote marks)
+    private func isLikelyQuote(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        
+        // Famous quote beginnings
+        let quoteStarters = [
+            "to be or not to be",
+            "i think therefore",
+            "the only thing we have to fear",
+            "ask not what your country",
+            "i have a dream"
+        ]
+        
+        for starter in quoteStarters {
+            if lowercased.hasPrefix(starter) {
+                return true
+            }
+        }
+        
+        // Poetic or philosophical language patterns
+        let poeticWords = ["shall", "unto", "thou", "thy", "wherefore", "henceforth"]
+        for word in poeticWords {
+            if lowercased.contains(word) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    // Check if this question should trigger AI
+    private func shouldTriggerAI(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        
+        // AI trigger patterns
+        let aiTriggers = [
+            "what does", "what do you think",
+            "explain", "tell me about",
+            "who is", "who was",
+            "why did", "why does",
+            "how does", "how did",
+            "summarize", "summary of"
+        ]
+        
+        for trigger in aiTriggers {
+            if lowercased.contains(trigger) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    // Detect reading progress updates
+    private func isReadingProgress(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+        
+        // Progress patterns
+        let progressPatterns = [
+            "page \\d+",
+            "on page \\d+",
+            "reading page \\d+",
+            "finished page \\d+",
+            "up to page \\d+",
+            "chapter \\d+",
+            "finished chapter"
+        ]
+        
+        for pattern in progressPatterns {
+            if lowercased.range(of: pattern, options: .regularExpression) != nil {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    // Extract page number from text
+    private func extractPageNumber(_ text: String) -> Int? {
+        // Find page number pattern
+        if let match = text.range(of: #"page\s+(\d+)"#, options: [.regularExpression, .caseInsensitive]) {
+            let pageText = String(text[match])
+            let numbers = pageText.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+            return Int(numbers)
+        }
+        
+        return nil
+    }
+    
+    // Update reading progress
+    private func updateReadingProgress(pageNumber: Int) {
+        if let book = selectedBookContext ?? libraryViewModel.currentDetailBook {
+            // Update the book's current page
+            if let index = libraryViewModel.books.firstIndex(where: { $0.id == book.id }) {
+                libraryViewModel.books[index].currentPage = pageNumber
+                libraryViewModel.updateBook(libraryViewModel.books[index])
+            }
+        }
+    }
 
     private func createNote(_ text: String) {
         // Use selected book context if available, otherwise current detail book
         let book = selectedBookContext ?? libraryViewModel.currentDetailBook
-        let note = Note(
-            type: .note,
-            content: text.isEmpty ? "New note" : text,
-            bookId: book?.localId,
-            bookTitle: book?.title,
-            author: book?.author,
-            pageNumber: nil
+        
+        // Send notification to create note in SwiftData
+        var noteData: [String: Any] = [
+            "content": text.isEmpty ? "New note" : text
+        ]
+        
+        // Add book context if available
+        if let book = book {
+            noteData["bookId"] = book.localId.uuidString
+            noteData["bookTitle"] = book.title
+            noteData["bookAuthor"] = book.author
+        }
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("CreateNewNote"),
+            object: noteData
         )
-        notesViewModel.addNote(note)
+        
         SensoryFeedback.success()
     }
 
     private func createQuote(_ text: String) {
         let content = text.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
         let book = selectedBookContext ?? libraryViewModel.currentDetailBook
-        let quote = Note(
-            type: .quote,
-            content: content,
-            bookId: book?.localId,
-            bookTitle: book?.title,
-            author: book?.author,
-            pageNumber: nil
+        
+        // Send notification to create quote in SwiftData
+        var quoteData: [String: Any] = [
+            "quote": content
+        ]
+        
+        // Add book context if available
+        if let book = book {
+            quoteData["bookId"] = book.localId.uuidString
+            quoteData["bookTitle"] = book.title
+            quoteData["bookAuthor"] = book.author
+        }
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("SaveQuote"),
+            object: quoteData
         )
-        notesViewModel.addNote(quote)
+        
+        SensoryFeedback.success()
+    }
+    
+    private func createQuoteWithAttribution(text: String, author: String?, bookTitle: String?) {
+        let book = selectedBookContext ?? libraryViewModel.currentDetailBook
+        
+        // Send notification to create quote in SwiftData
+        var quoteData: [String: Any] = [
+            "quote": text
+        ]
+        
+        // Add attribution
+        if let author = author {
+            quoteData["attribution"] = author
+        }
+        
+        // Add book context - prefer the parsed book title, then selected book
+        if let bookTitle = bookTitle {
+            // Use the parsed book title (e.g., "On the Shortness of Life")
+            quoteData["bookTitle"] = bookTitle
+            quoteData["bookAuthor"] = author // Author is both quote author and book author
+        } else if let book = book {
+            // Fall back to selected book context
+            quoteData["bookId"] = book.localId.uuidString
+            quoteData["bookTitle"] = book.title
+            quoteData["bookAuthor"] = book.author
+        } else if author != nil {
+            // No book context, but we have an author
+            // Just use the author for attribution
+        }
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("SaveQuote"),
+            object: quoteData
+        )
+        
         SensoryFeedback.success()
     }
 
