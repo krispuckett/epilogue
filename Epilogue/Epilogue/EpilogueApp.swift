@@ -15,7 +15,7 @@ struct EpilogueApp: App {
                 ContentView()
                     .preferredColorScheme(.dark)
                     .modelContainer(container)
-                    .runSwiftDataMigrations()
+                    // .runSwiftDataMigrations() // DISABLED - causing data loss
                     .onAppear {
                         // API key is now built-in, no setup needed
                         

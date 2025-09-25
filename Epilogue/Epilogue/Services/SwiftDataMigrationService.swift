@@ -16,8 +16,9 @@ final class SwiftDataMigrationService {
         #endif
         
         // FIRST: Migrate from old schema if needed
-        let container = modelContext.container
-        await DataMigrationService.shared.performMigrationIfNeeded(newContainer: container)
+        // DISABLED: This was causing data loss
+        // let container = modelContext.container
+        // await DataMigrationService.shared.performMigrationIfNeeded(newContainer: container)
         
         // Fix orphaned sessions
         await fixOrphanedSessions(modelContext: modelContext)
