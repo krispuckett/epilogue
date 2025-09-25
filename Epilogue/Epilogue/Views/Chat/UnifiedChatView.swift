@@ -524,7 +524,6 @@ struct UnifiedChatView: View {
                             if isAmbientMode && currentBookContext == nil && !isRecording {
                                 // Show elegant welcome prompt for ambient mode
                                 ambientWelcomeView
-                                    .padding(.top, 100)
                                     .transition(.asymmetric(
                                         insertion: .scale(scale: 0.98).combined(with: .opacity),
                                         removal: .scale(scale: 1.02).combined(with: .opacity)
@@ -540,7 +539,6 @@ struct UnifiedChatView: View {
                             } else {
                                 // Show empty state even when recording to keep book cover visible
                                 emptyStateView
-                                    .padding(.top, 100)
                                     .transition(.asymmetric(
                                         insertion: .scale(scale: 0.98).combined(with: .opacity),
                                         removal: .scale(scale: 1.02).combined(with: .opacity)

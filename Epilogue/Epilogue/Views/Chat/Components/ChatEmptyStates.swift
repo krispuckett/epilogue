@@ -16,7 +16,6 @@ struct InitialEmptyStateView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
     }
 }
 
@@ -44,7 +43,6 @@ struct BookEmptyStateView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
     }
 }
 
