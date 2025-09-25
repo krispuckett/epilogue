@@ -134,7 +134,32 @@ struct OptimizedPerplexitySessionsView: View {
                 .allowsHitTesting(false)
             
             if sessions.isEmpty {
-                ModernEmptyStates.noSessions
+                // Custom centered empty state
+                GeometryReader { geometry in
+                    VStack {
+                        Spacer()
+                        
+                        VStack(spacing: 16) {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .font(.system(size: 64))
+                                .foregroundStyle(.white.opacity(0.5))
+                            
+                            Text("No Sessions Yet")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundStyle(.white)
+                            
+                            Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .offset(y: -geometry.size.height * 0.1) // Offset up by 10% to center better
+                        
+                        Spacer()
+                    }
+                }
             } else if !filteredSessions.isEmpty || !isSearching {
                 ScrollView {
                     LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
