@@ -47,7 +47,14 @@ struct UnifiedQuickActionCard: View {
                     HStack(spacing: 12) {
                         // Plus/X button with rotation animation
                         Button {
-                            // Empty action - handled by onTapGesture below
+                            if !isExpanded {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    isExpanded = true
+                                }
+                                SensoryFeedback.light()
+                            } else {
+                                collapseCard()
+                            }
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 20, weight: .regular))
@@ -58,16 +65,6 @@ struct UnifiedQuickActionCard: View {
                                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .onTapGesture {
-                            if !isExpanded {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    isExpanded = true
-                                }
-                                SensoryFeedback.light()
-                            } else {
-                                collapseCard()
-                            }
-                        }
 
                         // Search/Input field - THE WHOLE AREA IS THE INPUT
                         VStack(spacing: 0) {

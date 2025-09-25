@@ -144,6 +144,7 @@ struct OptimizedPerplexitySessionsView: View {
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 100)
             } else if !filteredSessions.isEmpty || !isSearching {
                 ScrollView {
                     LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
