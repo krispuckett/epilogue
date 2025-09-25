@@ -107,33 +107,19 @@ struct UnifiedQuickActionCard: View {
                             }
 
                             HStack {
-                                if isExpanded {
-                                    // Active text field when expanded - allows vertical expansion
-                                    TextField(placeholderText, text: $searchText, axis: .vertical)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(.white)
-                                    .tint(themeManager.currentTheme.primaryAccent)
-                                    .lineLimit(1...5)  // Allow expansion up to 5 lines
-                                    .focused($isFocused)
-                                    .onSubmit {
-                                        processInput()
-                                    }
-                                } else {
-                                    // Clean input field matching ambient mode
-                                    TextField(placeholderText, text: $searchText, axis: .vertical)
+                                // Single TextField that changes line limit based on expansion
+                                TextField(placeholderText, text: $searchText, axis: .vertical)
                                     .textFieldStyle(.plain)
                                     .font(.system(size: 17, weight: .regular))
                                     .foregroundStyle(.white)
                                     .tint(themeManager.currentTheme.primaryAccent)
-                                    .lineLimit(1...3)  // Allow multi-line even when collapsed
+                                    .lineLimit(isExpanded ? 1...5 : 1...3)  // Dynamic line limit
                                     .focused($isFocused)
                                     .onSubmit {
-                                        if !searchText.isEmpty {
+                                        if !searchText.isEmpty || isExpanded {
                                             processInput()
                                         }
                                     }
-                            }
 
                                 Spacer()
                             }

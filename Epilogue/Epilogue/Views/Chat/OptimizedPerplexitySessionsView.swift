@@ -133,8 +133,8 @@ struct OptimizedPerplexitySessionsView: View {
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(false)
             
-            if sessions.isEmpty {
-                // Use ContentUnavailableView for consistent centering
+            if filteredSessions.isEmpty && !isSearching && sessions.isEmpty {
+                // Empty state - EXACTLY matching notes view
                 ContentUnavailableView {
                     Label("No Sessions Yet", systemImage: "bubble.left.and.bubble.right")
                         .foregroundStyle(.white)
@@ -145,7 +145,10 @@ struct OptimizedPerplexitySessionsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.top, 100)
-            } else if !filteredSessions.isEmpty || !isSearching {
+            } else if filteredSessions.isEmpty && isSearching {
+                ModernEmptyStates.noSearchResults(searchText: searchText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
                 ScrollView {
                     LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
                         if isSearching {
@@ -180,9 +183,6 @@ struct OptimizedPerplexitySessionsView: View {
                 }
                 .coordinateSpace(name: "scroll")
                 .scrollIndicators(.hidden)
-            } else {
-                ModernEmptyStates.noSearchResults(searchText: searchText)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
