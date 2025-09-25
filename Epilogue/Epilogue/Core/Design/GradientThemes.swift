@@ -147,7 +147,7 @@ public enum GradientTheme: String, CaseIterable, Codable {
     var primaryAccent: Color {
         switch self {
         case .amber:
-            return Color(red: 1.0, green: 0.55, blue: 0.26)  // Original amber
+            return Color(red: 1.0, green: 0.65, blue: 0.35)  // Warmer, less red amber
         case .ocean:
             return Color(red: 0.05, green: 0.65, blue: 0.82)  // Bright ocean teal
         case .forest:
@@ -171,10 +171,10 @@ public enum GradientTheme: String, CaseIterable, Codable {
         switch self {
         case .amber:
             return [
-                Color(red: 1.0, green: 0.55, blue: 0.26),
-                Color(red: 1.0, green: 0.45, blue: 0.20),
-                Color(red: 0.9, green: 0.35, blue: 0.15),
-                Color(red: 0.8, green: 0.25, blue: 0.10)
+                Color(red: 1.0, green: 0.65, blue: 0.35),   // Warm golden amber
+                Color(red: 0.98, green: 0.58, blue: 0.30),  // Honey gold
+                Color(red: 0.95, green: 0.52, blue: 0.25),  // Deep amber
+                Color(red: 0.90, green: 0.45, blue: 0.20)   // Burnished gold
             ]
         case .ocean:
             return [
