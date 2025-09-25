@@ -516,7 +516,10 @@ struct UnifiedQuickActionCard: View {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             isExpanded = true
         }
-        isFocused = true
+        // Don't refocus if already focused - this dismisses keyboard
+        if !isFocused {
+            isFocused = true
+        }
         SensoryFeedback.light()
     }
 
