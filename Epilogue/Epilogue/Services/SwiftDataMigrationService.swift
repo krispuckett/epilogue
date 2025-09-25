@@ -15,6 +15,10 @@ final class SwiftDataMigrationService {
         print("🔧 Starting SwiftData migrations...")
         #endif
         
+        // FIRST: Migrate from old schema if needed
+        let container = modelContext.container
+        await DataMigrationService.shared.performMigrationIfNeeded(newContainer: container)
+        
         // Fix orphaned sessions
         await fixOrphanedSessions(modelContext: modelContext)
         
@@ -26,6 +30,9 @@ final class SwiftDataMigrationService {
         
         // Clean up duplicate books
         await removeDuplicateBooks(modelContext: modelContext)
+        
+        // Run safety checks
+        await MigrationSafetyCheck.shared.runSafetyChecks(modelContext: modelContext)
         
         #if DEBUG
         print("✅ SwiftData migrations completed")

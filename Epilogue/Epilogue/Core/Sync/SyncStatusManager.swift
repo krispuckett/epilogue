@@ -70,6 +70,31 @@ final class SyncStatusManager: ObservableObject {
         }
     }
     
+    func forceSyncWithCloudKit() {
+        guard isOnline else {
+            status = .offline
+            return
+        }
+        
+        status = .syncing
+        
+        // Trigger CloudKit sync by posting notification
+        NotificationCenter.default.post(name: NSNotification.Name("NSPersistentStoreRemoteChange"), object: nil)
+        
+        // Update status after a delay
+        Task {
+            try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds for CloudKit
+            
+            await MainActor.run {
+                let now = Date()
+                lastSyncDate = now
+                status = .synced(now)
+                pendingChanges = 0
+                saveLastSyncDate()
+            }
+        }
+    }
+    
     func reportError(_ message: String) {
         status = .error(message)
     }

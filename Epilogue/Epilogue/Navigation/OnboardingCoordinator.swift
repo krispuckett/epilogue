@@ -112,9 +112,13 @@ final class OnboardingCoordinator: ObservableObject {
 
 struct OnboardingWrapper: ViewModifier {
     @StateObject private var coordinator = OnboardingCoordinator()
+    @State private var showContent = false
+    @State private var contentBlur: CGFloat = 10
 
     func body(content: Content) -> some View {
         content
+            .blur(radius: contentBlur)
+            .opacity(showContent ? 1 : 0)
             .fullScreenCover(isPresented: $coordinator.showOnboarding) {
                 AdvancedOnboardingView {
                     coordinator.completeOnboarding()
@@ -122,6 +126,28 @@ struct OnboardingWrapper: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowOnboarding"))) { _ in
                 coordinator.resetOnboarding()
+            }
+            .onChange(of: coordinator.showOnboarding) { _, newValue in
+                if !newValue {
+                    // Onboarding completed - animate content in with blur effect
+                    withAnimation(.easeOut(duration: 0.8)) {
+                        contentBlur = 0
+                    }
+                    withAnimation(.easeOut(duration: 0.6).delay(0.2)) {
+                        showContent = true
+                    }
+                } else {
+                    // Reset for showing onboarding
+                    showContent = false
+                    contentBlur = 10
+                }
+            }
+            .onAppear {
+                if !coordinator.showOnboarding {
+                    // Already completed onboarding, show content immediately
+                    showContent = true
+                    contentBlur = 0
+                }
             }
     }
 }

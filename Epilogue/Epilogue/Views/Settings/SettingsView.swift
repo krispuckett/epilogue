@@ -74,8 +74,8 @@ struct SettingsView: View {
                         Label {
                             Text("AI Provider")
                         } icon: {
-                            // Cache the logo to reduce re-renders
-                            PerplexityLogoDetailed(size: 20)
+                            // Use the new SVG-accurate logo
+                            PerplexityLogoSVG(size: 20)
                                 .drawingGroup()  // Flatten view hierarchy
                         }
                         Spacer()
@@ -155,13 +155,35 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundColor(.orange)
                         }
+                        
+                        Button {
+                            Task { @MainActor in
+                                // Safety check before migration
+                                let safetyCheck = CloudKitSafetyCheck.shared
+                                let summary = await safetyCheck.getMigrationSummary(for: modelContext.container)
+                                print("📋 Migration Safety Check:\n\(summary)")
+                                
+                                // Backup data before migration
+                                await safetyCheck.backupCriticalData(from: modelContext.container)
+                                
+                                // Proceed with migration
+                                CloudKitMigrationService.shared.resetMigration()
+                                await CloudKitMigrationService.shared.checkAndPerformMigration(container: modelContext.container)
+                            }
+                        } label: {
+                            Label("Reset CloudKit Migration", systemImage: "arrow.clockwise.icloud")
+                                .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                        }
                     } header: {
                         Text("Developer Options")
                     } footer: {
-                        Text("Gandalf mode disables all API quotas for testing. Use responsibly!")
+                        Text("Gandalf mode disables all API quotas for testing. Use responsibly!\n\nReset CloudKit Migration will re-run the sync process for all local data.")
                     }
                 }
 
+                // MARK: - iCloud Sync
+                CloudKitStatusView()
+                
                 // MARK: - Data
                 Section {
                     Button {

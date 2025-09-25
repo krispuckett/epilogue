@@ -41,6 +41,7 @@ struct ContentView: View {
             .setupSheetPresentations()
             .setupAmbientMode(libraryViewModel: libraryViewModel, notesViewModel: notesViewModel)
             .simplifiedAmbientPresentation()
+            .withCloudKitMigration()
             .onAppear {
                 performInitialSetup()
             }
@@ -119,6 +120,11 @@ struct ContentView: View {
         Task {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             ResponseCache.shared.cleanExpiredEntries()
+        }
+
+        // Check for CloudKit migration
+        Task { @MainActor in
+            await CloudKitMigrationService.shared.checkAndPerformMigration(container: modelContext.container)
         }
 
         // Prepare haptics

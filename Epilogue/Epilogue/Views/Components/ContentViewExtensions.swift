@@ -213,6 +213,17 @@ extension View {
                 }
         }
     }
+    
+    func withCloudKitMigration() -> some View {
+        self.fullScreenCover(isPresented: .init(
+            get: { CloudKitMigrationService.shared.showMigrationUI },
+            set: { CloudKitMigrationService.shared.showMigrationUI = $0 }
+        )) {
+            CloudKitMigrationView()
+                .preferredColorScheme(.dark)
+                .interactiveDismissDisabled()
+        }
+    }
 }
 
 // MARK: - Toast Extensions

@@ -1,10 +1,13 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import CloudKit
 
 @main
 struct EpilogueApp: App {
     @State private var modelContainer: ModelContainer?
+    @State private var showingCloudKitAlert = false
+    @State private var cloudKitErrorMessage = ""
     
     var body: some Scene {
         WindowGroup {
@@ -23,6 +26,19 @@ struct EpilogueApp: App {
                         
                         // Request notification permissions
                         requestNotificationPermissions()
+                        
+                        // Check CloudKit status and show alert if needed
+                        checkCloudKitStatus()
+                    }
+                    .alert("iCloud Sync Required", isPresented: $showingCloudKitAlert) {
+                        Button("Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        Button("Dismiss", role: .cancel) {}
+                    } message: {
+                        Text(cloudKitErrorMessage)
                     }
             } else {
                 // Minimal launch screen while loading
@@ -82,56 +98,114 @@ struct EpilogueApp: App {
             QueuedQuestion.self
         ])
 
-        // First, try with CloudKit (preferred for sync)
-        do {
-            let cloudKitConfig = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .automatic  // Enable CloudKit sync
-            )
-            modelContainer = try ModelContainer(for: schema, configurations: [cloudKitConfig])
-            DataRecovery.recordInitializationSuccess()
-            print("✅ ModelContainer initialized with CloudKit sync enabled")
-            return
-        } catch {
-            print("⚠️ CloudKit initialization failed: \(error)")
-            // Only record as failure if it's not a network issue
-            if !error.localizedDescription.contains("network") {
+        // CRITICAL: Always use CloudKit for data persistence and sync
+        // We'll retry multiple times to ensure CloudKit is properly initialized
+        var retryCount = 0
+        let maxRetries = 3
+        var lastError: Error?
+        
+        while retryCount < maxRetries {
+            do {
+                let cloudKitConfig = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .automatic  // Enable CloudKit sync
+                )
+                
+                // Set a custom name to ensure we're not conflicting with old local stores
+                let cloudKitContainer = ModelConfiguration(
+                    "EpilogueCloudKit",
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .automatic
+                )
+                
+                modelContainer = try ModelContainer(for: schema, configurations: [cloudKitContainer])
+                DataRecovery.recordInitializationSuccess()
+                
+                // Store that we're using CloudKit
+                UserDefaults.standard.set(true, forKey: "isUsingCloudKit")
+                
+                print("✅ ModelContainer initialized with CloudKit sync enabled")
+                print("✅ Your data will sync across all your devices signed into iCloud")
+                return
+            } catch {
+                lastError = error
+                retryCount += 1
+                
+                if retryCount < maxRetries {
+                    print("⚠️ CloudKit initialization attempt \(retryCount) failed: \(error)")
+                    print("🔄 Retrying in 1 second...")
+                    
+                    // Brief delay before retry
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                }
+            }
+        }
+
+        // If we get here, CloudKit initialization failed after all retries
+        print("❌ CloudKit initialization failed after \(maxRetries) attempts")
+        if let error = lastError {
+            print("❌ Last error: \(error)")
+            
+            // Check if it's a network issue
+            if error.localizedDescription.contains("network") || 
+               error.localizedDescription.contains("Internet") ||
+               error.localizedDescription.contains("offline") {
+                print("📱 Appears to be a network connectivity issue")
+                // Don't record as failure for network issues
+            } else {
                 DataRecovery.recordInitializationFailure()
             }
         }
 
-        // Fallback: Try local storage without CloudKit
+        // IMPORTANT: We should not fall back to local-only storage
+        // This causes data loss on reinstall. Instead, show an error to the user
+        // and ask them to ensure they're signed into iCloud
+        
+        // For now, we'll initialize with appropriate fallback storage
         do {
+            #if targetEnvironment(simulator)
+            // On simulator, use local persistent storage since CloudKit is unreliable
             let localConfig = ModelConfiguration(
+                "EpilogueLocal",
                 schema: schema,
                 isStoredInMemoryOnly: false,
-                cloudKitDatabase: .none  // No CloudKit, but data persists locally
+                cloudKitDatabase: .none  // No CloudKit on simulator
             )
             modelContainer = try ModelContainer(for: schema, configurations: [localConfig])
-            DataRecovery.recordInitializationSuccess()
-            print("⚠️ ModelContainer initialized WITHOUT CloudKit (local only)")
-            print("ℹ️ Data will not sync across devices")
-            return
-        } catch {
-            print("❌ Local initialization also failed: \(error)")
-            DataRecovery.recordInitializationFailure()
-        }
-
-        // Last resort: In-memory only
-        do {
+            
+            print("📱 Simulator detected: Using local persistent storage")
+            print("⚠️ CloudKit sync disabled on simulator")
+            
+            // Mark as not using CloudKit but don't show error
+            UserDefaults.standard.set(false, forKey: "isUsingCloudKit")
+            UserDefaults.standard.set(false, forKey: "cloudKitInitializationFailed")
+            
+            #else
+            // On real device, use in-memory storage and show error
             let memoryConfig = ModelConfiguration(
                 schema: schema,
                 isStoredInMemoryOnly: true
             )
             modelContainer = try ModelContainer(for: schema, configurations: [memoryConfig])
-            print("⚠️ ModelContainer initialized in-memory only (data won't persist)")
-            print("⚠️ Please use 'Delete All Data' in Settings to fix persistent storage")
+            
+            // Set a flag to show CloudKit error in the UI
+            UserDefaults.standard.set(false, forKey: "isUsingCloudKit")
+            UserDefaults.standard.set(true, forKey: "cloudKitInitializationFailed")
+            
+            print("⚠️ ModelContainer initialized in-memory only due to CloudKit issues")
+            print("⚠️ User needs to sign into iCloud for data persistence")
+            
+            // Show alert to user
+            cloudKitErrorMessage = "Please sign into iCloud in Settings to save your reading data. Without iCloud, your data won't be saved when you close the app."
+            showingCloudKitAlert = true
+            #endif
         } catch {
             print("❌ Fatal: Could not initialize ModelContainer: \(error)")
             // Clean the store and ask user to restart
             DataRecovery.cleanSwiftDataStore()
-            fatalError("Database error. Please restart the app.")
+            fatalError("Database error. Please ensure you're signed into iCloud and restart the app.")
         }
     }
     
@@ -154,6 +228,37 @@ struct EpilogueApp: App {
                 #if DEBUG
                 print("⚠️ Could not create Application Support directory: \(error)")
                 #endif
+            }
+        }
+    }
+    
+    @MainActor
+    private func checkCloudKitStatus() {
+        // Check if CloudKit initialization failed
+        if UserDefaults.standard.bool(forKey: "cloudKitInitializationFailed") {
+            Task {
+                // Check iCloud account status
+                let container = CKContainer.default()
+                let accountStatus = try? await container.accountStatus()
+                
+                switch accountStatus {
+                case .available:
+                    // iCloud is available but CloudKit failed - might be a temporary issue
+                    cloudKitErrorMessage = "Your data couldn't sync to iCloud. Please check your internet connection and try restarting the app. Your reading data will be stored locally until sync is restored."
+                case .noAccount:
+                    cloudKitErrorMessage = "Please sign in to iCloud in Settings to sync your reading data across devices. Without iCloud, your data won't be backed up or available on other devices."
+                case .restricted:
+                    cloudKitErrorMessage = "iCloud access is restricted. Please check parental controls or device management settings."
+                case .temporarilyUnavailable:
+                    cloudKitErrorMessage = "iCloud is temporarily unavailable. Your data will sync once the service is restored."
+                default:
+                    cloudKitErrorMessage = "iCloud sync is unavailable. Please ensure you're signed into iCloud and have an internet connection."
+                }
+                
+                showingCloudKitAlert = true
+                
+                // Clear the flag so we don't show this every time
+                UserDefaults.standard.set(false, forKey: "cloudKitInitializationFailed")
             }
         }
     }

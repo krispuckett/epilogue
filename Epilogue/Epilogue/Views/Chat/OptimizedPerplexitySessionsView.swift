@@ -135,7 +135,6 @@ struct OptimizedPerplexitySessionsView: View {
             
             if sessions.isEmpty {
                 ModernEmptyStates.noSessions
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 100)
             } else if !filteredSessions.isEmpty || !isSearching {
                 ScrollView {
