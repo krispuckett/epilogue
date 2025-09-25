@@ -135,7 +135,6 @@ struct OptimizedPerplexitySessionsView: View {
             
             if sessions.isEmpty {
                 ModernEmptyStates.noSessions
-                    .padding(.top, 100)
             } else if !filteredSessions.isEmpty || !isSearching {
                 ScrollView {
                     LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
@@ -174,7 +173,6 @@ struct OptimizedPerplexitySessionsView: View {
             } else {
                 ModernEmptyStates.noSearchResults(searchText: searchText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, 100)
             }
         }
     }

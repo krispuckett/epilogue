@@ -46,21 +46,21 @@ struct UnifiedQuickActionCard: View {
                     // Main input row
                     HStack(spacing: 12) {
                         // Plus/X button with rotation animation
-                        Button {
-                            if !isExpanded {
-                                expandCard()
-                            } else {
-                                collapseCard()
+                        // Use onTapGesture instead of Button to prevent keyboard dismissal
+                        Image(systemName: "plus")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(width: 36, height: 36)
+                            .contentShape(Circle())
+                            .rotationEffect(.degrees(isExpanded ? 45 : 0))
+                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
+                            .onTapGesture {
+                                if !isExpanded {
+                                    expandCard()
+                                } else {
+                                    collapseCard()
+                                }
                             }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .frame(width: 36, height: 36)
-                                .contentShape(Circle())
-                                .rotationEffect(.degrees(isExpanded ? 45 : 0)) // Rotate to X
-                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
-                        }
 
                         // Search/Input field - THE WHOLE AREA IS THE INPUT
                         VStack(spacing: 0) {
