@@ -46,27 +46,28 @@ struct UnifiedQuickActionCard: View {
                     // Main input row
                     HStack(spacing: 12) {
                         // Plus/X button with rotation animation
-                        Image(systemName: "plus")
-                            .font(.system(size: 20, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .frame(width: 36, height: 36)
-                            .contentShape(Circle())
-                            .rotationEffect(.degrees(isExpanded ? 45 : 0))
-                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
-                            .highPriorityGesture(
-                                TapGesture()
-                                    .onEnded { _ in
-                                        // Keep keyboard focus while expanding
-                                        if !isExpanded {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                                isExpanded = true
-                                            }
-                                            SensoryFeedback.light()
-                                        } else {
-                                            collapseCard()
-                                        }
-                                    }
-                            )
+                        Button {
+                            // Empty action - handled by onTapGesture below
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .frame(width: 36, height: 36)
+                                .contentShape(Circle())
+                                .rotationEffect(.degrees(isExpanded ? 45 : 0))
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .onTapGesture {
+                            if !isExpanded {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    isExpanded = true
+                                }
+                                SensoryFeedback.light()
+                            } else {
+                                collapseCard()
+                            }
+                        }
 
                         // Search/Input field - THE WHOLE AREA IS THE INPUT
                         VStack(spacing: 0) {
@@ -522,7 +523,6 @@ struct UnifiedQuickActionCard: View {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             isExpanded = true
         }
-        // NEVER touch focus state - let the user control the keyboard
         SensoryFeedback.light()
     }
 

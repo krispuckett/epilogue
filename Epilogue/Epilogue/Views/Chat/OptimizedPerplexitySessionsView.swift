@@ -134,32 +134,16 @@ struct OptimizedPerplexitySessionsView: View {
                 .allowsHitTesting(false)
             
             if sessions.isEmpty {
-                // Custom centered empty state
-                GeometryReader { geometry in
-                    VStack {
-                        Spacer()
-                        
-                        VStack(spacing: 16) {
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 64))
-                                .foregroundStyle(.white.opacity(0.5))
-                            
-                            Text("No Sessions Yet")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(.white)
-                            
-                            Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white.opacity(0.8))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .offset(y: -geometry.size.height * 0.1) // Offset up by 10% to center better
-                        
-                        Spacer()
-                    }
+                // Use ContentUnavailableView for consistent centering
+                ContentUnavailableView {
+                    Label("No Sessions Yet", systemImage: "bubble.left.and.bubble.right")
+                        .foregroundStyle(.white)
+                } description: {
+                    Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !filteredSessions.isEmpty || !isSearching {
                 ScrollView {
                     LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
