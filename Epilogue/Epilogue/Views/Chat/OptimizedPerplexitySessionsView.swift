@@ -133,57 +133,61 @@ struct OptimizedPerplexitySessionsView: View {
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(false)
             
-            if filteredSessions.isEmpty && !isSearching && sessions.isEmpty {
-                // Empty state - EXACTLY matching notes view
-                ContentUnavailableView {
-                    Label("No Sessions Yet", systemImage: "bubble.left.and.bubble.right")
-                        .foregroundStyle(.white)
-                } description: {
-                    Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
-                        .foregroundStyle(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 100)
-            } else if filteredSessions.isEmpty && isSearching {
-                ModernEmptyStates.noSearchResults(searchText: searchText)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
-                        if isSearching {
-                            searchBar
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .top).combined(with: .opacity),
-                                    removal: .move(edge: .top).combined(with: .opacity)
-                                ))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Progressive Search Bar (always present when searching)
+                    if isSearching {
+                        searchBar
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity),
+                                removal: .move(edge: .top).combined(with: .opacity)
+                            ))
+                    }
+                    
+                    // Content
+                    if filteredSessions.isEmpty && !isSearching && sessions.isEmpty {
+                        // Empty state - inside ScrollView like notes view
+                        ContentUnavailableView {
+                            Label("No Sessions Yet", systemImage: "bubble.left.and.bubble.right")
+                                .foregroundStyle(.white)
+                        } description: {
+                            Text("Start an ambient reading session to capture your thoughts and reflections as you explore your books")
+                                .foregroundStyle(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
                         }
-                        
-                        // Keep LazyVStack for sticky headers but optimize content
-                        ForEach(Array(filteredSessions.enumerated()), id: \.0) { index, group in
-                            Section {
-                                ForEach(group.sessions) { session in
-                                    OptimizedSessionRow(
-                                        session: session,
-                                        onTap: {
-                                            selectedSession = session
-                                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, 100)
+                    } else if filteredSessions.isEmpty && isSearching {
+                        ModernEmptyStates.noSearchResults(searchText: searchText)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        // Content sections
+                        LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
+                            ForEach(Array(filteredSessions.enumerated()), id: \.0) { index, group in
+                                Section {
+                                    ForEach(group.sessions) { session in
+                                        OptimizedSessionRow(
+                                            session: session,
+                                            onTap: {
+                                                selectedSession = session
+                                            }
+                                        )
+                                    }
+                                } header: {
+                                    OptimizedStickyHeader(
+                                        dateLabel: group.date,
+                                        sessionCount: group.sessions.count
                                     )
+                                    .id(group.date)
                                 }
-                            } header: {
-                                OptimizedStickyHeader(
-                                    dateLabel: group.date,
-                                    sessionCount: group.sessions.count
-                                )
-                                .id(group.date)
                             }
                         }
+                        .padding(.bottom, 100)
                     }
-                    .padding(.bottom, 100)
                 }
-                .coordinateSpace(name: "scroll")
-                .scrollIndicators(.hidden)
             }
+            .coordinateSpace(name: "scroll")
+            .scrollIndicators(.hidden)
         }
     }
     
