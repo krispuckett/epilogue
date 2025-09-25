@@ -123,9 +123,10 @@ struct ContentView: View {
         }
 
         // Check for CloudKit migration
-        Task { @MainActor in
-            await CloudKitMigrationService.shared.checkAndPerformMigration(container: modelContext.container)
-        }
+        // DISABLED - causing data loss
+        // Task { @MainActor in
+        //     await CloudKitMigrationService.shared.checkAndPerformMigration(container: modelContext.container)
+        // }
 
         // Prepare haptics
         SensoryFeedback.light()
