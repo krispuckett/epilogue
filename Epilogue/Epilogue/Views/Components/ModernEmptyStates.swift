@@ -90,7 +90,6 @@ struct ModernEmptyStates {
                 .foregroundStyle(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Search Empty State
