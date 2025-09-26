@@ -288,6 +288,11 @@ struct BookSearchSheet: View {
                 ], spacing: 20) {
                     ForEach(trendingService.trendingBooks, id: \.id) { book in
                         BestsellerBookCard(book: book) {
+                            print("🔥 DEBUG: Book selected from trending/bestsellers:")
+                            print("   ID: \(book.id)")
+                            print("   Title: \(book.title)")
+                            print("   Author: \(book.author)")
+                            print("   Cover URL: \(book.coverImageURL ?? "nil")")
                             onBookSelected(book)
                             dismiss()
                         }
@@ -303,6 +308,11 @@ struct BookSearchSheet: View {
                 ], spacing: 20) {
                     ForEach(bestsellerBooks, id: \.id) { book in
                         BestsellerBookCard(book: book) {
+                            print("📚 DEBUG: Book selected from static bestsellers:")
+                            print("   ID: \(book.id)")
+                            print("   Title: \(book.title)")
+                            print("   Author: \(book.author)")
+                            print("   Cover URL: \(book.coverImageURL ?? "nil")")
                             onBookSelected(book)
                             dismiss()
                         }
@@ -448,6 +458,11 @@ struct BookSearchSheet: View {
         LazyVStack(spacing: 0) {
             ForEach(searchResults) { book in
                 BookSearchResultRow(book: book, onAdd: {
+                    print("🔍 DEBUG: Book selected from search results:")
+                    print("   ID: \(book.id)")
+                    print("   Title: \(book.title)")
+                    print("   Author: \(book.author)")
+                    print("   Cover URL: \(book.coverImageURL ?? "nil")")
                     onBookSelected(book)
                     dismiss()
                 })
@@ -598,43 +613,49 @@ struct BookSearchResultRow: View {
     @State private var isPressed = false
     
     var body: some View {
-        Button(action: onAdd) {
-            HStack(spacing: 16) {
-                // Book cover - smaller and cleaner
-                bookCoverView
+        HStack(spacing: 16) {
+            // Book cover - smaller and cleaner
+            bookCoverView
+            
+            // Book info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(book.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 
-                // Book info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(book.title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    
-                    Text(book.author)
-                        .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .lineLimit(1)
-                    
-                    if let year = book.publishedYear {
-                        Text(year)
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.7))
-                    }
+                Text(book.author)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+                
+                if let year = book.publishedYear {
+                    Text(year)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.7))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Add button - simpler
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Add button - now the only clickable element
+            Button(action: {
+                print("📚 Book selected for addition:")
+                print("   ID: \(book.id)")
+                print("   Title: \(book.title)")
+                print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                onAdd()
+            }) {
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
+            .buttonStyle(PlainButtonStyle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        .padding(.vertical, 12)
     }
     
     @ViewBuilder
@@ -645,6 +666,10 @@ struct BookSearchResultRow: View {
                 .frame(width: 50, height: 75)
             
             if let coverURL = book.coverImageURL {
+                let _ = print("🔍 BookSearchResultRow displaying book:")
+                let _ = print("   Title: \(book.title)")
+                let _ = print("   ID: \(book.id)")
+                let _ = print("   Cover URL: \(coverURL)")
                 AsyncImage(url: URL(string: coverURL)) { image in
                     image
                         .resizable()

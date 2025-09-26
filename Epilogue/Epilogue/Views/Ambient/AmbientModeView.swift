@@ -199,6 +199,10 @@ struct AmbientModeView: View {
     @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
     @AppStorage("enableAnimations") private var enableAnimations = true
     @AppStorage("showLiveTranscriptionBubble") private var showLiveTranscriptionBubble = true
+    @AppStorage("alwaysShowInput") private var alwaysShowInput = false
+    
+    // Voice mode state
+    @State private var isVoiceModeEnabled = true
     
     enum DetectionState {
         case idle
@@ -416,6 +420,21 @@ struct AmbientModeView: View {
                 EpilogueAmbientCoordinator.shared.initialBook = nil
             }
 
+            // Initialize voice mode based on settings
+            isVoiceModeEnabled = !alwaysShowInput
+            if !isVoiceModeEnabled {
+                // Start with text input if voice mode is disabled
+                inputMode = .textInput
+                // Initialize text field height properly
+                textFieldHeight = 44
+                // Clear any lingering transcription
+                liveTranscription = ""
+                voiceManager.transcribedText = ""
+                // Initialize container blur for proper rendering
+                containerBlur = 0
+                // Don't auto-focus keyboard on appear - let user tap to focus
+            }
+            
             startAmbientExperience()
             setupKeyboardObservers()
             
@@ -588,6 +607,11 @@ struct AmbientModeView: View {
             bookCoverTimer?.invalidate()
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
+            
+            // Stop any active recording
+            if isRecording {
+                stopRecording()
+            }
         }
         // Camera temporarily disabled due to memory issues
         /*
@@ -638,9 +662,9 @@ struct AmbientModeView: View {
             }
         }
         .onReceive(voiceManager.$transcribedText) { text in
-            // CRITICAL: Only update if actually recording
-            guard isRecording else {
-                // Clear everything when not recording
+            // CRITICAL: Only update if actually recording AND voice mode is enabled
+            guard isRecording && isVoiceModeEnabled else {
+                // Clear everything when not recording or voice mode disabled
                 if !liveTranscription.isEmpty {
                     liveTranscription = ""
                     transcriptionFadeTimer?.invalidate()
@@ -1059,26 +1083,30 @@ struct AmbientModeView: View {
                 // FIXED: Main input controls at the very bottom
                 GeometryReader { geometry in
                 HStack(spacing: 0) {
-                    Spacer()
-                        .allowsHitTesting(false)  // Don't block touches
+                    // Only add spacer when in voice mode (centered orb)
+                    if inputMode != .textInput && isVoiceModeEnabled {
+                        Spacer()
+                            .allowsHitTesting(false)
+                    }
                     
                     // Single morphing container that expands/contracts
                     ZStack {
                         // Unified morphing background - always present, just changes shape
                         RoundedRectangle(
-                            cornerRadius: inputMode == .textInput ? 20 : 32,
+                            cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32,
                             style: .continuous
                         )
-                        .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
+                        .fill(Color.white.opacity(0.05)) // Slightly visible for glass to render properly
                         .frame(
-                            width: inputMode == .textInput ? min(geometry.size.width - 80, 320) : 64,
-                            height: inputMode == .textInput ? textFieldHeight : 64
+                            width: inputMode == .textInput || !isVoiceModeEnabled ? geometry.size.width - 60 : 64,
+                            height: inputMode == .textInput || !isVoiceModeEnabled ? textFieldHeight : 64
                         )
                         .blur(radius: containerBlur) // Ambient container blur
-                        .glassEffect(.regular, in: .rect(cornerRadius: inputMode == .textInput ? 20 : 32))
+                        .glassEffect(.regular, in: .rect(cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32))
                         .allowsHitTesting(false)  // Glass background shouldn't block touches
                         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: inputMode)
                         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: textFieldHeight)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: isVoiceModeEnabled)
                         
                         // Content that transitions inside the morphing container
                         ZStack {
@@ -1109,9 +1137,9 @@ struct AmbientModeView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                .opacity(inputMode == .textInput ? 0 : 1)
-                                .scaleEffect(inputMode == .textInput ? 0.5 : 1)
-                                .allowsHitTesting(!inputMode.isTextInput)
+                                .opacity(inputMode == .textInput || !isVoiceModeEnabled ? 0 : 1)
+                                .scaleEffect(inputMode == .textInput || !isVoiceModeEnabled ? 0.5 : 1)
+                                .allowsHitTesting(!inputMode.isTextInput && isVoiceModeEnabled)
                             
                             // Text input mode content - always present but with opacity control
                             Group {
@@ -1213,28 +1241,33 @@ struct AmbientModeView: View {
                                 .padding(.trailing, 12)
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
-                            .opacity(inputMode == .textInput ? 1 : 0)
-                            .blur(radius: inputMode == .textInput ? 0 : 8)  // Add blur transition
-                            .scaleEffect(inputMode == .textInput ? 1 : 0.95)  // Slight scale for depth
-                            .allowsHitTesting(inputMode == .textInput)
-                            .animation(inputMode == .textInput ?
+                            .opacity(inputMode == .textInput || !isVoiceModeEnabled ? 1 : 0)
+                            .blur(radius: inputMode == .textInput || !isVoiceModeEnabled ? 0 : 8)  // Add blur transition
+                            .scaleEffect(inputMode == .textInput || !isVoiceModeEnabled ? 1 : 0.95)  // Slight scale for depth
+                            .allowsHitTesting(inputMode == .textInput || !isVoiceModeEnabled)
+                            .animation(inputMode == .textInput || !isVoiceModeEnabled ?
                                 .easeOut(duration: 0.25).delay(0.35) :  // Smoother easeOut
                                 .easeOut(duration: 0.1),
                                 value: inputMode
                             )
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isVoiceModeEnabled)
                         }
                     }
                     .onAppear {
                         // Start subtle idle breathing animation
                         startContainerBreathing()
                     }
-
-                    // Morphing button - ambient orb when empty, submit arrow when has text
-                    if inputMode == .textInput {
+                    
+                    // Right side button - morphs between ambient orb and submit arrow
+                    if inputMode == .textInput || !isVoiceModeEnabled {
                         ZStack {
                             // Ambient orb when no text
                             if keyboardText.isEmpty {
                                 Button {
+                                    // If voice mode is disabled, enable it first
+                                    if !isVoiceModeEnabled {
+                                        isVoiceModeEnabled = true
+                                    }
                                     // Return to voice mode
                                     isKeyboardFocused = false
                                     withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
@@ -1249,11 +1282,11 @@ struct AmbientModeView: View {
                                     AmbientOrbButton(size: 48) {
                                         // Action handled by parent button
                                     }
-                                    .allowsHitTesting(false)
                                 }
+                                .buttonStyle(.plain)
                                 .transition(.scale.combined(with: .opacity))
                             }
-
+                            
                             // Submit arrow when text exists - with liquid glass
                             if !keyboardText.isEmpty {
                                 Button {
@@ -1277,19 +1310,19 @@ struct AmbientModeView: View {
                                             .foregroundStyle(.white)
                                     }
                                 }
+                                .buttonStyle(.plain)
                                 .transition(.scale.combined(with: .opacity))
                             }
                         }
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardText.isEmpty)
-                        .transition(.opacity)
-                        .animation(inputMode == .textInput ?
-                            .easeIn(duration: 0.1).delay(0.5) :  // Appear AFTER text at 100% complete
-                            .easeOut(duration: 0.1), value: inputMode)
                         .padding(.leading, 12)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: keyboardText.isEmpty)
                     }
                     
-                    Spacer()
-                        .allowsHitTesting(false)  // Don't block touches
+                    // Only add spacer when in voice mode (centered orb)
+                    if inputMode != .textInput && isVoiceModeEnabled {
+                        Spacer()
+                            .allowsHitTesting(false)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: geometry.size.height)
@@ -1298,21 +1331,23 @@ struct AmbientModeView: View {
             .frame(height: 100)
             .allowsHitTesting(true)  // Ensure only actual controls are interactive
         }
-        .padding(.horizontal, DesignSystem.Spacing.inlinePadding)  // Back to original padding
-        .padding(.bottom, inputMode == .textInput ? 1 : 24)  // Just 1pt above keyboard in text mode
+        .padding(.horizontal, 16)  // iOS 26 style - closer to edges
+        .padding(.bottom, inputMode == .textInput || !isVoiceModeEnabled ? 1 : 24)  // Just 1pt above keyboard in text mode
         
-        // Long press for quick keyboard
+        // Long press for quick keyboard - only when voice mode is enabled
         .onLongPressGesture(minimumDuration: 0.5) {
-            if isRecording {
-                stopRecording()
-            }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
-                inputMode = .textInput
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    isKeyboardFocused = true
+            if isVoiceModeEnabled {
+                if isRecording {
+                    stopRecording()
                 }
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.25)) {
+                    inputMode = .textInput
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isKeyboardFocused = true
+                    }
+                }
+                SensoryFeedback.medium()
             }
-            SensoryFeedback.medium()
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: textFieldHeight)
@@ -1409,7 +1444,25 @@ struct AmbientModeView: View {
             
             Spacer()
             
-            // Removed Switch Book button - book switching is handled via book strip
+            // Right side - Clean iOS toggle
+            Toggle("", isOn: $isVoiceModeEnabled)
+                .toggleStyle(SwitchToggleStyle(tint: Color(red: 1.0, green: 0.549, blue: 0.259)))
+                .labelsHidden()
+                .onChange(of: isVoiceModeEnabled) { _, newValue in
+                    SensoryFeedback.impact(newValue ? .light : .medium)
+                    
+                    // If turning voice mode off, switch to text input
+                    if !newValue {
+                        if isRecording {
+                            stopRecording()
+                        }
+                        inputMode = .textInput
+                    } else {
+                        // If turning voice mode on, switch to listening
+                        inputMode = .listening
+                        isKeyboardFocused = false
+                    }
+                }
         }
     }
     
@@ -2036,6 +2089,32 @@ struct AmbientModeView: View {
     }
 
     private func startAmbientExperience() {
+        // If voice mode is disabled, skip audio permissions and setup
+        if !isVoiceModeEnabled {
+            // Create session without audio setup
+            sessionStartTime = Date()
+            let session = AmbientSession(book: currentBookContext)
+            session.startTime = sessionStartTime!
+            currentSession = session
+            modelContext.insert(session)
+            
+            do {
+                try modelContext.save()
+                print("✅ Initial session created (voice mode disabled)")
+            } catch {
+                print("❌ Failed to save initial session: \(error)")
+            }
+            
+            // Start book cover fade timer
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                withAnimation(.easeOut(duration: 2.0)) {
+                    showBookCover = false
+                }
+            }
+            
+            return // Don't initialize any audio components
+        }
+        
         // Check permissions FIRST before creating session
         Task {
             // Check microphone permission
@@ -2111,6 +2190,9 @@ struct AmbientModeView: View {
     }
     
     private func handleMicrophoneTap() {
+        // Don't do anything if voice mode is disabled
+        guard isVoiceModeEnabled else { return }
+        
         if isRecording {
             stopRecording()
         } else {

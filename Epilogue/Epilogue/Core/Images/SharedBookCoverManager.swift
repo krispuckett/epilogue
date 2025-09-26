@@ -650,16 +650,70 @@ public class SharedBookCoverManager: ObservableObject {
     
     /// Clear all caches (memory and disk)
     public func clearAllCaches() {
+        print("🧹 Clearing ALL SharedBookCoverManager caches...")
+        
+        // Clear memory caches
         Self.imageCache.removeAllObjects()
         Self.thumbnailCache.removeAllObjects()
         
+        // Cancel all active tasks
+        activeTasks.values.forEach { $0.cancel() }
+        activeTasks.removeAll()
+        
         // Clear disk cache
         if let diskCacheURL = diskCacheURL {
-            try? FileManager.default.removeItem(at: diskCacheURL)
-            setupDiskCache()
+            do {
+                let fileManager = FileManager.default
+                if fileManager.fileExists(atPath: diskCacheURL.path) {
+                    let contents = try fileManager.contentsOfDirectory(at: diskCacheURL, includingPropertiesForKeys: nil)
+                    for fileURL in contents {
+                        try fileManager.removeItem(at: fileURL)
+                    }
+                    print("✅ Cleared \(contents.count) files from disk cache")
+                }
+            } catch {
+                print("❌ Error clearing disk cache: \(error)")
+            }
         }
         
-        // print("✅ Cleared all caches")
+        // Recreate disk cache directory
+        setupDiskCache()
+        
+        // Also clear URLCache
+        URLCache.shared.removeAllCachedResponses()
+        
+        print("✅ All SharedBookCoverManager caches cleared")
+    }
+    
+    /// Clear cache for specific URL
+    public func clearCacheForURL(_ urlString: String) {
+        let cleanedURL = cleanURL(urlString)
+        let fullCacheKey = "\(cleanedURL)_full" as NSString
+        let thumbCacheKey = "\(cleanedURL)_thumb" as NSString
+        let libraryCacheKey = "\(cleanedURL)_library" as NSString
+        
+        // Clear from memory caches
+        Self.imageCache.removeObject(forKey: fullCacheKey)
+        Self.thumbnailCache.removeObject(forKey: thumbCacheKey)
+        Self.thumbnailCache.removeObject(forKey: libraryCacheKey)
+        
+        // Cancel any active task for this URL
+        activeTasks.removeValue(forKey: fullCacheKey as String)
+        activeTasks.removeValue(forKey: thumbCacheKey as String)
+        activeTasks.removeValue(forKey: libraryCacheKey as String)
+        
+        // Clear from disk
+        if let diskCacheURL = diskCacheURL {
+            let fullPath = diskCacheURL.appendingPathComponent(fullCacheKey as String)
+            let thumbPath = diskCacheURL.appendingPathComponent(thumbCacheKey as String)
+            let libraryPath = diskCacheURL.appendingPathComponent(libraryCacheKey as String)
+            
+            try? FileManager.default.removeItem(at: fullPath)
+            try? FileManager.default.removeItem(at: thumbPath)
+            try? FileManager.default.removeItem(at: libraryPath)
+        }
+        
+        print("🧹 Cleared cache for URL: \(urlString)")
     }
     
     /// Batch preload covers for better performance

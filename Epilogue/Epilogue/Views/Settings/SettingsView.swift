@@ -14,9 +14,12 @@ struct SettingsView: View {
     @AppStorage("gandalfMode") private var gandalfMode = false
     @AppStorage("realTimeQuestions") private var realTimeQuestions = true
     @AppStorage("audioFeedback") private var audioFeedback = false
+    @AppStorage("alwaysShowInput") private var alwaysShowInput = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
+    @State private var showingCacheClearedToast = false
+    @State private var toastMessage = ""
 
     // Hidden developer mode activation
     @State private var developerModeUnlocked = false
@@ -122,6 +125,10 @@ struct SettingsView: View {
                     Toggle("Show Live Transcription", isOn: $showLiveTranscriptionBubble)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
                         .id("transcription")  // Stable identity
+                    
+                    Toggle("Always Show Input", isOn: $alwaysShowInput)
+                        .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                        .id("alwaysShowInput")  // Stable identity
                 } header: {
                     Text("Ambient Mode")
                 }
@@ -192,6 +199,30 @@ struct SettingsView: View {
                         Label("Export All Data", systemImage: "square.and.arrow.up")
                             .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                     }
+                    
+                    Button {
+                        Task { @MainActor in
+                            // Clear all caches
+                            SharedBookCoverManager.shared.clearAllCaches()
+                            DisplayedImageStore.clearAllCaches()
+                            
+                            // Show confirmation toast
+                            toastMessage = "Image caches cleared"
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showingCacheClearedToast = true
+                            }
+                            
+                            // Hide toast after delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                withAnimation {
+                                    showingCacheClearedToast = false
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Clear Image Caches", systemImage: "trash")
+                            .foregroundStyle(.orange)
+                    }
 
                     Button(role: .destructive) {
                         showingDeleteConfirmation = true
@@ -201,6 +232,8 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Data")
+                } footer: {
+                    Text("Clear Image Caches forces all book covers to reload from the server.")
                 }
 
                 // MARK: - About
@@ -285,6 +318,7 @@ struct SettingsView: View {
             } message: {
                 Text("Your data has been exported successfully.")
             }
+            .modifier(GlassToastModifier(isShowing: $showingCacheClearedToast, message: toastMessage))
         }
     }
 

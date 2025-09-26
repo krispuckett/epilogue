@@ -173,10 +173,7 @@ struct EnhancedBookScannerView: View {
                     showBookSearch = false
                     // Don't dismiss scanner - let user continue scanning or manually close
                     
-                    // Show success feedback
-                    detectionStatus = "Added \"\(book.title)\""
-                    
-                    // Reset status after delay
+                    // Reset status after delay (removed local status update since LibraryView shows toast)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         detectionStatus = "Position book cover or ISBN barcode"
                     }
@@ -191,10 +188,7 @@ struct EnhancedBookScannerView: View {
                     bookScanner.reset()
                     // Don't dismiss scanner - let user continue scanning or manually close
                     
-                    // Show success feedback
-                    detectionStatus = "Added \"\(book.title)\""
-                    
-                    // Reset status after delay
+                    // Reset status after delay (removed local status update since LibraryView shows toast)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         detectionStatus = "Position book cover or ISBN barcode"
                     }

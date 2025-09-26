@@ -1610,11 +1610,7 @@ class LibraryViewModel: ObservableObject {
                 // Don't reload during import - causes race conditions
                 // loadBooks()
 
-                // Show success toast for updated book
-                NotificationCenter.default.post(
-                    name: Notification.Name("ShowBookAddedToast"),
-                    object: ["message": "Updated \"\(book.title)\""]
-                )
+                // Toast removed - handled by UnifiedQuickActionCard
                 print("  ✅ Book updated with new data")
                 return
             } else {
@@ -1641,11 +1637,7 @@ class LibraryViewModel: ObservableObject {
         loadBooks()
         print("  ✅ Book saved. Library now has \(books.count) books")
 
-        // Show success toast for new book
-        NotificationCenter.default.post(
-            name: Notification.Name("ShowBookAddedToast"),
-            object: ["message": "Added \"\(book.title)\" to library"]
-        )
+        // Toast removed - handled by UnifiedQuickActionCard
         
         // Verify the saved book has the correct data
         if let savedBook = books.first(where: { $0.id == book.id }) {

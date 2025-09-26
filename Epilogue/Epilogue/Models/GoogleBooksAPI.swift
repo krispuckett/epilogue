@@ -24,9 +24,15 @@ struct GoogleBookItem: Codable, Identifiable {
             ?? volumeInfo.imageLinks?.small 
             ?? volumeInfo.imageLinks?.thumbnail
         
+        print("🏗️ Creating Book from GoogleBookItem:")
+        print("   Google ID: \(id)")
+        print("   Title: \(volumeInfo.title)")
+        print("   Original cover URL: \(imageURL ?? "nil")")
+        
         // Enhance Google Books image URL for higher resolution
         if let url = imageURL {
             imageURL = enhanceGoogleBooksImageURL(url)
+            print("   Enhanced cover URL: \(imageURL ?? "nil")")
         }
         
         return Book(

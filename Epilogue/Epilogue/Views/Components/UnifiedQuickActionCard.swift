@@ -300,6 +300,20 @@ struct UnifiedQuickActionCard: View {
                 libraryViewModel.addBook(book)
                 showBookSearch = false
                 showToast("Book added to library")
+                
+                // Dismiss the card after adding a book
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        isPresented = false
+                    }
+                }
+                
+                // Clear text and reset state
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    searchText = ""
+                    selectedBookContext = nil
+                    isExpanded = false
+                }
             }
         }
         .sheet(isPresented: $showBookScanner) {
