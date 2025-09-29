@@ -474,10 +474,10 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
-    // MARK: - Input Bar (Universal Input Bar WITHOUT .background())
+    // MARK: - Input Bar (Matching UnifiedQuickActionCard style)
     private var minimalInputBar: some View {
         VStack(spacing: 0) {
-            // Processing indicator with scrolling text pill
+            // Processing indicator overlay (like AmbientModeView)
             if isProcessingFollowUp {
                 HStack {
                     Spacer()
@@ -487,11 +487,12 @@ struct AmbientSessionSummaryView: View {
                         ScrollingBookMessages()
                             .frame(maxWidth: 200)
                     }
-                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                     .background(
                         Capsule()
                             .fill(Color.white.opacity(0.05))
+                            .glassEffect(.regular, in: Capsule())
                             .overlay(
                                 Capsule()
                                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
@@ -501,27 +502,31 @@ struct AmbientSessionSummaryView: View {
                     Spacer()
                 }
                 .padding(.bottom, 16)
+                .transition(
+                    .asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.95).combined(with: .opacity)
+                    )
+                )
             }
             
-            // Input bar with proper layout
-            HStack(spacing: 12) {
-                // Glass input container that expands
-                VStack(spacing: 0) {
+            // The actual card - matching UnifiedQuickActionCard exactly
+            VStack(spacing: 0) {
                     // Main input row
                     HStack(spacing: 12) {
-                        // Plus button that expands to show quick actions
+                        // Plus/X button with rotation animation
                         Button {
                             if !showQuickActions {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                     showQuickActions = true
                                 }
-                                isInputFocused = true
+                                SensoryFeedback.light()
                             } else {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                                     showQuickActions = false
                                 }
+                                SensoryFeedback.light()
                             }
-                            SensoryFeedback.light()
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 20, weight: .regular))
@@ -531,40 +536,25 @@ struct AmbientSessionSummaryView: View {
                                 .rotationEffect(.degrees(showQuickActions ? 45 : 0))
                                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showQuickActions)
                         }
-
-                        // Text input field
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Search/Input field - THE WHOLE AREA IS THE INPUT
                         VStack(spacing: 0) {
                             HStack {
-                                if showQuickActions {
-                                    // Active text field when expanded
-                                    TextField("Continue the conversation...", text: $continuationText, axis: .vertical)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 17))
-                                        .foregroundStyle(.white)
-                                        .tint(Color(red: 1.0, green: 0.549, blue: 0.259))
-                                        .lineLimit(1...5)
-                                        .focused($isInputFocused)
-                                        .onSubmit {
-                                            if !continuationText.isEmpty {
-                                                sendFollowUp()
-                                            }
+                                // Single TextField that changes line limit based on expansion
+                                TextField("Continue the conversation...", text: $continuationText, axis: .vertical)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 17, weight: .regular))
+                                    .foregroundStyle(.white)
+                                    .tint(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                    .lineLimit(showQuickActions ? 1...5 : 1...3)  // Dynamic line limit
+                                    .focused($isInputFocused)
+                                    .onSubmit {
+                                        if !continuationText.isEmpty || showQuickActions {
+                                            sendFollowUp()
                                         }
-                                } else {
-                                    // Clean input field
-                                    TextField("Continue the conversation...", text: $continuationText, axis: .vertical)
-                                        .textFieldStyle(.plain)
-                                        .font(.system(size: 17))
-                                        .foregroundStyle(.white)
-                                        .tint(Color(red: 1.0, green: 0.549, blue: 0.259))
-                                        .lineLimit(1...3)
-                                        .focused($isInputFocused)
-                                        .onSubmit {
-                                            if !continuationText.isEmpty {
-                                                sendFollowUp()
-                                            }
-                                        }
-                                }
-
+                                    }
+                                
                                 Spacer()
                             }
                         }
@@ -583,7 +573,7 @@ struct AmbientSessionSummaryView: View {
                             .opacity(continuationText.isEmpty ? 1 : 0)
                             .scaleEffect(continuationText.isEmpty ? 1 : 0.8)
                             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: continuationText.isEmpty)
-
+                            
                             // Submit button - shown when text exists
                             Button {
                                 sendFollowUp()
@@ -600,7 +590,7 @@ struct AmbientSessionSummaryView: View {
                                                     lineWidth: 0.5
                                                 )
                                         }
-
+                                    
                                     Image(systemName: "arrow.up")
                                         .font(.system(size: 16, weight: .semibold))
                                         .foregroundStyle(.white)
@@ -612,14 +602,15 @@ struct AmbientSessionSummaryView: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 10) // Reduced padding to make it less tall
 
-                    // Quick actions (only when expanded)
+                    // Quick actions (only when expanded) - context aware
                     if showQuickActions {
                         VStack(spacing: 0) {
                             Divider()
                                 .background(Color.white.opacity(0.1))
-
+                            
+                            // Quick action buttons - change based on context
                             VStack(spacing: 0) {
                                 // Ask About Books
                                 QuickActionRow(
@@ -628,12 +619,14 @@ struct AmbientSessionSummaryView: View {
                                     subtitle: "Get insights from your library",
                                     warmAmber: Color(red: 1.0, green: 0.549, blue: 0.259),
                                     action: {
-                                        continuationText = "What themes connect across my reading?"
-                                        showQuickActions = false
-                                        sendFollowUp()
+                                        continuationText = "What themes appear across my books?"
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                            showQuickActions = false
+                                        }
+                                        isInputFocused = true
                                     }
                                 )
-
+                                
                                 // Reading Insights
                                 QuickActionRow(
                                     icon: "lightbulb",
@@ -641,46 +634,60 @@ struct AmbientSessionSummaryView: View {
                                     subtitle: "Discover patterns in your notes",
                                     warmAmber: Color(red: 1.0, green: 0.549, blue: 0.259),
                                     action: {
-                                        continuationText = "What patterns do you see in my notes and highlights?"
-                                        showQuickActions = false
-                                        sendFollowUp()
+                                        continuationText = "What are the key ideas from my recent reading?"
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                            showQuickActions = false
+                                        }
+                                        isInputFocused = true
+                                    }
+                                )
+                                
+                                // Return to Ambient
+                                QuickActionRow(
+                                    icon: "waveform.circle",
+                                    title: "Return to Ambient",
+                                    subtitle: "Continue your reading session",
+                                    warmAmber: Color(red: 1.0, green: 0.549, blue: 0.259),
+                                    action: {
+                                        reopenAmbientMode()
                                     }
                                 )
                             }
                             .padding(.vertical, 8)
                         }
                         .transition(.asymmetric(
-                            insertion: .move(edge: .top).combined(with: .opacity),
-                            removal: .opacity
+                            insertion: .move(edge: .top),
+                            removal: .move(edge: .top)
                         ))
                     }
                 }
+                // Glass effect matching ambient mode with more pronounced rounded corners
                 .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(Color.white.opacity(0.001))
+                    RoundedRectangle(cornerRadius: showQuickActions ? 24 : 32, style: .continuous)
+                        .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
                 )
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .glassEffect(.regular, in: .rect(cornerRadius: showQuickActions ? 24 : 32))
+                .clipShape(RoundedRectangle(cornerRadius: showQuickActions ? 24 : 32, style: .continuous)) // CLIP CONTENT TO CARD BOUNDS
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: showQuickActions ? 24 : 32, style: .continuous)
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.25),
-                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.1)
+                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2),
+                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.05)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 0.5
+                            lineWidth: 1
                         )
                 }
-                .shadow(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15), radius: 16, y: 6)
+                .shadow(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.1), radius: 20, y: 8)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20) // Closer to bottom since action bar is hidden
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-        }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showQuickActions)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isProcessingFollowUp)
     }
     
     // MARK: - Helper Functions

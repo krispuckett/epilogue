@@ -9,14 +9,14 @@ struct BookSearchSheet: View {
     var mode: Mode = .add
     @Environment(\.dismiss) private var dismiss
     @StateObject private var booksService = EnhancedGoogleBooksService()
-    @StateObject private var trendingService = TrendingBooksService.shared
+    @StateObject private var trendingService = EnhancedTrendingBooksService.shared
     @State private var searchResults: [Book] = []
     @State private var isLoading = true
     @State private var searchError: String?
     @State private var refinedSearchQuery: String = ""
     @State private var hasAutoSearched = false
     @FocusState private var isSearchFocused: Bool
-    @State private var selectedFilter: TrendingBooksService.TrendingFilter = .currentYear
+    // Remove local state - use the service's selectedCategory directly
     
     var body: some View {
         NavigationStack {
@@ -243,21 +243,26 @@ struct BookSearchSheet: View {
 
                 // Filter Menu
                 Menu {
-                    ForEach(TrendingBooksService.TrendingFilter.allCases, id: \.self) { filter in
+                    ForEach(EnhancedTrendingBooksService.TrendingCategory.CategoryType.allCases, id: \.self) { category in
                         Button(action: {
-                            selectedFilter = filter
-                            Task {
-                                await trendingService.fetchTrendingBooks(for: filter)
+                            if trendingService.selectedCategory != category {
+                                trendingService.selectedCategory = category
+                                // Clear current books to show loading state
+                                trendingService.isLoading = true
+                                Task {
+                                    // Always refresh to get category-specific books
+                                    await trendingService.refreshTrendingBooks(for: category)
+                                }
                             }
                         }) {
-                            Label(filter.rawValue, systemImage: filter.icon)
+                            Label(category.rawValue, systemImage: category.icon)
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: selectedFilter.icon)
+                        Image(systemName: trendingService.selectedCategory.icon)
                             .font(.caption)
-                        Text(selectedFilter.rawValue)
+                        Text(trendingService.selectedCategory.rawValue)
                             .font(.caption)
                         Image(systemName: "chevron.down")
                             .font(.caption2)
@@ -279,52 +284,55 @@ struct BookSearchSheet: View {
                         .frame(height: 150)
                     Spacer()
                 }
-            } else if !trendingService.trendingBooks.isEmpty {
-                // Grid of dynamic trending books
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 20) {
-                    ForEach(trendingService.trendingBooks, id: \.id) { book in
-                        BestsellerBookCard(book: book) {
-                            print("🔥 DEBUG: Book selected from trending/bestsellers:")
-                            print("   ID: \(book.id)")
-                            print("   Title: \(book.title)")
-                            print("   Author: \(book.author)")
-                            print("   Cover URL: \(book.coverImageURL ?? "nil")")
-                            onBookSelected(book)
-                            dismiss()
-                        }
-                    }
-                }
-                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             } else {
-                // Fallback to static books if service hasn't loaded yet
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 20) {
-                    ForEach(bestsellerBooks, id: \.id) { book in
-                        BestsellerBookCard(book: book) {
-                            print("📚 DEBUG: Book selected from static bestsellers:")
-                            print("   ID: \(book.id)")
-                            print("   Title: \(book.title)")
-                            print("   Author: \(book.author)")
-                            print("   Cover URL: \(book.coverImageURL ?? "nil")")
-                            onBookSelected(book)
-                            dismiss()
+                let books = trendingService.getBooksForCurrentCategory()
+                if !books.isEmpty {
+                    // Grid of dynamic trending books
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 20) {
+                        ForEach(books, id: \.id) { book in
+                            BestsellerBookCard(book: book) {
+                                print("🔥 DEBUG: Book selected from trending/bestsellers:")
+                                print("   ID: \(book.id)")
+                                print("   Title: \(book.title)")
+                                print("   Author: \(book.author)")
+                                print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                                onBookSelected(book)
+                                dismiss()
+                            }
                         }
                     }
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                } else {
+                    // Fallback to static books if service hasn't loaded yet
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 20) {
+                        ForEach(bestsellerBooks, id: \.id) { book in
+                            BestsellerBookCard(book: book) {
+                                print("📚 DEBUG: Book selected from static bestsellers:")
+                                print("   ID: \(book.id)")
+                                print("   Title: \(book.title)")
+                                print("   Author: \(book.author)")
+                                print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                                onBookSelected(book)
+                                dismiss()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                 }
-                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             }
         }
         .task {
             // Load trending books if not already loaded
-            if trendingService.trendingBooks.isEmpty {
-                await trendingService.fetchTrendingBooks(for: selectedFilter)
+            if trendingService.getBooksForCurrentCategory().isEmpty {
+                await trendingService.refreshTrendingBooks(for: trendingService.selectedCategory)
             }
         }
     }
@@ -495,6 +503,12 @@ struct BookSearchSheet: View {
         searchResults = await booksService.searchBooksWithRanking(query: query)
         print("📖 Found \(searchResults.count) ranked results for: '\(query)'")
         
+        // Re-rank by visual similarity if we have a captured feature print
+        if BookScannerService.shared.capturedFeaturePrint != nil {
+            print("🎨 Re-ranking results by cover similarity...")
+            searchResults = await BookScannerService.shared.reRankBooksWithFeaturePrint(searchResults)
+        }
+        
         if searchResults.isEmpty {
             // Try spell correction
             if let correctedQuery = spellCorrect(query), correctedQuery != query {
@@ -660,37 +674,7 @@ struct BookSearchResultRow: View {
     
     @ViewBuilder
     private var bookCoverView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(0.03))
-                .frame(width: 50, height: 75)
-            
-            if let coverURL = book.coverImageURL {
-                let _ = print("🔍 BookSearchResultRow displaying book:")
-                let _ = print("   Title: \(book.title)")
-                let _ = print("   ID: \(book.id)")
-                let _ = print("   Cover URL: \(coverURL)")
-                AsyncImage(url: URL(string: coverURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 50, height: 75)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.white.opacity(0.05))
-                        .overlay {
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Color.white.opacity(0.2))
-                        }
-                }
-            } else {
-                Image(systemName: "book.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.white.opacity(0.2))
-            }
-        }
+        SmartBookCoverView(coverURL: book.coverImageURL, width: 50, height: 75)
     }
 }
 
@@ -728,31 +712,7 @@ struct BookSearchResultCard: View {
     // MARK: - Sub-views
     @ViewBuilder
     private var bookCoverView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.05))
-                .frame(width: 60, height: 90)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                }
-            
-            if let coverURL = book.coverImageURL {
-                AsyncImage(url: URL(string: coverURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 90)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } placeholder: {
-                    bookCoverPlaceholder
-                }
-            } else {
-                Image(systemName: "book.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.3))
-            }
-        }
+        SmartBookCoverView(coverURL: book.coverImageURL, width: 60, height: 90)
     }
     
     @ViewBuilder
@@ -823,6 +783,80 @@ struct BookSearchResultCard: View {
     }
 }
 
+// MARK: - Smart Book Cover View
+struct SmartBookCoverView: View {
+    let coverURL: String?
+    let width: CGFloat
+    let height: CGFloat
+    let cornerRadius: CGFloat = 8
+    
+    @State private var loadedImage: UIImage?
+    @State private var isLoading = true
+    
+    var body: some View {
+        ZStack {
+            // Background placeholder
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.white.opacity(0.05))
+                .frame(width: width, height: height)
+            
+            if let image = loadedImage {
+                // Display loaded image
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: width, height: height)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                    .transition(.opacity)
+            } else if isLoading {
+                // Loading indicator
+                ProgressView()
+                    .tint(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                    .scaleEffect(0.8)
+            } else {
+                // Fallback when no image
+                Image(systemName: "book.fill")
+                    .font(.system(size: min(width, height) * 0.25))
+                    .foregroundStyle(Color.white.opacity(0.2))
+            }
+        }
+        .task {
+            await loadCover()
+        }
+    }
+    
+    private func loadCover() async {
+        guard let url = coverURL else {
+            isLoading = false
+            return
+        }
+        
+        // Log URL for debugging
+        print("🔍 SmartBookCoverView loading: \(url)")
+        
+        // First check cache
+        if let cached = SharedBookCoverManager.shared.getCachedImage(for: url) {
+            print("✅ Found in cache")
+            loadedImage = cached
+            isLoading = false
+            return
+        }
+        
+        // Load thumbnail size for grid
+        let targetSize = CGSize(width: width * UIScreen.main.scale, 
+                               height: height * UIScreen.main.scale)
+        if let image = await SharedBookCoverManager.shared.loadThumbnail(from: url, targetSize: targetSize) {
+            print("✅ Loaded successfully")
+            withAnimation(.easeIn(duration: 0.3)) {
+                loadedImage = image
+            }
+        } else {
+            print("❌ Failed to load cover from: \(url)")
+        }
+        isLoading = false
+    }
+}
+
 // MARK: - Bestseller Book Card
 struct BestsellerBookCard: View {
     let book: Book
@@ -833,34 +867,8 @@ struct BestsellerBookCard: View {
         VStack(spacing: 0) {
             // Book cover with add button overlay
             ZStack(alignment: .topTrailing) {
-                // Book cover
-                if let coverURL = book.coverImageURL {
-                    AsyncImage(url: URL(string: coverURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 100, height: 150)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.white.opacity(0.05))
-                            .frame(width: 100, height: 150)
-                            .overlay {
-                                Image(systemName: "book.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(Color.white.opacity(0.2))
-                            }
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.05))
-                        .frame(width: 100, height: 150)
-                        .overlay {
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 20))
-                                .foregroundStyle(Color.white.opacity(0.2))
-                        }
-                }
+                // Use SmartBookCoverView instead of AsyncImage
+                SmartBookCoverView(coverURL: book.coverImageURL, width: 100, height: 150)
 
                 // Add button with glass effect
                 Button {

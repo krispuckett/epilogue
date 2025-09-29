@@ -2954,30 +2954,32 @@ struct AmbientChatGradientView: View {
 
     var body: some View {
         ZStack {
-            // Deep black base
+            // Base color - darker for daybreak to let gradients show
             Color.black
 
-            let colors = themeManager.currentTheme.gradientColors.map { enhanceColor($0) }
+            let colors = themeManager.currentTheme.gradientColors.map { 
+                themeManager.currentTheme == .daybreak ? $0 : enhanceColor($0) 
+            }
 
-            // Theme-aware gradient - top (more vibrant)
+            // Theme-aware gradient - top
             LinearGradient(
                 stops: [
-                    .init(color: colors[0].opacity(0.85), location: 0.0),
-                    .init(color: colors[1].opacity(0.65), location: 0.15),
-                    .init(color: colors[2].opacity(0.45), location: 0.3),
+                    .init(color: colors[0].opacity(themeManager.currentTheme == .daybreak ? 0.95 : 0.85), location: 0.0),
+                    .init(color: colors[1].opacity(themeManager.currentTheme == .daybreak ? 0.85 : 0.65), location: 0.15),
+                    .init(color: colors[2].opacity(themeManager.currentTheme == .daybreak ? 0.75 : 0.45), location: 0.3),
                     .init(color: Color.clear, location: 0.6)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            // Theme-aware gradient - bottom (more vibrant)
+            // Theme-aware gradient - bottom
             LinearGradient(
                 stops: [
                     .init(color: Color.clear, location: 0.4),
-                    .init(color: colors[2].opacity(0.35), location: 0.7),
-                    .init(color: colors[1].opacity(0.5), location: 0.85),
-                    .init(color: colors[3].opacity(0.65), location: 1.0)
+                    .init(color: colors[2].opacity(themeManager.currentTheme == .daybreak ? 0.65 : 0.35), location: 0.7),
+                    .init(color: colors[1].opacity(themeManager.currentTheme == .daybreak ? 0.75 : 0.5), location: 0.85),
+                    .init(color: colors[3].opacity(themeManager.currentTheme == .daybreak ? 0.85 : 0.65), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom

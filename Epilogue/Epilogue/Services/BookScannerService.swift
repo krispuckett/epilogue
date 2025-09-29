@@ -22,6 +22,9 @@ class BookScannerService: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var currentViewController: UIViewController?
     
+    // Feature print for cover similarity matching
+    var capturedFeaturePrint: VNFeaturePrintObservation?
+    
     // Detection confidence thresholds
     private let minimumTextConfidence: Float = 0.5
     private let minimumBarcodeConfidence: Float = 0.8
@@ -371,6 +374,66 @@ class BookScannerService: NSObject, ObservableObject {
         detectedBooks = []
         showSearchResults = false
         scanError = nil
+        capturedFeaturePrint = nil
+    }
+    
+    // MARK: - Feature Print Similarity
+    func reRankBooksWithFeaturePrint(_ books: [Book]) async -> [Book] {
+        guard let capturedPrint = capturedFeaturePrint else {
+            // No feature print to compare, return original order
+            return books
+        }
+        
+        var rankedBooks: [(book: Book, distance: Float)] = []
+        
+        for book in books {
+            // Skip books without cover images
+            guard let coverURLString = book.coverImageURL,
+                  let coverURL = URL(string: coverURLString) else {
+                rankedBooks.append((book: book, distance: Float.greatestFiniteMagnitude))
+                continue
+            }
+            
+            // Download and process cover image
+            do {
+                let (data, _) = try await URLSession.shared.data(from: coverURL)
+                guard let image = UIImage(data: data),
+                      let cgImage = image.cgImage else {
+                    rankedBooks.append((book: book, distance: Float.greatestFiniteMagnitude))
+                    continue
+                }
+                
+                // Generate feature print for book cover
+                let request = VNGenerateImageFeaturePrintRequest()
+                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                try handler.perform([request])
+                
+                if let results = request.results as? [VNFeaturePrintObservation],
+                   let bookPrint = results.first {
+                    // Calculate distance between feature prints
+                    var distance: Float = 0
+                    try bookPrint.computeDistance(&distance, to: capturedPrint)
+                    rankedBooks.append((book: book, distance: distance))
+                    
+                    #if DEBUG
+                    print("🔍 Cover similarity for '\(book.title)': \(distance)")
+                    #endif
+                } else {
+                    rankedBooks.append((book: book, distance: Float.greatestFiniteMagnitude))
+                }
+                
+            } catch {
+                #if DEBUG
+                print("Failed to process cover for '\(book.title)': \(error)")
+                #endif
+                rankedBooks.append((book: book, distance: Float.greatestFiniteMagnitude))
+            }
+        }
+        
+        // Sort by similarity (lower distance = more similar)
+        return rankedBooks
+            .sorted { $0.distance < $1.distance }
+            .map { $0.book }
     }
 }
 

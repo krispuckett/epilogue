@@ -25,10 +25,12 @@ struct LibraryView: View {
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
     @Environment(\.modelContext) private var modelContext
     @StateObject private var googleBooksService = GoogleBooksService()
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var isRefreshing = false
     @Namespace private var settingsTransition
     @State private var showingBookAddedToast = false
     @State private var toastMessage = ""
+    @State private var showingWebSearch = false
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -246,6 +248,16 @@ struct LibraryView: View {
                         }
                     }
                 }
+                
+                // Web Search option
+                Section {
+                    Button {
+                        showingWebSearch = true
+                        SensoryFeedback.light()
+                    } label: {
+                        Label("Search Web", systemImage: "globe")
+                    }
+                }
             } label: {
                 Image(systemName: viewMode == .grid ? "square.grid.2x2" : "list.bullet")
                     .font(.system(size: 18, weight: .medium))
@@ -390,14 +402,16 @@ struct LibraryView: View {
             ZStack {
                 // Permanent ambient gradient background
                 AmbientChatGradientView()
-                    .opacity(0.4)
+                    .opacity(themeManager.currentTheme == .daybreak ? 0.7 : 0.4)
                     .ignoresSafeArea(.all)
                     .allowsHitTesting(false)
                 
-                // Subtle darkening overlay for better readability
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea(.all)
-                    .allowsHitTesting(false)
+                // Subtle overlay for better readability - theme aware
+                if themeManager.currentTheme != .daybreak {
+                    Color.black.opacity(0.15)
+                        .ignoresSafeArea(.all)
+                        .allowsHitTesting(false)
+                }
                 
                 navigationLink
                 mainContent
@@ -423,6 +437,10 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $appState.showingGoodreadsImport) {
             goodreadsImportSheet
+        }
+        .sheet(isPresented: $showingWebSearch) {
+            WebSearchView()
+                .presentationDetents([.large])
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {

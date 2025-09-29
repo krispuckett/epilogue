@@ -74,11 +74,31 @@ enum URLValidator {
     
     /// Creates a safe URL for book cover images
     static func createSafeBookCoverURL(from urlString: String?) -> URL? {
-        guard let urlString = urlString,
-              !urlString.isEmpty,
-              isValidURL(urlString),
-              let sanitized = sanitizeURL(urlString),
-              let url = URL(string: sanitized) else {
+        guard let urlString = urlString, !urlString.isEmpty else {
+            #if DEBUG
+            print("🔒 URLValidator: Empty or nil URL string")
+            #endif
+            return nil
+        }
+        
+        guard isValidURL(urlString) else {
+            #if DEBUG
+            print("🔒 URLValidator: Failed basic URL validation for: \(urlString)")
+            #endif
+            return nil
+        }
+        
+        guard let sanitized = sanitizeURL(urlString) else {
+            #if DEBUG
+            print("🔒 URLValidator: Failed to sanitize URL: \(urlString)")
+            #endif
+            return nil
+        }
+        
+        guard let url = URL(string: sanitized) else {
+            #if DEBUG
+            print("🔒 URLValidator: Failed to create URL from sanitized string: \(sanitized)")
+            #endif
             return nil
         }
         
@@ -92,10 +112,19 @@ enum URLValidator {
                 // Google image delivery hosts often used by imageLinks
                 "books.googleusercontent.com",
                 "lh3.googleusercontent.com",
+                "lh4.googleusercontent.com",
+                "lh5.googleusercontent.com",
+                "lh6.googleusercontent.com",
                 "books.gstatic.com",
+                "encrypted.google.com",
+                "encrypted-tbn0.gstatic.com",
+                "encrypted-tbn1.gstatic.com",
+                "encrypted-tbn2.gstatic.com",
+                "encrypted-tbn3.gstatic.com",
                 // Open Library
                 "covers.openlibrary.org",
                 "openlibrary.org",
+                "archive.org",
                 // Amazon (occasionally used)
                 "images-na.ssl-images-amazon.com",
                 "m.media-amazon.com"
@@ -103,6 +132,11 @@ enum URLValidator {
             
             if trustedImageHosts.contains(where: { host.contains($0) }) {
                 return url
+            } else {
+                #if DEBUG
+                print("🔒 URLValidator: Host not in trusted list: \(host)")
+                print("   URL: \(url.absoluteString)")
+                #endif
             }
         }
         

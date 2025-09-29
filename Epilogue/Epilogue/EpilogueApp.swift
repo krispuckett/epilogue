@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 import CloudKit
+import BackgroundTasks
 
 @main
 struct EpilogueApp: App {
@@ -29,6 +30,9 @@ struct EpilogueApp: App {
                         
                         // Check CloudKit status and show alert if needed
                         checkCloudKitStatus()
+                        
+                        // Schedule background refresh for trending books
+                        EnhancedTrendingBooksService.shared.scheduleBackgroundRefresh()
                     }
                     .alert("iCloud Sync Required", isPresented: $showingCloudKitAlert) {
                         Button("Settings") {

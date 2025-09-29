@@ -179,8 +179,8 @@ class OrbMetalRenderer: NSObject {
                                          sin(rotation), cos(rotation));
             pos = rotMatrix * pos;
 
-            // Aurora iterations
-            const int ITERATIONS = 24;
+            // Aurora iterations - match original
+            const int ITERATIONS = 36;  // Use original iteration count
             float spacing = mix(1.0, 6.28318, 0.43);
 
             for(int i = 1; i < ITERATIONS + 1; i++) {
@@ -192,11 +192,12 @@ class OrbMetalRenderer: NSObject {
 
                 float ds = smoothstep(0.0, 0.02, d);
 
-                // Enhanced #FF8C42 amber - exact values
-                float3 exactColor = mix(themeColor, float3(1.0, 0.549, 0.259), 0.7); // 70% toward exact #FF8C42
-                exactColor.r *= 1.1; // Boost red channel
-                exactColor.g *= 0.9; // Reduce green to match #8C
-                float intensity = (1.5 + iter * 0.8); // Brighter aurora lines
+                // Use theme color with slight enhancement
+                float3 exactColor = themeColor;
+                // Boost saturation while keeping the hue
+                float colorLength = length(exactColor);
+                exactColor = normalize(exactColor) * colorLength * 1.3; // 30% saturation boost
+                float intensity = (2.5 + iter * 1.2); // Much brighter aurora lines
                 float3 color = exactColor * intensity;
 
                 float invd = 1.0 / max(d, 0.001);
@@ -208,7 +209,15 @@ class OrbMetalRenderer: NSObject {
             bloom = bloom / (bloom + 5e4); // Less bloom spread
 
             // Only apply color to the aurora lines, not the background
-            float3 color = (-pp + bloom * 1.5); // Dramatically reduced bloom multiplier for sharp lines
+            float3 color = (-pp * 2.0 + bloom * 0.8); // Emphasize lines more than bloom
+            
+            // Add subtle fog without expensive blur passes
+            float fogNoise = sin(pos.x * 5.0 + time) * cos(pos.y * 5.0 - time);
+            color *= 1.0 + fogNoise * 0.1;  // Subtle fog variation
+            
+            // Optional fog color tinting with theme awareness
+            float3 fogTint = mix(themeColor, float3(0.8275, 0.3529, 0.0), 0.3); // Blend theme with original fog color
+            color = mix(color, color * fogTint, 0.2);  // Subtle tint
 
             // Don't boost everything - just the lines
             color = max(color, 0.0); // Remove negative values that create background

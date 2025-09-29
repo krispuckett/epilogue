@@ -8,6 +8,7 @@ struct BookAtmosphericGradientView: View {
     
     @State private var gradientOffset: CGFloat = 0
     @State private var displayedPalette: ColorPalette?
+    @State private var pulseAnimation = false
     
     init(colorPalette: ColorPalette, intensity: Double = 1.0, audioLevel: Float = 0) {
         self.colorPalette = colorPalette
@@ -34,22 +35,45 @@ struct BookAtmosphericGradientView: View {
                     }() : ()
                     #endif
                     
-                    // Restored gradient from 73e8793 for proper vibrancy
+                    // Voice-responsive gradient
+                    let voiceBoost = 1.0 + Double(audioLevel) * 0.5 // 0-50% boost based on voice
+                    let voiceScale = 1.0 + Double(audioLevel) * 0.1 // Subtle scale effect
+                    
                     LinearGradient(
                         stops: [
-                            .init(color: palette.primary.opacity(intensity), location: 0.0),
-                            .init(color: palette.secondary.opacity(intensity * 0.8), location: 0.2),
-                            .init(color: palette.accent.opacity(intensity * 0.5), location: 0.35),
-                            .init(color: palette.background.opacity(intensity * 0.3), location: 0.5),
+                            .init(color: palette.primary.opacity(intensity * voiceBoost), location: 0.0),
+                            .init(color: palette.secondary.opacity(intensity * 0.8 * voiceBoost), location: 0.2),
+                            .init(color: palette.accent.opacity(intensity * 0.5 * voiceBoost), location: 0.35),
+                            .init(color: palette.background.opacity(intensity * 0.3 * voiceBoost), location: 0.5),
                             .init(color: Color.clear, location: 0.6)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .blur(radius: 40) // Restored to 40 for proper atmospheric effect
+                    .blur(radius: 40 - Double(audioLevel) * 10) // Less blur when speaking (30-40 range)
+                    .scaleEffect(voiceScale) // Subtle breathing effect
                     .ignoresSafeArea()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    .animation(.easeInOut(duration: 0.3), value: palette.primary)
+                    .animation(.easeInOut(duration: 0.1), value: audioLevel) // Fast response to voice
+                    
+                    // Voice-responsive pulse overlay
+                    if audioLevel > 0.3 {
+                        RadialGradient(
+                            colors: [
+                                palette.primary.opacity(Double(audioLevel) * 0.3),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 100,
+                            endRadius: 400
+                        )
+                        .ignoresSafeArea()
+                        .blendMode(.plusLighter)
+                        .scaleEffect(pulseAnimation ? 1.2 : 1.0)
+                        .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: pulseAnimation)
+                        .onAppear { pulseAnimation = true }
+                        .onDisappear { pulseAnimation = false }
+                    }
                 }
                 
                 // Subtle noise texture overlay

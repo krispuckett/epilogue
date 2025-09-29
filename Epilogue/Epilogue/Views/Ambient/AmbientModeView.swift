@@ -115,6 +115,7 @@ struct AmbientModeView: View {
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var bookDetector = AmbientBookDetector.shared
     @StateObject private var microInteractionManager = MicroInteractionManager.shared
+    @StateObject private var themeManager = ThemeManager.shared
 
     // Namespace for matched geometry morphing animation
     @Namespace private var buttonMorphNamespace
@@ -798,15 +799,17 @@ struct AmbientModeView: View {
             
             Spacer()
             
-            // Voice responsive bottom gradient - exactly like UnifiedChatView
+            // Voice responsive bottom gradient - show when voice mode is enabled
             VoiceResponsiveBottomGradient(
                 colorPalette: colorPalette,
                 audioLevel: audioLevel,
-                isRecording: isRecording,
+                isRecording: isRecording || isVoiceModeEnabled,
                 bookContext: currentBookContext
             )
             .allowsHitTesting(false)
             .ignoresSafeArea(.all)
+            .opacity(isVoiceModeEnabled || isRecording ? 1 : 0)
+            .animation(.easeInOut(duration: 0.5), value: isVoiceModeEnabled)
             .transition(.asymmetric(
                 insertion: .opacity.combined(with: .move(edge: .bottom)),
                 removal: .opacity.combined(with: .move(edge: .bottom))
@@ -845,6 +848,11 @@ struct AmbientModeView: View {
                                 .animation(.easeInOut(duration: 0.3), value: isRecording)
                         }
                     }
+                    
+                    // Capture Review Queue - shows above conversation
+                    CaptureReviewQueue()
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                        .padding(.bottom, 8)
                     
                     // Conversation section in minimal thread style
                     if !messages.isEmpty {
@@ -1446,7 +1454,7 @@ struct AmbientModeView: View {
             
             // Right side - Clean iOS toggle
             Toggle("", isOn: $isVoiceModeEnabled)
-                .toggleStyle(SwitchToggleStyle(tint: Color(red: 1.0, green: 0.549, blue: 0.259)))
+                .toggleStyle(SwitchToggleStyle(tint: themeManager.currentTheme.primaryAccent))
                 .labelsHidden()
                 .onChange(of: isVoiceModeEnabled) { _, newValue in
                     SensoryFeedback.impact(newValue ? .light : .medium)

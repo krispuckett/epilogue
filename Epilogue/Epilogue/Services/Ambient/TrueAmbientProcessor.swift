@@ -273,6 +273,36 @@ public class TrueAmbientProcessor: ObservableObject {
         let bookContext = AmbientBookDetector.shared.detectedBook
         let correctedText = applyBookContextCorrection(text, bookContext: bookContext)
         
+        // Use enhanced intent detection with Foundation Models
+        let classification = await classifyWithContext(correctedText, bookContext: bookContext)
+        
+        // If low confidence, send to review queue
+        if classification.confidence < 0.85 && confidence < 0.85 {
+            logger.info("📋 Low confidence capture sent to review queue (conf: \(classification.confidence))")
+            
+            // Send to review queue
+            NotificationCenter.default.post(
+                name: Notification.Name("CaptureForReview"),
+                object: [
+                    "text": correctedText,
+                    "type": classification.type == .quote ? "quote" : 
+                            classification.type == .question ? "question" : "note",
+                    "confidence": classification.confidence,
+                    "theme": classification.theme as Any,
+                    "page": classification.pageReference as Any
+                ]
+            )
+            
+            // Update reading context but don't save yet
+            await updateReadingContext([AmbientProcessedContent(
+                text: correctedText,
+                type: classification.type,
+                confidence: classification.confidence
+            )])
+            
+            return // Don't process further until user confirms
+        }
+        
         // Use enhanced intent detection FIRST to determine content type
         let enhancedIntent = intentDetector.detectIntent(
             from: correctedText,
@@ -1092,6 +1122,16 @@ public class TrueAmbientProcessor: ObservableObject {
         // Clear conversation memory for new session
         conversationMemory.clearSession()
         
+        // Clear reading context for new session
+        ReadingContextManager.shared.clearContext()
+        
+        // Update WhisperKit context if we have a book
+        if let book = currentBook {
+            Task {
+                await updateWhisperKitContext(for: nil) // Will build fresh context
+            }
+        }
+        
         logger.info("🎯 TrueAmbientProcessor session started")
     }
     
@@ -1596,6 +1636,193 @@ public class TrueAmbientProcessor: ObservableObject {
         var modifiedContent = content
         modifiedContent.response = "[Thought]" // Tag it
         await saveNote(modifiedContent)
+    }
+    
+    // MARK: - Enhanced WhisperKit Context Management
+    
+    public func updateWhisperKitContext(for context: ReadingContextManager.ReadingContext?) async {
+        guard let context = context, let whisperModel = whisperModel else { return }
+        
+        logger.info("📚 Updating WhisperKit with reading context for: \(context.book.title)")
+        
+        // Build custom vocabulary from context
+        var customVocabulary = context.contextualVocabulary
+        
+        // Add character variations (common misspellings/variations)
+        for character in context.recentCharacters {
+            customVocabulary.append(character)
+            // Add possessive forms
+            customVocabulary.append("\(character)'s")
+            customVocabulary.append("\(character)s")
+        }
+        
+        // Add location variations
+        for location in context.recentLocations {
+            customVocabulary.append(location)
+            customVocabulary.append("the \(location)")
+            customVocabulary.append("in \(location)")
+            customVocabulary.append("at \(location)")
+        }
+        
+        // Update WhisperKit's language model with custom vocabulary
+        // Note: WhisperKit doesn't directly support custom vocabulary, 
+        // but we can use this for post-processing corrections
+        await MainActor.run {
+            // Store vocabulary for autocorrection
+            self.currentBookContext = BookContext(
+                title: context.book.title,
+                author: context.book.author,
+                characters: context.recentCharacters,
+                locations: context.recentLocations,
+                vocabulary: customVocabulary
+            )
+        }
+        
+        logger.info("✅ WhisperKit context updated with \(customVocabulary.count) custom terms")
+    }
+    
+    // MARK: - Intelligent Capture Classification
+    
+    struct CaptureClassification {
+        let type: AmbientProcessedContent.ContentType
+        let confidence: Float
+        let pageReference: Int?
+        let theme: String?
+        let mood: String?
+    }
+    
+    private func classifyWithContext(_ text: String, bookContext: Book?) async -> CaptureClassification {
+        
+        // Use Foundation Models if available
+        let isAvailable = await MainActor.run { AIFoundationModelsManager.shared.isAvailable }
+        if isAvailable {
+            let prompt = """
+            Analyze this captured text from a reading session:
+            
+            Text: "\(text)"
+            Book: \(bookContext?.title ?? "Unknown") by \(bookContext?.author ?? "Unknown")
+            
+            Determine:
+            1. Type: Is this a quote from the book, a personal note, or a question?
+            2. Confidence: How certain are you? (0.0-1.0)
+            3. Page reference: If mentioned, what page number?
+            4. Theme: What theme does this relate to?
+            5. Mood: What is the emotional tone?
+            """
+            
+            let response = await AIFoundationModelsManager.shared.processQuery(
+                prompt,
+                bookContext: bookContext
+            )
+            
+            // Parse response into classification
+            return parseClassificationResponse(response, originalText: text)
+        }
+        
+        // Fallback to rule-based classification
+        return fallbackClassification(text)
+    }
+    
+    private func parseClassificationResponse(_ response: String, originalText: String) -> CaptureClassification {
+        // Simple parsing - enhance as needed
+        var type: AmbientProcessedContent.ContentType = .note
+        var confidence: Float = 0.7
+        var pageRef: Int? = nil
+        var theme: String? = nil
+        var mood: String? = nil
+        
+        let lines = response.components(separatedBy: .newlines)
+        for line in lines {
+            let lower = line.lowercased()
+            
+            if lower.contains("quote") && lower.contains("book") {
+                type = .quote
+            } else if lower.contains("question") {
+                type = .question
+            } else if lower.contains("note") || lower.contains("personal") {
+                type = .note
+            }
+            
+            // Extract confidence
+            if let range = line.range(of: #"\d+\.\d+"#, options: .regularExpression) {
+                if let conf = Float(line[range]) {
+                    confidence = conf
+                }
+            }
+            
+            // Extract page
+            if let range = line.range(of: #"page (\d+)"#, options: [.regularExpression, .caseInsensitive]) {
+                let pageText = String(line[range])
+                if let page = Int(pageText.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) {
+                    pageRef = page
+                }
+            }
+        }
+        
+        return CaptureClassification(
+            type: type,
+            confidence: confidence,
+            pageReference: pageRef,
+            theme: theme,
+            mood: mood
+        )
+    }
+    
+    private func fallbackClassification(_ text: String) -> CaptureClassification {
+        let lower = text.lowercased()
+        
+        // Question detection
+        if lower.contains("?") || lower.starts(with: "who") || lower.starts(with: "what") ||
+           lower.starts(with: "where") || lower.starts(with: "when") || lower.starts(with: "why") ||
+           lower.starts(with: "how") {
+            return CaptureClassification(
+                type: .question,
+                confidence: 0.9,
+                pageReference: nil,
+                theme: nil,
+                mood: "curious"
+            )
+        }
+        
+        // Quote detection (contains quotation marks or "said")
+        if text.contains("\"") || text.contains("\u{201C}") || text.contains("\u{201D}") ||
+           lower.contains(" said ") || lower.contains(" says ") {
+            return CaptureClassification(
+                type: .quote,
+                confidence: 0.8,
+                pageReference: nil,
+                theme: nil,
+                mood: nil
+            )
+        }
+        
+        // Default to note
+        return CaptureClassification(
+            type: .note,
+            confidence: 0.6,
+            pageReference: nil,
+            theme: nil,
+            mood: nil
+        )
+    }
+    
+    // Store current book context for autocorrection
+    private struct BookContext {
+        let title: String
+        let author: String
+        let characters: [String]
+        let locations: [String]
+        let vocabulary: [String]
+    }
+    
+    private var currentBookContext: BookContext?
+    
+    // MARK: - Helper Methods
+    
+    private func updateReadingContext(_ captures: [AmbientProcessedContent]) async {
+        if let book = currentBook {
+            await ReadingContextManager.shared.updateContext(from: captures, book: book)
+        }
     }
     
     // MARK: - Context Helpers

@@ -227,6 +227,7 @@ public class SharedBookCoverManager: ObservableObject {
         guard let coverURL = coverURL, !coverURL.isEmpty else { return nil }
         
         let cleanedURL = cleanURL(coverURL)
+        
         // Use zoom=3 consistently to match the known-good look
         let highQualityURL = appendZoomParameter(to: cleanedURL, zoom: 3)
         let cacheKey = "\(cleanedURL)_full" as NSString
@@ -340,7 +341,8 @@ public class SharedBookCoverManager: ObservableObject {
         let task = Task<UIImage?, Never> {
             guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else {
                 #if DEBUG
-                print("❌ Invalid or unsafe URL")
+                print("❌ Invalid or unsafe URL: \(urlString)")
+                print("   Failed URL validation for cover image")
                 #endif
                 return nil
             }
@@ -589,7 +591,8 @@ public class SharedBookCoverManager: ObservableObject {
         var cleaned = urlString
             .replacingOccurrences(of: "http://", with: "https://")
         
-        // Remove all zoom parameters
+        
+        // Remove all zoom parameters for other books
         let zoomPatterns = [
             "&zoom=10", "&zoom=9", "&zoom=8", "&zoom=7", "&zoom=6",
             "&zoom=5", "&zoom=4", "&zoom=3", "&zoom=2", "&zoom=1", "&zoom=0",

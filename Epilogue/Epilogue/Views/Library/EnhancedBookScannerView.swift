@@ -13,6 +13,18 @@ struct EnhancedBookScannerView: View {
     @State private var searchQuery = ""
     @State private var hasRequestedPermission = false
     
+    // Camera control states
+    @State private var isTorchOn = false
+    @State private var isExposureLocked = false
+    @State private var focusPoint: CGPoint? = nil
+    @State private var showFocusAnimation = false
+    
+    // Haptic generators
+    private let lightImpact = UIImpactFeedbackGenerator(style: .light)
+    private let mediumImpact = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyImpact = UIImpactFeedbackGenerator(style: .heavy)
+    private let notificationFeedback = UINotificationFeedbackGenerator()
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -24,9 +36,18 @@ struct EnhancedBookScannerView: View {
                 CameraScannerView(
                     onBookFound: onBookFound,
                     isProcessing: $isProcessing,
-                    detectionStatus: $detectionStatus
+                    detectionStatus: $detectionStatus,
+                    isTorchOn: $isTorchOn,
+                    isExposureLocked: $isExposureLocked,
+                    focusPoint: $focusPoint,
+                    showFocusAnimation: $showFocusAnimation
                 )
                 .ignoresSafeArea()
+                .onTapGesture { location in
+                    focusPoint = location
+                    showFocusAnimation = true
+                    lightImpact.impactOccurred()
+                }
                 
                 // Top gradient overlay for depth (like ambient mode)
                 VStack {
@@ -91,6 +112,37 @@ struct EnhancedBookScannerView: View {
                     
                     Spacer()
                     
+                    // Camera controls
+                    HStack(spacing: 16) {
+                        // Torch toggle
+                        Button {
+                            isTorchOn.toggle()
+                            lightImpact.impactOccurred()
+                        } label: {
+                            Image(systemName: isTorchOn ? "bolt.fill" : "bolt.slash.fill")
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundStyle(isTorchOn ? .yellow : .white)
+                                .frame(width: 44, height: 44)
+                                .glassEffect(in: Circle())
+                        }
+                        
+                        // Exposure lock
+                        Button {
+                            isExposureLocked.toggle()
+                            lightImpact.impactOccurred()
+                        } label: {
+                            Image(systemName: isExposureLocked ? "sun.max.fill" : "sun.max")
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundStyle(isExposureLocked ? .orange : .white)
+                                .frame(width: 44, height: 44)
+                                .glassEffect(in: Circle())
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    
                     // Action buttons at bottom
                     HStack(spacing: 12) {
                         // Cancel button
@@ -152,6 +204,16 @@ struct EnhancedBookScannerView: View {
                         Text("Identifying book...")
                             .foregroundStyle(.white)
                     }
+                }
+                
+                // Focus animation overlay
+                if showFocusAnimation, let point = focusPoint {
+                    FocusIndicatorView(at: point)
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                showFocusAnimation = false
+                            }
+                        }
                 }
             }
             .navigationBarHidden(true)
@@ -229,17 +291,53 @@ struct CameraScannerView: UIViewControllerRepresentable {
     let onBookFound: (Book) -> Void
     @Binding var isProcessing: Bool
     @Binding var detectionStatus: String
+    @Binding var isTorchOn: Bool
+    @Binding var isExposureLocked: Bool
+    @Binding var focusPoint: CGPoint?
+    @Binding var showFocusAnimation: Bool
     
     func makeUIViewController(context: Context) -> CameraScannerViewController {
         let controller = CameraScannerViewController()
         controller.onBookFound = onBookFound
         controller.isProcessing = $isProcessing
         controller.detectionStatus = $detectionStatus
+        controller.torchBinding = $isTorchOn
+        controller.exposureBinding = $isExposureLocked
+        controller.focusBinding = $focusPoint
+        controller.focusAnimationBinding = $showFocusAnimation
         return controller
     }
     
     func updateUIViewController(_ uiViewController: CameraScannerViewController, context: Context) {
-        // No updates needed
+        uiViewController.updateCameraControls()
+    }
+}
+
+// MARK: - Focus Indicator View
+struct FocusIndicatorView: View {
+    let at: CGPoint
+    @State private var scale: CGFloat = 1.5
+    @State private var opacity: Double = 0
+    
+    var body: some View {
+        Circle()
+            .stroke(Color.yellow, lineWidth: 2)
+            .frame(width: 80, height: 80)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .position(at)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    scale = 0.8
+                    opacity = 1
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        opacity = 0
+                    }
+                }
+            }
     }
 }
 
@@ -248,19 +346,39 @@ class CameraScannerViewController: UIViewController {
     var onBookFound: ((Book) -> Void)?
     var isProcessing: Binding<Bool>?
     var detectionStatus: Binding<String>?
+    var torchBinding: Binding<Bool>?
+    var exposureBinding: Binding<Bool>?
+    var focusBinding: Binding<CGPoint?>?
+    var focusAnimationBinding: Binding<Bool>?
     
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var photoOutput: AVCapturePhotoOutput?
+    private var videoDevice: AVCaptureDevice?
     private var processingISBN = false
     private var rectangleDetectionTimer: Timer?
     private var consecutiveDetections = 0
     private var lastRectangleCheck = Date()
     
+    // Feature print for similarity matching
+    private var featurePrintRequest: VNGenerateImageFeaturePrintRequest?
+    private var capturedFeaturePrint: VNFeaturePrintObservation?
+    
+    // Haptic generators
+    private let mediumImpact = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyImpact = UIImpactFeedbackGenerator(style: .heavy)
+    private let notificationFeedback = UINotificationFeedbackGenerator()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         print("📸 CameraScannerViewController viewDidLoad")
         setupCamera()
+        setupFeaturePrint()
+        
+        // Prepare haptic generators
+        mediumImpact.prepare()
+        heavyImpact.prepare()
+        notificationFeedback.prepare()
     }
     
     override func viewDidLayoutSubviews() {
@@ -281,6 +399,8 @@ class CameraScannerViewController: UIViewController {
             print("❌ Failed to get video device")
             return
         }
+        
+        videoDevice = videoCaptureDevice
         
         let videoInput: AVCaptureDeviceInput
         
@@ -365,6 +485,81 @@ class CameraScannerViewController: UIViewController {
             }
         }
     }
+    
+    // MARK: - Feature Print Setup
+    private func setupFeaturePrint() {
+        featurePrintRequest = VNGenerateImageFeaturePrintRequest()
+    }
+    
+    // MARK: - Camera Control Methods
+    func updateCameraControls() {
+        guard let device = videoDevice else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            // Update torch
+            if device.hasTorch {
+                device.torchMode = (torchBinding?.wrappedValue ?? false) ? .on : .off
+            }
+            
+            // Update exposure
+            if exposureBinding?.wrappedValue ?? false {
+                // Lock exposure at current values
+                if device.isExposureModeSupported(.locked) {
+                    device.exposureMode = .locked
+                }
+            } else {
+                // Auto exposure
+                if device.isExposureModeSupported(.continuousAutoExposure) {
+                    device.exposureMode = .continuousAutoExposure
+                }
+            }
+            
+            device.unlockForConfiguration()
+        } catch {
+            print("Failed to update camera controls: \(error)")
+        }
+    }
+    
+    // MARK: - Touch Handling for Focus
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first,
+              let device = videoDevice else { return }
+        
+        let touchPoint = touch.location(in: view)
+        let devicePoint = previewLayer?.captureDevicePointConverted(fromLayerPoint: touchPoint) ?? .zero
+        
+        do {
+            try device.lockForConfiguration()
+            
+            // Set focus point
+            if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(.autoFocus) {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+            }
+            
+            // Set exposure point
+            if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(.autoExpose) {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+            }
+            
+            device.unlockForConfiguration()
+            
+            // Update UI
+            focusBinding?.wrappedValue = touchPoint
+            focusAnimationBinding?.wrappedValue = true
+            
+            // Light haptic for focus
+            let impactGenerator = UIImpactFeedbackGenerator(style: .light)
+            impactGenerator.prepare()
+            impactGenerator.impactOccurred()
+            
+        } catch {
+            print("Focus error: \(error)")
+        }
+    }
 }
 
 // MARK: - Video Data Delegate for Rectangle Detection
@@ -393,6 +588,11 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
                 self?.consecutiveDetections += 1
                 self?.detectionStatus?.wrappedValue = "Book cover detected - hold steady"
                 
+                // Medium haptic on detection
+                if self?.consecutiveDetections == 1 {
+                    self?.mediumImpact.impactOccurred()
+                }
+                
                 // After 3 consecutive detections, capture the photo
                 if self?.consecutiveDetections ?? 0 >= 3 {
                     self?.captureBookPhoto()
@@ -419,6 +619,9 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
         print("📸 Capturing book photo...")
         isProcessing?.wrappedValue = true
         detectionStatus?.wrappedValue = "Capturing book cover..."
+        
+        // Heavy haptic on capture
+        heavyImpact.impactOccurred()
         
         // Don't stop the session until after capture
         let settings = AVCapturePhotoSettings()
@@ -458,7 +661,13 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
         
         // Process the captured image with BookScannerService
         Task {
+            // Generate feature print for similarity matching
+            if let cgImage = image.cgImage {
+                await generateFeaturePrint(from: cgImage)
+            }
+            
             let scanner = BookScannerService.shared
+            scanner.capturedFeaturePrint = self.capturedFeaturePrint
             let bookInfo = await scanner.processScannedImage(image)
             
             if bookInfo.hasValidInfo {
@@ -470,6 +679,9 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
                 
                 // Show the search results sheet
                 await MainActor.run { [weak self] in
+                    // Success haptic feedback
+                    self?.notificationFeedback.notificationOccurred(.success)
+                    
                     // The BookScannerService will set showSearchResults to true
                     // which triggers the sheet in this view
                     self?.isProcessing?.wrappedValue = false
@@ -486,6 +698,9 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
                 }
             } else {
                 await MainActor.run { [weak self] in
+                    // Error haptic feedback
+                    self?.notificationFeedback.notificationOccurred(.error)
+                    
                     self?.isProcessing?.wrappedValue = false
                     self?.detectionStatus?.wrappedValue = "Could not read book cover. Try ISBN."
                     self?.consecutiveDetections = 0
@@ -498,6 +713,23 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - Feature Print Generation
+    private func generateFeaturePrint(from cgImage: CGImage) async {
+        guard let request = featurePrintRequest else { return }
+        
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        do {
+            try handler.perform([request])
+            if let results = request.results as? [VNFeaturePrintObservation],
+               let featurePrint = results.first {
+                self.capturedFeaturePrint = featurePrint
+                print("✅ Generated feature print for cover matching")
+            }
+        } catch {
+            print("❌ Failed to generate feature print: \(error)")
         }
     }
 }
@@ -563,8 +795,8 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         processingISBN = true
         isProcessing?.wrappedValue = true
         
-        // Haptic feedback
-        SensoryFeedback.medium()
+        // Heavy haptic feedback for successful ISBN scan
+        heavyImpact.impactOccurred()
         
         // Stop camera for processing
         captureSession?.stopRunning()

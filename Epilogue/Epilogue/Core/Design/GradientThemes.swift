@@ -14,6 +14,7 @@ public enum GradientTheme: String, CaseIterable, Codable {
     case volcanic = "volcanic"
     case aurora = "aurora"
     case nebula = "nebula"
+    case daybreak = "daybreak"
 
     // MARK: - Display Properties
     var displayName: String {
@@ -34,6 +35,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return "Aurora Borealis"
         case .nebula:
             return "Nebula Dreams"
+        case .daybreak:
+            return "Daybreak"
         }
     }
 
@@ -55,6 +58,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return "Ethereal northern lights"
         case .nebula:
             return "Cosmic purple nebula"
+        case .daybreak:
+            return "Soft morning light"
         }
     }
 
@@ -76,6 +81,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return "sparkles"
         case .nebula:
             return "sparkle"
+        case .daybreak:
+            return "sun.max.fill"
         }
     }
 
@@ -98,6 +105,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return "glass-book-open"  // Could be aurora-themed book icon
         case .nebula:
             return "glass-book-open"  // Could be nebula-themed book icon
+        case .daybreak:
+            return "glass-book-open"  // Could be daybreak-themed book icon
         }
     }
 
@@ -119,6 +128,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return "glass-feather"
         case .nebula:
             return "glass-feather"
+        case .daybreak:
+            return "glass-feather"
         }
     }
 
@@ -139,6 +150,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
         case .aurora:
             return "glass-msgs"
         case .nebula:
+            return "glass-msgs"
+        case .daybreak:
             return "glass-msgs"
         }
     }
@@ -162,6 +175,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return Color(red: 0.45, green: 0.95, blue: 0.75) // Bright aurora mint
         case .nebula:
             return Color(red: 0.65, green: 0.35, blue: 0.95) // Bright nebula purple
+        case .daybreak:
+            return Color(red: 0.25, green: 0.60, blue: 0.85) // Rich sky blue
         }
     }
 
@@ -225,6 +240,13 @@ public enum GradientTheme: String, CaseIterable, Codable {
                 Color(red: 0.38, green: 0.22, blue: 0.48),  // Deep lavender
                 Color(red: 0.32, green: 0.20, blue: 0.42)   // Royal purple
             ]
+        case .daybreak:
+            return [
+                Color(red: 0.85, green: 0.95, blue: 0.98),  // Softer light cyan
+                Color(red: 0.65, green: 0.85, blue: 0.93),  // Muted sky blue
+                Color(red: 0.45, green: 0.70, blue: 0.85),  // Gentle medium blue
+                Color(red: 0.25, green: 0.45, blue: 0.70)   // Softer deep blue
+            ]
         }
     }
 
@@ -242,6 +264,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return 4.0  // Intense theme pulses faster
         case .aurora:
             return 8.0  // Aurora flows gracefully
+        case .daybreak:
+            return 6.0  // Gentle morning rhythm
         }
     }
 
@@ -257,6 +281,8 @@ public enum GradientTheme: String, CaseIterable, Codable {
             return 1.0  // Strong movement
         case .aurora:
             return 0.85 // Flowing movement
+        case .daybreak:
+            return 0.6  // Very subtle movement
         }
     }
 }

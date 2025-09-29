@@ -100,10 +100,34 @@ final class AmbientSession {
             }
         }
         
+        // Analyze quotes and notes too
+        for quote in capturedQuotes ?? [] {
+            if let text = quote.text {
+                extractTopicsFromText(text, into: &topics)
+            }
+        }
+        
+        for note in capturedNotes ?? [] {
+            if let content = note.content {
+                extractTopicsFromText(content, into: &topics)
+            }
+        }
+        
         // Sort by frequency and take top 5
         return topics.sorted { $0.value > $1.value }
             .prefix(5)
             .map { $0.key.capitalized }
+    }
+    
+    private func extractTopicsFromText(_ text: String, into topics: inout [String: Int]) {
+        let words = text.split(separator: " ")
+        for word in words {
+            let key = String(word).lowercased().trimmingCharacters(in: .punctuationCharacters)
+            // Filter for meaningful words (not common words)
+            if key.count > 4 && !commonWords.contains(key) {
+                topics[key, default: 0] += 1
+            }
+        }
     }
     
     private func groupConversations() -> [ConversationThread] {
@@ -179,6 +203,143 @@ final class AmbientSession {
         
         return Array(suggestions.prefix(3))
     }
+    
+    // MARK: - AI-Powered Session Analysis
+    
+    func generateSessionInsights() async -> SessionInsights {
+        
+        // Use Foundation Models if available
+        let isAvailable = await MainActor.run { AIFoundationModelsManager.shared.isAvailable }
+        if isAvailable {
+            let capturesText = formatAllCaptures()
+            
+            let prompt = """
+            Analyze this reading session and provide insights:
+            
+            Book: \(bookModel?.title ?? "Unknown")
+            Duration: \(Int(duration / 60)) minutes
+            
+            Content captured:
+            \(capturesText)
+            
+            Provide:
+            1. The dominant theme explored
+            2. The emotional arc of the session
+            3. A key realization or insight
+            4. Connections between different captures
+            5. A suggested reflection question
+            """
+            
+            let response = await AIFoundationModelsManager.shared.processQuery(
+                prompt,
+                bookContext: nil
+            )
+            
+            return parseSessionInsights(from: response)
+        }
+        
+        // Fallback to basic analysis
+        return generateBasicInsights()
+    }
+    
+    private func formatAllCaptures() -> String {
+        var text = ""
+        
+        // Add questions
+        if let questions = capturedQuestions, !questions.isEmpty {
+            text += "Questions asked:\n"
+            for (i, question) in questions.enumerated() {
+                text += "\(i + 1). \(question.content ?? "")\n"
+            }
+            text += "\n"
+        }
+        
+        // Add quotes
+        if let quotes = capturedQuotes, !quotes.isEmpty {
+            text += "Quotes captured:\n"
+            for quote in quotes {
+                text += "• \"\(quote.text ?? "")\"\n"
+            }
+            text += "\n"
+        }
+        
+        // Add notes
+        if let notes = capturedNotes, !notes.isEmpty {
+            text += "Notes taken:\n"
+            for note in notes {
+                text += "• \(note.content ?? "")\n"
+            }
+        }
+        
+        return text
+    }
+    
+    private func parseSessionInsights(from response: String) -> SessionInsights {
+        // Basic parsing - enhance as needed
+        let defaultInsights = SessionInsights(
+            dominantTheme: "Exploration and discovery",
+            emotionalArc: "Started curious, ended thoughtful",
+            keyRealization: nil,
+            connectionsFound: [],
+            suggestedReflection: "What resonated most with you from this session?"
+        )
+        
+        // Parse the AI response for structured data
+        var theme = defaultInsights.dominantTheme
+        var arc = defaultInsights.emotionalArc
+        var realization: String? = nil
+        var connections: [String] = []
+        var reflection = defaultInsights.suggestedReflection
+        
+        let lines = response.components(separatedBy: .newlines)
+        for line in lines {
+            if line.lowercased().contains("theme") {
+                theme = line.replacingOccurrences(of: "theme:", with: "", options: .caseInsensitive).trimmingCharacters(in: .whitespaces)
+            }
+            // Add more parsing as needed
+        }
+        
+        return SessionInsights(
+            dominantTheme: theme,
+            emotionalArc: arc,
+            keyRealization: realization,
+            connectionsFound: connections,
+            suggestedReflection: reflection
+        )
+    }
+    
+    private func generateBasicInsights() -> SessionInsights {
+        let topics = keyTopics
+        let theme = topics.first ?? "Reading and reflection"
+        
+        let questionCount = (capturedQuestions ?? []).count
+        let quoteCount = (capturedQuotes ?? []).count
+        let noteCount = (capturedNotes ?? []).count
+        
+        var emotionalArc = "Engaged throughout"
+        if questionCount > 5 {
+            emotionalArc = "Started curious, grew more inquisitive"
+        } else if quoteCount > noteCount {
+            emotionalArc = "Focused on memorable passages"
+        }
+        
+        return SessionInsights(
+            dominantTheme: theme,
+            emotionalArc: emotionalArc,
+            keyRealization: nil,
+            connectionsFound: [],
+            suggestedReflection: "What surprised you most in this reading session?"
+        )
+    }
+}
+
+// MARK: - Session Insights
+struct SessionInsights {
+    let dominantTheme: String
+    let emotionalArc: String // "Started curious, ended contemplative"
+    let keyRealization: String?
+    let connectionsFound: [String] // Links between captures
+    let suggestedReflection: String
 }
 
 // MARK: - Conversation Thread
