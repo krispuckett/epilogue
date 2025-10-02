@@ -174,32 +174,36 @@ class AIFoundationModelsManager: ObservableObject {
     }
     
     // MARK: - Query Processing
-    
+
     func processQuery(_ query: String, bookContext: Book?) async -> String {
         #if canImport(FoundationModels)
         guard case .available = modelState else {
             logger.warning("⚠️ Model not available, falling back")
             return await fallbackToPerplexity(query, bookContext: bookContext)
         }
-        
+
         do {
             let session = try await getOrCreateSession(for: bookContext?.title)
             guard let languageSession = session as? LanguageModelSession else {
                 throw ModelError.configurationFailed
             }
-            
+
             // Check token count
             let sessionKey = bookContext?.title ?? "default"
             let currentTokens = sessionTokenCounts[sessionKey] ?? 0
-            
+
             if currentTokens > maxTokensPerSession - 500 { // Leave buffer
                 logger.info("🔄 Token limit approaching, creating new session")
                 sessions.removeValue(forKey: sessionKey)
                 return await processQuery(query, bookContext: bookContext) // Retry with new session
             }
-            
-            // Generate response using the Foundation Models API
-            let llmResponse = try await languageSession.respond(to: query)
+
+            // BUILD ENRICHED CONTEXT FROM INTELLIGENCE SYSTEMS
+            let enrichedQuery = await buildEnrichedQuery(query, bookContext: bookContext)
+            logger.info("🧠 Enriched query with context (\(enrichedQuery.count - query.count) chars added)")
+
+            // Generate response using the Foundation Models API with enriched context
+            let llmResponse = try await languageSession.respond(to: enrichedQuery)
             
             // Create structured response from LLM output
             let response = AIBookResponse(
@@ -295,21 +299,24 @@ class AIFoundationModelsManager: ObservableObject {
     }
     
     // MARK: - Confidence-Based Escalation
-    
+
     func processWithConfidenceEscalation(_ query: String, bookContext: Book?) async -> String {
         #if canImport(FoundationModels)
         guard case .available = modelState else {
             return await fallbackToPerplexity(query, bookContext: bookContext)
         }
-        
+
         do {
             let session = try await getOrCreateSession(for: bookContext?.title)
             guard let languageSession = session as? LanguageModelSession else {
                 throw ModelError.configurationFailed
             }
-            
-            // Generate with confidence tracking
-            let llmResponse = try await languageSession.respond(to: query)
+
+            // BUILD ENRICHED CONTEXT FROM INTELLIGENCE SYSTEMS
+            let enrichedQuery = await buildEnrichedQuery(query, bookContext: bookContext)
+
+            // Generate with confidence tracking using enriched query
+            let llmResponse = try await languageSession.respond(to: enrichedQuery)
             
             let response = AIBookResponse(
                 answer: llmResponse.content,
@@ -344,8 +351,47 @@ class AIFoundationModelsManager: ObservableObject {
         #endif
     }
     
+    // MARK: - Context Enrichment
+
+    /// Builds enriched query with context from ConversationMemory and AmbientContextManager
+    private func buildEnrichedQuery(_ query: String, bookContext: Book?) async -> String {
+        var contextParts: [String] = []
+
+        // 1. Get conversation memory context
+        // First, we need to classify the query to build proper intent
+        let detector = EnhancedIntentDetector()
+        let intent = detector.detectIntent(from: query, bookTitle: bookContext?.title, bookAuthor: bookContext?.author)
+
+        let memoryContext = ConversationMemory().buildContextForResponse(currentIntent: intent)
+        if !memoryContext.isEmpty {
+            contextParts.append(memoryContext)
+            logger.info("📚 Added conversation memory context")
+        }
+
+        // 2. Get ambient context (reading progress, patterns, etc.)
+        let ambientContext = await AmbientContextManager.shared.buildEnhancedContext(for: query, book: bookContext)
+        if !ambientContext.isEmpty {
+            contextParts.append(ambientContext)
+            logger.info("🎯 Added ambient context (page, progress, patterns)")
+        }
+
+        // 3. Build final enriched query
+        if contextParts.isEmpty {
+            logger.debug("ℹ️ No additional context available")
+            return query
+        }
+
+        let enrichedPrompt = """
+        \(contextParts.joined(separator: "\n\n"))
+
+        User question: \(query)
+        """
+
+        return enrichedPrompt
+    }
+
     // MARK: - Helper Methods
-    
+
     private func fallbackToPerplexity(_ query: String, bookContext: Book?) async -> String {
         logger.info("🔄 Falling back to Perplexity")
         

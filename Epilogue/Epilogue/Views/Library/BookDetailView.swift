@@ -78,6 +78,7 @@ struct BookDetailView: View {
     // SwiftData queries for notes and quotes
     @Query private var allCapturedNotes: [CapturedNote]
     @Query private var allCapturedQuotes: [CapturedQuote]
+    @Query private var allBookModels: [BookModel]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -194,12 +195,78 @@ struct BookDetailView: View {
     
     // Status picker state
     @State private var showingStatusPicker = false
-    
+
+    // Reading session state
+    @State private var activeSession: ReadingSession?
+    @State private var showingEndSession = false
+    @State private var showingSessionSavedToast = false
+
+    // Get or create BookModel for this Book struct
+    private var bookModel: BookModel? {
+        allBookModels.first { $0.localId == book.localId.uuidString }
+    }
+
     // Computed properties for filtering notes by book
     private var progressPercentage: Double {
         guard let total = book.pageCount,
               total > 0 else { return 0 }
         return Double(book.currentPage) / Double(total)
+    }
+
+    private var startReadingButton: some View {
+        Button(action: startSession) {
+            startReadingLabel
+        }
+    }
+
+    private var startReadingLabel: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "play.fill")
+                .font(.system(size: 13))
+            Text("Start Reading")
+                .font(.system(size: 15, weight: .semibold))
+        }
+        .foregroundColor(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.001)))
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+        }
+    }
+
+    private func startSession() {
+        let model: BookModel
+        if let existing = bookModel {
+            model = existing
+        } else {
+            model = BookModel(from: book)
+            modelContext.insert(model)
+        }
+        let session = ReadingSession(bookModel: model, startPage: book.currentPage)
+        modelContext.insert(session)
+
+        // Polished morphing animation with haptic
+        SensoryFeedback.success()
+        withAnimation(.spring(duration: 0.5, bounce: 0.3)) {
+            activeSession = session
+        }
+    }
+
+    private func upgradeToAmbientMode() {
+        guard let session = activeSession else { return }
+
+        // Mark session as ambient and save
+        SensoryFeedback.light()
+        session.toggleAmbientMode()
+        try? modelContext.save()
+
+        // Launch ambient mode with current book and transfer session
+        SimplifiedAmbientCoordinator.shared.openAmbientReading(with: book)
+
+        print("🎙️ Upgraded to Ambient Mode - Session transferred")
     }
     
     var bookQuotes: [Note] {
@@ -237,69 +304,186 @@ struct BookDetailView: View {
             }
         }
     }
-    
-    
-    var body: some View {
-        ZStack {
-            // Use the Apple Music-style atmospheric gradient with simplified transitions
-            BookAtmosphericGradientView(
-                colorPalette: colorPalette ?? generatePlaceholderPalette(),
-                intensity: gradientIntensity
-            )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .opacity(gradientOpacity) // Only affected by scroll, not appear
-                .animation(.easeOut(duration: 0.3), value: gradientOpacity)
-                .id(book.id) // Force view recreation when book changes
-            
-            // Content - simple and natural
-            ScrollView {
-                VStack(spacing: 20) {
-                        
-                        // Book info section
-                        centeredHeaderView
-                            .padding(.top, 20)
-                    
-                    // Progressive content loading for better performance
-                    if contentLoaded {
-                        Group {
-                            // Summary section wrapped in padding container
-                            if let description = book.description {
-                                summarySection(description: description)
-                                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                                    .padding(.top, 32)
-                                    .fixedSize(horizontal: false, vertical: true) // Prevent any horizontal expansion
-                                    .blur(radius: summaryBlur)
-                                    .opacity(summaryOpacity)
-                            }
 
-                            // Progress section
-                            if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
-                                progressSection
-                                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                                    .padding(.top, 24)
-                                    .blur(radius: summaryBlur)
-                                    .opacity(summaryOpacity)
-                            }
-                        }
+    private var backgroundGradient: some View {
+        BookAtmosphericGradientView(
+            colorPalette: colorPalette ?? generatePlaceholderPalette(),
+            intensity: gradientIntensity
+        )
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .opacity(gradientOpacity)
+        .animation(.easeOut(duration: 0.3), value: gradientOpacity)
+        .id(book.id)
+    }
+
+    @ViewBuilder
+    private var sessionHUD: some View {
+        EmptyView() // Removed - session now morphs in place below author
+    }
+
+    @ViewBuilder
+    private var sessionPillOrHUD: some View {
+        if let session = activeSession {
+            // Full session HUD (morphs from pill) - compact rectangular version
+            HStack(spacing: 12) {
+                // Metrics with staggered fade-in
+                HStack(spacing: 12) {
+                    metricItem(value: session.formattedDuration, label: "DURATION")
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.15)),
+                        removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                    ))
+
+                    Divider()
+                    .frame(height: 24)
+                    .background(Color.white.opacity(0.2))
+                    .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.23)))
+
+                    metricItem(value: "\(session.endPage)", label: "PAGE")
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.23)),
+                        removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                    ))
+
+                    if let totalPages = book.pageCount, totalPages > 0 {
+                    Divider()
+                        .frame(height: 24)
+                        .background(Color.white.opacity(0.2))
+                        .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.31)))
+
+                    metricItem(value: "\(totalPages - session.endPage)", label: "LEFT")
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.31)),
+                            removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                        ))
                     }
-                    
-                    // Delayed content for smooth initial load
-                    if delayedContentLoaded {
-                        Group {
-                            // Contextual content based on reading status
-                            contextualContentSections
-                                .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                                .padding(.top, 24)
-                                .padding(.bottom, 100) // Space for tab bar
-                                .blur(radius: contextBlur)
-                                .opacity(contextOpacity)
-                        }
+                }
+
+                // Ambient upgrade + End session buttons
+                HStack(spacing: 8) {
+                    // Upgrade to Ambient button - using ambient orb shader
+                    AmbientOrbButton(size: 32) {
+                    upgradeToAmbientMode()
+                    }
+                    .transition(.asymmetric(
+                    insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.38)),
+                    removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                    ))
+
+                    // End session button
+                    Button {
+                    showingEndSession = true
+                    } label: {
+                    Image(systemName: "stop.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white.opacity(0.9))
+                    }
+                    .transition(.asymmetric(
+                    insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.45)),
+                    removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                    ))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            // Remove any under-glass background to preserve inherited blur
+            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5) }
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(duration: 0.5, bounce: 0.3)),
+                removal: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.2))
+            ))
+        } else {
+            // Quick Reading Session pill
+            Button(action: startSession) {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.fill")
+                    .font(.system(size: 11))
+                    Text("Quick Reading Session")
+                    .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                // No background under glass to keep liquid refraction
+                .glassEffect(.regular, in: .capsule)
+                .overlay { Capsule().strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5) }
+            }
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3)),
+                removal: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+            ))
+        }
+    }
+
+    private func metricItem(value: String, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 16, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.95))
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .tracking(1.2)
+        }
+    }
+
+    private var contentScrollView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                centeredHeaderView
+                    .padding(.top, 20)
+
+                // Session pill/HUD that morphs in place
+                sessionPillOrHUD
+                    .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                    .padding(.top, 16)
+
+                if contentLoaded {
+                    Group {
+                    if let description = book.description {
+                        summarySection(description: description)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                            .padding(.top, 32)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .blur(radius: summaryBlur)
+                            .opacity(summaryOpacity)
+                    }
+
+                    if book.readingStatus == .currentlyReading, let pageCount = book.pageCount, pageCount > 0 {
+                        progressSection
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                            .padding(.top, 24)
+                            .blur(radius: summaryBlur)
+                            .opacity(summaryOpacity)
+                    }
+                    }
+                }
+
+                if delayedContentLoaded {
+                    Group {
+                    contextualContentSections
+                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                        .padding(.top, 24)
+                        .padding(.bottom, 100)
+                        .blur(radius: contextBlur)
+                        .opacity(contextOpacity)
                     }
                 }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.immediately)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
+    }
+
+    var body: some View {
+        ZStack {
+            backgroundGradient
+            VStack(spacing: 0) {
+                sessionHUD
+                contentScrollView
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.automatic, for: .navigationBar)
@@ -309,20 +493,57 @@ struct BookDetailView: View {
 
             // Trigger micro-interaction for ambient icon animation
             MicroInteractionManager.shared.enteredBookView()
+
+            // Sessions checked on demand when button tapped
+
+            // Enrich book with smart synopsis/themes if not already done
+            if let bookModel = bookModel {
+                if !bookModel.isEnriched {
+                    print("📖 Triggering enrichment for: \(bookModel.title)")
+                    Task {
+                        await BookEnrichmentService.shared.enrichBook(bookModel)
+                        print("✅ Enrichment completed for: \(bookModel.title)")
+                        print("   Synopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
+                    }
+                } else {
+                    print("ℹ️ Book already enriched: \(bookModel.title)")
+                }
+            } else {
+                print("⚠️ Could not find BookModel for: \(book.title)")
+            }
         }
         .onDisappear {
             // Clear the current detail book when leaving
             libraryViewModel.currentDetailBook = nil
         }
         .toolbar {
+            // Reading status pill (exact copy from header)
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Edit Book") {
-                    editedTitle = book.title
-                    showingBookSearch = true
-                    SensoryFeedback.light()
+                Menu {
+                    ForEach(ReadingStatus.allCases, id: \.self) { status in
+                    Button {
+                        withAnimation(DesignSystem.Animation.springStandard) {
+                            libraryViewModel.updateReadingStatus(for: book.id, status: status)
+                            if status == .read && book.readingStatus != .read {
+                                SensoryFeedback.success()
+                            }
+                            if status == .read && book.readingStatus != .read {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    showingCompletionSheet = true
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(
+                            status.rawValue,
+                            systemImage: status == book.readingStatus ? "checkmark.circle.fill" : "circle"
+                        )
+                    }
+                    }
+                } label: {
+                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                 }
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
+                .menuStyle(.borderlessButton)
             }
         }
         .sheet(isPresented: $showingBookSearch) {
@@ -330,32 +551,32 @@ struct BookDetailView: View {
                 searchQuery: editedTitle,
                 onBookSelected: { selected in
                     Task { @MainActor in
-                        // Resolve a canonical display URL for the selected book
-                        let resolved = await DisplayCoverURLResolver.resolveDisplayURL(
-                            googleID: selected.id,
-                            isbn: selected.isbn,
-                            thumbnailURL: selected.coverImageURL
-                        )
-                        var updated = selected
-                        updated.coverImageURL = resolved ?? selected.coverImageURL
+                    // Resolve a canonical display URL for the selected book
+                    let resolved = await DisplayCoverURLResolver.resolveDisplayURL(
+                        googleID: selected.id,
+                        isbn: selected.isbn,
+                        thumbnailURL: selected.coverImageURL
+                    )
+                    var updated = selected
+                    updated.coverImageURL = resolved ?? selected.coverImageURL
 
-                        // Replace while preserving user data
-                        libraryViewModel.replaceBook(originalBook: book, with: updated, preserveCover: false)
+                    // Replace while preserving user data
+                    libraryViewModel.replaceBook(originalBook: book, with: updated, preserveCover: false)
 
-                        // Update cover explicitly to override any preserved-cover logic
-                        libraryViewModel.updateBookCover(updated, newCoverURL: updated.coverImageURL)
+                    // Update cover explicitly to override any preserved-cover logic
+                    libraryViewModel.updateBookCover(updated, newCoverURL: updated.coverImageURL)
 
-                        // Refresh image caches and palette
-                        if let oldURL = book.coverImageURL {
-                            _ = await SharedBookCoverManager.shared.refreshCover(for: oldURL)
-                        }
-                        if let newURL = updated.coverImageURL {
-                            _ = await SharedBookCoverManager.shared.loadFullImage(from: newURL)
-                            await BookColorPaletteCache.shared.refreshPalette(for: updated.id, coverURL: newURL)
-                        }
+                    // Refresh image caches and palette
+                    if let oldURL = book.coverImageURL {
+                        _ = await SharedBookCoverManager.shared.refreshCover(for: oldURL)
+                    }
+                    if let newURL = updated.coverImageURL {
+                        _ = await SharedBookCoverManager.shared.loadFullImage(from: newURL)
+                        await BookColorPaletteCache.shared.refreshPalette(for: updated.id, coverURL: newURL)
+                    }
 
-                        NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
-                        showingBookSearch = false
+                    NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                    showingBookSearch = false
                     }
                 },
                 mode: .replace
@@ -366,14 +587,30 @@ struct BookDetailView: View {
                 book: Binding(
                     get: { book },
                     set: { updatedBook in
-                        // Update the book in the library when changes are made
-                        libraryViewModel.updateBook(updatedBook)
+                    // Update the book in the library when changes are made
+                    libraryViewModel.updateBook(updatedBook)
                     }
                 ),
                 isPresented: $showingCompletionSheet
             )
             .environmentObject(libraryViewModel)
         }
+        .sheet(isPresented: $showingEndSession) {
+            if let session = activeSession {
+                EndSessionSheet(
+                    session: session,
+                    book: book,
+                    activeSession: $activeSession,
+                    colorPalette: nil,
+                    showingSessionSavedToast: $showingSessionSavedToast
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.clear)
+                .presentationCornerRadius(32)
+            }
+        }
+        .glassToast(isShowing: $showingSessionSavedToast, message: "Quick Session Saved")
         .onAppear {
             // findOrCreateThreadForBook() // DISABLED - ChatThread removed
             
@@ -382,7 +619,7 @@ struct BookDetailView: View {
                 let bookID = book.localId.uuidString
                 if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
                     await MainActor.run {
-                        self.colorPalette = cachedPalette
+                    self.colorPalette = cachedPalette
                     }
                 }
             }
@@ -455,19 +692,19 @@ struct BookDetailView: View {
                     
                     // Trigger smooth cover blur-in animation
                     withAnimation(.easeOut(duration: 0.4)) {
-                        coverBlur = 0
-                        coverOpacity = 1.0
+                    coverBlur = 0
+                    coverOpacity = 1.0
                     }
                     
                     // Only extract colors if we don't have them yet
                     if colorPalette == nil && !isExtractingColors {
-                        Task.detached(priority: .userInitiated) {
-                            // Quick extraction from displayed image
-                            if !hasLowResColors {
-                                await extractColorsFromDisplayedImage(uiImage)
-                                hasLowResColors = true
-                            }
+                    Task.detached(priority: .userInitiated) {
+                        // Quick extraction from displayed image
+                        if !hasLowResColors {
+                            await extractColorsFromDisplayedImage(uiImage)
+                            hasLowResColors = true
                         }
+                    }
                     }
                 }
             )
@@ -495,22 +732,22 @@ struct BookDetailView: View {
                 
                 if authors.count == 1 {
                     Text("by \(book.author)")
+                    .font(.system(size: 16, weight: .regular, design: .monospaced))
+                    .kerning(1.2)
+                    .foregroundColor(secondaryTextColor)
+                    .shadow(color: shadowColor, radius: 1, x: 0, y: 1)
+                    } else {
+                    Text("by")
+                    .font(.system(size: 14, weight: .regular, design: .monospaced))
+                    .kerning(1.2)
+                    .foregroundColor(secondaryTextColor.opacity(0.875))
+                        
+                    ForEach(authors, id: \.self) { author in
+                    Text(author)
                         .font(.system(size: 16, weight: .regular, design: .monospaced))
                         .kerning(1.2)
                         .foregroundColor(secondaryTextColor)
-                        .shadow(color: shadowColor, radius: 1, x: 0, y: 1)
-                        } else {
-                    Text("by")
-                        .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        .kerning(1.2)
-                        .foregroundColor(secondaryTextColor.opacity(0.875))
-                            
-                    ForEach(authors, id: \.self) { author in
-                        Text(author)
-                            .font(.system(size: 16, weight: .regular, design: .monospaced))
-                            .kerning(1.2)
-                            .foregroundColor(secondaryTextColor)
-                                }
+                            }
                 }
             }
             .multilineTextAlignment(.center)
@@ -518,48 +755,14 @@ struct BookDetailView: View {
             .blur(radius: metadataBlur)
             .opacity(metadataOpacity)
             
-            // Status and page info
-            HStack(spacing: 16) {
-                // Interactive reading status pill with Menu
-                Menu {
-                    ForEach(ReadingStatus.allCases, id: \.self) { status in
-                        Button {
-                            withAnimation(DesignSystem.Animation.springStandard) {
-                                libraryViewModel.updateReadingStatus(for: book.id, status: status)
-                                // Reduced haptics - only for significant status changes
-                                if status == .read && book.readingStatus != .read {
-                                    SensoryFeedback.success()
-                                }
-                                
-                                // Show completion sheet when marking as read
-                                if status == .read && book.readingStatus != .read {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        showingCompletionSheet = true
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label(
-                                status.rawValue,
-                                systemImage: status == book.readingStatus ? "checkmark.circle.fill" : "circle"
-                            )
-                        }
-                    }
-                } label: {
-                    StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8)
-                }
-                
-                // Page count and percentage removed per user request
-                
-                if let rating = book.userRating {
-                    StatusPill(text: "★ \(rating)", color: accentColor, interactive: false)
-                        .accessibilityLabel("Rating: \(rating) stars")
-                }
+            // Rating only (status pill moved to toolbar)
+            if let rating = book.userRating {
+                StatusPill(text: "★ \(rating)", color: accentColor, interactive: false)
+                    .accessibilityLabel("Rating: \(rating) stars")
+                    .padding(.top, 8)
+                    .blur(radius: metadataBlur)
+                    .opacity(metadataOpacity)
             }
-            .padding(.top, 8)
-            .blur(radius: metadataBlur)
-            .opacity(metadataOpacity)
             
             // Progress bar removed per user request
             
@@ -573,29 +776,29 @@ struct BookDetailView: View {
             ForEach(BookSection.allCases, id: \.self) { section in
                 Button {
                     withAnimation(DesignSystem.Animation.springStandard) {
-                        selectedSection = section
+                    selectedSection = section
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 16, weight: .medium))
-                        Text(section.rawValue)
-                            .font(.system(size: 16, weight: .medium))
+                    Image(systemName: section.icon)
+                        .font(.system(size: 16, weight: .medium))
+                    Text(section.rawValue)
+                        .font(.system(size: 16, weight: .medium))
                     }
                     .foregroundColor(selectedSection == section ? textColor : secondaryTextColor)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)
                     .background {
-                        if selectedSection == section {
-                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
-                                .fill(Color.warmAmber.opacity(0.15))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
-                                        .strokeBorder(Color.warmAmber.opacity(0.3), lineWidth: 1)
-                                }
-                                .shadow(color: Color.warmAmber.opacity(0.3), radius: 6)
-                                .matchedGeometryEffect(id: "sectionSelection", in: sectionAnimation)
-                        }
+                    if selectedSection == section {
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                            .fill(Color.warmAmber.opacity(0.15))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large)
+                                    .strokeBorder(Color.warmAmber.opacity(0.3), lineWidth: 1)
+                            }
+                            .shadow(color: Color.warmAmber.opacity(0.3), radius: 6)
+                            .matchedGeometryEffect(id: "sectionSelection", in: sectionAnimation)
+                    }
                     }
                 }
             }
@@ -614,20 +817,20 @@ struct BookDetailView: View {
             ForEach(BookSection.allCases, id: \.self) { section in
                 Button {
                     withAnimation(DesignSystem.Animation.springStandard) {
-                        selectedSection = section
+                    selectedSection = section
                     }
                 } label: {
                     Image(systemName: section.icon)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(selectedSection == section ? accentColor : textColor.opacity(0.6))
-                        .frame(width: 44, height: 44)
-                        .background {
-                            if selectedSection == section {
-                                Circle()
-                                    .fill(accentColor.opacity(0.15))
-                                    .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
-                            }
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(selectedSection == section ? accentColor : textColor.opacity(0.6))
+                    .frame(width: 44, height: 44)
+                    .background {
+                        if selectedSection == section {
+                            Circle()
+                                .fill(accentColor.opacity(0.15))
+                                .matchedGeometryEffect(id: "iconSelection", in: sectionAnimation)
                         }
+                    }
                 }
                 .accessibilityLabel("\(section.rawValue) section")
                 .accessibilityHint(selectedSection == section ? "Currently selected" : "Tap to select")
@@ -691,47 +894,71 @@ struct BookDetailView: View {
     }
     
     private func summarySection(description: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
                 Image(systemName: "text.book.closed")
                     .font(.system(size: 16))
                     .foregroundColor(accentColor)
-                    .frame(width: 28, height: 28)  // Fixed size
-                
+                    .frame(width: 28, height: 28)
+
                 Text("Summary")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(textColor)
-                
+
                 Spacer()
             }
-            
-            // Summary text - clean cut animation, no morphing
+
+            // Show enriched synopsis if available, otherwise Google Books description
             Group {
-                if summaryExpanded {
-                    Text(description)
-                        .font(.system(size: 15))
-                        .foregroundColor(textColor.opacity(0.85))
+                if let synopsis = bookModel?.smartSynopsis {
+                    // Enriched synopsis (spoiler-free)
+                    Text(synopsis)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(textColor.opacity(0.9))
                         .lineSpacing(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true) // Prevent horizontal size changes
-                        .transition(.opacity)
+                        .onAppear {
+                            print("📱 [UI] Displaying ENRICHED synopsis for '\(book.title)'")
+                            print("   Length: \(synopsis.count) chars")
+                            print("   Preview: \(synopsis.prefix(80))...")
+                        }
                 } else {
-                    Text(description)
-                        .font(.system(size: 15))
-                        .foregroundColor(textColor.opacity(0.85))
-                        .lineSpacing(8)
-                        .lineLimit(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true) // Prevent horizontal size changes
-                        .transition(.opacity)
+                    // Fallback to Google Books description
+                    if summaryExpanded {
+                        Text(description)
+                            .font(.system(size: 15))
+                            .foregroundColor(textColor.opacity(0.85))
+                            .lineSpacing(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.opacity)
+                            .onAppear {
+                                print("📱 [UI] Displaying GOOGLE BOOKS description for '\(book.title)' (expanded)")
+                                print("   BookModel enriched: \(bookModel?.isEnriched ?? false)")
+                                print("   SmartSynopsis: \(bookModel?.smartSynopsis?.prefix(30) ?? "nil")")
+                            }
+                    } else {
+                        Text(description)
+                            .font(.system(size: 15))
+                            .foregroundColor(textColor.opacity(0.85))
+                            .lineSpacing(8)
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.opacity)
+                            .onAppear {
+                                print("📱 [UI] Displaying GOOGLE BOOKS description for '\(book.title)' (collapsed)")
+                                print("   BookModel enriched: \(bookModel?.isEnriched ?? false)")
+                                print("   SmartSynopsis: \(bookModel?.smartSynopsis?.prefix(30) ?? "nil")")
+                            }
+                    }
                 }
             }
-            // Only animate if the view has already appeared (not on initial load)
             .animation(hasAppeared ? .easeInOut(duration: 0.2) : nil, value: summaryExpanded)
-            
-            // Read more/less button
-            if description.count > 200 {
+
+            // Read more/less button (only for Google Books description)
+            if bookModel?.smartSynopsis == nil && description.count > 200 {
                 Button {
                     summaryExpanded.toggle()
                 } label: {
@@ -741,12 +968,49 @@ struct BookDetailView: View {
                         .shadow(color: shadowColor.opacity(0.7), radius: 0.5, x: 0, y: 0.5)
                 }
             }
+
+            // Themes (if enriched)
+            if let themes = bookModel?.keyThemes, !themes.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("THEMES")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(textColor.opacity(0.5))
+                        .tracking(1.2)
+
+                    // Flow layout for theme pills (NO .background!)
+                    FlowLayout(spacing: 8) {
+                        ForEach(themes, id: \.self) { theme in
+                            Text(theme.capitalized)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(accentColor)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .glassEffect(in: Capsule())
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+
+            // Characters (if enriched and non-empty)
+            if let characters = bookModel?.majorCharacters, !characters.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("CHARACTERS")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(textColor.opacity(0.5))
+                        .tracking(1.2)
+
+                    Text(characters.joined(separator: " · "))
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(textColor.opacity(0.7))
+                }
+                .padding(.top, 4)
+            }
         }
         .padding(DesignSystem.Spacing.listItemPadding)
-        .frame(maxWidth: .infinity)  // Fixed width from start
-        .fixedSize(horizontal: false, vertical: true) // Lock horizontal size
+        .frame(maxWidth: .infinity)
+        .fixedSize(horizontal: false, vertical: true)
         .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
-        // NO transition modifier
     }
     
     private var progressSection: some View {
@@ -772,6 +1036,7 @@ struct BookDetailView: View {
             // Ambient Reading Progress Timeline - Detailed View (now interactive!)
             AmbientReadingProgressView(
                 book: book,
+                bookModel: bookModel,
                 width: 320,
                 showDetailed: true,
                 colorPalette: colorPalette
@@ -805,10 +1070,10 @@ struct BookDetailView: View {
                 // Quick add note button
                 Button {
                     SensoryFeedback.light()
-                    // Open command palette with book note context
+                    // Show unified quick action card
                     NotificationCenter.default.post(
-                        name: Notification.Name("ShowCommandInput"),
-                        object: ["bookNote": true]
+                        name: Notification.Name("ShowQuickActionCard"),
+                        object: nil
                     )
                 } label: {
                     Image(systemName: "plus.circle.fill")
@@ -822,17 +1087,17 @@ struct BookDetailView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 12) {
-                        Image(systemName: "note.text")
-                            .font(.system(size: 32))
-                            .foregroundStyle(accentColor.opacity(0.5))
+                    Image(systemName: "note.text")
+                        .font(.system(size: 32))
+                        .foregroundStyle(accentColor.opacity(0.5))
 
-                        Text("No notes yet")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(textColor.opacity(0.5))
+                    Text("No notes yet")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(textColor.opacity(0.5))
 
-                        Text("Tap + to add your first note")
-                            .font(.system(size: 12))
-                            .foregroundStyle(textColor.opacity(0.4))
+                    Text("Tap + to add your first note")
+                        .font(.system(size: 12))
+                        .foregroundStyle(textColor.opacity(0.4))
                     }
                     .padding(.vertical, 20)
                     Spacer()
@@ -841,26 +1106,26 @@ struct BookDetailView: View {
                 // Compact note cards
                 VStack(spacing: 12) {
                     ForEach(bookNotesCaptured.prefix(3)) { note in
-                        CompactNoteCard(note: note, accentColor: accentColor)
+                    CompactNoteCard(note: note, accentColor: accentColor)
                     }
 
                     if bookNotesCaptured.count > 3 {
-                        Button {
-                            // Navigate to all notes
-                            selectedSection = .notes
-                        } label: {
-                            HStack {
-                                Text("View all \(bookNotesCaptured.count) notes")
-                                    .font(.system(size: 14, weight: .medium))
+                    Button {
+                        // Navigate to all notes
+                        selectedSection = .notes
+                    } label: {
+                        HStack {
+                            Text("View all \(bookNotesCaptured.count) notes")
+                                .font(.system(size: 14, weight: .medium))
 
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                            .foregroundStyle(accentColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 12, weight: .semibold))
                         }
+                        .foregroundStyle(accentColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+                    }
                     }
                 }
             }
@@ -923,18 +1188,18 @@ struct BookDetailView: View {
                     let daysToFinish = (pageCount - book.currentPage) / max(1, pagesPerDay)
                     
                     Text("At your current pace of \(pagesPerDay) pages per day")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.8))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
                     
                     Text("You'll finish in approximately \(daysToFinish) days")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.8))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
                 }
                 
                 if bookQuotes.count > 0 {
                     Text("\(bookQuotes.count) quotes saved from this book")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.8))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
                 }
             }
         }
@@ -951,9 +1216,9 @@ struct BookDetailView: View {
                 .font(.system(size: 44))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [accentColor, accentColor.opacity(0.7)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                    colors: [accentColor, accentColor.opacity(0.7)],
+                    startPoint: .top,
+                    endPoint: .bottom
                     )
                 )
                 .symbolRenderingMode(.hierarchical)
@@ -965,8 +1230,8 @@ struct BookDetailView: View {
                 
                 if let pageCount = book.pageCount {
                     Text("\(pageCount) pages await")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.7))
                 }
             }
             
@@ -983,21 +1248,21 @@ struct BookDetailView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     Text("Start Reading")
-                        .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 14)
                 .background {
                     Capsule()
-                        .fill(accentColor.opacity(0.2))
+                    .fill(accentColor.opacity(0.2))
                 }
                 .glassEffect(in: Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(accentColor.opacity(0.4), lineWidth: 1)
+                    .strokeBorder(accentColor.opacity(0.4), lineWidth: 1)
                 }
             }
             .buttonStyle(PlainButtonStyle())
@@ -1009,12 +1274,12 @@ struct BookDetailView: View {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(
                     LinearGradient(
-                        colors: [
-                            accentColor.opacity(0.3),
-                            accentColor.opacity(0.1)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                    colors: [
+                        accentColor.opacity(0.3),
+                        accentColor.opacity(0.1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                     ),
                     lineWidth: 1
                 )
@@ -1047,8 +1312,8 @@ struct BookDetailView: View {
                     summaryExpanded.toggle()
                 } label: {
                     Text(summaryExpanded ? "Show less" : "Read more")
-                        .font(.caption)
-                        .foregroundStyle(accentColor)
+                    .font(.caption)
+                    .foregroundStyle(accentColor)
                 }
             }
         }
@@ -1078,20 +1343,20 @@ struct BookDetailView: View {
             HStack(spacing: 24) {
                 VStack(alignment: .leading) {
                     Text("\(hours)")
-                        .font(.system(size: 24, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
                     Text("hours total")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
                 }
                 
                 VStack(alignment: .leading) {
                     Text("\(days)")
-                        .font(.system(size: 24, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
                     Text("days at 2hr/day")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
                 }
             }
         }
@@ -1116,17 +1381,17 @@ struct BookDetailView: View {
                     SensoryFeedback.light()
                 } label: {
                     Text("Edit")
-                        .font(.system(size: 14))
-                        .foregroundStyle(accentColor)
+                    .font(.system(size: 14))
+                    .foregroundStyle(accentColor)
                 }
             }
             
             if let rating = book.userRating {
                 HStack(spacing: 4) {
                     ForEach(1...5, id: \.self) { star in
-                        Image(systemName: star <= rating ? "star.fill" : "star")
-                            .font(.system(size: 20))
-                            .foregroundStyle(accentColor)
+                    Image(systemName: star <= rating ? "star.fill" : "star")
+                        .font(.system(size: 20))
+                        .foregroundStyle(accentColor)
                     }
                 }
                 .padding(.bottom, 8)
@@ -1201,8 +1466,8 @@ struct BookDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(bookQuotes) { quote in
-                        BookQuoteCard(quote: quote)
-                            .frame(width: 280)
+                    BookQuoteCard(quote: quote)
+                        .frame(width: 280)
                     }
                 }
             }
@@ -1232,30 +1497,30 @@ struct BookDetailView: View {
             HStack(spacing: 32) {
                 VStack(alignment: .leading) {
                     Text("\(daysSinceStart)")
-                        .font(.system(size: 24, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
                     Text("days to finish")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
                 }
                 
                 VStack(alignment: .leading) {
                     Text("\(pagesPerDay)")
-                        .font(.system(size: 24, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
                     Text("pages per day")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
                 }
                 
                 if bookQuotes.count > 0 {
                     VStack(alignment: .leading) {
-                        Text("\(bookQuotes.count)")
-                            .font(.system(size: 24, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white)
-                        Text("quotes saved")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.6))
+                    Text("\(bookQuotes.count)")
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("quotes saved")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
                     }
                 }
             }
@@ -1291,27 +1556,27 @@ struct BookDetailView: View {
             ForEach(bookNotes) { note in
                 BookNoteCard(note: note)
                     .iOS26SwipeActions([
-                        SwipeAction(
-                            icon: "pencil",
-                            backgroundColor: accentColor,
-                            handler: {
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("EditNote"),
-                                    object: note
-                                )
-                                SensoryFeedback.light()
+                    SwipeAction(
+                        icon: "pencil",
+                        backgroundColor: accentColor,
+                        handler: {
+                            NotificationCenter.default.post(
+                                name: Notification.Name("EditNote"),
+                                object: note
+                            )
+                            SensoryFeedback.light()
+                        }
+                    ),
+                    SwipeAction(
+                        icon: "trash.fill",
+                        backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                        isDestructive: true,
+                        handler: {
+                            withAnimation(.spring(response: 0.4)) {
+                                notesViewModel.deleteNote(note)
                             }
-                        ),
-                        SwipeAction(
-                            icon: "trash.fill",
-                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                            isDestructive: true,
-                            handler: {
-                                withAnimation(.spring(response: 0.4)) {
-                                    notesViewModel.deleteNote(note)
-                                }
-                            }
-                        )
+                        }
+                    )
                     ])
             }
         }
@@ -1344,24 +1609,24 @@ struct BookDetailView: View {
             ForEach(bookQuotes) { quote in
                 BookQuoteCard(quote: quote)
                     .iOS26SwipeActions([
-                        SwipeAction(
-                            icon: "square.and.arrow.up",
-                            backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
-                            handler: {
-                                ShareQuoteService.shareQuote(quote)
-                                SensoryFeedback.success()
+                    SwipeAction(
+                        icon: "square.and.arrow.up",
+                        backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                        handler: {
+                            ShareQuoteService.shareQuote(quote)
+                            SensoryFeedback.success()
+                        }
+                    ),
+                    SwipeAction(
+                        icon: "trash.fill",
+                        backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                        isDestructive: true,
+                        handler: {
+                            withAnimation(.spring(response: 0.4)) {
+                                notesViewModel.deleteNote(quote)
                             }
-                        ),
-                        SwipeAction(
-                            icon: "trash.fill",
-                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                            isDestructive: true,
-                            handler: {
-                                withAnimation(.spring(response: 0.4)) {
-                                    notesViewModel.deleteNote(quote)
-                                }
-                            }
-                        )
+                        }
+                    )
                     ])
             }
         }
@@ -1380,43 +1645,43 @@ struct BookDetailView: View {
             } else {
                 ForEach(bookQuotes) { quote in
                     BookQuoteCard(quote: quote)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.9).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                        .iOS26SwipeActions([
-                            SwipeAction(
-                                icon: "pencil",
-                                backgroundColor: accentColor,
-                                handler: {
-                                    // Edit quote
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("EditNote"),
-                                        object: quote
-                                    )
-                                    SensoryFeedback.light()
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
+                    .iOS26SwipeActions([
+                        SwipeAction(
+                            icon: "pencil",
+                            backgroundColor: accentColor,
+                            handler: {
+                                // Edit quote
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("EditNote"),
+                                    object: quote
+                                )
+                                SensoryFeedback.light()
+                            }
+                        ),
+                        SwipeAction(
+                            icon: "square.and.arrow.up",
+                            backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                            handler: {
+                                // Share quote
+                                ShareQuoteService.shareQuote(quote)
+                                SensoryFeedback.success()
+                            }
+                        ),
+                        SwipeAction(
+                            icon: "trash.fill",
+                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                            isDestructive: true,
+                            handler: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    notesViewModel.deleteNote(quote)
                                 }
-                            ),
-                            SwipeAction(
-                                icon: "square.and.arrow.up",
-                                backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
-                                handler: {
-                                    // Share quote
-                                    ShareQuoteService.shareQuote(quote)
-                                    SensoryFeedback.success()
-                                }
-                            ),
-                            SwipeAction(
-                                icon: "trash.fill",
-                                backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                                isDestructive: true,
-                                handler: {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        notesViewModel.deleteNote(quote)
-                                    }
-                                }
-                            )
-                        ])
+                            }
+                        )
+                    ])
                 }
             }
         }
@@ -1433,58 +1698,58 @@ struct BookDetailView: View {
             } else {
                 ForEach(bookNotes) { note in
                     BookNoteCard(note: note)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.9).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                        .iOS26SwipeActions([
-                            SwipeAction(
-                                icon: "pencil",
-                                backgroundColor: accentColor,
-                                handler: {
-                                    // Edit note
-                                    NotificationCenter.default.post(
-                                        name: Notification.Name("EditNote"),
-                                        object: note
-                                    )
-                                    SensoryFeedback.light()
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
+                    .iOS26SwipeActions([
+                        SwipeAction(
+                            icon: "pencil",
+                            backgroundColor: accentColor,
+                            handler: {
+                                // Edit note
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("EditNote"),
+                                    object: note
+                                )
+                                SensoryFeedback.light()
+                            }
+                        ),
+                        SwipeAction(
+                            icon: "square.and.arrow.up",
+                            backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
+                            handler: {
+                                // Share note as text
+                                let shareText = """
+                                \(note.content)
+                                
+                                — Note from "\(note.bookTitle ?? "Unknown Book")"
+                                """
+                                
+                                let activityController = UIActivityViewController(
+                                    activityItems: [shareText],
+                                    applicationActivities: nil
+                                )
+                                
+                                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                   let rootViewController = windowScene.windows.first?.rootViewController {
+                                    rootViewController.present(activityController, animated: true)
                                 }
-                            ),
-                            SwipeAction(
-                                icon: "square.and.arrow.up",
-                                backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
-                                handler: {
-                                    // Share note as text
-                                    let shareText = """
-                                    \(note.content)
-                                    
-                                    — Note from "\(note.bookTitle ?? "Unknown Book")"
-                                    """
-                                    
-                                    let activityController = UIActivityViewController(
-                                        activityItems: [shareText],
-                                        applicationActivities: nil
-                                    )
-                                    
-                                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                       let rootViewController = windowScene.windows.first?.rootViewController {
-                                        rootViewController.present(activityController, animated: true)
-                                    }
-                                    
-                                    SensoryFeedback.success()
+                                
+                                SensoryFeedback.success()
+                            }
+                        ),
+                        SwipeAction(
+                            icon: "trash.fill",
+                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
+                            isDestructive: true,
+                            handler: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    notesViewModel.deleteNote(note)
                                 }
-                            ),
-                            SwipeAction(
-                                icon: "trash.fill",
-                                backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                                isDestructive: true,
-                                handler: {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        notesViewModel.deleteNote(note)
-                                    }
-                                }
-                            )
-                        ])
+                            }
+                        )
+                    ])
                 }
             }
         }
@@ -1848,13 +2113,13 @@ struct BookDetailView: View {
                 // Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Luminance: \(String(format: "%.2f", palette.luminance))")
-                        .font(.system(size: 12))
+                    .font(.system(size: 12))
                     Text("Monochromatic: \(palette.isMonochromatic ? "Yes" : "No")")
-                        .font(.system(size: 12))
+                    .font(.system(size: 12))
                     Text("Quality: \(String(format: "%.1f", palette.extractionQuality * 100))%")
-                        .font(.system(size: 12))
+                    .font(.system(size: 12))
                     Text("Text: \(palette.textColor == .white ? "White" : "Black")")
-                        .font(.system(size: 12))
+                    .font(.system(size: 12))
                 }
                 .foregroundColor(secondaryTextColor)
                 
@@ -1899,7 +2164,7 @@ struct BookDetailView: View {
                 .fill(textColor.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                        .strokeBorder(textColor.opacity(0.1), lineWidth: 1)
+                    .strokeBorder(textColor.opacity(0.1), lineWidth: 1)
                 )
         )
     }
@@ -1912,7 +2177,7 @@ struct BookDetailView: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Circle()
-                        .strokeBorder(DesignSystem.Colors.textQuaternary, lineWidth: 1)
+                    .strokeBorder(DesignSystem.Colors.textQuaternary, lineWidth: 1)
                 )
             
             Text(label)
@@ -1939,7 +2204,7 @@ struct ActionButton: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(textColor.opacity(0.1))
+                    .fill(textColor.opacity(0.1))
                 )
         }
     }
@@ -1954,19 +2219,13 @@ struct StatusPill: View {
         HStack(spacing: 4) {
             Text(text)
                 .font(.system(size: 12, weight: .medium))
-            
+
             if interactive {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .medium))
             }
         }
-        .foregroundColor(.white)  // Always white text
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .glassEffect(
-            .regular.tint(color.opacity(0.3)),
-            in: Capsule()
-        )
+        .foregroundColor(.white)
     }
 }
 
@@ -2015,9 +2274,9 @@ struct BookQuoteCard: View {
                 // Thin horizontal rule with gradient
                 LinearGradient(
                     gradient: Gradient(stops: [
-                        .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 0),
-                        .init(color: DesignSystem.Colors.surfaceBackground.opacity(1.0), location: 0.5),
-                        .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 1.0)
+                    .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 0),
+                    .init(color: DesignSystem.Colors.surfaceBackground.opacity(1.0), location: 0.5),
+                    .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 1.0)
                     ]),
                     startPoint: .leading,
                     endPoint: .trailing
@@ -2028,24 +2287,24 @@ struct BookQuoteCard: View {
                 // Attribution text - reordered: Author -> Source -> Page
                 VStack(alignment: .leading, spacing: 6) {
                     if let author = quote.author {
-                        Text(author.uppercased())
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .kerning(1.5)
-                            .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.8))
+                    Text(author.uppercased())
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .kerning(1.5)
+                        .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.8))
                     }
                     
                     if let bookTitle = quote.bookTitle {
-                        Text(bookTitle.uppercased())
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                            .kerning(1.2)
-                            .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.6))
+                    Text(bookTitle.uppercased())
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .kerning(1.2)
+                        .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.6))
                     }
                     
                     if let pageNumber = quote.pageNumber {
-                        Text("PAGE \(pageNumber)")
-                            .font(.system(size: 10, weight: .regular, design: .monospaced))
-                            .kerning(1.0)
-                            .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.5))
+                    Text("PAGE \(pageNumber)")
+                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .kerning(1.0)
+                        .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.5))
                     }
                 }
             }
@@ -2077,7 +2336,7 @@ struct BookNoteCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .onTapGesture {
                     withAnimation {
-                        isExpanded.toggle()
+                    isExpanded.toggle()
                     }
                 }
             
@@ -2090,8 +2349,8 @@ struct BookNoteCard: View {
                 
                 if let pageNumber = note.pageNumber {
                     Text("Page \(pageNumber)")
-                        .font(.system(size: 12, weight: .regular, design: .monospaced))
-                        .foregroundColor(.black.opacity(0.5))
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                    .foregroundColor(.black.opacity(0.5))
                 }
             }
         }
@@ -2135,22 +2394,22 @@ struct QuestionCard: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(question.question)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.black.opacity(0.8))
-                        .lineLimit(2)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.black.opacity(0.8))
+                    .lineLimit(2)
                     
                     if let answer = question.answer {
-                        Text(answer)
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundColor(.black.opacity(0.6))
-                            .lineLimit(3)
-                            .padding(.top, 4)
+                    Text(answer)
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(.black.opacity(0.6))
+                        .lineLimit(3)
+                        .padding(.top, 4)
                     }
                     
                     Text("Tap to view conversation →")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(.warmAmber.opacity(0.8))
-                        .padding(.top, 2)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.warmAmber.opacity(0.8))
+                    .padding(.top, 2)
                 }
                 
                 Spacer()
@@ -2188,8 +2447,8 @@ struct ChatMessageBubble: View {
                     .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                     .padding(.vertical, 10)
                     .background(
-                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                            .fill(message.isUser ? accentColor : Color(hex: "FAF8F5"))
+                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                        .fill(message.isUser ? accentColor : Color(hex: "FAF8F5"))
                     )
                 
                 Text(message.timestamp.formatted(date: .omitted, time: .shortened))
@@ -2217,9 +2476,9 @@ struct ShimmerModifier: ViewModifier {
             .overlay(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0),
-                        Color.white.opacity(isActive ? 0.1 : 0),
-                        Color.white.opacity(0)
+                    Color.white.opacity(0),
+                    Color.white.opacity(isActive ? 0.1 : 0),
+                    Color.white.opacity(0)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -2259,5 +2518,367 @@ struct BookDetailView_Previews: PreviewProvider {
         .environmentObject(NotesViewModel())
         .environmentObject(LibraryViewModel())
         // .modelContainer(for: [ChatThread.self]) // DISABLED - ChatThread removed
+    }
+}
+
+// MARK: - Reading Session Views
+
+// MARK: - Compact Session HUD (Bottom Floating) - Proper Glass Card
+struct CompactSessionHUD: View {
+    @Bindable var session: ReadingSession
+    let book: Book
+    @Binding var activeSession: ReadingSession?
+
+    @State private var currentTime = Date()
+    @State private var showingPageSheet = false
+    @State private var editingPage = false
+    @State private var pageText = ""
+    @FocusState private var isPageFocused: Bool
+    @State private var timer: Timer?
+
+    var body: some View {
+        HStack(spacing: 20) {
+            // Duration metric
+            VStack(spacing: 4) {
+                Text(session.formattedDuration)
+                    .font(.system(size: 20, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.95))
+
+                Text("DURATION")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .tracking(1.5)
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 0.5)
+                .frame(maxHeight: 40)
+
+            // Page tracking - tappable to edit
+            if editingPage {
+                VStack(spacing: 4) {
+                    TextField("Page", text: $pageText)
+                    .font(.system(size: 20, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .multilineTextAlignment(.center)
+                    .frame(width: 60)
+                    .focused($isPageFocused)
+                    .keyboardType(.numberPad)
+                    .onSubmit {
+                        savePageNumber()
+                    }
+
+                    Text("PAGE")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .tracking(1.5)
+                }
+            } else {
+                Button {
+                    pageText = "\(session.endPage)"
+                    editingPage = true
+                    isPageFocused = true
+                    SensoryFeedback.light()
+                } label: {
+                    VStack(spacing: 4) {
+                    HStack(spacing: 2) {
+                        Text("\(session.endPage)")
+                            .font(.system(size: 20, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.95))
+
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+
+                    Text("PAGE")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .tracking(1.5)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Progress indicator if we have page count
+            if let totalPages = book.pageCount, totalPages > 0 {
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 0.5)
+                    .frame(maxHeight: 40)
+
+                VStack(spacing: 4) {
+                    Text("\(totalPages - session.endPage)")
+                    .font(.system(size: 20, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.95))
+
+                    Text("LEFT")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .tracking(1.5)
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.001))
+        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+        }
+        .onAppear {
+            startTimer()
+        }
+        .onDisappear {
+            timer?.invalidate()
+        }
+        .onTapGesture {
+            if editingPage {
+                savePageNumber()
+            }
+        }
+    }
+
+    private func savePageNumber() {
+        editingPage = false
+        isPageFocused = false
+
+        if let pageNumber = Int(pageText), pageNumber > 0 {
+            session.updateCurrentPage(pageNumber)
+            // Also update the book's current page for timeline progress
+            if let bookModel = session.bookModel {
+                bookModel.currentPage = pageNumber
+            }
+            print("📖 Updated session page to: \(pageNumber)")
+        }
+    }
+
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            currentTime = Date()
+        }
+    }
+}
+
+// MARK: - End Session Sheet - Matches Ambient Session Summary
+struct EndSessionSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var libraryViewModel: LibraryViewModel
+
+    @Bindable var session: ReadingSession
+    let book: Book
+    @Binding var activeSession: ReadingSession?
+    let colorPalette: ColorPalette?
+    @Binding var showingSessionSavedToast: Bool
+
+    @State private var pagesRead: String
+    @State private var currentPage: String
+    @State private var isUpdatingFromPagesRead = false
+    @State private var isUpdatingFromCurrentPage = false
+    @FocusState private var focusedField: Field?
+
+    enum Field {
+        case pagesRead, currentPage
+    }
+
+    init(session: ReadingSession, book: Book, activeSession: Binding<ReadingSession?>, colorPalette: ColorPalette?, showingSessionSavedToast: Binding<Bool>) {
+        self.session = session
+        self.book = book
+        self._activeSession = activeSession
+        self.colorPalette = colorPalette
+        self._showingSessionSavedToast = showingSessionSavedToast
+        _pagesRead = State(initialValue: "0")
+        _currentPage = State(initialValue: "\(session.startPage)")
+    }
+
+    // Enhanced color matching the gradient background
+    private var accentColor: Color {
+        guard let palette = colorPalette else { return Color.warmAmber }
+        return enhanceColor(palette.primary)
+    }
+
+    private func enhanceColor(_ color: Color) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+
+        // Same enhancement as BookAtmosphericGradientView
+        saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
+        brightness = max(brightness, 0.4)         // Minimum brightness
+
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 32) {
+                // Duration - prominent at top
+                VStack(spacing: 8) {
+                    Text(session.formattedDuration)
+                        .font(.system(size: 48, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white)
+
+                    Text("DURATION")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .tracking(1.2)
+                }
+                .padding(.top, 40)
+
+                // Inputs contained in a single glass card
+                VStack {
+                    HStack(spacing: 24) {
+                        // Pages Read
+                        VStack(spacing: 8) {
+                            TextField("0", text: $pagesRead)
+                                .font(.system(size: 36, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 80)
+                                .focused($focusedField, equals: .pagesRead)
+                                .keyboardType(.numberPad)
+                                .onChange(of: pagesRead) { _, newValue in
+                                    if let pages = Int(newValue), !isUpdatingFromCurrentPage {
+                                        isUpdatingFromPagesRead = true
+                                        let calculated = session.startPage + pages
+                                        currentPage = "\(calculated)"
+                                        isUpdatingFromPagesRead = false
+                                    }
+                                }
+
+                            Text("PAGES READ")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .tracking(1)
+                        }
+                        .padding(8)
+                        .overlay {
+                            if focusedField == .pagesRead {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(accentColor.opacity(0.5), lineWidth: 1)
+                            }
+                        }
+
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.3))
+
+                        // Current Page
+                        VStack(spacing: 8) {
+                            TextField("\(session.startPage)", text: $currentPage)
+                                .font(.system(size: 36, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 80)
+                                .focused($focusedField, equals: .currentPage)
+                                .keyboardType(.numberPad)
+                                .onChange(of: currentPage) { _, newValue in
+                                    if let page = Int(newValue), !isUpdatingFromPagesRead {
+                                        isUpdatingFromCurrentPage = true
+                                        let calculated = page - session.startPage
+                                        pagesRead = "\(max(0, calculated))"
+                                        isUpdatingFromCurrentPage = false
+                                    }
+                                }
+
+                            Text("CURRENT PAGE")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .tracking(1)
+                        }
+                        .padding(8)
+                        .overlay {
+                            if focusedField == .currentPage {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(accentColor.opacity(0.5), lineWidth: 1)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                }
+                // Apply glass directly to the container (no background)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .navigationTitle("End Session")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                // Remove trailing primary to avoid two competing CTAs; bottom CTA is primary
+            }
+            // Bottom button area
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    let finalPage = Int(currentPage) ?? session.endPage
+                    session.endSession(at: finalPage)
+                    if let bookModel = session.bookModel {
+                        bookModel.currentPage = finalPage
+                        try? modelContext.save()
+                        print("📊 Session ended - Updated currentPage to \(finalPage)")
+                        print("📊 Book total pages: \(bookModel.pageCount ?? 0)")
+                    }
+                    // Also update the Book struct through LibraryViewModel
+                    libraryViewModel.updateCurrentPage(for: book, to: finalPage)
+                    activeSession = nil
+                    dismiss()
+                    SensoryFeedback.success()
+
+                    // Show success toast after a brief delay (after sheet dismisses)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showingSessionSavedToast = true
+                        }
+                    }
+                } label: {
+                    Text("Save Session")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 14)
+                        .glassEffect(.regular.tint(accentColor.opacity(0.3)), in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(accentColor.opacity(0.4), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            }
+        }
+        .onAppear {
+            focusedField = .pagesRead
+        }
+    }
+
+    private func metricItem(value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 24, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.95))
+
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .tracking(1.5)
+        }
     }
 }

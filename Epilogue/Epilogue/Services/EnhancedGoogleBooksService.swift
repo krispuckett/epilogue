@@ -336,9 +336,28 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 }
                 // Extra boost for popular publishers
                 if let publisher = volumeInfo.publisher?.lowercased() {
-                    if publisher.contains("houghton") || publisher.contains("harper") || 
+                    if publisher.contains("houghton") || publisher.contains("harper") ||
                        publisher.contains("ballantine") || publisher.contains("mariner") {
                         score += 50
+                    }
+                }
+            }
+
+            // General publisher quality boost for all books
+            if let publisher = volumeInfo.publisher?.lowercased() {
+                // Major literary publishers get significant boost
+                let majorPublishers = [
+                    "penguin", "random house", "harpercollins", "simon & schuster",
+                    "macmillan", "oxford", "cambridge", "yale", "harvard",
+                    "vintage", "knopf", "pantheon", "norton", "farrar",
+                    "scribner", "bloomsbury", "penguin classics", "modern library",
+                    "dover", "everyman", "houghton mifflin"
+                ]
+
+                for majorPub in majorPublishers {
+                    if publisher.contains(majorPub) {
+                        score += 50
+                        break
                     }
                 }
             }
@@ -424,18 +443,21 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 }
             }
             
-            // Popularity metrics
+            // Popularity metrics - SIGNIFICANTLY boost popular editions
             let ratingsCount = volumeInfo.ratingsCount ?? 0
             let averageRating = volumeInfo.averageRating ?? 0
-            
-            // Logarithmic scale for ratings count (popular books score higher)
+
+            // Stronger logarithmic scale for ratings count (popular editions rise to top)
             if ratingsCount > 0 {
-                score += min(20, log10(Double(ratingsCount)) * 5)
+                // Much more aggressive: up to +80 for very popular books (10k+ ratings)
+                score += min(80, log10(Double(ratingsCount)) * 20)
             }
-            
-            // High average rating bonus
-            if averageRating >= 4.0 {
-                score += 10
+
+            // High average rating bonus (increased)
+            if averageRating >= 4.5 {
+                score += 30  // Excellent rating
+            } else if averageRating >= 4.0 {
+                score += 15  // Good rating
             }
             
             // Page count (filter out previews/samples)

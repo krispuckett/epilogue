@@ -19,20 +19,34 @@ struct EpilogueApp: App {
                     // .runSwiftDataMigrations() // DISABLED - causing data loss
                     .onAppear {
                         // API key is now built-in, no setup needed
-                        
+
                         // Clear command history on app launch to prevent artifacts
                         Task { @MainActor in
                             CommandHistoryManager.shared.clearHistory()
                         }
-                        
+
                         // Request notification permissions
                         requestNotificationPermissions()
-                        
+
                         // Check CloudKit status and show alert if needed
                         checkCloudKitStatus()
-                        
+
                         // Schedule background refresh for trending books
                         EnhancedTrendingBooksService.shared.scheduleBackgroundRefresh()
+
+                        // Initialize offline services
+                        if let container = modelContainer {
+                            let context = ModelContext(container)
+                            OfflineQueueManager.shared.configure(with: context)
+                            OfflineCoverCacheService.shared.configure(with: context)
+
+                            // Background task: Cache all library covers for offline use
+                            Task.detached(priority: .background) { @MainActor in
+                                // Wait 5 seconds after launch to avoid competing for resources
+                                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                                await OfflineCoverCacheService.shared.cacheAllLibraryCovers()
+                            }
+                        }
                     }
                     .alert("iCloud Sync Required", isPresented: $showingCloudKitAlert) {
                         Button("Settings") {
@@ -93,38 +107,45 @@ struct EpilogueApp: App {
             DataRecovery.cleanSwiftDataStore()
         }
 
-        let schema = Schema([
-            BookModel.self,
-            CapturedNote.self,
-            CapturedQuote.self,
-            CapturedQuestion.self,
-            AmbientSession.self,
-            QueuedQuestion.self
-        ])
-
         // CRITICAL: Always use CloudKit for data persistence and sync
         // We'll retry multiple times to ensure CloudKit is properly initialized
         var retryCount = 0
         let maxRetries = 3
         var lastError: Error?
-        
+
         while retryCount < maxRetries {
             do {
-                let cloudKitConfig = ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: false,
-                    cloudKitDatabase: .automatic  // Enable CloudKit sync
-                )
-                
                 // Set a custom name to ensure we're not conflicting with old local stores
                 let cloudKitContainer = ModelConfiguration(
                     "EpilogueCloudKit",
-                    schema: schema,
                     isStoredInMemoryOnly: false,
                     cloudKitDatabase: .automatic
                 )
-                
-                modelContainer = try ModelContainer(for: schema, configurations: [cloudKitContainer])
+
+                // SwiftData will automatically handle lightweight migration for optional fields
+                print("🔄 Initializing ModelContainer with automatic migration...")
+                modelContainer = try ModelContainer(
+                    for: BookModel.self,
+                         CapturedNote.self,
+                         CapturedQuote.self,
+                         CapturedQuestion.self,
+                         AmbientSession.self,
+                         QueuedQuestion.self,
+                         ReadingSession.self,
+                    configurations: cloudKitContainer
+                )
+                print("✅ ModelContainer initialized successfully")
+
+                // Verify data after migration
+                let context = ModelContext(modelContainer!)
+                let bookDescriptor = FetchDescriptor<BookModel>()
+                if let books = try? context.fetch(bookDescriptor) {
+                    print("📚 Books in library after init: \(books.count)")
+                    if let firstBook = books.first {
+                        print("   Sample: '\(firstBook.title)' by \(firstBook.author)")
+                        print("   Enrichment: \(firstBook.isEnriched ? "YES" : "not yet")")
+                    }
+                }
                 DataRecovery.recordInitializationSuccess()
                 
                 // Store that we're using CloudKit
@@ -173,11 +194,19 @@ struct EpilogueApp: App {
             // On simulator, use local persistent storage since CloudKit is unreliable
             let localConfig = ModelConfiguration(
                 "EpilogueLocal",
-                schema: schema,
                 isStoredInMemoryOnly: false,
                 cloudKitDatabase: .none  // No CloudKit on simulator
             )
-            modelContainer = try ModelContainer(for: schema, configurations: [localConfig])
+            modelContainer = try ModelContainer(
+                for: BookModel.self,
+                     CapturedNote.self,
+                     CapturedQuote.self,
+                     CapturedQuestion.self,
+                     AmbientSession.self,
+                     QueuedQuestion.self,
+                     ReadingSession.self,
+                configurations: localConfig
+            )
             
             print("📱 Simulator detected: Using local persistent storage")
             print("⚠️ CloudKit sync disabled on simulator")
@@ -192,7 +221,11 @@ struct EpilogueApp: App {
                 schema: schema,
                 isStoredInMemoryOnly: true
             )
-            modelContainer = try ModelContainer(for: schema, configurations: [memoryConfig])
+            modelContainer = try ModelContainer(
+                for: schema,
+                migrationPlan: EpilogueMigrationPlan.self,
+                configurations: [memoryConfig]
+            )
             
             // Set a flag to show CloudKit error in the UI
             UserDefaults.standard.set(false, forKey: "isUsingCloudKit")

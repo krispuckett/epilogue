@@ -1,13 +1,19 @@
 import SwiftUI
+import SwiftData
 import UIKit
 
 // MARK: - Book Search Sheet (Matching Session Summary Design)
 struct BookSearchSheet: View {
     enum Mode { case add, replace }
+    enum ViewMode { case trending, forYou }
+
     let searchQuery: String
     let onBookSelected: (Book) -> Void
     var mode: Mode = .add
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allBooks: [BookModel]
+
     @StateObject private var booksService = EnhancedGoogleBooksService()
     @StateObject private var trendingService = EnhancedTrendingBooksService.shared
     @State private var searchResults: [Book] = []
@@ -16,7 +22,16 @@ struct BookSearchSheet: View {
     @State private var refinedSearchQuery: String = ""
     @State private var hasAutoSearched = false
     @FocusState private var isSearchFocused: Bool
-    // Remove local state - use the service's selectedCategory directly
+
+    // For You state
+    @State private var viewMode: ViewMode = .trending
+    @State private var forYouRecommendations: [RecommendationEngine.Recommendation] = []
+    @State private var isLoadingForYou = false
+
+    // Library size check for For You availability
+    private var hasEnoughBooksForRecommendations: Bool {
+        allBooks.count >= 5
+    }
     
     var body: some View {
         NavigationStack {
@@ -26,22 +41,36 @@ struct BookSearchSheet: View {
                 
                 ScrollView {
                     VStack(spacing: 0) {
-                        if isLoading {
-                            loadingView
-                                .padding(.top, 100)
-                        } else if let error = searchError {
-                            errorView(error: error)
-                        } else if searchResults.isEmpty {
-                            // Show bestsellers when no search results and no query
-                            if searchQuery.isEmpty && refinedSearchQuery.isEmpty {
-                                bestsellersView
-                                    .padding(.top, 24)
-                            } else {
-                                emptyStateView
-                            }
+                        // Mode toggle (Trending | For You)
+                        if searchQuery.isEmpty && refinedSearchQuery.isEmpty {
+                            modeToggle
+                                .padding(.top, 16)
+                                .padding(.bottom, 8)
+                        }
+
+                        // Content based on view mode
+                        if viewMode == .forYou {
+                            forYouView
+                                .padding(.top, 16)
                         } else {
-                            resultsView
-                                .padding(.top, 24)
+                            // Original trending/search view
+                            if isLoading {
+                                loadingView
+                                    .padding(.top, 100)
+                            } else if let error = searchError {
+                                errorView(error: error)
+                            } else if searchResults.isEmpty {
+                                // Show bestsellers when no search results and no query
+                                if searchQuery.isEmpty && refinedSearchQuery.isEmpty {
+                                    bestsellersView
+                                        .padding(.top, 24)
+                                } else {
+                                    emptyStateView
+                                }
+                            } else {
+                                resultsView
+                                    .padding(.top, 24)
+                            }
                         }
                     }
                     .padding(.bottom, 100) // Space for input bar
@@ -618,6 +647,277 @@ struct BookSearchSheet: View {
         
         return matrix[m][n]
     }
+
+    // MARK: - Mode Toggle (Trending | For You)
+
+    private var modeToggle: some View {
+        HStack(spacing: 8) {
+            // Trending button
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    viewMode = .trending
+                }
+                SensoryFeedback.selection()
+            } label: {
+                Text("Trending")
+                    .font(.system(size: 15, weight: viewMode == .trending ? .semibold : .medium))
+                    .foregroundStyle(viewMode == .trending ? DesignSystem.Colors.primaryAccent : .white.opacity(0.6))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background {
+                        if viewMode == .trending {
+                            Capsule()
+                                .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
+                                .matchedGeometryEffect(id: "mode_pill", in: modeToggleNamespace)
+                        }
+                    }
+            }
+            .buttonStyle(.plain)
+
+            // For You button
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    viewMode = .forYou
+                }
+                SensoryFeedback.selection()
+
+                // Load recommendations on first tap
+                if forYouRecommendations.isEmpty {
+                    Task {
+                        await loadForYouRecommendations()
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if !hasEnoughBooksForRecommendations {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 11))
+                    }
+                    Text("For You")
+                }
+                .font(.system(size: 15, weight: viewMode == .forYou ? .semibold : .medium))
+                .foregroundStyle(viewMode == .forYou ? DesignSystem.Colors.primaryAccent : .white.opacity(hasEnoughBooksForRecommendations ? 0.6 : 0.3))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background {
+                    if viewMode == .forYou {
+                        Capsule()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
+                            .matchedGeometryEffect(id: "mode_pill", in: modeToggleNamespace)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasEnoughBooksForRecommendations)
+        }
+        .padding(6)
+        .background {
+            Capsule()
+                .fill(Color.white.opacity(0.05))
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                }
+        }
+    }
+
+    @Namespace private var modeToggleNamespace
+
+    // MARK: - For You View
+
+    @ViewBuilder
+    private var forYouView: some View {
+        if !hasEnoughBooksForRecommendations {
+            forYouEmptyState
+        } else if isLoadingForYou {
+            forYouLoadingState
+        } else if forYouRecommendations.isEmpty {
+            Text("No recommendations yet")
+                .foregroundStyle(.white.opacity(0.6))
+                .padding(.top, 100)
+        } else {
+            forYouResults
+        }
+    }
+
+    // MARK: - For You Empty State (<5 books)
+
+    private var forYouEmptyState: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 16) {
+                // Lock icon
+                ZStack {
+                    Circle()
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.1))
+                        .frame(width: 80, height: 80)
+
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                }
+
+                VStack(spacing: 8) {
+                    Text("For You")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text("Add \(5 - allBooks.count) more \(5 - allBooks.count == 1 ? "book" : "books") to unlock personalized recommendations")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+
+                // Mini explainer
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("HOW IT WORKS")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .tracking(1.2)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Analyzes your library on-device", systemImage: "cpu")
+                        Label("Uses AI to understand your taste", systemImage: "brain")
+                        Label("Recommends books you'll love", systemImage: "sparkles")
+                    }
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.02))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                        }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                .padding(.top, 8)
+            }
+
+            Spacer()
+            Spacer()
+        }
+    }
+
+    // MARK: - For You Loading State
+
+    private var forYouLoadingState: some View {
+        VStack(spacing: 24) {
+            // Animated dots
+            HStack(spacing: 8) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.8))
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(1.0)
+                        .animation(
+                            .easeInOut(duration: 0.6)
+                                .repeatForever()
+                                .delay(Double(index) * 0.2),
+                            value: isLoadingForYou
+                        )
+                }
+            }
+
+            VStack(spacing: 12) {
+                Text("Analyzing your library...")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Text("Reading your taste, finding perfect matches")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 80)
+    }
+
+    // MARK: - For You Results
+
+    private var forYouResults: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Header
+            VStack(alignment: .leading, spacing: 8) {
+                Text("FOR YOU")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .tracking(1.2)
+
+                Text("Based on your library of \(allBooks.count) books")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+
+            // Recommendations list
+            LazyVStack(spacing: 0) {
+                ForEach(forYouRecommendations) { rec in
+                    ForYouRecommendationRow(recommendation: rec, onAdd: {
+                        // Convert to Book and call onBookSelected
+                        let book = Book(
+                            id: rec.id,
+                            title: rec.title,
+                            author: rec.author,
+                            publishedYear: rec.year,
+                            coverImageURL: rec.coverURL
+                        )
+                        onBookSelected(book)
+                        dismiss()
+                    })
+                }
+            }
+        }
+    }
+
+    // MARK: - Load For You Recommendations
+
+    private func loadForYouRecommendations() async {
+        isLoadingForYou = true
+
+        do {
+            // Check cache first
+            if let cached = await RecommendationCache.shared.load(currentBookCount: allBooks.count) {
+                print("✅ Using cached recommendations")
+                forYouRecommendations = cached.recommendations
+                isLoadingForYou = false
+                return
+            }
+
+            // Generate fresh recommendations
+            print("🎯 Generating fresh For You recommendations...")
+
+            // Step 1: Analyze library on-device
+            let profile = await LibraryTasteAnalyzer.shared.analyzeLibrary(books: allBooks)
+
+            // Step 2: Get recommendations from Perplexity
+            let recommendations = try await RecommendationEngine.shared.generateRecommendations(for: profile)
+
+            // Step 3: Cache for 30 days
+            await RecommendationCache.shared.save(
+                profile: profile,
+                recommendations: recommendations,
+                bookCount: allBooks.count
+            )
+
+            await MainActor.run {
+                forYouRecommendations = recommendations
+                isLoadingForYou = false
+            }
+
+            print("✅ Loaded \(recommendations.count) For You recommendations")
+
+        } catch {
+            print("❌ Failed to load For You recommendations: \(error)")
+            isLoadingForYou = false
+        }
+    }
 }
 
 // MARK: - Clean Book Search Result Row
@@ -854,6 +1154,66 @@ struct SmartBookCoverView: View {
             print("❌ Failed to load cover from: \(url)")
         }
         isLoading = false
+    }
+}
+
+// MARK: - For You Recommendation Row
+struct ForYouRecommendationRow: View {
+    let recommendation: RecommendationEngine.Recommendation
+    let onAdd: () -> Void
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            // Book cover
+            SmartBookCoverView(coverURL: recommendation.coverURL, width: 50, height: 75)
+
+            // Book info with reasoning
+            VStack(alignment: .leading, spacing: 6) {
+                Text(recommendation.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                Text(recommendation.author)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+
+                // Reasoning - collapsible
+                Text(recommendation.reasoning)
+                    .font(.system(size: 13))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.9))
+                    .lineLimit(isExpanded ? nil : 2)
+                    .multilineTextAlignment(.leading)
+                    .padding(.top, 4)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isExpanded.toggle()
+                        }
+                    }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Add button
+            Button(action: {
+                print("📚 For You book selected:")
+                print("   Title: \(recommendation.title)")
+                print("   Reasoning: \(recommendation.reasoning)")
+                onAdd()
+            }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        .padding(.vertical, 12)
     }
 }
 

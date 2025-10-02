@@ -3,6 +3,7 @@ import SwiftData
 import Network
 import Combine
 import OSLog
+import UserNotifications
 
 @MainActor
 class OfflineQueueManager: ObservableObject {
@@ -131,45 +132,107 @@ class OfflineQueueManager: ObservableObject {
     }
     
     private func processQuestion(_ question: QueuedQuestion) async {
-        do {
-            // Create book context if available
-            var bookContext: BookModel?
-            if let title = question.bookTitle,
-               let author = question.bookAuthor,
-               let modelContext = modelContext {
-                let descriptor = FetchDescriptor<BookModel>(
-                    predicate: #Predicate { (book: BookModel) in
-                        book.title == title && book.author == author
-                    }
+        // Check if network is still available before processing
+        guard isOnline else {
+            logger.info("⏸️ Network lost during processing, pausing queue")
+            return
+        }
+
+        let maxRetries = 3
+        var lastError: Error?
+
+        for attempt in 1...maxRetries {
+            do {
+                // Create book context if available
+                var bookContext: BookModel?
+                if let title = question.bookTitle,
+                   let author = question.bookAuthor,
+                   let modelContext = modelContext {
+                    let descriptor = FetchDescriptor<BookModel>(
+                        predicate: #Predicate { (book: BookModel) in
+                            book.title == title && book.author == author
+                        }
+                    )
+                    bookContext = try modelContext.fetch(descriptor).first
+                }
+
+                // Process with OptimizedPerplexityService - we can't cast BookModel to Book directly
+                // For now, pass nil to avoid type conflicts
+                // TODO: Figure out the proper Book type conversion
+                let response = try await OptimizedPerplexityService.shared.chat(
+                    message: question.question ?? "",
+                    bookContext: nil as Book?
                 )
-                bookContext = try modelContext.fetch(descriptor).first
+
+                // Success! Mark as processed
+                question.processed = true
+                question.response = response
+                question.processingError = nil
+
+                try modelContext?.save()
+
+                logger.info("✅ Processed question (attempt \(attempt)): \(question.question ?? "")")
+
+                // Post notification for UI update
+                NotificationCenter.default.post(
+                    name: Notification.Name("QueuedQuestionProcessed"),
+                    object: question
+                )
+
+                // Send user notification if app is in background
+                await sendNotificationForAnsweredQuestion(question)
+
+                return // Success, exit retry loop
+
+            } catch {
+                lastError = error
+                logger.warning("⚠️ Attempt \(attempt) failed: \(error.localizedDescription)")
+
+                // Check if we should retry
+                if attempt < maxRetries {
+                    // Check network status before retrying
+                    guard isOnline else {
+                        logger.info("📵 Network lost, stopping retries")
+                        question.processingError = "Network unavailable"
+                        try? modelContext?.save()
+                        return
+                    }
+
+                    // Exponential backoff: 2s, 4s, 8s
+                    let delay = pow(2.0, Double(attempt))
+                    logger.info("⏳ Retrying in \(Int(delay))s...")
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                } else {
+                    // All retries exhausted
+                    question.processingError = "Failed after \(maxRetries) attempts: \(error.localizedDescription)"
+                    try? modelContext?.save()
+                    logger.error("❌ All retries exhausted for question: \(question.question ?? "")")
+                }
             }
-            
-            // Process with OptimizedPerplexityService - we can't cast BookModel to Book directly
-            // For now, pass nil to avoid type conflicts
-            // TODO: Figure out the proper Book type conversion
-            let response = try await OptimizedPerplexityService.shared.chat(
-                message: question.question ?? "",
-                bookContext: nil as Book?
-            )
-            
-            // Mark as processed
-            question.processed = true
-            question.response = response
-            
-            try modelContext?.save()
-            
-            logger.info("✅ Processed question: \(question.question ?? "")")
-            
-            // Post notification for UI update
-            NotificationCenter.default.post(
-                name: Notification.Name("QueuedQuestionProcessed"),
-                object: question
-            )
-            
+        }
+    }
+
+    // MARK: - Notifications
+
+    private func sendNotificationForAnsweredQuestion(_ question: QueuedQuestion) async {
+        guard let questionText = question.question else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Question Answered"
+        content.body = questionText
+        content.sound = .default
+        content.categoryIdentifier = "ANSWERED_QUESTION"
+
+        let request = UNNotificationRequest(
+            identifier: question.id?.uuidString ?? UUID().uuidString,
+            content: content,
+            trigger: nil // Deliver immediately
+        )
+
+        do {
+            try await UNUserNotificationCenter.current().add(request)
         } catch {
-            question.processingError = error.localizedDescription
-            logger.error("❌ Failed to process question: \(error)")
+            logger.error("Failed to send notification: \(error)")
         }
     }
     

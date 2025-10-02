@@ -15,7 +15,19 @@ final class BookModel {
     var isbn: String?
     var desc: String? // 'description' is reserved
     var pageCount: Int?
-    
+
+    // Offline cover image caching
+    @Attribute(.externalStorage) var coverImageData: Data?
+
+    // Smart enrichment (spoiler-free AI-generated context)
+    var smartSynopsis: String?        // 2-3 sentences, NO spoilers
+    var keyThemes: [String]?          // ["friendship", "courage", "sacrifice"]
+    var majorCharacters: [String]?    // ["Frodo", "Sam", "Gandalf"] - just names
+    var setting: String?              // "Middle Earth, Third Age"
+    var tone: [String]?               // ["epic", "dark", "hopeful"]
+    var literaryStyle: String?        // "High fantasy, allegorical"
+    var enrichedAt: Date?             // When enrichment was fetched
+
     // Reading status
     var isInLibrary: Bool = false  // Default for CloudKit
     var readingStatus: String = ReadingStatus.wantToRead.rawValue // Store as string for SwiftData
@@ -36,6 +48,9 @@ final class BookModel {
     
     @Relationship(deleteRule: .cascade, inverse: \AmbientSession.bookModel)
     var sessions: [AmbientSession]?
+
+    @Relationship(deleteRule: .cascade, inverse: \ReadingSession.bookModel)
+    var readingSessions: [ReadingSession]?
     
     init(
         id: String,
@@ -127,6 +142,11 @@ final class BookModel {
         }
         
         return book
+    }
+
+    // Check if book has been enriched with smart context
+    var isEnriched: Bool {
+        smartSynopsis != nil
     }
 }
 

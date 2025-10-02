@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import SwiftData
 import os.log
 
 /// Unified service for adding books to the library
@@ -16,14 +17,16 @@ class BookAdditionService {
     func addBook(
         _ book: Book,
         to libraryViewModel: LibraryViewModel,
+        modelContext: ModelContext? = nil,
         extractColors: Bool = true,
         preloadCover: Bool = true,
+        cacheCoverOffline: Bool = true,
         overwriteIfExists: Bool = false
     ) async {
         #if DEBUG
         print("📚 BookAdditionService: Adding \(book.title)")
         #endif
-        
+
         // Add to library
         libraryViewModel.addBook(book, overwriteIfExists: overwriteIfExists)
 
@@ -37,15 +40,26 @@ class BookAdditionService {
             #endif
             _ = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL)
         }
-        
+
+        // Cache cover for offline use (persistent to SwiftData)
+        if cacheCoverOffline, let context = modelContext {
+            // Find the BookModel that was just added
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.id == book.id }
+            )
+            if let bookModel = try? context.fetch(descriptor).first {
+                await OfflineCoverCacheService.shared.cacheCoverForNewBook(bookModel)
+            }
+        }
+
         // Extract colors
         if extractColors {
             await extractAndCacheColors(for: book)
         }
-        
+
         // Generate AI context for instant responses
         await BookContextCache.shared.generateContextForBook(book)
-        
+
         #if DEBUG
         print("✅ Successfully added: \(book.title)")
         #endif
@@ -57,34 +71,38 @@ class BookAdditionService {
     func addBooks(
         _ books: [Book],
         to libraryViewModel: LibraryViewModel,
+        modelContext: ModelContext? = nil,
         extractColors: Bool = true,
         preloadCovers: Bool = true,
+        cacheCoverOffline: Bool = true,
         overwriteIfExists: Bool = true,
         progressHandler: ((Int, Int, String) -> Void)? = nil
     ) async {
         #if DEBUG
         print("📚 BookAdditionService: Adding \(books.count) books")
         #endif
-        
+
         for (index, book) in books.enumerated() {
             // Update progress
             progressHandler?(index + 1, books.count, book.title)
-            
+
             // Add book using single book method
             await addBook(
                 book,
                 to: libraryViewModel,
+                modelContext: modelContext,
                 extractColors: false, // We'll extract colors in batch after
                 preloadCover: preloadCovers,
+                cacheCoverOffline: cacheCoverOffline,
                 overwriteIfExists: overwriteIfExists
             )
-            
+
             // Small delay to avoid overwhelming the system
             if index < books.count - 1 {
                 try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
             }
         }
-        
+
         // Extract colors for all books in batch
         if extractColors {
             #if DEBUG
@@ -93,7 +111,7 @@ class BookAdditionService {
             progressHandler?(0, books.count, "Extracting colors...")
             await extractColorsInBatch(for: books, progressHandler: progressHandler)
         }
-        
+
         #if DEBUG
         print("✅ Batch addition complete: \(books.count) books added")
         #endif
