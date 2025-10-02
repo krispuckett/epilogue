@@ -83,7 +83,7 @@ public class TrueAmbientProcessor: ObservableObject {
     
     // Enhanced intelligence systems
     private let intentDetector = EnhancedIntentDetector()
-    private let conversationMemory = ConversationMemory()
+    private let conversationMemory = ConversationMemory.shared
     private let foundationModels = FoundationModelsManager.shared  // This refers to iOS26FoundationModels wrapper
     
     // NEW: Optimized components for App Store quality
@@ -401,16 +401,26 @@ public class TrueAmbientProcessor: ObservableObject {
                                            (evolving.base.hasPrefix("how is") && normalizedText.hasPrefix("how is"))
                     
                     if similarity > 0.7 && lastWordSimilar && sameQuestionStart {
-                        
+
                         // IMPORTANT: Only treat as evolution if the new text is MORE complete (longer)
                         // This prevents "Who is Bilbo Baggins?" from being replaced by "Who is Bilbo Ba?"
                         if normalizedText.count < evolving.base.count {
                             logger.info("⚠️ Ignoring shorter variant: '\(normalizedText)' (keeping '\(evolving.base)')")
                             return  // Don't process this shorter version
                         }
-                        
+
                         // This is likely a correction - remove the old question
                         logger.info("🔄 Detected question evolution: '\(evolving.base)' → '\(normalizedText)'")
+
+                        // Post notification for UI to show evolution correction
+                        NotificationCenter.default.post(
+                            name: Notification.Name("TranscriptionEvolved"),
+                            object: nil,
+                            userInfo: [
+                                "original": evolving.base,
+                                "corrected": normalizedText
+                            ]
+                        )
                         
                         // Remove from active questions
                         activeQuestions.remove(evolving.base)

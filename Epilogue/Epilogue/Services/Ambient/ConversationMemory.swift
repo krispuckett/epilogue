@@ -6,7 +6,10 @@ private let logger = Logger(subsystem: "com.epilogue", category: "ConversationMe
 
 // MARK: - Conversation Memory System
 public class ConversationMemory {
-    
+
+    // Shared singleton instance
+    public static let shared = ConversationMemory()
+
     // MARK: - Memory Entry
     public struct MemoryEntry {
         let id = UUID()

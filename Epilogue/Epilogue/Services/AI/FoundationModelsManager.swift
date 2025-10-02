@@ -120,7 +120,7 @@ class AIFoundationModelsManager: ObservableObject {
     func getOrCreateSession(for bookTitle: String?) async throws -> Any? {
         #if canImport(FoundationModels)
         let sessionKey = bookTitle ?? "default"
-        
+
         // Check if session exists and is still valid
         if let existingSession = sessions[sessionKey],
            let timestamp = sessionTimestamps[sessionKey],
@@ -128,21 +128,47 @@ class AIFoundationModelsManager: ObservableObject {
             logger.info("♻️ Reusing session for: \(sessionKey)")
             return existingSession
         }
-        
+
         // Create new session with book-specific instructions
         logger.info("🆕 Creating session for: \(sessionKey)")
-        
+
         let instructions = generateBookSpecificInstructions(bookTitle: bookTitle)
-        
-        // Create session with instructions using the correct API
-        let session = LanguageModelSession(instructions: instructions)
-        
-        // Cache session
-        sessions[sessionKey] = session
-        sessionTimestamps[sessionKey] = Date()
-        sessionTokenCounts[sessionKey] = 0
-        
-        return session
+
+        // Create reading tools for the AI
+        if #available(iOS 26.0, *) {
+            let tools: [any Tool] = [
+                ReadingProgressTool(),
+                ConversationHistoryTool(),
+                EntityMentionsTool(),
+                RelatedCapturesTool(),
+                ActiveThreadTool()
+            ]
+
+            logger.info("🛠️ Registering \(tools.count) tools with Foundation Models session")
+
+            // Create session with tools and instructions
+            let session = LanguageModelSession(
+                tools: tools,
+                instructions: instructions
+            )
+
+            // Cache session
+            sessions[sessionKey] = session
+            sessionTimestamps[sessionKey] = Date()
+            sessionTokenCounts[sessionKey] = 0
+
+            return session
+        } else {
+            // Fallback for earlier iOS versions - session without tools
+            let session = LanguageModelSession(instructions: instructions)
+
+            // Cache session
+            sessions[sessionKey] = session
+            sessionTimestamps[sessionKey] = Date()
+            sessionTokenCounts[sessionKey] = 0
+
+            return session
+        }
         #else
         return nil
         #endif
@@ -151,13 +177,27 @@ class AIFoundationModelsManager: ObservableObject {
     private func generateBookSpecificInstructions(bookTitle: String?) -> String {
         let baseInstructions = """
         You are an intelligent reading companion helping users understand and explore books.
-        
+
         CRITICAL RULES:
         1. ALWAYS answer questions about book content factually and directly
         2. NEVER give spoiler warnings - users are actively reading these books
         3. Be specific and detailed when discussing plot, characters, and themes
         4. If you need current information (news, updates, reviews), indicate this clearly
         5. Provide thoughtful analysis and insights to enhance the reading experience
+
+        AVAILABLE TOOLS:
+        You have access to tools that let you query the user's reading session:
+        - getReadingProgress: Get current page, chapter, and session duration
+        - getConversationHistory: See what you discussed earlier in this session
+        - findEntityMentions: Find all mentions of a character, location, or concept
+        - findRelatedCaptures: Search saved quotes and notes
+        - getActiveThread: Get info about the current conversation thread
+
+        USE THESE TOOLS when helpful to provide better context-aware responses.
+        For example:
+        - If asked "What did I say about Gandalf?", use findEntityMentions
+        - If asked "Did we discuss this before?", use getConversationHistory
+        - If asked "What quotes do I have about power?", use findRelatedCaptures
         """
         
         if let bookTitle = bookTitle {
@@ -362,7 +402,7 @@ class AIFoundationModelsManager: ObservableObject {
         let detector = EnhancedIntentDetector()
         let intent = detector.detectIntent(from: query, bookTitle: bookContext?.title, bookAuthor: bookContext?.author)
 
-        let memoryContext = ConversationMemory().buildContextForResponse(currentIntent: intent)
+        let memoryContext = ConversationMemory.shared.buildContextForResponse(currentIntent: intent)
         if !memoryContext.isEmpty {
             contextParts.append(memoryContext)
             logger.info("📚 Added conversation memory context")

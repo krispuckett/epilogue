@@ -70,27 +70,20 @@ class AmbientContextManager {
         // 1. Current Reading Context
         if let book = book {
             contextParts.append("Reading '\(book.title)' by \(book.author)")
-            
+
             if let page = currentPage {
-                contextParts.append("Currently on page \(page)")
-                
+                contextParts.append("User reports being on page \(page)")
+
                 // Add pace context
                 if timeOnCurrentPage > 300 {  // More than 5 minutes on same page
                     contextParts.append("(Reader spending time on this page - might be complex or interesting)")
                 }
             }
-            
-            if let pageCount = book.pageCount, pageCount > 0 {
-                let progress = Double(book.currentPage) / Double(pageCount)
-                let percentage = Int(progress * 100)
-                contextParts.append("Progress: \(percentage)% complete")
-                
-                // Add context based on progress
-                if progress < 0.2 {
-                    contextParts.append("Early in the book - avoid major spoilers")
-                } else if progress > 0.8 {
-                    contextParts.append("Near the end - can discuss most plot points")
-                }
+
+            // NOTE: We don't calculate progress % because page numbers vary by edition
+            // Instead, rely on chapter or reading time for progress tracking
+            if let chapter = currentChapter {
+                contextParts.append("Currently reading: \(chapter)")
             }
         }
         
