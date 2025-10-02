@@ -242,10 +242,10 @@ public enum GradientTheme: String, CaseIterable, Codable {
             ]
         case .daybreak:
             return [
-                Color(red: 0.85, green: 0.95, blue: 0.98),  // Softer light cyan
-                Color(red: 0.65, green: 0.85, blue: 0.93),  // Muted sky blue
-                Color(red: 0.45, green: 0.70, blue: 0.85),  // Gentle medium blue
-                Color(red: 0.25, green: 0.45, blue: 0.70)   // Softer deep blue
+                Color(red: 0.85, green: 0.78, blue: 0.88),  // Soft lavender pink
+                Color(red: 0.72, green: 0.75, blue: 0.88),  // Periwinkle blue
+                Color(red: 0.58, green: 0.70, blue: 0.90),  // Sky blue
+                Color(red: 0.88, green: 0.92, blue: 0.95)   // Pale morning blue
             ]
         }
     }

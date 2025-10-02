@@ -1,35 +1,107 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Session Wrapper for Unified Display
+enum SessionType: Identifiable {
+    case ambient(AmbientSession)
+    case quick(ReadingSession)
+
+    var id: UUID {
+        switch self {
+        case .ambient(let session):
+            return session.id ?? UUID()
+        case .quick(let session):
+            return session.id
+        }
+    }
+
+    var startDate: Date {
+        switch self {
+        case .ambient(let session):
+            return session.startTime ?? Date()
+        case .quick(let session):
+            return session.startDate
+        }
+    }
+
+    var endDate: Date? {
+        switch self {
+        case .ambient(let session):
+            return session.endTime
+        case .quick(let session):
+            return session.endDate
+        }
+    }
+
+    var duration: TimeInterval {
+        switch self {
+        case .ambient(let session):
+            return session.duration
+        case .quick(let session):
+            return session.currentDuration
+        }
+    }
+
+    var bookModel: BookModel? {
+        switch self {
+        case .ambient(let session):
+            return session.bookModel
+        case .quick(let session):
+            return session.bookModel
+        }
+    }
+
+    var isAmbient: Bool {
+        if case .ambient = self { return true }
+        return false
+    }
+}
+
 // MARK: - Minimal Sessions View (Redesigned)
 struct MinimalSessionsView: View {
-    @Query(sort: \AmbientSession.startTime, order: .reverse) 
-    private var sessions: [AmbientSession]
-    
+    @Query(sort: \AmbientSession.startTime, order: .reverse)
+    private var ambientSessions: [AmbientSession]
+
+    @Query(sort: \ReadingSession.startDate, order: .reverse)
+    private var quickSessions: [ReadingSession]
+
     @State private var searchText = ""
     @State private var showingNewChat = false
-    
+
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
-    
-    private var filteredSessions: [AmbientSession] {
+
+    private var allSessions: [SessionType] {
+        var sessions: [SessionType] = []
+        sessions.append(contentsOf: ambientSessions.map { .ambient($0) })
+        sessions.append(contentsOf: quickSessions.filter { $0.endDate != nil }.map { .quick($0) })
+        return sessions.sorted { $0.startDate > $1.startDate }
+    }
+
+    private var filteredSessions: [SessionType] {
         if searchText.isEmpty {
-            return sessions
+            return allSessions
         }
-        
-        return sessions.filter { session in
-            let questions = (session.capturedQuestions ?? []).compactMap { $0.content }
-            let quotes = (session.capturedQuotes ?? []).compactMap { $0.text }
-            let notes = (session.capturedNotes ?? []).compactMap { $0.content }
-            let searchContent = (questions + quotes + notes).joined(separator: " ")
-            return searchContent.localizedCaseInsensitiveContains(searchText)
+
+        return allSessions.filter { sessionType in
+            switch sessionType {
+            case .ambient(let session):
+                let questions = (session.capturedQuestions ?? []).compactMap { $0.content }
+                let quotes = (session.capturedQuotes ?? []).compactMap { $0.text }
+                let notes = (session.capturedNotes ?? []).compactMap { $0.content }
+                let searchContent = (questions + quotes + notes).joined(separator: " ")
+                return searchContent.localizedCaseInsensitiveContains(searchText)
+            case .quick:
+                // Quick sessions don't have searchable content yet
+                return false
+            }
         }
     }
-    
-    private var groupedSessions: [(date: Date, sessions: [AmbientSession])] {
-        Dictionary(grouping: filteredSessions) { session in
-            Calendar.current.startOfDay(for: session.startTime ?? Date())
+
+    private var groupedSessions: [(date: Date, sessions: [SessionType])] {
+        Dictionary(grouping: filteredSessions) { sessionType in
+            Calendar.current.startOfDay(for: sessionType.startDate)
         }
         .map { (date: $0.key, sessions: $0.value) }
         .sorted { $0.date > $1.date }
@@ -48,7 +120,7 @@ struct MinimalSessionsView: View {
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(false)
             
-            if sessions.isEmpty {
+            if allSessions.isEmpty {
                 emptyState
             } else {
                 sessionsList
@@ -102,8 +174,8 @@ struct MinimalSessionsView: View {
                             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         
                         // Sessions for this day
-                        ForEach(group.sessions) { session in
-                            MinimalSessionCard(session: session)
+                        ForEach(group.sessions) { sessionType in
+                            MinimalSessionCard(sessionType: sessionType)
                                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         }
                     }
@@ -148,41 +220,52 @@ struct MinimalSessionsView: View {
 
 // MARK: - Minimal Session Card
 struct MinimalSessionCard: View {
-    let session: AmbientSession
+    let sessionType: SessionType
     @State private var isPressed = false
     @State private var showingDetail = false
     @EnvironmentObject var libraryViewModel: LibraryViewModel
-    
+
     private var book: Book? {
-        guard let bookModel = session.bookModel else { return nil }
+        guard let bookModel = sessionType.bookModel else { return nil }
         return libraryViewModel.books.first { $0.id == bookModel.id }
     }
-    
+
     private var keyInsight: String {
-        if let firstQuestion = (session.capturedQuestions ?? []).first {
-            return firstQuestion.content ?? ""
-        } else if let firstQuote = (session.capturedQuotes ?? []).first {
-            return "\"\(firstQuote.text ?? "")\""
-        } else if let firstNote = (session.capturedNotes ?? []).first {
-            return firstNote.content ?? ""
+        switch sessionType {
+        case .ambient(let session):
+            if let firstQuestion = (session.capturedQuestions ?? []).first {
+                return firstQuestion.content ?? ""
+            } else if let firstQuote = (session.capturedQuotes ?? []).first {
+                return "\"\(firstQuote.text ?? "")\""
+            } else if let firstNote = (session.capturedNotes ?? []).first {
+                return firstNote.content ?? ""
+            }
+            return "Reading session"
+        case .quick:
+            return "Quick Reading Session"
         }
-        return "Reading session"
     }
-    
+
     private var sessionMetrics: String {
-        let items = [
-            (session.capturedQuestions ?? []).isEmpty ? nil : "\((session.capturedQuestions ?? []).count) questions",
-            (session.capturedQuotes ?? []).isEmpty ? nil : "\((session.capturedQuotes ?? []).count) quotes",
-            (session.capturedNotes ?? []).isEmpty ? nil : "\((session.capturedNotes ?? []).count) notes"
-        ].compactMap { $0 }
-        
-        return items.isEmpty ? "Empty session" : items.joined(separator: " · ")
+        switch sessionType {
+        case .ambient(let session):
+            let items = [
+                (session.capturedQuestions ?? []).isEmpty ? nil : "\((session.capturedQuestions ?? []).count) questions",
+                (session.capturedQuotes ?? []).isEmpty ? nil : "\((session.capturedQuotes ?? []).count) quotes",
+                (session.capturedNotes ?? []).isEmpty ? nil : "\((session.capturedNotes ?? []).count) notes"
+            ].compactMap { $0 }
+            return items.isEmpty ? "Empty session" : items.joined(separator: " · ")
+        case .quick(let session):
+            let minutes = Int(session.currentDuration / 60)
+            let pagesText = session.pagesRead > 0 ? "\(session.pagesRead) pages" : "No pages tracked"
+            return "\(minutes)m · \(pagesText)"
+        }
     }
-    
+
     private var timeAgo: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: session.startTime ?? Date(), relativeTo: Date())
+        return formatter.localizedString(for: sessionType.startDate, relativeTo: Date())
     }
     
     var body: some View {
@@ -259,9 +342,22 @@ struct MinimalSessionCard: View {
             }
         }
         .sheet(isPresented: $showingDetail) {
-            if let book = book {
-                NavigationStack {
-                    UnifiedChatView(preSelectedBook: book)
+            switch sessionType {
+            case .ambient:
+                if let book = book {
+                    NavigationStack {
+                        UnifiedChatView(preSelectedBook: book)
+                    }
+                }
+            case .quick:
+                // For quick sessions, just show book detail for now
+                // TODO: Create a dedicated quick session summary view
+                if let book = book {
+                    NavigationStack {
+                        BookDetailView(book: book)
+                            .environmentObject(libraryViewModel)
+                            .environmentObject(NotesViewModel())
+                    }
                 }
             }
         }

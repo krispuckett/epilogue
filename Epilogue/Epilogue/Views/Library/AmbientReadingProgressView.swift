@@ -3,10 +3,11 @@ import SwiftUI
 /// Ultra-polished scroll timeline reading progress with ambient effects
 struct AmbientReadingProgressView: View {
     let book: Book
+    var bookModel: BookModel?  // Optional - use SwiftData model for reactive updates when available
     let width: CGFloat
     let showDetailed: Bool
     let colorPalette: ColorPalette?
-    
+
     // MARK: - State Variables
     @State private var animatedProgress: Double = 0
     @State private var glowIntensity: Double = 0
@@ -16,35 +17,40 @@ struct AmbientReadingProgressView: View {
     @State private var hasAppeared: Bool = false
     @State private var isDragging: Bool = false
     @State private var dragStartProgress: Double = 0
-    
+
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    
+
     // MARK: - Color Properties
     private var primaryColor: Color {
         colorPalette?.primary ?? DesignSystem.Colors.primaryAccent
     }
-    
+
     private var secondaryColor: Color {
         colorPalette?.secondary ?? Color(red: 1.0, green: 0.7, blue: 0.4)
     }
-    
+
     private var accentColor: Color {
         colorPalette?.accent ?? Color(red: 0.9, green: 0.4, blue: 0.15)
     }
-    
+
     // MARK: - Computed Properties
     var progress: Double {
-        guard let totalPages = book.pageCount, totalPages > 0 else { return 0 }
-        return Double(book.currentPage) / Double(totalPages)
+        // Use bookModel if available (reactive), otherwise fall back to book struct
+        if let bookModel = bookModel, let pages = bookModel.pageCount, pages > 0 {
+            return Double(bookModel.currentPage) / Double(pages)
+        } else {
+            guard let totalPages = book.pageCount, totalPages > 0 else { return 0 }
+            return Double(book.currentPage) / Double(totalPages)
+        }
     }
-    
+
     var pagesRead: Int {
-        return book.currentPage
+        return bookModel?.currentPage ?? book.currentPage
     }
-    
+
     var totalPages: Int {
-        return book.pageCount ?? 0
+        return bookModel?.pageCount ?? (book.pageCount ?? 0)
     }
     
     var body: some View {
@@ -234,9 +240,10 @@ struct AmbientReadingProgressView: View {
 
                 Spacer()
 
-                Text("Page \(pagesRead) of \(totalPages)")
+                Text("Page \(Int(animatedProgress * Double(totalPages))) of \(totalPages)")
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.6))
+                    .contentTransition(.numericText())
             }
 
             // Interactive timeline with slider
@@ -375,27 +382,31 @@ struct AmbientReadingProgressView: View {
         HStack(spacing: 20) {
             // Pages remaining
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(totalPages - pagesRead)")
+                let currentPage = Int(animatedProgress * Double(totalPages))
+                Text("\(totalPages - currentPage)")
                     .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white)
-                
+                    .contentTransition(.numericText())
+
                 Text("pages left")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.6))
             }
-            
+
             Spacer()
-            
+
             // Estimated time
             VStack(alignment: .trailing, spacing: 4) {
-                let remainingMinutes = (totalPages - pagesRead) * 2 // ~2 min per page
+                let currentPage = Int(animatedProgress * Double(totalPages))
+                let remainingMinutes = (totalPages - currentPage) * 2 // ~2 min per page
                 let hours = remainingMinutes / 60
                 let minutes = remainingMinutes % 60
-                
+
                 Text(hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m")
                     .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundStyle(primaryColor)
-                
+                    .contentTransition(.numericText())
+
                 Text("remaining")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.6))

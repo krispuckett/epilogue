@@ -52,6 +52,12 @@ struct ContentView: View {
                 // Switch to library tab when navigating from ambient mode
                 selectedTab = 0
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowQuickActionCard"))) { _ in
+                // Show unified input card from anywhere in the app
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    showQuickActionCard = true
+                }
+            }
             .id(themeManager.currentTheme) // Force complete view recreation on theme change
     }
 
