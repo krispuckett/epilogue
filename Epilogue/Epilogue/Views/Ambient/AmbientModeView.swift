@@ -744,9 +744,6 @@ struct AmbientModeView: View {
             }
         }
         .onAppear {
-            // Donate Ambient opened for TipKit
-            EpilogueTips.donateAmbientOpened()
-
             // Don't set isPresentedModally - let the close button handle dismissal
             isPresentedModally = false
 
@@ -1490,13 +1487,8 @@ struct AmbientModeView: View {
 
             Spacer()
 
-            // Right side - Custom liquid glass toggle with tip
+            // Right side - Custom liquid glass toggle
             LiquidGlassInputToggle(isVoiceMode: $isVoiceModeEnabled)
-                .popoverTip(VoiceModeTip(), arrowEdge: .bottom) { config in
-                    TipView(config.tip, arrowEdge: .bottom)
-                        .glassEffect()
-                        .tint(.white.opacity(0.9))
-                }
                 .onChange(of: isVoiceModeEnabled) { _, newValue in
                     SensoryFeedback.impact(newValue ? .light : .medium)
 
@@ -2437,9 +2429,6 @@ struct AmbientModeView: View {
         print("📝 Processing typed message: '\(messageText)' as \(contentType)")
 
         if contentType == .question {
-            // Donate question asked for TipKit
-            EpilogueTips.donateQuestionAsked()
-
             // Save the question immediately for the session
             let content = AmbientProcessedContent(
                 text: messageText,
