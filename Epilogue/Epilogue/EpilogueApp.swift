@@ -48,13 +48,8 @@ struct EpilogueApp: App {
                             }
                         }
                     }
-                    .alert("iCloud Sync Required", isPresented: $showingCloudKitAlert) {
-                        Button("Settings") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
-                        }
-                        Button("Dismiss", role: .cancel) {}
+                    .alert("iCloud Sync", isPresented: $showingCloudKitAlert) {
+                        Button("OK", role: .cancel) {}
                     } message: {
                         Text(cloudKitErrorMessage)
                     }
@@ -243,8 +238,8 @@ struct EpilogueApp: App {
             print("⚠️ ModelContainer initialized with local storage only (no sync)")
             print("⚠️ User should sign into iCloud for data sync across devices")
 
-            // Show alert to user
-            cloudKitErrorMessage = "Your data is being saved locally. Sign into iCloud in Settings to sync across all your devices."
+            // Show alert to user (optional - user can check Settings view)
+            cloudKitErrorMessage = "Your data is saved locally. To sync across devices, enable iCloud in system Settings → [Your Name] → iCloud → iCloud Drive."
             showingCloudKitAlert = true
             #endif
         } catch {

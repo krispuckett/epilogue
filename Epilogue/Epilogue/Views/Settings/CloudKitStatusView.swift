@@ -65,7 +65,7 @@ struct CloudKitStatusView: View {
                                     Text("Active")
                                         .foregroundStyle(statusColor)
                                 case .notSynced:
-                                    Text("Not signed in")
+                                    Text("Local storage only")
                                         .foregroundStyle(statusColor)
                                 case .error(let message):
                                     Text(message)
@@ -130,28 +130,17 @@ struct CloudKitStatusView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             
-                            // Button
-                            Button {
-                                SensoryFeedback.light()
-                                if let url = URL(string: UIApplication.openSettingsURLString) {
-                                    UIApplication.shared.open(url)
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "arrow.up.forward.app")
-                                        .font(.system(size: 15))
-                                    Text("Open Settings")
-                                        .font(.system(size: 15, weight: .medium))
-                                }
-                                .foregroundStyle(themeManager.currentTheme.primaryAccent)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 42)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 21, style: .continuous)
-                                        .fill(themeManager.currentTheme.primaryAccent.opacity(0.12))
-                                )
+                            // Note about local storage
+                            HStack(spacing: 8) {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.white.opacity(0.5))
+
+                                Text("Your data is safe and saved locally. Enable iCloud in system Settings to sync across devices.")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            .buttonStyle(.plain)
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
                             .padding(.bottom, 16)
@@ -250,10 +239,10 @@ struct CloudKitStatusView: View {
     
     private var troubleshootingSteps: [String] {
         [
-            "Sign in to iCloud in Settings app",
-            "Check your internet connection",
-            "Enable iCloud Drive in Settings",
-            "Force quit and restart Epilogue"
+            "Your data is saved locally and will work offline",
+            "To enable iCloud sync: Open Settings → [Your Name] → iCloud",
+            "Turn on iCloud Drive for Epilogue",
+            "Restart Epilogue after enabling iCloud"
         ]
     }
     
