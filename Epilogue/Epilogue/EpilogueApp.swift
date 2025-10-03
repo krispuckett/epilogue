@@ -110,11 +110,13 @@ struct EpilogueApp: App {
         // CRITICAL: Always use CloudKit for data persistence and sync
         // We'll retry multiple times to ensure CloudKit is properly initialized
         var retryCount = 0
-        let maxRetries = 3
+        let maxRetries = 2  // Reduced from 3 to 2 for faster fallback
         var lastError: Error?
 
         while retryCount < maxRetries {
             do {
+                print("🔄 Attempt \(retryCount + 1)/\(maxRetries): Initializing ModelContainer with CloudKit...")
+
                 // Set a custom name to ensure we're not conflicting with old local stores
                 let cloudKitContainer = ModelConfiguration(
                     "EpilogueCloudKit",
@@ -123,7 +125,6 @@ struct EpilogueApp: App {
                 )
 
                 // SwiftData will automatically handle lightweight migration for optional fields
-                print("🔄 Initializing ModelContainer with automatic migration...")
                 modelContainer = try ModelContainer(
                     for: BookModel.self,
                          CapturedNote.self,
@@ -134,7 +135,7 @@ struct EpilogueApp: App {
                          ReadingSession.self,
                     configurations: cloudKitContainer
                 )
-                print("✅ ModelContainer initialized successfully")
+                print("✅ ModelContainer initialized successfully with CloudKit")
 
                 // Verify data after migration
                 let context = ModelContext(modelContainer!)
@@ -159,11 +160,13 @@ struct EpilogueApp: App {
                 retryCount += 1
                 
                 if retryCount < maxRetries {
-                    print("⚠️ CloudKit initialization attempt \(retryCount) failed: \(error)")
-                    print("🔄 Retrying in 1 second...")
-                    
-                    // Brief delay before retry
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    print("⚠️ CloudKit initialization attempt \(retryCount) failed: \(error.localizedDescription)")
+                    print("🔄 Retrying in 0.5 seconds...")
+
+                    // Brief delay before retry (reduced from 1s to 0.5s)
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                } else {
+                    print("❌ All CloudKit attempts failed, will use fallback storage")
                 }
             }
         }
@@ -216,9 +219,13 @@ struct EpilogueApp: App {
             UserDefaults.standard.set(false, forKey: "cloudKitInitializationFailed")
             
             #else
-            // On real device, use in-memory storage and show error
-            let memoryConfig = ModelConfiguration(
-                isStoredInMemoryOnly: true
+            // On real device, use LOCAL PERSISTENT storage as fallback (NOT in-memory)
+            // This prevents data loss while still allowing the app to function
+            print("⚠️ Using local persistent storage as fallback on real device")
+            let localConfig = ModelConfiguration(
+                "EpilogueLocalFallback",
+                isStoredInMemoryOnly: false,  // Use persistent storage
+                cloudKitDatabase: .none  // No CloudKit sync
             )
             modelContainer = try ModelContainer(
                 for: BookModel.self,
@@ -228,18 +235,18 @@ struct EpilogueApp: App {
                      AmbientSession.self,
                      QueuedQuestion.self,
                      ReadingSession.self,
-                configurations: memoryConfig
+                configurations: localConfig
             )
-            
+
             // Set a flag to show CloudKit error in the UI
             UserDefaults.standard.set(false, forKey: "isUsingCloudKit")
             UserDefaults.standard.set(true, forKey: "cloudKitInitializationFailed")
-            
-            print("⚠️ ModelContainer initialized in-memory only due to CloudKit issues")
-            print("⚠️ User needs to sign into iCloud for data persistence")
-            
+
+            print("⚠️ ModelContainer initialized with local storage only (no sync)")
+            print("⚠️ User should sign into iCloud for data sync across devices")
+
             // Show alert to user
-            cloudKitErrorMessage = "Please sign into iCloud in Settings to save your reading data. Without iCloud, your data won't be saved when you close the app."
+            cloudKitErrorMessage = "Your data is being saved locally. Sign into iCloud in Settings to sync across all your devices."
             showingCloudKitAlert = true
             #endif
         } catch {
