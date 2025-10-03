@@ -112,12 +112,12 @@ struct EpilogueApp: App {
             do {
                 print("🔄 Attempt \(retryCount + 1)/\(maxRetries): Initializing ModelContainer with CloudKit...")
 
-                // CRITICAL: Use explicit CloudKit container that matches entitlements
+                // CRITICAL: Use DEFAULT unnamed container to preserve existing user data
                 // DO NOT use a custom ModelConfiguration name - that creates a new database!
-                // But DO specify the CloudKit container identifier
+                // .automatic will use the CloudKit container from entitlements (iCloud.com.krispuckett.Epilogue)
                 let cloudKitContainer = ModelConfiguration(
                     isStoredInMemoryOnly: false,
-                    cloudKitDatabase: .init(containerIdentifier: "iCloud.com.krispuckett.Epilogue")
+                    cloudKitDatabase: .automatic
                 )
 
                 // SwiftData will automatically handle lightweight migration for optional fields
