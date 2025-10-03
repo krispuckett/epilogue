@@ -117,9 +117,9 @@ struct EpilogueApp: App {
             do {
                 print("🔄 Attempt \(retryCount + 1)/\(maxRetries): Initializing ModelContainer with CloudKit...")
 
-                // Set a custom name to ensure we're not conflicting with old local stores
+                // CRITICAL: Use DEFAULT unnamed container to preserve existing user data
+                // DO NOT use a custom name - that creates a new database!
                 let cloudKitContainer = ModelConfiguration(
-                    "EpilogueCloudKit",
                     isStoredInMemoryOnly: false,
                     cloudKitDatabase: .automatic
                 )
@@ -194,9 +194,8 @@ struct EpilogueApp: App {
         // For now, we'll initialize with appropriate fallback storage
         do {
             #if targetEnvironment(simulator)
-            // On simulator, use local persistent storage since CloudKit is unreliable
+            // On simulator, use DEFAULT local persistent storage (no custom name!)
             let localConfig = ModelConfiguration(
-                "EpilogueLocal",
                 isStoredInMemoryOnly: false,
                 cloudKitDatabase: .none  // No CloudKit on simulator
             )
@@ -219,11 +218,10 @@ struct EpilogueApp: App {
             UserDefaults.standard.set(false, forKey: "cloudKitInitializationFailed")
             
             #else
-            // On real device, use LOCAL PERSISTENT storage as fallback (NOT in-memory)
-            // This prevents data loss while still allowing the app to function
-            print("⚠️ Using local persistent storage as fallback on real device")
+            // On real device, use DEFAULT local persistent storage as fallback
+            // CRITICAL: No custom name - use default container to preserve data!
+            print("⚠️ Using default local persistent storage as fallback on real device")
             let localConfig = ModelConfiguration(
-                "EpilogueLocalFallback",
                 isStoredInMemoryOnly: false,  // Use persistent storage
                 cloudKitDatabase: .none  // No CloudKit sync
             )
