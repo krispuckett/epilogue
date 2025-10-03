@@ -112,11 +112,12 @@ struct EpilogueApp: App {
             do {
                 print("🔄 Attempt \(retryCount + 1)/\(maxRetries): Initializing ModelContainer with CloudKit...")
 
-                // CRITICAL: Use DEFAULT unnamed container to preserve existing user data
-                // DO NOT use a custom name - that creates a new database!
+                // CRITICAL: Use explicit CloudKit container that matches entitlements
+                // DO NOT use a custom ModelConfiguration name - that creates a new database!
+                // But DO specify the CloudKit container identifier
                 let cloudKitContainer = ModelConfiguration(
                     isStoredInMemoryOnly: false,
-                    cloudKitDatabase: .automatic
+                    cloudKitDatabase: .init(containerIdentifier: "iCloud.com.krispuckett.Epilogue")
                 )
 
                 // SwiftData will automatically handle lightweight migration for optional fields
@@ -155,13 +156,16 @@ struct EpilogueApp: App {
                 retryCount += 1
                 
                 if retryCount < maxRetries {
-                    print("⚠️ CloudKit initialization attempt \(retryCount) failed: \(error.localizedDescription)")
+                    print("⚠️ CloudKit initialization attempt \(retryCount) failed:")
+                    print("   Error: \(error.localizedDescription)")
+                    print("   Full error: \(error)")
                     print("🔄 Retrying in 0.5 seconds...")
 
                     // Brief delay before retry (reduced from 1s to 0.5s)
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 } else {
                     print("❌ All CloudKit attempts failed, will use fallback storage")
+                    print("   Final error: \(error)")
                 }
             }
         }
@@ -169,10 +173,13 @@ struct EpilogueApp: App {
         // If we get here, CloudKit initialization failed after all retries
         print("❌ CloudKit initialization failed after \(maxRetries) attempts")
         if let error = lastError {
-            print("❌ Last error: \(error)")
-            
+            print("❌ Last error description: \(error.localizedDescription)")
+            print("❌ Last error full: \(error)")
+            print("❌ Error domain: \((error as NSError).domain)")
+            print("❌ Error code: \((error as NSError).code)")
+
             // Check if it's a network issue
-            if error.localizedDescription.contains("network") || 
+            if error.localizedDescription.contains("network") ||
                error.localizedDescription.contains("Internet") ||
                error.localizedDescription.contains("offline") {
                 print("📱 Appears to be a network connectivity issue")
