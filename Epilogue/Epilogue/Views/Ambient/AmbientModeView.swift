@@ -357,6 +357,22 @@ struct AmbientModeView: View {
             .allowsHitTesting(false)
             .blur(radius: 0.5)  // Subtle blur to soften the gradient edge
         }
+        // Top toolbar overlay
+        .overlay(alignment: .top) {
+            HStack {
+                Spacer()
+
+                // Only show offline status when actually offline
+                if !OfflineQueueManager.shared.isOnline {
+                    OfflineStatusPill()
+                        .transition(.scale.combined(with: .opacity))
+                }
+
+                Spacer()
+            }
+            .padding(.top, 60) // Below status bar
+            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: OfflineQueueManager.shared.isOnline)
+        }
         // Bottom gradient and input controls
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {
@@ -726,15 +742,38 @@ struct AmbientModeView: View {
                 bookStripOverlay
             }
         }
-        .toolbar {
-            // Remove Done button - the close (X) button handles dismissal
-        }
         .onAppear {
             // Don't set isPresentedModally - let the close button handle dismissal
             isPresentedModally = false
 
+            // Configure offline queue manager
+            OfflineQueueManager.shared.configure(with: modelContext)
+
             // Load existing session context if continuing from a previous session
             loadExistingSessionIfAvailable()
+
+            // Set up listener for queued questions being processed
+            NotificationCenter.default.addObserver(
+                forName: Notification.Name("QueuedQuestionProcessed"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let question = notification.object as? QueuedQuestion,
+                   let response = question.response,
+                   let questionText = question.question {
+                    // Update messages to show the answer
+                    let answerMessage = UnifiedChatMessage(
+                        content: "**\(questionText)**\n\n\(response)",
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(answerMessage)
+                }
+            }
+        }
+        .onDisappear {
+            NotificationCenter.default.removeObserver(self, name: Notification.Name("QueuedQuestionProcessed"), object: nil)
         }
     }
     
@@ -1449,16 +1488,14 @@ struct AmbientModeView: View {
                     .glassEffect()
                     .clipShape(Circle())
             }
-            
+
             Spacer()
-            
-            // Right side - Clean iOS toggle
-            Toggle("", isOn: $isVoiceModeEnabled)
-                .toggleStyle(SwitchToggleStyle(tint: themeManager.currentTheme.primaryAccent))
-                .labelsHidden()
+
+            // Right side - Custom liquid glass toggle
+            LiquidGlassInputToggle(isVoiceMode: $isVoiceModeEnabled)
                 .onChange(of: isVoiceModeEnabled) { _, newValue in
                     SensoryFeedback.impact(newValue ? .light : .medium)
-                    
+
                     // If turning voice mode off, switch to text input
                     if !newValue {
                         if isRecording {
@@ -2926,7 +2963,8 @@ struct AmbientModeView: View {
 
     private func getAIResponse(for text: String) async {
         let aiService = AICompanionService.shared
-        
+        let offlineQueue = OfflineQueueManager.shared
+
         guard aiService.isConfigured() else {
             await MainActor.run {
                 // Update thinking message to show error
@@ -2950,7 +2988,53 @@ struct AmbientModeView: View {
             }
             return
         }
-        
+
+        // Check network status - if offline, queue the question
+        if !offlineQueue.isOnline {
+            await MainActor.run {
+                offlineQueue.addQuestion(text, book: currentBookContext, sessionContext: currentSession?.id?.uuidString)
+
+                // Update UI to show queued state
+                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
+                    let queuedMessage = UnifiedChatMessage(
+                        content: "**\(text)**\n\n📵 You're offline. This question has been queued and will be answered when you're back online.",
+                        isUser: false,
+                        timestamp: messages[thinkingIndex].timestamp,
+                        bookContext: currentBookContext
+                    )
+                    messages[thinkingIndex] = queuedMessage
+                } else {
+                    let queuedMessage = UnifiedChatMessage(
+                        content: "📵 You're offline. This question has been queued and will be answered when you're back online.",
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: currentBookContext
+                    )
+                    messages.append(queuedMessage)
+                }
+
+                // Save question to current session
+                if let session = currentSession {
+                    let capturedQuestion = CapturedQuestion(
+                        content: text,
+                        book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+                        pageNumber: nil,
+                        timestamp: Date(),
+                        source: .manual
+                    )
+                    capturedQuestion.answer = "Queued for when you're back online"
+                    capturedQuestion.isAnswered = false
+
+                    if session.capturedQuestions == nil {
+                        session.capturedQuestions = []
+                    }
+                    session.capturedQuestions?.append(capturedQuestion)
+                    try? modelContext.save()
+                }
+            }
+            return
+        }
+
         do {
             let response = try await aiService.processMessage(
                 text,
@@ -4052,15 +4136,9 @@ struct AmbientMessageThreadView: View {
                         Rectangle()
                             .fill(Color.white.opacity(0.10))
                             .frame(height: 0.5)
-                        
-                        Text(formatResponseText(content.answer))
-                            .font(.custom("Georgia", size: 17))  // ← Increased from 15
-                            .foregroundStyle(.white.opacity(0.85))
-                            .lineSpacing(8)  // ← Increased from 6
+
+                        SmartFormattedText(text: content.answer, isUser: false)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 0)  // ← Changed to align under number
-                            .padding(.trailing, 20)
-                            .padding(.vertical, 12)
                             .padding(.bottom, 4)
                     }
                     .opacity(isExpanded ? answerOpacity : 0)

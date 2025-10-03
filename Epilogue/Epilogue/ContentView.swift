@@ -16,6 +16,7 @@ struct ContentView: View {
     @StateObject private var libraryViewModel = LibraryViewModel()
     @StateObject private var notesViewModel = NotesViewModel()
     @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var whatsNewManager = WhatsNewManager.shared
 
     // MARK: - State
     @State private var selectedTab = 0
@@ -57,6 +58,11 @@ struct ContentView: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     showQuickActionCard = true
                 }
+            }
+            .sheet(isPresented: $whatsNewManager.shouldShow) {
+                whatsNewManager.markAsShown()
+            } content: {
+                WhatsNewView()
             }
             .id(themeManager.currentTheme) // Force complete view recreation on theme change
     }

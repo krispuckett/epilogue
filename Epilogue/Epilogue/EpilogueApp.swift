@@ -218,13 +218,17 @@ struct EpilogueApp: App {
             #else
             // On real device, use in-memory storage and show error
             let memoryConfig = ModelConfiguration(
-                schema: schema,
                 isStoredInMemoryOnly: true
             )
             modelContainer = try ModelContainer(
-                for: schema,
-                migrationPlan: EpilogueMigrationPlan.self,
-                configurations: [memoryConfig]
+                for: BookModel.self,
+                     CapturedNote.self,
+                     CapturedQuote.self,
+                     CapturedQuestion.self,
+                     AmbientSession.self,
+                     QueuedQuestion.self,
+                     ReadingSession.self,
+                configurations: memoryConfig
             )
             
             // Set a flag to show CloudKit error in the UI

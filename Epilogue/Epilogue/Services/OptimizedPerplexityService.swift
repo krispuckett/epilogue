@@ -545,18 +545,7 @@ class OptimizedPerplexityService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let systemPrompt = bookContext.map { book in
-            """
-            IMPORTANT: You are answering questions SPECIFICALLY about the book "\(book.title)" by \(book.author).
-
-            ALL answers MUST relate directly to this book. When asked about characters, plot, themes, or any aspect - answer ONLY about "\(book.title)".
-
-            For example:
-            - "Who is the main character?" → Answer about the main character(s) in "\(book.title)"
-            - "What happens next?" → Answer about what happens next in "\(book.title)"
-            - "What is the theme?" → Answer about the themes in "\(book.title)"
-
-            NEVER give generic definitions. ALWAYS give book-specific answers about "\(book.title)".
-            """
+            buildEnrichedBookContext(for: book)
         } ?? "Be concise and helpful."
         
         // Back to sonar - it was working fine before
@@ -662,6 +651,59 @@ class OptimizedPerplexityService: ObservableObject {
     
     func getCacheStats() async -> (hits: Int, misses: Int, size: Int) {
         return await responseCache.getStats()
+    }
+
+    // MARK: - Enriched Context Building
+
+    private func buildEnrichedBookContext(for book: Book) -> String {
+        var context = """
+        IMPORTANT: You are answering questions SPECIFICALLY about the book "\(book.title)" by \(book.author).
+
+        ALL answers MUST relate directly to this book. When asked about characters, plot, themes, or any aspect - answer ONLY about "\(book.title)".
+        """
+
+        // Try to find enrichment data from BookModel
+        // Note: This requires looking up the BookModel, which we'll do via a helper
+        if let enrichment = getEnrichmentData(for: book) {
+            context += "\n\n"
+            context += "BOOK CONTEXT:\n"
+
+            if !enrichment.synopsis.isEmpty {
+                context += "Premise: \(enrichment.synopsis)\n"
+            }
+
+            if !enrichment.characters.isEmpty {
+                context += "Main Characters: \(enrichment.characters.joined(separator: ", "))\n"
+            }
+
+            if !enrichment.themes.isEmpty {
+                context += "Key Themes: \(enrichment.themes.joined(separator: ", "))\n"
+            }
+
+            if !enrichment.setting.isEmpty {
+                context += "Setting: \(enrichment.setting)\n"
+            }
+        }
+
+        context += """
+
+
+        For example:
+        - "Who is the main character?" → Answer about the main character(s) in "\(book.title)"
+        - "What happens next?" → Answer about what happens next in "\(book.title)"
+        - "What is the theme?" → Answer about the themes in "\(book.title)"
+
+        NEVER give generic definitions. ALWAYS give book-specific answers about "\(book.title)".
+        """
+
+        return context
+    }
+
+    private func getEnrichmentData(for book: Book) -> (synopsis: String, characters: [String], themes: [String], setting: String)? {
+        // This is a simplified lookup - ideally we'd inject BookModel via dependency
+        // For now, we'll return nil and rely on basic context
+        // TODO: Enhance by accepting BookModel directly in chat() method
+        return nil
     }
 }
 
