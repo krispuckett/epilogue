@@ -3,13 +3,19 @@ import SwiftData
 import UserNotifications
 import CloudKit
 import BackgroundTasks
+import TipKit
 
 @main
 struct EpilogueApp: App {
     @State private var modelContainer: ModelContainer?
     @State private var showingCloudKitAlert = false
     @State private var cloudKitErrorMessage = ""
-    
+
+    init() {
+        // Configure TipKit for feature discovery
+        EpilogueTips.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             if let container = modelContainer {
@@ -18,6 +24,9 @@ struct EpilogueApp: App {
                     .modelContainer(container)
                     // .runSwiftDataMigrations() // DISABLED - causing data loss
                     .onAppear {
+                        // Donate app launch for TipKit
+                        EpilogueTips.donateAppLaunch()
+
                         // API key is now built-in, no setup needed
 
                         // Clear command history on app launch to prevent artifacts

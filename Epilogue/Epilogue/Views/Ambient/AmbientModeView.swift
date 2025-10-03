@@ -7,6 +7,7 @@ import Vision
 import PhotosUI
 import AVFoundation
 import Speech
+import TipKit
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeView")
 
@@ -743,6 +744,9 @@ struct AmbientModeView: View {
             }
         }
         .onAppear {
+            // Donate Ambient opened for TipKit
+            EpilogueTips.donateAmbientOpened()
+
             // Don't set isPresentedModally - let the close button handle dismissal
             isPresentedModally = false
 
@@ -887,12 +891,7 @@ struct AmbientModeView: View {
                                 .animation(.easeInOut(duration: 0.3), value: isRecording)
                         }
                     }
-                    
-                    // Capture Review Queue - shows above conversation
-                    CaptureReviewQueue()
-                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                        .padding(.bottom, 8)
-                    
+
                     // Conversation section in minimal thread style
                     if !messages.isEmpty {
                         VStack(alignment: .leading, spacing: 20) {
@@ -1491,8 +1490,13 @@ struct AmbientModeView: View {
 
             Spacer()
 
-            // Right side - Custom liquid glass toggle
+            // Right side - Custom liquid glass toggle with tip
             LiquidGlassInputToggle(isVoiceMode: $isVoiceModeEnabled)
+                .popoverTip(VoiceModeTip(), arrowEdge: .bottom) { config in
+                    TipView(config.tip, arrowEdge: .bottom)
+                        .glassEffect()
+                        .tint(.white.opacity(0.9))
+                }
                 .onChange(of: isVoiceModeEnabled) { _, newValue in
                     SensoryFeedback.impact(newValue ? .light : .medium)
 
@@ -2431,8 +2435,11 @@ struct AmbientModeView: View {
         let contentType = determineContentType(messageText)
         
         print("📝 Processing typed message: '\(messageText)' as \(contentType)")
-        
+
         if contentType == .question {
+            // Donate question asked for TipKit
+            EpilogueTips.donateQuestionAsked()
+
             // Save the question immediately for the session
             let content = AmbientProcessedContent(
                 text: messageText,

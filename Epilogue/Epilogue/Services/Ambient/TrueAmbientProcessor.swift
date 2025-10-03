@@ -277,30 +277,10 @@ public class TrueAmbientProcessor: ObservableObject {
         let classification = await classifyWithContext(correctedText, bookContext: bookContext)
         
         // If low confidence, send to review queue
-        if classification.confidence < 0.85 && confidence < 0.85 {
-            logger.info("📋 Low confidence capture sent to review queue (conf: \(classification.confidence))")
-            
-            // Send to review queue
-            NotificationCenter.default.post(
-                name: Notification.Name("CaptureForReview"),
-                object: [
-                    "text": correctedText,
-                    "type": classification.type == .quote ? "quote" : 
-                            classification.type == .question ? "question" : "note",
-                    "confidence": classification.confidence,
-                    "theme": classification.theme as Any,
-                    "page": classification.pageReference as Any
-                ]
-            )
-            
-            // Update reading context but don't save yet
-            await updateReadingContext([AmbientProcessedContent(
-                text: correctedText,
-                type: classification.type,
-                confidence: classification.confidence
-            )])
-            
-            return // Don't process further until user confirms
+        // Low confidence captures are now saved automatically
+        // Review queue removed for better flow
+        if classification.confidence < 0.7 {
+            logger.info("⚠️ Low confidence capture (conf: \(classification.confidence)), saving anyway")
         }
         
         // Use enhanced intent detection FIRST to determine content type
