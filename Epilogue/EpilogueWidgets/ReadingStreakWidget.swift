@@ -2,7 +2,7 @@
 //  ReadingStreakWidget.swift
 //  EpilogueWidgets
 //
-//  Shows daily reading streak - matching WidgetDesignLab
+//  EXACT match to WidgetDesignLab streak widget
 //
 
 import WidgetKit
@@ -19,7 +19,6 @@ struct ReadingStreakProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        // TODO: Fetch real streak data from SwiftData
         let entry = placeholder(in: context)
         let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
         completion(timeline)
@@ -38,24 +37,13 @@ struct ReadingStreakWidgetView: View {
         ZStack {
             Color.black
 
-            // Ambient gradient
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(1.0), location: 0.0),
-                    .init(color: Color(red: 0.98, green: 0.4, blue: 0.2).opacity(0.8), location: 0.15),
-                    .init(color: Color(red: 0.9, green: 0.35, blue: 0.18).opacity(0.5), location: 0.3),
-                    .init(color: Color(red: 0.85, green: 0.3, blue: 0.15).opacity(0.3), location: 0.45),
-                    .init(color: Color.clear, location: 0.55)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .blur(radius: 40)
+            // Ambient gradient (same as ambient widget)
+            ambientAtmosphericGradient
 
             VStack(spacing: 8) {
                 Spacer()
 
-                // Number with blur effect (glow)
+                // Number with blur effect (glow) - EXACT from WidgetDesignLab
                 ZStack {
                     // Glow/blur layer
                     Text("\(entry.streakDays)")
@@ -69,13 +57,40 @@ struct ReadingStreakWidgetView: View {
                         .foregroundStyle(.white)
                 }
 
-                Text(entry.streakDays == 1 ? "day streak" : "day streak")
+                Text("day streak")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.7))
 
                 Spacer()
             }
         }
+    }
+
+    // EXACT ambient gradient from WidgetDesignLab (no color enhancement)
+    private var ambientAtmosphericGradient: some View {
+        let amberColors = defaultGradientColors
+
+        return LinearGradient(
+            stops: [
+                .init(color: amberColors[0].opacity(1.0), location: 0.0),
+                .init(color: amberColors[1].opacity(0.8), location: 0.15),
+                .init(color: amberColors[2].opacity(0.5), location: 0.3),
+                .init(color: amberColors[3].opacity(0.3), location: 0.45),
+                .init(color: Color.clear, location: 0.55)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .blur(radius: 40)
+    }
+
+    private var defaultGradientColors: [Color] {
+        [
+            Color(red: 1.0, green: 0.549, blue: 0.259),
+            Color(red: 0.98, green: 0.4, blue: 0.2),
+            Color(red: 0.9, green: 0.35, blue: 0.18),
+            Color(red: 0.85, green: 0.3, blue: 0.15)
+        ]
     }
 }
 

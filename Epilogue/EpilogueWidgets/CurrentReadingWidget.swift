@@ -2,7 +2,7 @@
 //  CurrentReadingWidget.swift
 //  EpilogueWidgets
 //
-//  Beautiful reading progress widget matching WidgetDesignLab design
+//  EXACT match to WidgetDesignLab
 //
 
 import WidgetKit
@@ -50,6 +50,7 @@ struct CurrentReadingEntry: TimelineEntry {
     }
 }
 
+// MARK: - Widget View
 struct CurrentReadingWidgetView: View {
     var entry: CurrentReadingProvider.Entry
     @Environment(\.widgetFamily) var family
@@ -75,39 +76,24 @@ struct CurrentReadingWidgetView: View {
             ZStack {
                 Color.black
 
-                // Atmospheric gradient
                 atmosphericGradient
 
                 VStack(spacing: 8) {
-                    // Book cover placeholder
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(.white.opacity(0.1))
-                        .frame(width: 55, height: 82)
-                        .overlay(
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.white.opacity(0.3))
-                        )
-                        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+                    bookCoverPlaceholder(width: 55, height: 82, cornerRadius: 5)
 
                     Spacer()
 
-                    // Circular progress ring
+                    // Progress ring
                     ZStack {
-                        // Background ring
                         Circle()
                             .stroke(Color.white.opacity(0.15), lineWidth: 3)
                             .frame(width: 54, height: 54)
 
-                        // Progress ring
                         Circle()
                             .trim(from: 0, to: entry.progress)
                             .stroke(
                                 LinearGradient(
-                                    colors: [
-                                        Color(red: 1.0, green: 0.549, blue: 0.259),
-                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.7)
-                                    ],
+                                    colors: gradientColors,
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
@@ -116,7 +102,6 @@ struct CurrentReadingWidgetView: View {
                             .frame(width: 54, height: 54)
                             .rotationEffect(.degrees(-90))
 
-                        // Percentage - MONOSPACED
                         Text("\(Int(entry.progress * 100))")
                             .font(.system(size: 17, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white)
@@ -135,38 +120,26 @@ struct CurrentReadingWidgetView: View {
             ZStack {
                 Color.black
 
-                // Atmospheric gradient
                 atmosphericGradient
 
                 HStack(spacing: 16) {
-                    // Book cover placeholder
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(.white.opacity(0.1))
-                        .frame(width: 75, height: 112)
-                        .overlay(
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 30))
-                                .foregroundStyle(.white.opacity(0.3))
-                        )
-                        .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
+                    bookCoverPlaceholder(width: 75, height: 112, cornerRadius: 7)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        // Book title - Georgia
                         Text(entry.bookTitle)
                             .font(.custom("Georgia", size: 21))
                             .foregroundStyle(.white)
                             .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
 
                         Spacer()
                             .frame(height: 4)
 
-                        // Progress slider
                         progressSlider(progress: entry.progress)
 
                         Spacer()
                             .frame(height: 2)
 
-                        // Page count - MONOSPACED
                         HStack(spacing: 4) {
                             Text("\(entry.currentPage)")
                                 .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -202,28 +175,15 @@ struct CurrentReadingWidgetView: View {
             ZStack {
                 Color.black
 
-                // Atmospheric gradient
                 atmosphericGradient
 
                 VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: 32)
+                    Spacer().frame(height: 32)
 
-                    // Book cover placeholder
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(.white.opacity(0.1))
-                        .frame(width: 70, height: 105)
-                        .overlay(
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.white.opacity(0.3))
-                        )
-                        .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
+                    bookCoverPlaceholder(width: 70, height: 105, cornerRadius: 7)
 
-                    Spacer()
-                        .frame(height: 12)
+                    Spacer().frame(height: 12)
 
-                    // Title and author
                     VStack(spacing: 4) {
                         Text(entry.bookTitle)
                             .font(.custom("Georgia", size: 17))
@@ -236,8 +196,7 @@ struct CurrentReadingWidgetView: View {
                     }
                     .multilineTextAlignment(.center)
 
-                    Spacer()
-                        .frame(height: 20)
+                    Spacer().frame(height: 20)
 
                     // Progress ring
                     ZStack {
@@ -250,8 +209,8 @@ struct CurrentReadingWidgetView: View {
                             .stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 1.0, green: 0.647, blue: 0.0),
-                                        Color(red: 1.0, green: 0.549, blue: 0.259)
+                                        enhancedGradientColors[1],
+                                        enhancedGradientColors[0]
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -261,7 +220,7 @@ struct CurrentReadingWidgetView: View {
                             .frame(width: 100, height: 100)
                             .rotationEffect(.degrees(-90))
                             .shadow(
-                                color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.5),
+                                color: enhancedGradientColors[0].opacity(0.5),
                                 radius: 6,
                                 x: 0,
                                 y: 0
@@ -272,10 +231,8 @@ struct CurrentReadingWidgetView: View {
                             .foregroundStyle(.white)
                     }
 
-                    Spacer()
-                        .frame(height: 24)
+                    Spacer().frame(height: 24)
 
-                    // Stats - MONOSPACED
                     HStack(alignment: .bottom, spacing: 40) {
                         VStack(spacing: 3) {
                             Text("\(entry.pagesRemaining)")
@@ -290,7 +247,7 @@ struct CurrentReadingWidgetView: View {
                         VStack(spacing: 3) {
                             Text("14h 46m")
                                 .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                .foregroundStyle(enhancedGradientColors[0])
 
                             Text("remaining")
                                 .font(.system(size: 10, weight: .medium))
@@ -298,21 +255,34 @@ struct CurrentReadingWidgetView: View {
                         }
                     }
 
-                    Spacer()
-                        .frame(height: 28)
+                    Spacer().frame(height: 28)
                 }
             }
         }
     }
 
     // MARK: - Shared Components
+    private static func bookCoverPlaceholder(width: CGFloat, height: CGFloat, cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(.white.opacity(0.1))
+            .frame(width: width, height: height)
+            .overlay(
+                Image(systemName: "book.fill")
+                    .font(.system(size: width * 0.35))
+                    .foregroundStyle(.white.opacity(0.3))
+            )
+            .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
+    }
+
     private static var atmosphericGradient: some View {
-        LinearGradient(
+        let colors = enhancedGradientColors
+
+        return LinearGradient(
             stops: [
-                .init(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(1.0), location: 0.0),
-                .init(color: Color(red: 0.98, green: 0.4, blue: 0.2).opacity(0.8), location: 0.15),
-                .init(color: Color(red: 0.9, green: 0.35, blue: 0.18).opacity(0.5), location: 0.3),
-                .init(color: Color(red: 0.85, green: 0.3, blue: 0.15).opacity(0.3), location: 0.45),
+                .init(color: colors[0].opacity(1.0), location: 0.0),
+                .init(color: colors[1].opacity(0.8), location: 0.15),
+                .init(color: colors[2].opacity(0.5), location: 0.3),
+                .init(color: colors[3].opacity(0.3), location: 0.45),
                 .init(color: Color.clear, location: 0.55)
             ],
             startPoint: .top,
@@ -324,34 +294,74 @@ struct CurrentReadingWidgetView: View {
     private static func progressSlider(progress: Double) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Base track
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.white.opacity(0.1))
                     .frame(height: 4)
 
-                // Progress fill
                 RoundedRectangle(cornerRadius: 2)
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.549, blue: 0.259),
-                                Color(red: 1.0, green: 0.647, blue: 0.0)
-                            ],
+                            colors: gradientColors,
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .frame(width: geometry.size.width * progress, height: 4)
 
-                // Glass handle
+                // Glass-style handle
                 Circle()
-                    .fill(.white)
+                    .fill(
+                        RadialGradient(
+                            colors: [.white.opacity(0.95), .white.opacity(0.8)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 10
+                        )
+                    )
                     .frame(width: 20, height: 20)
+                    .overlay(
+                        Circle()
+                            .stroke(.white.opacity(0.3), lineWidth: 0.5)
+                    )
                     .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                     .offset(x: (geometry.size.width - 20) * progress)
             }
         }
         .frame(height: 20)
+    }
+
+    // MARK: - Colors (matching WidgetDesignLab)
+    private static var defaultGradientColors: [Color] {
+        [
+            Color(red: 1.0, green: 0.549, blue: 0.259),
+            Color(red: 0.98, green: 0.4, blue: 0.2),
+            Color(red: 0.9, green: 0.35, blue: 0.18),
+            Color(red: 0.85, green: 0.3, blue: 0.15)
+        ]
+    }
+
+    private static var enhancedGradientColors: [Color] {
+        defaultGradientColors.map { enhanceColor($0) }
+    }
+
+    private static var gradientColors: [Color] {
+        [enhancedGradientColors[0], enhancedGradientColors[1]]
+    }
+
+    // EXACT same enhancement as WidgetDesignLab
+    private static func enhanceColor(_ color: Color) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+
+        let enhancedSaturation = min(saturation * 1.4, 1.0)
+        let enhancedBrightness = max(brightness, 0.4)
+
+        return Color(hue: Double(hue), saturation: Double(enhancedSaturation), brightness: Double(enhancedBrightness))
     }
 }
 
