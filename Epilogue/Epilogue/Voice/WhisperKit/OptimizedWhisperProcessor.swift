@@ -190,7 +190,11 @@ class OptimizedWhisperProcessor: ObservableObject {
         guard let channelData = buffer.floatChannelData else {
             throw EpilogueWhisperError.invalidAudioBuffer
         }
-        
+
+        guard buffer.format.channelCount > 0 else {
+            throw EpilogueWhisperError.invalidAudioBuffer
+        }
+
         let frameLength = Int(buffer.frameLength)
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
         let format = buffer.format
@@ -334,8 +338,14 @@ class OptimizedWhisperProcessor: ObservableObject {
         
         // Calculate adaptive threshold
         let sortedEnergies = energyValues.sorted()
-        let percentile20 = sortedEnergies[Int(Float(sortedEnergies.count) * 0.2)]
-        let percentile80 = sortedEnergies[Int(Float(sortedEnergies.count) * 0.8)]
+        guard sortedEnergies.count > 1 else {
+            // Not enough data for threshold calculation, return original samples
+            return samples
+        }
+        let index20 = min(Int(Float(sortedEnergies.count) * 0.2), sortedEnergies.count - 1)
+        let index80 = min(Int(Float(sortedEnergies.count) * 0.8), sortedEnergies.count - 1)
+        let percentile20 = sortedEnergies[index20]
+        let percentile80 = sortedEnergies[index80]
         let threshold = percentile20 + 0.1 * (percentile80 - percentile20)
         
         // Apply VAD flags

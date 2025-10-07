@@ -133,8 +133,13 @@ final class EnhancedTrendingBooksService: ObservableObject {
     func refreshTrendingBooks(for category: TrendingCategory.CategoryType? = nil) async {
         logger.info("Starting trending books refresh for: \(category?.rawValue ?? "all categories")")
         isLoading = true
-        
-        let categoriesToRefresh = category != nil ? [category!] : TrendingCategory.CategoryType.allCases
+
+        let categoriesToRefresh: [TrendingCategory.CategoryType]
+        if let category = category {
+            categoriesToRefresh = [category]
+        } else {
+            categoriesToRefresh = TrendingCategory.CategoryType.allCases
+        }
         var newCategories: [TrendingCategory] = []
         
         for categoryType in categoriesToRefresh {
@@ -621,7 +626,12 @@ final class EnhancedTrendingBooksService: ObservableObject {
             forTaskWithIdentifier: Self.refreshTaskIdentifier,
             using: nil
         ) { task in
-            self.handleBackgroundRefresh(task: task as! BGAppRefreshTask)
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                self.logger.error("Received task of unexpected type: \(type(of: task))")
+                task.setTaskCompleted(success: false)
+                return
+            }
+            self.handleBackgroundRefresh(task: refreshTask)
         }
     }
     

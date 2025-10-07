@@ -231,13 +231,13 @@ class GoodreadsCleanImporter: ObservableObject {
                 let book = CSVBook(
                     title: cleanCSVValue(columns[titleIndex]),
                     author: cleanCSVValue(columns[authorIndex]),
-                    isbn: isbnIndex != nil && columns.count > isbnIndex! ? cleanCSVValue(columns[isbnIndex!]) : "",
-                    isbn13: isbn13Index != nil && columns.count > isbn13Index! ? cleanCSVValue(columns[isbn13Index!]) : "",
-                    myRating: ratingIndex != nil && columns.count > ratingIndex! ? Int(cleanCSVValue(columns[ratingIndex!])) ?? 0 : 0,
-                    dateRead: dateReadIndex != nil && columns.count > dateReadIndex! ? cleanCSVValue(columns[dateReadIndex!]) : "",
-                    dateAdded: dateAddedIndex != nil && columns.count > dateAddedIndex! ? cleanCSVValue(columns[dateAddedIndex!]) : "",
-                    exclusiveShelf: shelfIndex != nil && columns.count > shelfIndex! ? cleanCSVValue(columns[shelfIndex!]) : "to-read",
-                    privateNotes: notesIndex != nil && columns.count > notesIndex! ? cleanCSVValue(columns[notesIndex!]) : ""
+                    isbn: isbnIndex.map { idx in columns.count > idx ? cleanCSVValue(columns[idx]) : "" } ?? "",
+                    isbn13: isbn13Index.map { idx in columns.count > idx ? cleanCSVValue(columns[idx]) : "" } ?? "",
+                    myRating: ratingIndex.map { idx in columns.count > idx ? Int(cleanCSVValue(columns[idx])) ?? 0 : 0 } ?? 0,
+                    dateRead: dateReadIndex.map { idx in columns.count > idx ? cleanCSVValue(columns[idx]) : "" } ?? "",
+                    dateAdded: dateAddedIndex.map { idx in columns.count > idx ? cleanCSVValue(columns[idx]) : "" } ?? "",
+                    exclusiveShelf: shelfIndex.map { idx in columns.count > idx ? cleanCSVValue(columns[idx]) : "to-read" } ?? "to-read",
+                    privateNotes: notesIndex.map { idx in columns.count > idx ? cleanCSVValue(columns[idx]) : "" } ?? ""
                 )
                 
                 books.append(book)

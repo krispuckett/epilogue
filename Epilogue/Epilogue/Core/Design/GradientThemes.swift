@@ -87,73 +87,55 @@ public enum GradientTheme: String, CaseIterable, Codable {
     }
 
     // MARK: - Themed Tab Bar Icons
-    var libraryIcon: String {
+    var libraryIconActive: String {
         switch self {
         case .amber:
-            return "glass-book-open"  // Warm amber book
+            return "book-active"
         case .ocean:
-            return "glass-book-open"  // Could be custom ocean-themed book icon
+            return "book-active-ocean"
         case .forest:
-            return "glass-book-open"  // Could be forest-themed book icon
-        case .sunset:
-            return "glass-book-open"  // Could be sunset-themed book icon
-        case .midnight:
-            return "glass-book-open"  // Could be midnight-themed book icon
-        case .volcanic:
-            return "glass-book-open"  // Could be volcanic-themed book icon
-        case .aurora:
-            return "glass-book-open"  // Could be aurora-themed book icon
-        case .nebula:
-            return "glass-book-open"  // Could be nebula-themed book icon
-        case .daybreak:
-            return "glass-book-open"  // Could be daybreak-themed book icon
+            return "book-active-forest"
+        default:
+            return "book-active"
         }
     }
 
-    var notesIcon: String {
+    var notesIconActive: String {
         switch self {
         case .amber:
-            return "glass-feather"
+            return "feather-active"
         case .ocean:
-            return "glass-feather"
+            return "feather-active-ocean"
         case .forest:
-            return "glass-feather"
-        case .sunset:
-            return "glass-feather"
-        case .midnight:
-            return "glass-feather"
-        case .volcanic:
-            return "glass-feather"
-        case .aurora:
-            return "glass-feather"
-        case .nebula:
-            return "glass-feather"
-        case .daybreak:
-            return "glass-feather"
+            return "feather-active-forest"
+        default:
+            return "feather-active"
         }
     }
 
-    var sessionsIcon: String {
+    var sessionsIconActive: String {
         switch self {
         case .amber:
-            return "glass-msgs"
+            return "msgs-active"
         case .ocean:
-            return "glass-msgs"
+            return "msgs-active-ocean"
         case .forest:
-            return "glass-msgs"
-        case .sunset:
-            return "glass-msgs"
-        case .midnight:
-            return "glass-msgs"
-        case .volcanic:
-            return "glass-msgs"
-        case .aurora:
-            return "glass-msgs"
-        case .nebula:
-            return "glass-msgs"
-        case .daybreak:
-            return "glass-msgs"
+            return "msgs-active-forest"
+        default:
+            return "msgs-active"
         }
+    }
+
+    var libraryIconInactive: String {
+        return "book-inactive"
+    }
+
+    var notesIconInactive: String {
+        return "feather-inactive"
+    }
+
+    var sessionsIconInactive: String {
+        return "msgs-inactive"
     }
 
     // MARK: - Color Palette

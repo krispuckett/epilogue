@@ -120,7 +120,9 @@ struct AmbientSessionSummaryView: View {
                 // Auto-expand all questions on first load
                 if !hasInitializedExpanded {
                     for question in session.capturedQuestions ?? [] {
-                        expandedQuestions.insert((question.id ?? UUID()).uuidString)
+                        if let questionId = question.id {
+                            expandedQuestions.insert(questionId.uuidString)
+                        }
                     }
                     hasInitializedExpanded = true
                 }
@@ -267,13 +269,17 @@ struct AmbientSessionSummaryView: View {
                 }
             } else {
                 Button {
-                    pageText = session.currentPage != nil ? "\(session.currentPage!)" : ""
+                    if let currentPage = session.currentPage {
+                        pageText = "\(currentPage)"
+                    } else {
+                        pageText = ""
+                    }
                     editingPage = true
                     isPageFocused = true
                 } label: {
                     VStack(spacing: 4) {
                         HStack(spacing: 2) {
-                            Text(session.currentPage != nil ? "\(session.currentPage!)" : "—")
+                            Text(session.currentPage.map { "\($0)" } ?? "—")
                                 .font(.system(size: 24, weight: .medium, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.95))
                             
@@ -387,14 +393,24 @@ struct AmbientSessionSummaryView: View {
                     Rectangle()
                         .fill(Color.white.opacity(0.1))
                         .frame(height: 0.5)
-                    
-                    Text(try! AttributedString(markdown: answer))
-                        .font(.custom("Georgia", size: 15))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .lineSpacing(6)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, DesignSystem.Spacing.cardPadding)
-                        .padding(.bottom, 24)
+
+                    if let attributedAnswer = try? AttributedString(markdown: answer) {
+                        Text(attributedAnswer)
+                            .font(.custom("Georgia", size: 15))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                            .padding(.bottom, 24)
+                    } else {
+                        Text(answer)
+                            .font(.custom("Georgia", size: 15))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, DesignSystem.Spacing.cardPadding)
+                            .padding(.bottom, 24)
+                    }
                 }
                 .transition(.asymmetric(
                     insertion: .opacity,
@@ -424,16 +440,17 @@ struct AmbientSessionSummaryView: View {
             
             VStack(spacing: 1) {
                 ForEach(Array((session.capturedQuestions ?? []).enumerated()), id: \.element.id) { index, question in
+                    let questionIdString = question.id?.uuidString ?? UUID().uuidString
                     MinimalThreadView(
                         question: question,
                         index: index,
-                        isExpanded: expandedQuestions.contains((question.id ?? UUID()).uuidString),
+                        isExpanded: expandedQuestions.contains(questionIdString),
                         onToggle: {
                             withAnimation(DesignSystem.Animation.easeQuick) {
-                                if expandedQuestions.contains((question.id ?? UUID()).uuidString) {
-                                    expandedQuestions.remove((question.id ?? UUID()).uuidString)
+                                if expandedQuestions.contains(questionIdString) {
+                                    expandedQuestions.remove(questionIdString)
                                 } else {
-                                    expandedQuestions.insert((question.id ?? UUID()).uuidString)
+                                    expandedQuestions.insert(questionIdString)
                                 }
                             }
                         }
@@ -1145,15 +1162,25 @@ struct MinimalThreadView: View {
                     Rectangle()
                         .fill(Color.white.opacity(0.10))
                         .frame(height: 0.5)
-                    
-                    Text(try! AttributedString(markdown: answer))
-                        .font(.custom("Georgia", size: 15))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .lineSpacing(6)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, 40)
-                        .padding(.vertical, 12)
-                    
+
+                    if let attributedAnswer = try? AttributedString(markdown: answer) {
+                        Text(attributedAnswer)
+                            .font(.custom("Georgia", size: 15))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 40)
+                            .padding(.vertical, 12)
+                    } else {
+                        Text(answer)
+                            .font(.custom("Georgia", size: 15))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 40)
+                            .padding(.vertical, 12)
+                    }
+
                     Rectangle()
                         .fill(Color.white.opacity(0.10))
                         .frame(height: 0.5)

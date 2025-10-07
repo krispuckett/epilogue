@@ -243,8 +243,8 @@ struct CommandParser {
         }
         
         // Debug: Print first few book titles
-        if books.count > 0 {
-            print("CommandParser: First book: '\(books[0].title)'")
+        if let firstBook = books.first {
+            print("CommandParser: First book: '\(firstBook.title)'")
             if books.count > 1 {
                 print("CommandParser: Books in library: \(books.prefix(3).map { $0.title }.joined(separator: ", "))")
             }
@@ -294,11 +294,12 @@ struct CommandParser {
         // Phase 6: Advanced Book Title Detection with ML-like scoring
         let bookScore = calculateBookTitleScore(input: trimmed)
         let noteScore = calculateNoteScore(input: trimmed)
-        
+
         print("CommandParser: Scores - Book: \(bookScore), Note: \(noteScore)")
-        
-        // If book score is significantly higher than note score, it's likely a book
-        if bookScore > noteScore && bookScore > 0.4 {
+
+        // IMPROVED: Lower threshold and check if input looks like a title
+        // If book score is higher than note score OR looks like a title pattern, treat as book
+        if (bookScore > noteScore && bookScore > 0.3) || isLikelyBookTitle(input: trimmed) {
             let query = cleanBookQuery(from: input)
             print("CommandParser: Detected book title (score: \(bookScore)), query: '\(query)'")
             return .addBook(query: query)
@@ -339,19 +340,27 @@ struct CommandParser {
             }
         }
         
-        // Default: If no clear intent, check if it might be a search
+        // Default: If no clear intent, check if it might be a search or book title
         if trimmed.count < 50 && !trimmed.contains(".") && !trimmed.contains("?") {
             // One more attempt to find books with very loose matching
             if trimmed.count >= 2 {
                 for book in books {
-                    if book.title.lowercased().contains(trimmed.lowercased()) || 
+                    if book.title.lowercased().contains(trimmed.lowercased()) ||
                        book.author.lowercased().contains(trimmed.lowercased()) {
                         print("CommandParser: Found book in final search: '\(book.title)'")
                         return .existingBook(book: book)
                     }
                 }
             }
-            
+
+            // SMART BOOK DETECTION: If not found in library but looks like a book title,
+            // open BookSearchSheet instead of generic search
+            if isLikelyBookTitle(input: trimmed) || matchesBookTitlePattern(input: trimmed) {
+                let query = cleanBookQuery(from: input)
+                print("CommandParser: Not in library but looks like book title, opening BookSearchSheet with: '\(query)'")
+                return .addBook(query: query)
+            }
+
             print("CommandParser: Short input without punctuation, returning .searchAll")
             return .searchAll(query: input)
         }
@@ -818,21 +827,15 @@ struct CommandParser {
                         // Parse the attribution (e.g., "Ryan Holiday, The Obstacle is the Way, pg 40")
                         let parts = attribution.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                         
-                        var author: String? = nil
-                        var bookTitle: String? = nil
+                        let author = parts.indices.contains(0) ? parts[0] : nil
+                        let bookTitle = parts.indices.contains(1) ? parts[1] : nil
                         var pageNumber: Int? = nil
-                        
-                        if parts.indices.contains(0) {
-                            author = parts[0]
-                        }
-                        if parts.indices.contains(1) {
-                            bookTitle = parts[1]
-                        }
+
                         if parts.indices.contains(2) {
                             let pageStr = parts[2]
                             // Extract page number from strings like "pg 30", "p. 30", "page 30"
                             if let pageMatch = pageStr.range(of: #"\d+"#, options: .regularExpression) {
-                                pageNumber = Int(pageStr[pageMatch])
+                                pageNumber = Int(String(pageStr[pageMatch]))
                             }
                         }
                         
@@ -863,7 +866,7 @@ struct CommandParser {
             if parts.count >= 2 {
                 // Try to find where the quote ends and author begins
                 // Look for capital letters that might indicate author name
-                let firstPart = parts[0]
+                guard let firstPart = parts.first else { return (workingText, nil) }
                 
                 // Split by spaces and find potential author name start
                 let words = firstPart.split(separator: " ")
@@ -988,7 +991,10 @@ struct CommandParser {
             }
             // Or if it has author, book pattern (at least 2 parts)
             let parts = trimmed.split(separator: ",")
-            if parts.count >= 2 && !parts[0].isEmpty && !parts[1].isEmpty {
+            if parts.count >= 2,
+               let firstPart = parts.first,
+               let secondPart = parts.dropFirst().first,
+               !firstPart.isEmpty && !secondPart.isEmpty {
                 return true
             }
         }
@@ -1002,27 +1008,30 @@ struct CommandParser {
         let parts = attribution.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         
         if parts.count >= 2 {
-            let author = parts[0]
-            var book = parts[1]
+            guard let author = parts.first,
+                  let book = parts.dropFirst().first else {
+                return (content, attribution.isEmpty ? nil : attribution)
+            }
+
+            var finalBook = book
             var pageInfo: String? = nil
-            
+
             // Check if we have page info in the last part
-            if parts.count >= 3 {
-                let lastPart = parts[2]
+            if parts.count >= 3, let lastPart = parts.dropFirst(2).first {
                 // Check for page patterns: "p. 47", "page 47", "pg 47", or just "47"
-                if lastPart.lowercased().hasPrefix("p.") || 
-                   lastPart.lowercased().hasPrefix("page") || 
+                if lastPart.lowercased().hasPrefix("p.") ||
+                   lastPart.lowercased().hasPrefix("page") ||
                    lastPart.lowercased().hasPrefix("pg") ||
                    Int(lastPart) != nil {
                     pageInfo = lastPart
                 } else {
                     // If not a page number, it might be part of the book title
-                    book = "\(book), \(lastPart)"
+                    finalBook = "\(book), \(lastPart)"
                 }
             }
             
             // Format with our special separator including page if present
-            var result = "\(author)|||BOOK|||\(book)"
+            var result = "\(author)|||BOOK|||\(finalBook)"
             if let page = pageInfo {
                 result += "|||PAGE|||\(page)"
             }

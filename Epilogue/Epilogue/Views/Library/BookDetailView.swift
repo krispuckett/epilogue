@@ -379,6 +379,8 @@ struct BookDetailView: View {
                         .font(.system(size: 22))
                         .foregroundColor(.white.opacity(0.9))
                     }
+                    .accessibilityLabel("End reading session")
+                    .accessibilityHint("Double tap to end your current reading session")
                     .transition(.asymmetric(
                     insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.45)),
                     removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
@@ -410,6 +412,8 @@ struct BookDetailView: View {
                 .glassEffect(.regular, in: .capsule)
                 .overlay { Capsule().strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5) }
             }
+            .accessibilityLabel("Start quick reading session")
+            .accessibilityHint("Double tap to begin a new reading session for this book")
             .transition(.asymmetric(
                 insertion: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3)),
                 removal: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
@@ -544,6 +548,8 @@ struct BookDetailView: View {
                     StatusPill(text: book.readingStatus.rawValue, color: accentColor, interactive: true)
                 }
                 .menuStyle(.borderlessButton)
+                .accessibilityLabel("Reading status: \(book.readingStatus.rawValue)")
+                .accessibilityHint("Double tap to change reading status")
             }
         }
         .sheet(isPresented: $showingBookSearch) {
@@ -801,6 +807,8 @@ struct BookDetailView: View {
                     }
                     }
                 }
+                .accessibilityLabel("\(section.rawValue) section")
+                .accessibilityHint(selectedSection == section ? "Currently selected" : "Double tap to select")
             }
         }
         .padding(4)

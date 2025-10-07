@@ -1,0 +1,170 @@
+/* Navigation - Tab Bar */
+"tab.library" = "ライブラリ";
+"tab.notes" = "ノート";
+"tab.sessions" = "セッション";
+
+/* Reading Status */
+"reading_status.want_to_read" = "読みたい";
+"reading_status.currently_reading" = "読書中";
+"reading_status.read" = "読了";
+
+/* Common Actions */
+"action.save" = "保存";
+"action.cancel" = "キャンセル";
+"action.delete" = "削除";
+"action.add" = "追加";
+"action.edit" = "編集";
+"action.done" = "完了";
+"action.share" = "共有";
+"action.search" = "検索";
+
+/* Settings - Section Headers */
+"settings.title" = "設定";
+"settings.section.appearance" = "外観";
+"settings.section.library" = "ライブラリ";
+"settings.section.ai_assistant" = "AIアシスタント";
+"settings.section.ambient_mode" = "アンビエントモード";
+"settings.section.developer_options" = "開発者オプション";
+"settings.section.icloud_sync" = "iCloud同期";
+"settings.section.data" = "データ";
+"settings.section.about" = "について";
+
+/* Settings - Appearance */
+"settings.gradient_theme" = "グラデーションテーマ";
+
+/* Settings - Library */
+"settings.import_from_goodreads" = "Goodreadsからインポート";
+
+/* Settings - AI Assistant */
+"settings.ai_provider" = "AIプロバイダー";
+"settings.ai_provider.perplexity" = "Perplexity";
+"settings.use_sonar_pro" = "Sonar Proを使用";
+"settings.sonar_pro_description" = "より高度な推論";
+
+/* Settings - Ambient Mode */
+"settings.realtime_questions" = "リアルタイム質問";
+"settings.audio_responses" = "音声応答";
+"settings.default_capture" = "デフォルトキャプチャ";
+"settings.show_live_transcription" = "ライブ文字起こしを表示";
+"settings.always_show_input" = "常に入力を表示";
+
+/* Settings - Default Capture Options */
+"settings.capture.quote" = "引用";
+"settings.capture.note" = "ノート";
+"settings.capture.question" = "質問";
+
+/* Settings - Developer Options */
+"settings.gandalf_mode" = "ガンダルフモード";
+"settings.gandalf_mode_description" = "無制限テスト（クォータ制限なし）";
+"settings.gandalf_mode_active" = "テストモードアクティブ - クォータ無効";
+"settings.reset_cloudkit_migration" = "CloudKit移行をリセット";
+"settings.developer_footer" = "ガンダルフモードは、テスト用にすべてのAPIクォータを無効にします。責任を持って使用してください！\n\nCloudKit移行のリセットは、すべてのローカルデータの同期プロセスを再実行します。";
+
+/* Settings - Data */
+"settings.export_all_data" = "すべてのデータをエクスポート";
+"settings.clear_image_caches" = "画像キャッシュをクリア";
+"settings.delete_all_data" = "すべてのデータを削除";
+"settings.clear_caches_footer" = "画像キャッシュをクリアすると、すべての本の表紙がサーバーから再読み込みされます。";
+
+/* Settings - About */
+"settings.version" = "バージョン";
+"settings.privacy_policy" = "プライバシーポリシー";
+"settings.terms_of_service" = "利用規約";
+"settings.credits" = "クレジット";
+"settings.replay_onboarding" = "オンボーディングを再生";
+
+/* Alerts - Delete Data */
+"alert.delete_data.title" = "すべてのデータを削除しますか？";
+"alert.delete_data.message" = "これにより、すべての本、ノート、読書データが完全に削除されます。この操作は元に戻せません。";
+
+/* Alerts - Export */
+"alert.export_complete.title" = "エクスポート完了";
+"alert.export_complete.message" = "データが正常にエクスポートされました。";
+
+/* Toast Messages */
+"toast.image_caches_cleared" = "画像キャッシュをクリアしました";
+
+/* Library View */
+"library.title" = "ライブラリ";
+"library.view_mode.grid" = "グリッド表示";
+"library.view_mode.list" = "リスト表示";
+"library.filter.all_books" = "すべての本";
+"library.filter.currently_reading" = "読書中";
+"library.filter.unread" = "未読";
+"library.filter.finished" = "読了";
+"library.reorder_books" = "本を並べ替え";
+"library.done_reordering" = "並べ替え完了";
+"library.search_web" = "ウェブ検索";
+
+/* Library - Book Actions */
+"library.mark_as_read" = "読了としてマーク";
+"library.mark_as_want_to_read" = "読みたいとしてマーク";
+"library.change_cover" = "表紙を変更";
+"library.delete_from_library" = "ライブラリから削除";
+
+/* Library - Empty State */
+"library.empty.title" = "まだ本がありません";
+"library.empty.message" = "最初の本を追加して始めましょう";
+"library.empty.add_book" = "本を追加";
+"library.empty.import_goodreads" = "Goodreadsからインポート";
+
+/* Library - Book Card */
+"library.pages" = "%dページ";
+
+/* Notes View */
+"notes.title" = "ノート";
+
+/* Book Detail */
+"book_detail.reading_status" = "読書ステータス";
+"book_detail.your_notes" = "あなたのノート";
+"book_detail.no_notes" = "まだノートがありません";
+"book_detail.add_note" = "ノートを追加";
+"book_detail.page_progress" = "%d/%dページ";
+"book_detail.start_reading" = "読書を開始";
+"book_detail.continue_reading" = "読書を続ける";
+
+/* Empty States */
+"empty.no_books.title" = "まだ本がありません";
+"empty.no_books.message" = "ライブラリを構築しましょう";
+"empty.no_notes.title" = "ノートがありません";
+"empty.no_notes.message" = "読書中の思考を記録しましょう";
+"empty.no_sessions.title" = "セッションがありません";
+"empty.no_sessions.message" = "アンビエント読書セッションを開始";
+
+/* Onboarding */
+"onboarding.welcome" = "Epilogueへようこそ";
+"onboarding.get_started" = "始める";
+"onboarding.skip" = "スキップ";
+"onboarding.next" = "次へ";
+"onboarding.continue" = "続ける";
+
+/* Ambient Mode */
+"ambient.start_session" = "セッション開始";
+"ambient.end_session" = "セッション終了";
+"ambient.listening" = "聞いています...";
+"ambient.processing" = "処理中...";
+
+/* Errors - User-facing only */
+"error.generic" = "問題が発生しました";
+"error.network" = "インターネット接続を確認してください";
+"error.save_failed" = "変更の保存に失敗しました";
+"error.load_failed" = "データの読み込みに失敗しました";
+
+/* CloudKit Status */
+"cloudkit.status.available" = "iCloud利用可能";
+"cloudkit.status.syncing" = "同期中...";
+"cloudkit.status.error" = "同期エラー";
+"cloudkit.status.not_available" = "iCloud利用不可";
+
+/* Context Menu */
+"context.share" = "共有";
+"context.edit" = "編集";
+"context.delete" = "削除";
+
+/* General */
+"general.loading" = "読み込み中...";
+"general.saving" = "保存中...";
+"general.syncing" = "同期中...";
+"general.ok" = "OK";
+"general.yes" = "はい";
+"general.no" = "いいえ";

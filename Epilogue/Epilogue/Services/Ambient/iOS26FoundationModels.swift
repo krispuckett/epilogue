@@ -281,11 +281,12 @@ public class iOS26FoundationModels {
         for token in tokens {
             let tokenString = String(token)
             if let entityType = model.predictedLabel(for: tokenString),
-               entityType != "O" { // Not "Other"
+               entityType != "O", // Not "Other"
+               let range = text.range(of: tokenString) {
                 entities.append(FoundationEntity(
                     text: tokenString,
                     type: .custom(entityType),
-                    range: text.range(of: tokenString)!,
+                    range: range,
                     confidence: 0.85
                 ))
             }
@@ -303,8 +304,11 @@ public class iOS26FoundationModels {
                 "history": history.joined(separator: " [SEP] ")
             ])
         } catch {
-            // Return empty provider on error
-            return try! MLDictionaryFeatureProvider(dictionary: [:])
+            // Return empty provider on error - this should never fail with empty dictionary
+            guard let emptyProvider = try? MLDictionaryFeatureProvider(dictionary: [:]) else {
+                fatalError("Failed to create empty MLDictionaryFeatureProvider")
+            }
+            return emptyProvider
         }
     }
     

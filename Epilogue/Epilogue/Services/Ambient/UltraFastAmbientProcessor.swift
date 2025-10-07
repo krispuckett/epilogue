@@ -216,17 +216,23 @@ public class UltraFastAmbientProcessor: ObservableObject {
     
     // MARK: - Save Audio Helper
     private func saveAudioToFile(_ samples: [Float], url: URL, sampleRate: Double) throws {
-        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
+            throw NSError(domain: "UltraFastAmbientProcessor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio format"])
+        }
         let audioFile = try AVAudioFile(forWriting: url, settings: format.settings)
-        
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
+
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
+            throw NSError(domain: "UltraFastAmbientProcessor", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio buffer"])
+        }
         buffer.frameLength = buffer.frameCapacity
-        
-        let channelData = buffer.floatChannelData![0]
+
+        guard let channelData = buffer.floatChannelData?[0] else {
+            throw NSError(domain: "UltraFastAmbientProcessor", code: -3, userInfo: [NSLocalizedDescriptionKey: "Failed to access channel data"])
+        }
         for (index, sample) in samples.enumerated() {
             channelData[index] = sample
         }
-        
+
         try audioFile.write(from: buffer)
     }
     

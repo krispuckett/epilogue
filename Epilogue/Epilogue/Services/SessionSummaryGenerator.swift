@@ -32,7 +32,10 @@ final class SessionSummaryGenerator: ObservableObject {
             .map { $0.content }
         
         guard !questions.isEmpty else {
-            return book != nil ? "Discussion about \(book!.title)" : "New Conversation"
+            if let book = book {
+                return "Discussion about \(book.title)"
+            }
+            return "New Conversation"
         }
         
         // Build context for title generation

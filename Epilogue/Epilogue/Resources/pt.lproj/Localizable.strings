@@ -1,0 +1,170 @@
+/* Navigation - Tab Bar */
+"tab.library" = "Biblioteca";
+"tab.notes" = "Notas";
+"tab.sessions" = "Sessões";
+
+/* Reading Status */
+"reading_status.want_to_read" = "Quero Ler";
+"reading_status.currently_reading" = "Lendo Atualmente";
+"reading_status.read" = "Lido";
+
+/* Common Actions */
+"action.save" = "Salvar";
+"action.cancel" = "Cancelar";
+"action.delete" = "Excluir";
+"action.add" = "Adicionar";
+"action.edit" = "Editar";
+"action.done" = "Concluído";
+"action.share" = "Compartilhar";
+"action.search" = "Pesquisar";
+
+/* Settings - Section Headers */
+"settings.title" = "Configurações";
+"settings.section.appearance" = "Aparência";
+"settings.section.library" = "Biblioteca";
+"settings.section.ai_assistant" = "Assistente IA";
+"settings.section.ambient_mode" = "Modo Ambiente";
+"settings.section.developer_options" = "Opções do Desenvolvedor";
+"settings.section.icloud_sync" = "Sincronização iCloud";
+"settings.section.data" = "Dados";
+"settings.section.about" = "Sobre";
+
+/* Settings - Appearance */
+"settings.gradient_theme" = "Tema Gradiente";
+
+/* Settings - Library */
+"settings.import_from_goodreads" = "Importar do Goodreads";
+
+/* Settings - AI Assistant */
+"settings.ai_provider" = "Provedor de IA";
+"settings.ai_provider.perplexity" = "Perplexity";
+"settings.use_sonar_pro" = "Usar Sonar Pro";
+"settings.sonar_pro_description" = "Raciocínio mais avançado";
+
+/* Settings - Ambient Mode */
+"settings.realtime_questions" = "Perguntas em Tempo Real";
+"settings.audio_responses" = "Respostas em Áudio";
+"settings.default_capture" = "Captura Padrão";
+"settings.show_live_transcription" = "Mostrar Transcrição ao Vivo";
+"settings.always_show_input" = "Sempre Mostrar Entrada";
+
+/* Settings - Default Capture Options */
+"settings.capture.quote" = "Citação";
+"settings.capture.note" = "Nota";
+"settings.capture.question" = "Pergunta";
+
+/* Settings - Developer Options */
+"settings.gandalf_mode" = "Modo Gandalf";
+"settings.gandalf_mode_description" = "Testes ilimitados (sem limites de cota)";
+"settings.gandalf_mode_active" = "Modo de teste ativo - cotas desabilitadas";
+"settings.reset_cloudkit_migration" = "Redefinir Migração do CloudKit";
+"settings.developer_footer" = "O modo Gandalf desabilita todas as cotas de API para testes. Use com responsabilidade!\n\nRedefinir Migração do CloudKit executará novamente o processo de sincronização para todos os dados locais.";
+
+/* Settings - Data */
+"settings.export_all_data" = "Exportar Todos os Dados";
+"settings.clear_image_caches" = "Limpar Cache de Imagens";
+"settings.delete_all_data" = "Excluir Todos os Dados";
+"settings.clear_caches_footer" = "Limpar Cache de Imagens força o recarregamento de todas as capas de livros do servidor.";
+
+/* Settings - About */
+"settings.version" = "Versão";
+"settings.privacy_policy" = "Política de Privacidade";
+"settings.terms_of_service" = "Termos de Serviço";
+"settings.credits" = "Créditos";
+"settings.replay_onboarding" = "Repetir Introdução";
+
+/* Alerts - Delete Data */
+"alert.delete_data.title" = "Excluir Todos os Dados?";
+"alert.delete_data.message" = "Isso excluirá permanentemente todos os seus livros, notas e dados de leitura. Esta ação não pode ser desfeita.";
+
+/* Alerts - Export */
+"alert.export_complete.title" = "Exportação Concluída";
+"alert.export_complete.message" = "Seus dados foram exportados com sucesso.";
+
+/* Toast Messages */
+"toast.image_caches_cleared" = "Cache de imagens limpo";
+
+/* Library View */
+"library.title" = "Biblioteca";
+"library.view_mode.grid" = "Visualização em Grade";
+"library.view_mode.list" = "Visualização em Lista";
+"library.filter.all_books" = "Todos os Livros";
+"library.filter.currently_reading" = "Lendo Atualmente";
+"library.filter.unread" = "Não Lido";
+"library.filter.finished" = "Concluído";
+"library.reorder_books" = "Reordenar Livros";
+"library.done_reordering" = "Reordenação Concluída";
+"library.search_web" = "Pesquisar na Web";
+
+/* Library - Book Actions */
+"library.mark_as_read" = "Marcar como Lido";
+"library.mark_as_want_to_read" = "Marcar como Quero Ler";
+"library.change_cover" = "Alterar Capa";
+"library.delete_from_library" = "Excluir da Biblioteca";
+
+/* Library - Empty State */
+"library.empty.title" = "Ainda Não Há Livros";
+"library.empty.message" = "Adicione seu primeiro livro para começar";
+"library.empty.add_book" = "Adicionar Livro";
+"library.empty.import_goodreads" = "Importar do Goodreads";
+
+/* Library - Book Card */
+"library.pages" = "%d páginas";
+
+/* Notes View */
+"notes.title" = "Notas";
+
+/* Book Detail */
+"book_detail.reading_status" = "Status de Leitura";
+"book_detail.your_notes" = "Suas Notas";
+"book_detail.no_notes" = "Ainda não há notas";
+"book_detail.add_note" = "Adicionar uma nota";
+"book_detail.page_progress" = "Página %d de %d";
+"book_detail.start_reading" = "Começar a Ler";
+"book_detail.continue_reading" = "Continuar Lendo";
+
+/* Empty States */
+"empty.no_books.title" = "Ainda não há livros";
+"empty.no_books.message" = "Comece a construir sua biblioteca";
+"empty.no_notes.title" = "Sem notas";
+"empty.no_notes.message" = "Capture seus pensamentos enquanto lê";
+"empty.no_sessions.title" = "Sem sessões";
+"empty.no_sessions.message" = "Inicie uma sessão de leitura ambiente";
+
+/* Onboarding */
+"onboarding.welcome" = "Bem-vindo ao Epilogue";
+"onboarding.get_started" = "Começar";
+"onboarding.skip" = "Pular";
+"onboarding.next" = "Próximo";
+"onboarding.continue" = "Continuar";
+
+/* Ambient Mode */
+"ambient.start_session" = "Iniciar Sessão";
+"ambient.end_session" = "Encerrar Sessão";
+"ambient.listening" = "Ouvindo...";
+"ambient.processing" = "Processando...";
+
+/* Errors - User-facing only */
+"error.generic" = "Algo deu errado";
+"error.network" = "Verifique sua conexão com a internet";
+"error.save_failed" = "Falha ao salvar alterações";
+"error.load_failed" = "Falha ao carregar dados";
+
+/* CloudKit Status */
+"cloudkit.status.available" = "iCloud Disponível";
+"cloudkit.status.syncing" = "Sincronizando...";
+"cloudkit.status.error" = "Erro de Sincronização";
+"cloudkit.status.not_available" = "iCloud Não Disponível";
+
+/* Context Menu */
+"context.share" = "Compartilhar";
+"context.edit" = "Editar";
+"context.delete" = "Excluir";
+
+/* General */
+"general.loading" = "Carregando...";
+"general.saving" = "Salvando...";
+"general.syncing" = "Sincronizando...";
+"general.ok" = "OK";
+"general.yes" = "Sim";
+"general.no" = "Não";

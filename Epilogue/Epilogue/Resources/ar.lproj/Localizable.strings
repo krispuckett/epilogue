@@ -1,0 +1,170 @@
+/* Navigation - Tab Bar */
+"tab.library" = "المكتبة";
+"tab.notes" = "الملاحظات";
+"tab.sessions" = "الجلسات";
+
+/* Reading Status */
+"reading_status.want_to_read" = "أريد القراءة";
+"reading_status.currently_reading" = "أقرأ حالياً";
+"reading_status.read" = "مقروء";
+
+/* Common Actions */
+"action.save" = "حفظ";
+"action.cancel" = "إلغاء";
+"action.delete" = "حذف";
+"action.add" = "إضافة";
+"action.edit" = "تعديل";
+"action.done" = "تم";
+"action.share" = "مشاركة";
+"action.search" = "بحث";
+
+/* Settings - Section Headers */
+"settings.title" = "الإعدادات";
+"settings.section.appearance" = "المظهر";
+"settings.section.library" = "المكتبة";
+"settings.section.ai_assistant" = "المساعد الذكي";
+"settings.section.ambient_mode" = "الوضع المحيطي";
+"settings.section.developer_options" = "خيارات المطور";
+"settings.section.icloud_sync" = "مزامنة iCloud";
+"settings.section.data" = "البيانات";
+"settings.section.about" = "حول";
+
+/* Settings - Appearance */
+"settings.gradient_theme" = "السمة المتدرجة";
+
+/* Settings - Library */
+"settings.import_from_goodreads" = "استيراد من Goodreads";
+
+/* Settings - AI Assistant */
+"settings.ai_provider" = "مزود الذكاء الاصطناعي";
+"settings.ai_provider.perplexity" = "Perplexity";
+"settings.use_sonar_pro" = "استخدام Sonar Pro";
+"settings.sonar_pro_description" = "تفكير أكثر تقدماً";
+
+/* Settings - Ambient Mode */
+"settings.realtime_questions" = "أسئلة فورية";
+"settings.audio_responses" = "ردود صوتية";
+"settings.default_capture" = "الالتقاط الافتراضي";
+"settings.show_live_transcription" = "إظهار النسخ المباشر";
+"settings.always_show_input" = "إظهار الإدخال دائماً";
+
+/* Settings - Default Capture Options */
+"settings.capture.quote" = "اقتباس";
+"settings.capture.note" = "ملاحظة";
+"settings.capture.question" = "سؤال";
+
+/* Settings - Developer Options */
+"settings.gandalf_mode" = "وضع غاندالف";
+"settings.gandalf_mode_description" = "اختبار غير محدود (بدون حدود)";
+"settings.gandalf_mode_active" = "وضع الاختبار نشط - الحصص معطلة";
+"settings.reset_cloudkit_migration" = "إعادة تعيين ترحيل CloudKit";
+"settings.developer_footer" = "يعطل وضع غاندالف جميع حصص API للاختبار. استخدمه بمسؤولية!\n\nإعادة تعيين ترحيل CloudKit سيعيد تشغيل عملية المزامنة لجميع البيانات المحلية.";
+
+/* Settings - Data */
+"settings.export_all_data" = "تصدير جميع البيانات";
+"settings.clear_image_caches" = "مسح ذاكرة التخزين المؤقت للصور";
+"settings.delete_all_data" = "حذف جميع البيانات";
+"settings.clear_caches_footer" = "مسح ذاكرة التخزين المؤقت للصور يفرض إعادة تحميل جميع أغلفة الكتب من الخادم.";
+
+/* Settings - About */
+"settings.version" = "الإصدار";
+"settings.privacy_policy" = "سياسة الخصوصية";
+"settings.terms_of_service" = "شروط الخدمة";
+"settings.credits" = "الشكر والتقدير";
+"settings.replay_onboarding" = "إعادة المقدمة";
+
+/* Alerts - Delete Data */
+"alert.delete_data.title" = "حذف جميع البيانات؟";
+"alert.delete_data.message" = "سيؤدي هذا إلى حذف جميع كتبك وملاحظاتك وبيانات القراءة نهائياً. لا يمكن التراجع عن هذا الإجراء.";
+
+/* Alerts - Export */
+"alert.export_complete.title" = "اكتمل التصدير";
+"alert.export_complete.message" = "تم تصدير بياناتك بنجاح.";
+
+/* Toast Messages */
+"toast.image_caches_cleared" = "تم مسح ذاكرة التخزين المؤقت للصور";
+
+/* Library View */
+"library.title" = "المكتبة";
+"library.view_mode.grid" = "عرض الشبكة";
+"library.view_mode.list" = "عرض القائمة";
+"library.filter.all_books" = "جميع الكتب";
+"library.filter.currently_reading" = "أقرأ حالياً";
+"library.filter.unread" = "غير مقروء";
+"library.filter.finished" = "مكتمل";
+"library.reorder_books" = "إعادة ترتيب الكتب";
+"library.done_reordering" = "اكتمل الترتيب";
+"library.search_web" = "البحث على الويب";
+
+/* Library - Book Actions */
+"library.mark_as_read" = "وضع علامة كمقروء";
+"library.mark_as_want_to_read" = "وضع علامة كأريد القراءة";
+"library.change_cover" = "تغيير الغلاف";
+"library.delete_from_library" = "حذف من المكتبة";
+
+/* Library - Empty State */
+"library.empty.title" = "لا توجد كتب بعد";
+"library.empty.message" = "أضف كتابك الأول للبدء";
+"library.empty.add_book" = "إضافة كتاب";
+"library.empty.import_goodreads" = "استيراد من Goodreads";
+
+/* Library - Book Card */
+"library.pages" = "%d صفحة";
+
+/* Notes View */
+"notes.title" = "الملاحظات";
+
+/* Book Detail */
+"book_detail.reading_status" = "حالة القراءة";
+"book_detail.your_notes" = "ملاحظاتك";
+"book_detail.no_notes" = "لا توجد ملاحظات بعد";
+"book_detail.add_note" = "إضافة ملاحظة";
+"book_detail.page_progress" = "صفحة %d من %d";
+"book_detail.start_reading" = "بدء القراءة";
+"book_detail.continue_reading" = "متابعة القراءة";
+
+/* Empty States */
+"empty.no_books.title" = "لا توجد كتب بعد";
+"empty.no_books.message" = "ابدأ ببناء مكتبتك";
+"empty.no_notes.title" = "لا توجد ملاحظات";
+"empty.no_notes.message" = "التقط أفكارك أثناء القراءة";
+"empty.no_sessions.title" = "لا توجد جلسات";
+"empty.no_sessions.message" = "ابدأ جلسة قراءة محيطية";
+
+/* Onboarding */
+"onboarding.welcome" = "مرحباً بك في Epilogue";
+"onboarding.get_started" = "ابدأ";
+"onboarding.skip" = "تخطي";
+"onboarding.next" = "التالي";
+"onboarding.continue" = "متابعة";
+
+/* Ambient Mode */
+"ambient.start_session" = "بدء الجلسة";
+"ambient.end_session" = "إنهاء الجلسة";
+"ambient.listening" = "أستمع...";
+"ambient.processing" = "جارٍ المعالجة...";
+
+/* Errors - User-facing only */
+"error.generic" = "حدث خطأ ما";
+"error.network" = "تحقق من اتصالك بالإنترنت";
+"error.save_failed" = "فشل حفظ التغييرات";
+"error.load_failed" = "فشل تحميل البيانات";
+
+/* CloudKit Status */
+"cloudkit.status.available" = "iCloud متاح";
+"cloudkit.status.syncing" = "جارٍ المزامنة...";
+"cloudkit.status.error" = "خطأ في المزامنة";
+"cloudkit.status.not_available" = "iCloud غير متاح";
+
+/* Context Menu */
+"context.share" = "مشاركة";
+"context.edit" = "تعديل";
+"context.delete" = "حذف";
+
+/* General */
+"general.loading" = "جارٍ التحميل...";
+"general.saving" = "جارٍ الحفظ...";
+"general.syncing" = "جارٍ المزامنة...";
+"general.ok" = "موافق";
+"general.yes" = "نعم";
+"general.no" = "لا";

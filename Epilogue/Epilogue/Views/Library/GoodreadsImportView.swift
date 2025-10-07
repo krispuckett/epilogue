@@ -1760,8 +1760,22 @@ struct BookSearchRow: View {
 }
 
 #Preview {
-    GoodreadsImportView(
-        modelContext: ModelContext(try! ModelContainer(for: BookModel.self)),
+    let container = try? ModelContainer(for: BookModel.self)
+    let context: ModelContext
+    if let container = container {
+        context = ModelContext(container)
+    } else {
+        // Fallback to in-memory container for preview
+        do {
+            let fallbackContainer = try ModelContainer(for: BookModel.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+            context = ModelContext(fallbackContainer)
+        } catch {
+            fatalError("Preview: Failed to create ModelContainer - \(error)")
+        }
+    }
+
+    return GoodreadsImportView(
+        modelContext: context,
         googleBooksService: GoogleBooksService(),
         libraryViewModel: LibraryViewModel()
     )

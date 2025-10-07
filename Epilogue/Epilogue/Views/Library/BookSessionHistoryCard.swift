@@ -437,6 +437,8 @@ struct ChatHistoryBubble: View {
 struct AmbientSessionRow: View {
     let session: AmbientSession
     let onTap: () -> Void
+    @Environment(\.modelContext) private var modelContext
+    @State private var showingDeleteAlert = false
     
     private var formattedDate: String {
         let formatter = RelativeDateTimeFormatter()
@@ -545,5 +547,30 @@ struct AmbientSessionRow: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .onLongPressGesture(minimumDuration: 0.5) {
+            showingDeleteAlert = true
+            SensoryFeedback.medium()
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                showingDeleteAlert = true
+            } label: {
+                Label("Delete Session", systemImage: "trash")
+            }
+        }
+        .alert("Delete Session", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteSession()
+            }
+        } message: {
+            Text("Are you sure you want to delete this reading session? This action cannot be undone.")
+        }
+    }
+
+    private func deleteSession() {
+        modelContext.delete(session)
+        try? modelContext.save()
+        SensoryFeedback.success()
     }
 }

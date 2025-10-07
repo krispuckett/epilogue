@@ -1,0 +1,170 @@
+/* Navigation - Tab Bar */
+"tab.library" = "书库";
+"tab.notes" = "笔记";
+"tab.sessions" = "会话";
+
+/* Reading Status */
+"reading_status.want_to_read" = "想要阅读";
+"reading_status.currently_reading" = "正在阅读";
+"reading_status.read" = "已读";
+
+/* Common Actions */
+"action.save" = "保存";
+"action.cancel" = "取消";
+"action.delete" = "删除";
+"action.add" = "添加";
+"action.edit" = "编辑";
+"action.done" = "完成";
+"action.share" = "分享";
+"action.search" = "搜索";
+
+/* Settings - Section Headers */
+"settings.title" = "设置";
+"settings.section.appearance" = "外观";
+"settings.section.library" = "书库";
+"settings.section.ai_assistant" = "AI助手";
+"settings.section.ambient_mode" = "环境模式";
+"settings.section.developer_options" = "开发者选项";
+"settings.section.icloud_sync" = "iCloud同步";
+"settings.section.data" = "数据";
+"settings.section.about" = "关于";
+
+/* Settings - Appearance */
+"settings.gradient_theme" = "渐变主题";
+
+/* Settings - Library */
+"settings.import_from_goodreads" = "从Goodreads导入";
+
+/* Settings - AI Assistant */
+"settings.ai_provider" = "AI提供商";
+"settings.ai_provider.perplexity" = "Perplexity";
+"settings.use_sonar_pro" = "使用Sonar Pro";
+"settings.sonar_pro_description" = "更高级的推理";
+
+/* Settings - Ambient Mode */
+"settings.realtime_questions" = "实时问答";
+"settings.audio_responses" = "音频回复";
+"settings.default_capture" = "默认捕获";
+"settings.show_live_transcription" = "显示实时转录";
+"settings.always_show_input" = "始终显示输入";
+
+/* Settings - Default Capture Options */
+"settings.capture.quote" = "引用";
+"settings.capture.note" = "笔记";
+"settings.capture.question" = "问题";
+
+/* Settings - Developer Options */
+"settings.gandalf_mode" = "甘道夫模式";
+"settings.gandalf_mode_description" = "无限测试（无配额限制）";
+"settings.gandalf_mode_active" = "测试模式已激活 - 配额已禁用";
+"settings.reset_cloudkit_migration" = "重置CloudKit迁移";
+"settings.developer_footer" = "甘道夫模式禁用所有API配额以进行测试。请负责任地使用！\n\n重置CloudKit迁移将重新运行所有本地数据的同步过程。";
+
+/* Settings - Data */
+"settings.export_all_data" = "导出所有数据";
+"settings.clear_image_caches" = "清除图片缓存";
+"settings.delete_all_data" = "删除所有数据";
+"settings.clear_caches_footer" = "清除图片缓存将强制从服务器重新加载所有书籍封面。";
+
+/* Settings - About */
+"settings.version" = "版本";
+"settings.privacy_policy" = "隐私政策";
+"settings.terms_of_service" = "服务条款";
+"settings.credits" = "致谢";
+"settings.replay_onboarding" = "重播引导";
+
+/* Alerts - Delete Data */
+"alert.delete_data.title" = "删除所有数据？";
+"alert.delete_data.message" = "这将永久删除您的所有书籍、笔记和阅读数据。此操作无法撤消。";
+
+/* Alerts - Export */
+"alert.export_complete.title" = "导出完成";
+"alert.export_complete.message" = "您的数据已成功导出。";
+
+/* Toast Messages */
+"toast.image_caches_cleared" = "图片缓存已清除";
+
+/* Library View */
+"library.title" = "书库";
+"library.view_mode.grid" = "网格视图";
+"library.view_mode.list" = "列表视图";
+"library.filter.all_books" = "所有书籍";
+"library.filter.currently_reading" = "正在阅读";
+"library.filter.unread" = "未读";
+"library.filter.finished" = "已完成";
+"library.reorder_books" = "重新排序书籍";
+"library.done_reordering" = "排序完成";
+"library.search_web" = "网页搜索";
+
+/* Library - Book Actions */
+"library.mark_as_read" = "标记为已读";
+"library.mark_as_want_to_read" = "标记为想要阅读";
+"library.change_cover" = "更换封面";
+"library.delete_from_library" = "从书库删除";
+
+/* Library - Empty State */
+"library.empty.title" = "还没有书籍";
+"library.empty.message" = "添加您的第一本书开始使用";
+"library.empty.add_book" = "添加书籍";
+"library.empty.import_goodreads" = "从Goodreads导入";
+
+/* Library - Book Card */
+"library.pages" = "%d页";
+
+/* Notes View */
+"notes.title" = "笔记";
+
+/* Book Detail */
+"book_detail.reading_status" = "阅读状态";
+"book_detail.your_notes" = "您的笔记";
+"book_detail.no_notes" = "还没有笔记";
+"book_detail.add_note" = "添加笔记";
+"book_detail.page_progress" = "第%d页，共%d页";
+"book_detail.start_reading" = "开始阅读";
+"book_detail.continue_reading" = "继续阅读";
+
+/* Empty States */
+"empty.no_books.title" = "还没有书籍";
+"empty.no_books.message" = "开始建立您的书库";
+"empty.no_notes.title" = "没有笔记";
+"empty.no_notes.message" = "在阅读时捕获您的想法";
+"empty.no_sessions.title" = "没有会话";
+"empty.no_sessions.message" = "开始环境阅读会话";
+
+/* Onboarding */
+"onboarding.welcome" = "欢迎使用Epilogue";
+"onboarding.get_started" = "开始使用";
+"onboarding.skip" = "跳过";
+"onboarding.next" = "下一步";
+"onboarding.continue" = "继续";
+
+/* Ambient Mode */
+"ambient.start_session" = "开始会话";
+"ambient.end_session" = "结束会话";
+"ambient.listening" = "正在聆听...";
+"ambient.processing" = "正在处理...";
+
+/* Errors - User-facing only */
+"error.generic" = "出了点问题";
+"error.network" = "请检查您的网络连接";
+"error.save_failed" = "保存更改失败";
+"error.load_failed" = "加载数据失败";
+
+/* CloudKit Status */
+"cloudkit.status.available" = "iCloud可用";
+"cloudkit.status.syncing" = "正在同步...";
+"cloudkit.status.error" = "同步错误";
+"cloudkit.status.not_available" = "iCloud不可用";
+
+/* Context Menu */
+"context.share" = "分享";
+"context.edit" = "编辑";
+"context.delete" = "删除";
+
+/* General */
+"general.loading" = "加载中...";
+"general.saving" = "保存中...";
+"general.syncing" = "同步中...";
+"general.ok" = "确定";
+"general.yes" = "是";
+"general.no" = "否";

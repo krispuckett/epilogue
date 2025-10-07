@@ -7,6 +7,8 @@ private let logger = Logger(subsystem: "com.epilogue", category: "DeepLink")
 /// Handles deep linking and notification-based navigation
 @MainActor
 final class DeepLinkHandler: ObservableObject {
+    static let shared = DeepLinkHandler()
+
     @Published var highlightedBookId: UUID?
     @Published var scrollToBookId: UUID?
 
@@ -14,7 +16,7 @@ final class DeepLinkHandler: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    private init() {
         setupNotificationObservers()
     }
 
@@ -24,6 +26,10 @@ final class DeepLinkHandler: ObservableObject {
     }
 
     // MARK: - Public Methods
+
+    func handle(url: URL) {
+        handleURL(url)
+    }
 
     func handleURL(_ url: URL) {
         logger.info("Handling URL: \(url.absoluteString)")

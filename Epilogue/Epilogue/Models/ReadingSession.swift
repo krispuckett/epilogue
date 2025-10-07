@@ -3,13 +3,13 @@ import Foundation
 
 @Model
 final class ReadingSession {
-    @Attribute(.unique) var id: UUID
-    var startDate: Date
+    var id: UUID = UUID()  // CloudKit: no unique constraint, default value
+    var startDate: Date = Date()  // CloudKit: default value
     var endDate: Date?
-    var duration: TimeInterval
-    var startPage: Int
-    var endPage: Int
-    var pagesRead: Int
+    var duration: TimeInterval = 0  // CloudKit: default value
+    var startPage: Int = 0  // CloudKit: default value
+    var endPage: Int = 0  // CloudKit: default value
+    var pagesRead: Int = 0  // CloudKit: default value
     var isAmbientSession: Bool = false  // Default to preserve old data
     var lastInteraction: Date = Date()  // Default to preserve old data
 

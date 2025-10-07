@@ -11,7 +11,7 @@ struct ContentView: View {
     @StateObject private var navigationCoordinator = NavigationCoordinator.shared
     @StateObject private var ambientCoordinator = EpilogueAmbientCoordinator.shared
     @StateObject private var appStateCoordinator = AppStateCoordinator()
-    @StateObject private var deepLinkHandler = DeepLinkHandler()
+    @StateObject private var deepLinkHandler = DeepLinkHandler.shared
     @StateObject private var onboardingCoordinator = OnboardingCoordinator()
     @StateObject private var libraryViewModel = LibraryViewModel()
     @StateObject private var notesViewModel = NotesViewModel()
@@ -132,6 +132,15 @@ struct ContentView: View {
         Task {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             ResponseCache.shared.cleanExpiredEntries()
+        }
+
+        // Migrate UserDefaults books to SwiftData (one-time)
+        // This ensures all existing books have BookModels for enrichment
+        Task { @MainActor in
+            await BookModelMigrationService.shared.migrateIfNeeded(
+                libraryViewModel: libraryViewModel,
+                modelContext: modelContext
+            )
         }
 
         // Check for CloudKit migration

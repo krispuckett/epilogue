@@ -1096,9 +1096,10 @@ struct UnifiedChatView: View {
         // Create BookModel if we have book context
         var bookModel: BookModel? = nil
         if let book = currentBookContext {
-            bookModel = BookModel(from: book)
+            let model = BookModel(from: book)
+            bookModel = model
             // Insert book model if not already in context
-            modelContext.insert(bookModel!)
+            modelContext.insert(model)
         }
         
         // Create and save the note
@@ -1161,10 +1162,11 @@ struct UnifiedChatView: View {
         // Create BookModel if we have book context
         var bookModel: BookModel? = nil
         if let book = currentBookContext {
-            bookModel = BookModel(from: book)
+            let model = BookModel(from: book)
+            bookModel = model
             // Insert book model if not already in context
-            modelContext.insert(bookModel!)
-            
+            modelContext.insert(model)
+
             // If no author specified, use book author
             if author == nil {
                 author = book.author
@@ -1715,14 +1717,15 @@ struct UnifiedChatView: View {
             if let lastMessage = messages.last, lastMessage.content == "Capturing quote..." {
                 messages.removeLast()
             }
-            
+
             // Create BookModel if needed
             var bookModel: BookModel? = nil
             if let book = currentBookContext {  // Use current book context
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let model = BookModel(from: book)
+                bookModel = model
+                modelContext.insert(model)
             }
-            
+
             // Create and save quote
             let capturedQuote = CapturedQuote(
                 text: content.text,
@@ -1798,14 +1801,15 @@ struct UnifiedChatView: View {
             if let lastMessage = messages.last, lastMessage.content == "Saving note..." {
                 messages.removeLast()
             }
-            
+
             // Create BookModel if needed
             var bookModel: BookModel? = nil
             if let book = currentBookContext {  // Use current book context
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let model = BookModel(from: book)
+                bookModel = model
+                modelContext.insert(model)
             }
-            
+
             // Create and save note
             let capturedNote = CapturedNote(
                 content: content.text,

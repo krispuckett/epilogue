@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Unified Quick Action Card (Clean, No Microphone)
 struct UnifiedQuickActionCard: View {
@@ -11,6 +12,7 @@ struct UnifiedQuickActionCard: View {
     @EnvironmentObject var notesViewModel: NotesViewModel
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var navigationCoordinator = NavigationCoordinator.shared
+    @Environment(\.modelContext) private var modelContext
 
     // For sheets
     @State private var showBookSearch = false
@@ -297,17 +299,43 @@ struct UnifiedQuickActionCard: View {
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(searchQuery: searchText) { book in
+                print("📚 [INPUT BAR] Book selected: \(book.title)")
+
+                // Add to UserDefaults
                 libraryViewModel.addBook(book)
+
+                // Create BookModel in SwiftData + enrich
+                Task {
+                    print("📚 [INPUT BAR] Creating BookModel...")
+                    let descriptor = FetchDescriptor<BookModel>(
+                        predicate: #Predicate<BookModel> { $0.id == book.id }
+                    )
+
+                    if let existingModel = try? modelContext.fetch(descriptor).first {
+                        print("✅ BookModel exists, enriching...")
+                        if !existingModel.isEnriched {
+                            await BookEnrichmentService.shared.enrichBook(existingModel)
+                        }
+                    } else {
+                        print("📝 Creating new BookModel...")
+                        let bookModel = BookModel(from: book)
+                        modelContext.insert(bookModel)
+                        try? modelContext.save()
+                        print("✅ BookModel saved, enriching...")
+                        await BookEnrichmentService.shared.enrichBook(bookModel)
+                    }
+                }
+
                 showBookSearch = false
                 showToast("Book added to library")
-                
+
                 // Dismiss the card after adding a book
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         isPresented = false
                     }
                 }
-                
+
                 // Clear text and reset state
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     searchText = ""
@@ -597,66 +625,71 @@ struct UnifiedQuickActionCard: View {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        // ULTRA-INTELLIGENT INTENT DETECTION
-        // We anticipate what users mean, not just what they type
-        
-        // 1. Smart Quote Detection (multiple patterns)
-        if let parsedQuote = parseQuoteWithAttribution(trimmed) {
-            createQuoteWithAttribution(
-                text: parsedQuote.quote,
-                author: parsedQuote.author,
-                bookTitle: parsedQuote.book
+        // USE SMART COMMANDPARSER FOR CONSISTENT BEHAVIOR
+        print("🔍 UnifiedQuickActionCard: Processing input: '\(trimmed)'")
+        let intent = CommandParser.parse(trimmed, books: libraryViewModel.books, notes: notesViewModel.notes)
+        print("🔍 UnifiedQuickActionCard: Detected intent: \(intent)")
+
+        switch intent {
+        case .addBook(let query):
+            // Open book search sheet with query
+            print("📚 UnifiedQuickActionCard: Opening book search with query: '\(query)'")
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowBookSearch"),
+                object: query
             )
-        }
-        // Quoted text - obvious quote intent
-        else if trimmed.hasPrefix("\"") || trimmed.hasPrefix("\u{201C}") || 
-                trimmed.hasPrefix("'") || trimmed.hasPrefix("\u{2018}") {
-            createQuote(trimmed)
-        }
-        // Common quote-like phrases
-        else if isLikelyQuote(trimmed) {
-            createQuote(trimmed)
-        }
-        
-        // 2. Book Search (only very explicit intents)
-        else if isBookSearchIntent(trimmed) {
-            showBookSearch = true
-        }
-        
-        // 3. Questions and Thoughts
-        else if trimmed.hasSuffix("?") {
-            // Questions - could trigger AI assistant
-            if shouldTriggerAI(trimmed) {
-                // Future: Trigger AI
-                createNote(trimmed) // For now, save as note
+
+        case .createQuote(let text):
+            let (content, attribution) = CommandParser.parseQuote(text)
+            if let attr = attribution {
+                let parts = attr.split(separator: "|||").map { String($0) }
+                let author = parts.count >= 1 ? parts[0] : nil
+                let bookTitle = parts.count >= 3 && parts[1] == "BOOK" ? parts[2] : nil
+                createQuoteWithAttribution(text: content, author: author, bookTitle: bookTitle)
             } else {
-                createNote(trimmed)
+                createQuote(text)
             }
-        }
-        
-        // 4. Reading Progress Updates
-        else if isReadingProgress(trimmed) {
-            // Extract page number and update progress
-            if let pageNumber = extractPageNumber(trimmed) {
-                updateReadingProgress(pageNumber: pageNumber)
-                createNote(trimmed) // Also save as note for history
-            } else {
-                createNote(trimmed)
+
+        case .createNote(let text):
+            createNote(text)
+
+        case .existingBook(let book):
+            // Navigate to book
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToBook"),
+                object: book
+            )
+
+        case .existingNote(let note):
+            // Navigate to note
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToNote"),
+                object: note
+            )
+
+        case .searchLibrary(let query), .searchNotes(let query), .searchAll(let query):
+            // For now, create as note - could enhance with search UI later
+            createNote(trimmed)
+
+        case .createNoteWithBook(let text, let book):
+            // Note with book context
+            selectedBookContext = book
+            createNote(text)
+
+        case .createQuoteWithBook(let text, let book):
+            // Quote with book context
+            selectedBookContext = book
+            createQuote(text)
+
+        default:
+            // Ambient mode triggers
+            if trimmed.lowercased().contains("ambient") ||
+               trimmed.lowercased() == "start reading" ||
+               trimmed.lowercased() == "reading mode" {
+                startAmbientMode()
+                return // Don't save as note
             }
-        }
-        
-        // 5. Ambient Mode Triggers
-        else if trimmed.lowercased().contains("ambient") || 
-                trimmed.lowercased() == "start reading" ||
-                trimmed.lowercased() == "reading mode" {
-            startAmbientMode()
-            return // Don't save as note
-        }
-        
-        // 6. Default: Smart Note Creation
-        else {
-            // Everything else becomes a note
-            // This is the safest default - never lose user content
+            // Fallback to note
             createNote(trimmed)
         }
         

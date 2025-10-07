@@ -194,6 +194,7 @@ struct AmbientModeView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isPresentedModally = false
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
     
@@ -1625,10 +1626,11 @@ struct AmbientModeView: View {
                                           "frodo", "gandalf", "bilbo", "ring", "hobbit", "shire", "middle-earth", 
                                           "protagonist", "antagonist", "theme", "ending", "beginning"]
                 let seemsBookRelated = bookRelatedKeywords.contains { questionLower.contains($0) } ||
-                                       (currentBookContext != nil && 
-                                        currentBookContext!.title.lowercased().split(separator: " ").contains { 
-                                            questionLower.contains($0) && $0.count > 3 
-                                        })
+                                       (currentBookContext.map { context in
+                                        context.title.lowercased().split(separator: " ").contains {
+                                            questionLower.contains($0) && $0.count > 3
+                                        }
+                                       } ?? false)
                 
                 // Filter out if it's clearly non-book content and not book-related
                 if isNonBookContent && !seemsBookRelated {
@@ -1726,9 +1728,9 @@ struct AmbientModeView: View {
                         !msg.isUser && (msg.content == item.response || msg.content.contains(item.text))
                     }
                     
-                    if !responseExists {
+                    if !responseExists, let response = item.response {
                         // Format the response with the question for context
-                        let formattedResponse = "**\(item.text)**\n\n\(item.response!)"
+                        let formattedResponse = "**\(item.text)**\n\n\(response)"
                         let aiMessage = UnifiedChatMessage(
                             content: formattedResponse,
                             isUser: false,
@@ -1881,19 +1883,84 @@ struct AmbientModeView: View {
                     model.localId == book.localId.uuidString
                 }
             )
-            
+
             if let existingBook = try? modelContext.fetch(fetchRequest).first {
                 bookModel = existingBook
             } else {
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: book)
+                bookModel = newBookModel
+                modelContext.insert(newBookModel)
             }
         }
-        
-        // Detect attribution for known quotes
-        var quoteAuthor = currentBookContext?.author
+
+        // Parse attribution from quote text itself
+        // Common patterns: "quote text by Author", "quote text - Author", "quote text, Author", "quote text from Book"
+        var quoteAuthor: String? = currentBookContext?.author
+        var parsedBookTitle: String? = nil
+        var attributionWasParsed = false
+
+        let attributionPatterns = [
+            // "by Author" or "by Author, Book"
+            try? NSRegularExpression(pattern: "\\s+by\\s+([^,]+)(?:,\\s*(.+))?\\s*$", options: .caseInsensitive),
+            // "- Author" or "- Author, Book"
+            try? NSRegularExpression(pattern: "\\s*[-—–]\\s*([^,]+)(?:,\\s*(.+))?\\s*$", options: []),
+            // ", Author" at the end
+            try? NSRegularExpression(pattern: ",\\s+([^,]+)\\s*$", options: [])
+        ]
+
+        for pattern in attributionPatterns.compactMap({ $0 }) {
+            let range = NSRange(quoteText.startIndex..., in: quoteText)
+            if let match = pattern.firstMatch(in: quoteText, range: range) {
+                // Extract author
+                if let authorRange = Range(match.range(at: 1), in: quoteText) {
+                    let extractedAuthor = String(quoteText[authorRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !extractedAuthor.isEmpty && extractedAuthor.count > 2 {
+                        quoteAuthor = extractedAuthor
+                        attributionWasParsed = true
+                    }
+                }
+
+                // Extract book title if present (capture group 2)
+                if match.numberOfRanges > 2, let bookRange = Range(match.range(at: 2), in: quoteText) {
+                    let extractedBook = String(quoteText[bookRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !extractedBook.isEmpty && extractedBook.count > 2 {
+                        parsedBookTitle = extractedBook
+                    }
+                }
+
+                // Remove attribution from quote text
+                if let matchRange = Range(match.range, in: quoteText) {
+                    quoteText = String(quoteText[..<matchRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+
+                break  // Only use first matching pattern
+            }
+        }
+
+        // If we parsed a book title, try to find or create that book
+        if let bookTitle = parsedBookTitle {
+            let bookFetchRequest = FetchDescriptor<BookModel>(
+                predicate: #Predicate { model in
+                    model.title == bookTitle
+                }
+            )
+
+            if let existingBook = try? modelContext.fetch(bookFetchRequest).first {
+                bookModel = existingBook
+            } else if bookModel == nil {
+                // Create a new book with the parsed info
+                let newBookModel = BookModel(
+                    id: UUID().uuidString,
+                    title: bookTitle,
+                    author: quoteAuthor ?? "Unknown"
+                )
+                modelContext.insert(newBookModel)
+                bookModel = newBookModel
+            }
+        }
+
         let cleanedQuote = quoteText.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         // Check for Gandalf quotes from LOTR
         if gandalfQuotes.contains(cleanedQuote) && currentBookContext?.title.lowercased().contains("lord of the rings") == true {
             quoteAuthor = "Gandalf"
@@ -1951,15 +2018,16 @@ struct AmbientModeView: View {
                     model.localId == book.localId.uuidString
                 }
             )
-            
+
             if let existingBook = try? modelContext.fetch(fetchRequest).first {
                 bookModel = existingBook
             } else {
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: book)
+                bookModel = newBookModel
+                modelContext.insert(newBookModel)
             }
         }
-        
+
         let capturedNote = CapturedNote(
             content: content.text,
             book: bookModel,
@@ -2047,15 +2115,16 @@ struct AmbientModeView: View {
                     model.localId == book.localId.uuidString
                 }
             )
-            
+
             if let existingBook = try? modelContext.fetch(fetchRequest).first {
                 bookModel = existingBook
             } else {
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: book)
+                bookModel = newBookModel
+                modelContext.insert(newBookModel)
             }
         }
-        
+
         let capturedQuestion = CapturedQuestion(
             content: questionText,
             book: bookModel,
@@ -2133,9 +2202,10 @@ struct AmbientModeView: View {
         // If voice mode is disabled, skip audio permissions and setup
         if !isVoiceModeEnabled {
             // Create session without audio setup
-            sessionStartTime = Date()
+            let startTime = Date()
+            sessionStartTime = startTime
             let session = AmbientSession(book: currentBookContext)
-            session.startTime = sessionStartTime!
+            session.startTime = startTime
             currentSession = session
             modelContext.insert(session)
             
@@ -2181,11 +2251,12 @@ struct AmbientModeView: View {
             // NOW we can create the session
             await MainActor.run {
                 // Record when the session actually starts
-                sessionStartTime = Date()
-                
+                let startTime = Date()
+                sessionStartTime = startTime
+
                 // Create the session at the START
                 let session = AmbientSession(book: currentBookContext)
-                session.startTime = sessionStartTime! // Use the actual start time
+                session.startTime = startTime // Use the actual start time
                 currentSession = session
                 modelContext.insert(session)
                 
@@ -2843,7 +2914,7 @@ struct AmbientModeView: View {
         // Save quote to SwiftData immediately
         let quote = CapturedQuote(
             text: text,
-            book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+            book: currentBookContext.map { BookModel(from: $0) },
             author: currentBookContext?.author,
             pageNumber: nil,
             timestamp: Date(),
@@ -2907,7 +2978,7 @@ struct AmbientModeView: View {
         // Create the captured quote
         let capturedQuote = CapturedQuote(
             text: text,
-            book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+            book: currentBookContext.map { BookModel(from: $0) },
             author: currentBookContext?.author,
             pageNumber: pageNumber,
             timestamp: Date(),
@@ -2923,14 +2994,14 @@ struct AmbientModeView: View {
         }
 
         // Add to messages
-        let pageInfo = pageNumber != nil ? "from page \(pageNumber!)" : ""
+        let pageInfo = pageNumber.map { "from page \($0)" } ?? ""
         let message = UnifiedChatMessage(
             content: "**Quote captured \(pageInfo)**\n\n\(text)",
             isUser: false,
             timestamp: Date(),
             messageType: .quote(CapturedQuote(
                 text: text,
-                book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+                book: currentBookContext.map { BookModel(from: $0) },
                 author: currentBookContext?.author,
                 pageNumber: pageNumber,
                 timestamp: Date(),
@@ -3013,7 +3084,7 @@ struct AmbientModeView: View {
                 if let session = currentSession {
                     let capturedQuestion = CapturedQuestion(
                         content: text,
-                        book: currentBookContext != nil ? BookModel(from: currentBookContext!) : nil,
+                        book: currentBookContext.map { BookModel(from: $0) },
                         pageNumber: nil,
                         timestamp: Date(),
                         source: .manual
@@ -3866,13 +3937,36 @@ struct AmbientQuoteView: View {
                         SensoryFeedback.light()
                         onEdit(quote.text ?? "")
                     }
-                
-                // Author attribution if available
-                if let author = quote.author {
-                    Text("— \(author)")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .padding(.top, 4)
+
+                // Horizontal divider line
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color.white.opacity(0.1), location: 0),
+                        .init(color: Color.white.opacity(0.5), location: 0.5),
+                        .init(color: Color.white.opacity(0.1), location: 1.0)
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+                // Attribution section (author and book title)
+                VStack(alignment: .leading, spacing: 6) {
+                    if let author = quote.author {
+                        Text(author.uppercased())
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .kerning(1.2)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    if let bookTitle = quote.book?.title {
+                        Text(bookTitle.uppercased())
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .kerning(1.0)
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -4051,16 +4145,22 @@ struct AmbientMessageThreadView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     // Use streaming text if available, otherwise use message content
-                    let displayContent = streamingText != nil ? 
-                        "**\(extractContent(from: message.content).question)**\n\n\(streamingText!)" : 
-                        message.content
-                    let content = extractContent(from: displayContent)
-                    
-                    // Show question text
-                    Text(content.question)
-                        .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
-                        .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Group {
+                        let displayContent: String = {
+                            if let streaming = streamingText {
+                                return "**\(extractContent(from: message.content).question)**\n\n\(streaming)"
+                            } else {
+                                return message.content
+                            }
+                        }()
+                        let content = extractContent(from: displayContent)
+
+                        // Show question text
+                        Text(content.question)
+                            .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
+                            .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
                 
                 if !message.isUser {
@@ -4117,11 +4217,15 @@ struct AmbientMessageThreadView: View {
             // Answer (expandable for AI responses) with blur transition
             if !message.isUser && isExpanded {
                 // Use streaming text if available
-                let displayContent = streamingText != nil ? 
-                    "**\(extractContent(from: message.content).question)**\n\n\(streamingText!)" : 
-                    message.content
+                let displayContent: String = {
+                    if let streaming = streamingText {
+                        return "**\(extractContent(from: message.content).question)**\n\n\(streaming)"
+                    } else {
+                        return message.content
+                    }
+                }()
                 let content = extractContent(from: displayContent)
-                
+
                 // If no answer yet, don't show anything special
                 // The scrolling text is already shown above the input field
                 if content.answer.isEmpty && streamingText == nil {

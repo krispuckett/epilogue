@@ -324,10 +324,11 @@ class PerformanceProfiler {
         let duration = Date().timeIntervalSince(start)
         
         measurements[label, default: []].append(duration)
-        
+
         // Keep only last 100 measurements
-        if measurements[label]!.count > 100 {
-            measurements[label]!.removeFirst()
+        if var times = measurements[label], times.count > 100 {
+            times.removeFirst()
+            measurements[label] = times
         }
         
         return result

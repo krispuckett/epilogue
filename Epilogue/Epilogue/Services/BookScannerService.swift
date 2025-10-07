@@ -247,11 +247,11 @@ class BookScannerService: NSObject, ObservableObject {
             }
             
             // If no title found from large text, use first few text elements
-            if info.title == nil || info.title!.isEmpty {
+            if info.title == nil || info.title?.isEmpty == true {
                 let topTexts = allText.prefix(5).map { $0.text }
                 let titleTexts = topTexts.filter { text in
                     let lower = text.lowercased()
-                    return !lower.contains("by ") && 
+                    return !lower.contains("by ") &&
                            !lower.contains("author") &&
                            !isPublisherInfo(text) &&
                            !isLikelyAuthorName(text) &&

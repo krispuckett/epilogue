@@ -119,7 +119,16 @@ class OptimizedPerplexityService: ObservableObject {
     
     // MARK: - Cerebras-Powered Streaming with SSE
     
-    func streamSonarResponse(_ query: String, bookContext: Book?) -> AsyncThrowingStream<PerplexityResponse, Error> {
+    func streamSonarResponse(
+        _ query: String,
+        bookContext: Book?,
+        enrichment: (synopsis: String, characters: [String], themes: [String], setting: String)? = nil,
+        sessionHistory: [String]? = nil,
+        userNotes: [(content: String, page: Int?)]? = nil,
+        userQuotes: [(text: String, page: Int?, notes: String?)]? = nil,
+        userQuestions: [(question: String, page: Int?, answer: String?)]? = nil,
+        currentPage: Int? = nil
+    ) -> AsyncThrowingStream<PerplexityResponse, Error> {
         AsyncThrowingStream { continuation in
             Task { [weak self] in
                 guard let self = self else {
@@ -180,7 +189,13 @@ class OptimizedPerplexityService: ObservableObject {
                         query: query,
                         bookContext: bookContext,
                         model: model,
-                        stream: true
+                        stream: true,
+                        enrichment: enrichment,
+                        sessionHistory: sessionHistory,
+                        userNotes: userNotes,
+                        userQuotes: userQuotes,
+                        userQuestions: userQuestions,
+                        currentPage: currentPage
                     )
                     
                     // Start streaming with automatic reconnection
@@ -511,7 +526,18 @@ class OptimizedPerplexityService: ObservableObject {
     
     // MARK: - Request Creation
     
-    private func createSonarRequest(query: String, bookContext: Book?, model: String, stream: Bool) throws -> URLRequest {
+    private func createSonarRequest(
+        query: String,
+        bookContext: Book?,
+        model: String,
+        stream: Bool,
+        enrichment: (synopsis: String, characters: [String], themes: [String], setting: String)? = nil,
+        sessionHistory: [String]? = nil,
+        userNotes: [(content: String, page: Int?)]? = nil,
+        userQuotes: [(text: String, page: Int?, notes: String?)]? = nil,
+        userQuestions: [(question: String, page: Int?, answer: String?)]? = nil,
+        currentPage: Int? = nil
+    ) throws -> URLRequest {
         guard let url = URL(string: currentEndpoint) else {
             throw PerplexityError.invalidURL
         }
@@ -545,7 +571,15 @@ class OptimizedPerplexityService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let systemPrompt = bookContext.map { book in
-            buildEnrichedBookContext(for: book)
+            buildEnrichedBookContext(
+                for: book,
+                enrichment: enrichment,
+                sessionHistory: sessionHistory,
+                userNotes: userNotes,
+                userQuotes: userQuotes,
+                userQuestions: userQuestions,
+                currentPage: currentPage
+            )
         } ?? "Be concise and helpful."
         
         // Back to sonar - it was working fine before
@@ -595,33 +629,49 @@ class OptimizedPerplexityService: ObservableObject {
     // MARK: - Public Methods
     
     func chat(message: String, bookContext: Book?) async throws -> String {
-        // Progressive loading: get 200 chars fast, then up to 600+ chars
+        // Detect if this is a JSON request (enrichment) - needs full response
+        let needsFullResponse = message.contains("JSON") || message.contains("json")
+
         logger.info("🚀 Starting chat request: \(message.prefix(100))...")
+        if needsFullResponse {
+            logger.info("📊 JSON response required - waiting for complete response")
+        }
         if let book = bookContext {
             logger.info("📚 Book context: \(book.title) by \(book.author)")
         }
         var fullResponse = ""
         var responseCount = 0
         let startTime = Date()
-        
+
         do {
             for try await response in streamSonarResponse(message, bookContext: bookContext) {
                 responseCount += 1
                 fullResponse = response.text
-                
+
                 // Log progress every 10 responses
                 if responseCount % 10 == 0 {
                     logger.info("📝 Received \(responseCount) streaming chunks, current length: \(fullResponse.count)")
                 }
-                
-                // Progressive loading thresholds:
+
+                let elapsed = Date().timeIntervalSince(startTime)
+
+                // For JSON responses (enrichment), wait for complete response
+                if needsFullResponse {
+                    // Only timeout after 10 seconds for JSON
+                    if elapsed > 10.0 {
+                        logger.info("⏱️ Timeout at 10s for JSON response, length: \(fullResponse.count)")
+                        break
+                    }
+                    // Continue collecting until stream ends naturally
+                    continue
+                }
+
+                // For chat responses, use progressive loading thresholds:
                 // 1. Return at 200 chars after 1.5 seconds (quick preview)
                 // 2. Return at 400 chars after 3 seconds (good response)
                 // 3. Return at 600 chars after 4 seconds (comprehensive)
                 // 4. Hard stop at 5 seconds regardless
-                
-                let elapsed = Date().timeIntervalSince(startTime)
-                
+
                 if (fullResponse.count >= 200 && elapsed > 1.5) ||
                    (fullResponse.count >= 400 && elapsed > 3.0) ||
                    (fullResponse.count >= 600 && elapsed > 4.0) ||
@@ -630,12 +680,12 @@ class OptimizedPerplexityService: ObservableObject {
                     break
                 }
             }
-            
+
             if fullResponse.isEmpty {
                 logger.error("❌ Received empty response from Perplexity")
                 throw PerplexityError.invalidResponse
             }
-            
+
             logger.info("✅ Chat completed with \(responseCount) chunks, final length: \(fullResponse.count)")
             return fullResponse
         } catch {
@@ -655,16 +705,64 @@ class OptimizedPerplexityService: ObservableObject {
 
     // MARK: - Enriched Context Building
 
-    private func buildEnrichedBookContext(for book: Book) -> String {
+    private func buildEnrichedBookContext(
+        for book: Book,
+        enrichment: (synopsis: String, characters: [String], themes: [String], setting: String)? = nil,
+        sessionHistory: [String]? = nil,
+        userNotes: [(content: String, page: Int?)]? = nil,
+        userQuotes: [(text: String, page: Int?, notes: String?)]? = nil,
+        userQuestions: [(question: String, page: Int?, answer: String?)]? = nil,
+        currentPage: Int? = nil
+    ) -> String {
         var context = """
         IMPORTANT: You are answering questions SPECIFICALLY about the book "\(book.title)" by \(book.author).
 
         ALL answers MUST relate directly to this book. When asked about characters, plot, themes, or any aspect - answer ONLY about "\(book.title)".
         """
 
-        // Try to find enrichment data from BookModel
-        // Note: This requires looking up the BookModel, which we'll do via a helper
-        if let enrichment = getEnrichmentData(for: book) {
+        // SERIES SPOILER PROTECTION
+        let seriesInfo = detectSeriesInformation(for: book)
+        if let (seriesName, bookNumber) = seriesInfo {
+            context += """
+
+
+            CRITICAL SPOILER PROTECTION:
+            This book is part of the "\(seriesName)" series (Book \(bookNumber)).
+
+            STRICT RULES:
+            1. The user is currently reading Book \(bookNumber). You may discuss:
+               ✅ Events from Book \(bookNumber) (current book) - NO RESTRICTIONS
+               ✅ Events from Books 1-\(bookNumber - 1) (previous books) - SAFE to reference
+
+            2. You must NEVER reveal or hint at:
+               ❌ Plot points from Book \(bookNumber + 1) or later (future books)
+               ❌ Character fates that occur after Book \(bookNumber)
+               ❌ Major revelations or twists from later books
+               ❌ Events, battles, or outcomes from future installments
+
+            3. If asked about the series or future events:
+               - Say "I can discuss Books 1-\(bookNumber), but I'll avoid spoiling future books"
+               - Suggest they ask again after finishing later books
+               - NEVER say "I can't answer that" without explaining why
+
+            4. When discussing connections to previous books:
+               - Feel free to reference earlier events that inform the current story
+               - Explain callbacks and references to Books 1-\(bookNumber - 1)
+            """
+        } else {
+            // Even for standalone books, add general spoiler awareness
+            context += """
+
+
+            SPOILER AWARENESS:
+            - If this book is part of a series, discuss only THIS book and any confirmed prequels
+            - Do not reveal plot points beyond what the user is currently reading
+            - If unsure about spoilers, err on the side of caution
+            """
+        }
+
+        // Use enrichment data if provided
+        if let enrichment = enrichment {
             context += "\n\n"
             context += "BOOK CONTEXT:\n"
 
@@ -685,6 +783,79 @@ class OptimizedPerplexityService: ObservableObject {
             }
         }
 
+        // Add session history for continuity
+        if let sessionHistory = sessionHistory, !sessionHistory.isEmpty {
+            context += "\n\n"
+            context += "PREVIOUS READING SESSIONS:\n"
+            context += "The user has had previous reading sessions about this book. Here's what they explored:\n\n"
+            for (index, insight) in sessionHistory.enumerated() {
+                context += "Session \(index + 1): \(insight)\n"
+            }
+            context += "\nUse this context to provide continuity and build on previous discussions.\n"
+            context += "You can reference previous sessions naturally, e.g., 'Building on what we discussed before...'\n"
+        }
+
+        // Add user's current page for context
+        if let currentPage = currentPage, let pageCount = book.pageCount, pageCount > 0 {
+            let percentage = Int((Double(currentPage) / Double(pageCount)) * 100)
+            context += "\n\n"
+            context += "READING PROGRESS:\n"
+            context += "The user is currently on page \(currentPage) of \(pageCount) (\(percentage)% through the book).\n"
+        }
+
+        // Add user's notes - shows what they're thinking and noticing
+        if let userNotes = userNotes, !userNotes.isEmpty {
+            context += "\n\n"
+            context += "USER'S NOTES AND OBSERVATIONS:\n"
+            context += "These are the user's own thoughts and observations as they read. Use these to understand what interests them, what they're questioning, and what themes resonate:\n\n"
+            for (index, note) in userNotes.enumerated() {
+                if let page = note.page {
+                    context += "\(index + 1). (Page \(page)): \(note.content)\n"
+                } else {
+                    context += "\(index + 1). \(note.content)\n"
+                }
+            }
+            context += "\nWhen answering, you can reference their notes naturally, e.g., 'I see you noted that...' or 'Building on your observation about...'\n"
+        }
+
+        // Add user's highlighted quotes - shows what resonates with them
+        if let userQuotes = userQuotes, !userQuotes.isEmpty {
+            context += "\n\n"
+            context += "PASSAGES THE USER HIGHLIGHTED:\n"
+            context += "These quotes show what resonated with the user emotionally or intellectually:\n\n"
+            for (index, quote) in userQuotes.enumerated() {
+                var quoteText = "\(index + 1). "
+                if let page = quote.page {
+                    quoteText += "(Page \(page)) "
+                }
+                quoteText += "\"\(quote.text)\""
+                if let notes = quote.notes, !notes.isEmpty {
+                    quoteText += " — User's note: \(notes)"
+                }
+                context += quoteText + "\n"
+            }
+            context += "\nUse these to understand the user's interests and values. You can reference specific quotes in your answers.\n"
+        }
+
+        // Add user's questions - shows what they're wondering about
+        if let userQuestions = userQuestions, !userQuestions.isEmpty {
+            context += "\n\n"
+            context += "USER'S QUESTIONS:\n"
+            context += "The user has asked themselves these questions while reading:\n\n"
+            for (index, question) in userQuestions.enumerated() {
+                var questionText = "\(index + 1). "
+                if let page = question.page {
+                    questionText += "(Page \(page)) "
+                }
+                questionText += question.question
+                if let answer = question.answer, !answer.isEmpty {
+                    questionText += " [They later noted: \(answer)]"
+                }
+                context += questionText + "\n"
+            }
+            context += "\nIf relevant, you can help answer their earlier questions or build on their curiosity.\n"
+        }
+
         context += """
 
 
@@ -697,6 +868,72 @@ class OptimizedPerplexityService: ObservableObject {
         """
 
         return context
+    }
+
+    /// Detects if a book is part of a series and returns (seriesName, bookNumber)
+    private func detectSeriesInformation(for book: Book) -> (String, Int)? {
+        let title = book.title
+        let author = book.author
+
+        // Pattern 1: "Series Name: Book N" or "Series Name, Book N"
+        if let match = title.range(of: #"(.+?)[\s:,]+Book\s+(\d+)"#, options: .regularExpression) {
+            let seriesName = String(title[..<match.lowerBound]).trimmingCharacters(in: .whitespaces)
+            if let bookNumberStr = title[match].components(separatedBy: CharacterSet.decimalDigits.inverted).last,
+               let bookNumber = Int(bookNumberStr) {
+                return (seriesName, bookNumber)
+            }
+        }
+
+        // Pattern 2: "Title (#N in Series)" or "(Book N)"
+        if let match = title.range(of: #"\((?:#|Book\s+)?(\d+)(?:\s+in\s+.+?)?\)"#, options: .regularExpression) {
+            let bookNumberStr = title[match].components(separatedBy: CharacterSet.decimalDigits.inverted).first { !$0.isEmpty } ?? ""
+            if let bookNumber = Int(bookNumberStr) {
+                let seriesName = String(title[..<match.lowerBound]).trimmingCharacters(in: .whitespaces)
+                return (seriesName.isEmpty ? "series" : seriesName, bookNumber)
+            }
+        }
+
+        // Known series patterns by author and title
+        let knownSeries: [(pattern: String, series: String, bookMap: [String: Int])] = [
+            ("harry potter", "Harry Potter", [
+                "philosopher's stone": 1, "sorcerer's stone": 1,
+                "chamber of secrets": 2,
+                "prisoner of azkaban": 3,
+                "goblet of fire": 4,
+                "order of the phoenix": 5,
+                "half-blood prince": 6,
+                "deathly hallows": 7
+            ]),
+            ("lord of the rings", "Lord of the Rings", [
+                "fellowship": 1,
+                "two towers": 2,
+                "return of the king": 3
+            ]),
+            ("hunger games", "Hunger Games", [
+                "hunger games": 1,
+                "catching fire": 2,
+                "mockingjay": 3
+            ]),
+            ("dune", "Dune", [
+                "dune": 1,
+                "dune messiah": 2,
+                "children of dune": 3,
+                "god emperor": 4
+            ])
+        ]
+
+        let lowerTitle = title.lowercased()
+        for (pattern, seriesName, bookMap) in knownSeries {
+            if lowerTitle.contains(pattern) || author.lowercased().contains(pattern) {
+                for (bookKey, bookNum) in bookMap {
+                    if lowerTitle.contains(bookKey) {
+                        return (seriesName, bookNum)
+                    }
+                }
+            }
+        }
+
+        return nil
     }
 
     private func getEnrichmentData(for book: Book) -> (synopsis: String, characters: [String], themes: [String], setting: String)? {

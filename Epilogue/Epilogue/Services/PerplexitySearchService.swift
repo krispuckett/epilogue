@@ -37,7 +37,15 @@ final class CachedSearchResult {
     init(query: String, domains: [String], results: [SearchResult], searchType: String, cacheDuration: TimeInterval) {
         self.cacheKey = CachedSearchResult.generateCacheKey(query: query, domains: domains)
         self.query = query
-        self.domains = (try? JSONEncoder().encode(domains)) != nil ? String(data: try! JSONEncoder().encode(domains), encoding: .utf8)! : "[]"
+
+        // Safely encode domains to JSON string
+        if let domainsData = try? JSONEncoder().encode(domains),
+           let domainsString = String(data: domainsData, encoding: .utf8) {
+            self.domains = domainsString
+        } else {
+            self.domains = "[]"
+        }
+
         self.results = (try? JSONEncoder().encode(results)) ?? Data()
         self.createdAt = Date()
         self.expiresAt = Date().addingTimeInterval(cacheDuration)
@@ -210,12 +218,16 @@ final class PerplexitySearchService: ObservableObject {
         }
         
         isSearching = true
-        defer { 
+        defer {
             isSearching = false
             lastRequestTime = Date()
         }
-        
-        var request = URLRequest(url: URL(string: searchEndpoint)!)
+
+        guard let url = URL(string: searchEndpoint) else {
+            throw PerplexitySearchError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

@@ -17,29 +17,41 @@ struct NavigationContainer: View {
                 LibraryView()
             }
             .tabItem {
-                Image(selectedTab == 0 ? "book-active" : "book-inactive")
+                Image(selectedTab == 0 ? themeManager.currentTheme.libraryIconActive : themeManager.currentTheme.libraryIconInactive)
                     .renderingMode(.original)
-                Text("Library")
+                    .imageScale(.medium)
+                Text(L10n.Tab.library)
             }
             .tag(0)
+            .accessibilityLabel(L10n.Tab.library)
+            .accessibilityHint("Double tap to view your book library")
+            .accessibilityIdentifier("tab.library")
 
             NavigationStack {
                 CleanNotesView()
             }
             .tabItem {
-                Image(selectedTab == 1 ? "feather-active" : "feather-inactive")
+                Image(selectedTab == 1 ? themeManager.currentTheme.notesIconActive : themeManager.currentTheme.notesIconInactive)
                     .renderingMode(.original)
-                Text("Notes")
+                    .imageScale(.medium)
+                Text(L10n.Tab.notes)
             }
             .tag(1)
+            .accessibilityLabel(L10n.Tab.notes)
+            .accessibilityHint("Double tap to view your reading notes")
+            .accessibilityIdentifier("tab.notes")
 
             ChatViewWrapper()
             .tabItem {
-                Image(selectedTab == 2 ? "msgs-active" : "msgs-inactive")
+                Image(selectedTab == 2 ? themeManager.currentTheme.sessionsIconActive : themeManager.currentTheme.sessionsIconInactive)
                     .renderingMode(.original)
-                Text("Sessions")
+                    .imageScale(.medium)
+                Text(L10n.Tab.sessions)
             }
             .tag(2)
+            .accessibilityLabel(L10n.Tab.sessions)
+            .accessibilityHint("Double tap to view your reading sessions")
+            .accessibilityIdentifier("tab.sessions")
         }
         // Apply tint for text labels only (icons use original rendering)
         .tint(themeManager.currentTheme.primaryAccent)

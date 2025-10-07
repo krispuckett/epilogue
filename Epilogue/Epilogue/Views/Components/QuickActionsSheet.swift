@@ -53,8 +53,7 @@ struct QuickActionsSheet: View {
             Command(
                 icon: "note.text",
                 title: "New Note",
-                description: libraryViewModel.currentDetailBook != nil ?
-                    "Add note to \(libraryViewModel.currentDetailBook!.title)" :
+                description: libraryViewModel.currentDetailBook.map { "Add note to \($0.title)" } ??
                     "Capture a thought or idea",
                 action: .newNote
             ),
@@ -67,8 +66,7 @@ struct QuickActionsSheet: View {
             Command(
                 icon: "quote.opening",
                 title: "New Quote",
-                description: libraryViewModel.currentDetailBook != nil ?
-                    "Save quote from \(libraryViewModel.currentDetailBook!.title)" :
+                description: libraryViewModel.currentDetailBook.map { "Save quote from \($0.title)" } ??
                     "Save a meaningful passage",
                 action: .newQuote
             ),

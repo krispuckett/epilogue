@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UIKit
 import Combine
 
@@ -46,6 +47,15 @@ struct LibraryView: View {
         case reading = "Currently Reading"
         case unread = "Unread"
         case read = "Finished"
+
+        var displayName: String {
+            switch self {
+            case .all: return L10n.Library.Filter.allBooks
+            case .reading: return L10n.Library.Filter.currentlyReading
+            case .unread: return L10n.Library.Filter.unread
+            case .read: return L10n.Library.Filter.finished
+            }
+        }
     }
     
     // Filter books based on read status and prioritize currently reading
@@ -88,17 +98,91 @@ struct LibraryView: View {
     // Refresh library data
     private func refreshLibrary() async {
         SensoryFeedback.light()
-        
+
         // Simulate network delay for smooth UX
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
+
         await MainActor.run {
             // Trigger refresh - loadBooks is private
             NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
             SensoryFeedback.light()
         }
     }
-    
+
+    /// Unified book addition: syncs both UserDefaults (legacy) and SwiftData (modern)
+    private func addBookUnified(_ book: Book, context: ModelContext) {
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("📚 [UNIFIED] CALLED for: \(book.title)")
+        print("   Book ID: \(book.id)")
+        print("   LocalID: \(book.localId)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        // 1. Add to UserDefaults array (legacy display layer)
+        print("1️⃣ Adding to UserDefaults...")
+        viewModel.addBook(book)
+        print("   ✅ UserDefaults updated")
+
+        // 2. Create/update BookModel in SwiftData + enrich
+        print("2️⃣ Starting SwiftData Task...")
+        Task { @MainActor in
+            print("   🔹 Task started on MainActor")
+
+            // Check if BookModel already exists
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate<BookModel> { $0.id == book.id }
+            )
+            print("   🔹 Created FetchDescriptor for id: \(book.id)")
+
+            do {
+                let results = try context.fetch(descriptor)
+                print("   🔹 Fetch succeeded, found \(results.count) results")
+
+                if let existingModel = results.first {
+                    print("   ✅ BookModel ALREADY EXISTS in SwiftData")
+                    print("      isEnriched: \(existingModel.isEnriched)")
+                    print("      smartSynopsis: \(existingModel.smartSynopsis?.prefix(50) ?? "nil")")
+
+                    if !existingModel.isEnriched {
+                        print("   🎨 Enriching existing BookModel...")
+                        await BookEnrichmentService.shared.enrichBook(existingModel)
+                        print("   ✅ Enrichment completed")
+                    } else {
+                        print("   ⏭️ Already enriched, skipping")
+                    }
+                } else {
+                    print("   📝 Creating NEW BookModel in SwiftData...")
+                    let bookModel = BookModel(from: book)
+                    print("      BookModel created in memory")
+
+                    context.insert(bookModel)
+                    print("      Inserted into context")
+
+                    do {
+                        try context.save()
+                        print("   ✅ BookModel SAVED to SwiftData")
+
+                        // Enrich the new model
+                        print("   🎨 Starting enrichment for new book...")
+                        await BookEnrichmentService.shared.enrichBook(bookModel)
+                        print("   ✅ Enrichment completed")
+                        print("      isEnriched: \(bookModel.isEnriched)")
+                        print("      smartSynopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
+                    } catch {
+                        print("   ❌ FAILED to save BookModel: \(error)")
+                        print("      Error type: \(type(of: error))")
+                        print("      Description: \(error.localizedDescription)")
+                    }
+                }
+            } catch {
+                print("   ❌ FAILED to fetch BookModel: \(error)")
+                print("      Error type: \(type(of: error))")
+                print("      Description: \(error.localizedDescription)")
+            }
+
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+        }
+    }
+
     private func preloadNeighboringCovers(for book: Book) {
         guard let index = viewModel.books.firstIndex(where: { $0.id == book.id }) else { return }
         
@@ -159,6 +243,9 @@ struct LibraryView: View {
             }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Library is empty")
+        .accessibilityHint("Add your first book to start building your library")
     }
     
     
@@ -204,9 +291,9 @@ struct LibraryView: View {
             Menu {
                 // View mode section with picker style
                 Picker("View Mode", selection: $viewMode.animation(DesignSystem.Animation.springStandard)) {
-                    Label("Grid View", systemImage: "square.grid.2x2")
+                    Label(L10n.Library.ViewMode.grid, systemImage: "square.grid.2x2")
                         .tag(ViewMode.grid)
-                    Label("List View", systemImage: "list.bullet")
+                    Label(L10n.Library.ViewMode.list, systemImage: "list.bullet")
                         .tag(ViewMode.list)
                 }
                 .pickerStyle(.inline)
@@ -217,12 +304,12 @@ struct LibraryView: View {
                         viewModel.isReorderMode = false
                     }
                 }
-                
+
                 // Read status filter
                 Section {
                     Picker("Filter", selection: $readFilter.animation(DesignSystem.Animation.springStandard)) {
                         ForEach(ReadFilter.allCases, id: \.self) { filter in
-                            Label(filter.rawValue, systemImage: filterIcon(for: filter))
+                            Label(filter.displayName, systemImage: filterIcon(for: filter))
                                 .tag(filter)
                         }
                     }
@@ -242,20 +329,20 @@ struct LibraryView: View {
                             }
                         } label: {
                             Label(
-                                viewModel.isReorderMode ? "Done Reordering" : "Reorder Books",
+                                viewModel.isReorderMode ? L10n.Library.doneReordering : L10n.Library.reorderBooks,
                                 systemImage: viewModel.isReorderMode ? "checkmark.circle" : "arrow.up.arrow.down"
                             )
                         }
                     }
                 }
-                
+
                 // Web Search option
                 Section {
                     Button {
                         showingWebSearch = true
                         SensoryFeedback.light()
                     } label: {
-                        Label("Search Web", systemImage: "globe")
+                        Label(L10n.Library.searchWeb, systemImage: "globe")
                     }
                 }
             } label: {
@@ -264,6 +351,9 @@ struct LibraryView: View {
                     .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .symbolRenderingMode(.hierarchical)
             }
+            .accessibilityLabel("View and filter options")
+            .accessibilityHint("Double tap to change view mode or filter books")
+            .accessibilityIdentifier("library.viewOptionsMenu")
         }
         
         // Fixed spacer between menu and settings
@@ -280,6 +370,9 @@ struct LibraryView: View {
                     .foregroundStyle(.white.opacity(0.8))
                     .symbolRenderingMode(.hierarchical)
             }
+            .accessibilityLabel("Settings")
+            .accessibilityHint("Double tap to open app settings")
+            .accessibilityIdentifier("library.settingsButton")
         }
     }
     
@@ -333,18 +426,36 @@ struct LibraryView: View {
         BookSearchSheet(
             searchQuery: pendingBookSearchQuery,
             onBookSelected: { book in
-                viewModel.addBook(book)
+                print("🟢 BookSearchSheet.onBookSelected TRIGGERED for: \(book.title)")
+                print("   modelContext: \(modelContext)")
+
+                // Unified book addition: syncs UserDefaults + SwiftData
+                addBookUnified(book, context: modelContext)
+
                 appState.showingBookSearch = false
-                pendingBookSearchQuery = ""  // Reset after use
+                pendingBookSearchQuery = ""
             }
         )
     }
     
     @ViewBuilder
     private var enhancedScannerSheet: some View {
-        EnhancedBookScannerView { book in
-            viewModel.addBook(book)
-            appState.showingEnhancedScanner = false
+        if #available(iOS 16.0, *) {
+            UltraFastBookScanner { book in
+                print("🟢 UltraFastBookScanner.onBookAdded TRIGGERED for: \(book.title)")
+                print("   modelContext: \(modelContext)")
+
+                // Unified book addition: syncs UserDefaults + SwiftData
+                addBookUnified(book, context: modelContext)
+                // Don't dismiss - allow continuous scanning
+            }
+        } else {
+            // Fallback for iOS 15
+            EnhancedBookScannerView { book in
+                // Unified book addition: syncs UserDefaults + SwiftData
+                addBookUnified(book, context: modelContext)
+                appState.showingEnhancedScanner = false
+            }
         }
     }
     
@@ -416,7 +527,7 @@ struct LibraryView: View {
                 navigationLink
                 mainContent
             }
-            .navigationTitle("Library")
+            .navigationTitle(L10n.Library.title)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 toolbarContent
@@ -512,6 +623,11 @@ struct LibraryGridItem: View {
         .buttonStyle(PlainButtonStyle())
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(book.title) by \(book.author)")
+        .accessibilityHint("Double tap to view book details")
+        .accessibilityIdentifier("library.bookCard.\(book.id)")
+        .accessibilityAddTraits(.isButton)
         .contextMenu {
                 // Same menu items as card
                 Button {
@@ -521,45 +637,45 @@ struct LibraryGridItem: View {
                     }
                 } label: {
                     Label(
-                        book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                        book.readingStatus == .read ? L10n.Library.markAsWantToRead : L10n.Library.markAsRead,
                         systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
                     )
                 }
-                
+
                 Divider()
-                
+
                 Button {
                     SensoryFeedback.light()
                     // Share functionality
                     let text = "Check out \"\(book.title)\" by \(book.author)"
                     let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
-                    
+
                     if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                        let window = windowScene.windows.first {
                         window.rootViewController?.present(activityVC, animated: true)
                     }
                 } label: {
-                    Label("Share", systemImage: "square.and.arrow.up")
+                    Label(L10n.Action.share, systemImage: "square.and.arrow.up")
                 }
-                
+
                 Divider()
-                
+
                 Button {
                     SensoryFeedback.light()
                     onChangeCover(book)
                 } label: {
-                    Label("Change Cover", systemImage: "photo")
+                    Label(L10n.Library.changeCover, systemImage: "photo")
                 }
-                
+
                 Divider()
-                
+
                 Button(role: .destructive) {
                     SensoryFeedback.light()
                     withAnimation {
                         viewModel.deleteBook(book)
                     }
                 } label: {
-                    Label("Delete from Library", systemImage: "trash")
+                    Label(L10n.Library.deleteFromLibrary, systemImage: "trash")
                 }
             }
     }
@@ -592,6 +708,11 @@ struct LibraryListItemWrapper: View {
         .buttonStyle(PlainButtonStyle())
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(book.title) by \(book.author), \(book.readingStatus.displayName)")
+        .accessibilityHint("Double tap to view book details")
+        .accessibilityIdentifier("library.listItem.\(book.id)")
+        .accessibilityAddTraits(.isButton)
             .contextMenu {
                 // Same menu items
                 Button {
@@ -601,7 +722,7 @@ struct LibraryListItemWrapper: View {
                     }
                 } label: {
                     Label(
-                        book.readingStatus == .read ? "Mark as Want to Read" : "Mark as Read",
+                        book.readingStatus == .read ? L10n.Library.markAsWantToRead : L10n.Library.markAsRead,
                         systemImage: book.readingStatus == .read ? "checkmark.circle.fill" : "checkmark.circle"
                     )
                 }
@@ -618,7 +739,7 @@ struct LibraryListItemWrapper: View {
                         window.rootViewController?.present(activityVC, animated: true)
                     }
                 } label: {
-                    Label("Share", systemImage: "square.and.arrow.up")
+                    Label(L10n.Action.share, systemImage: "square.and.arrow.up")
                 }
                 
                 Divider()
@@ -627,7 +748,7 @@ struct LibraryListItemWrapper: View {
                     SensoryFeedback.light()
                     onChangeCover(book)
                 } label: {
-                    Label("Change Cover", systemImage: "photo")
+                    Label(L10n.Library.changeCover, systemImage: "photo")
                 }
                 
                 Divider()
@@ -638,7 +759,7 @@ struct LibraryListItemWrapper: View {
                         viewModel.deleteBook(book)
                     }
                 } label: {
-                    Label("Delete from Library", systemImage: "trash")
+                    Label(L10n.Library.deleteFromLibrary, systemImage: "trash")
                 }
             }
     }
@@ -693,13 +814,13 @@ struct LibraryBookCard: View {
                     if book.coverImageURL == nil {
                         print("⚠️⚠️ LibraryBookCard displaying book with NO cover URL: \(book.title)")
                         print("   Book.id: \(book.id)")
-                    } else {
+                    } else if let coverURL = book.coverImageURL {
                         print("📚 LibraryBookCard showing: \(book.title)")
-                        print("   Cover URL: \(book.coverImageURL!)")
-                        
+                        print("   Cover URL: \(coverURL)")
+
                         // TEST: Try loading this URL directly
                         Task {
-                            if let url = URL(string: book.coverImageURL!) {
+                            if let url = URL(string: coverURL) {
                                 do {
                                     let (data, response) = try await URLSession.shared.data(from: url)
                                     if let httpResponse = response as? HTTPURLResponse {
@@ -1595,7 +1716,6 @@ class LibraryViewModel: ObservableObject {
             print("ℹ️ All book cover URLs already optimized")
         }
     }
-    
     func addBook(_ book: Book, overwriteIfExists: Bool = false) {
         print("\n📖📖📖 LibraryViewModel.addBook called 📖📖📖")
         print("  Title: \(book.title)")
@@ -1710,22 +1830,27 @@ class LibraryViewModel: ObservableObject {
             return
         }
         
+        // Remove from Spotlight index
+        Task {
+            await SpotlightIndexingService.shared.deindexBook(book.id)
+        }
+
         // Remove the book
         books.remove(at: index)
         print("  📊 Removed book at index \(index), \(books.count) books remaining")
-        
+
         // Save immediately
         saveBooks()
-        
+
         // Force UI update
         objectWillChange.send()
-        
+
         // Reload to ensure consistency
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.loadBooks()
             print("  🔄 Reloaded library after deletion")
         }
-        
+
         print("  ✅ Book deleted and UI update triggered")
     }
     

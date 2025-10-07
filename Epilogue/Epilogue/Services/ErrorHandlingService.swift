@@ -176,15 +176,16 @@ final class ErrorHandlingService: ObservableObject {
     }
     
     private func isCriticalError(_ error: Error) -> Bool {
-        if error is EpilogueError {
-            switch error as! EpilogueError {
-            case .dataCorruption, .migrationFailed:
-                return true
-            default:
-                return false
-            }
+        guard let epilogueError = error as? EpilogueError else {
+            return false
         }
-        return false
+
+        switch epilogueError {
+        case .dataCorruption, .migrationFailed:
+            return true
+        default:
+            return false
+        }
     }
     
     private func sendErrorTelemetry(_ record: ErrorRecord) {

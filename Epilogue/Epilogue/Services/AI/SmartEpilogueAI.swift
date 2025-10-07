@@ -113,32 +113,67 @@ class SmartEpilogueAI: ObservableObject {
                 """
             }
             
-            instructions = bookInfo + """
-            
+            // Add series spoiler protection
+            let seriesInfo = detectSeriesInformation(title: book.title, author: book.author)
+            var seriesSpoilerInstructions = ""
+
+            if let (seriesName, bookNumber) = seriesInfo {
+                seriesSpoilerInstructions = """
+
+                CRITICAL SPOILER PROTECTION:
+                This book is part of the "\(seriesName)" series (Book \(bookNumber)).
+
+                STRICT RULES:
+                1. The user is currently reading Book \(bookNumber). You may discuss:
+                   ✅ Events from Book \(bookNumber) (current book) - NO RESTRICTIONS
+                   ✅ Events from Books 1-\(bookNumber - 1) (previous books) - SAFE to reference
+
+                2. You must NEVER reveal or hint at:
+                   ❌ Plot points from Book \(bookNumber + 1) or later (future books)
+                   ❌ Character fates that occur after Book \(bookNumber)
+                   ❌ Major revelations or twists from later books
+                   ❌ Events, battles, or outcomes from future installments
+
+                3. If asked about the series or future events:
+                   - Say "I can discuss Books 1-\(bookNumber), but I'll avoid spoiling future books"
+                   - Suggest they ask again after finishing later books
+                """
+            } else {
+                seriesSpoilerInstructions = """
+
+                SPOILER AWARENESS:
+                - If this book is part of a series, discuss only THIS book and any confirmed prequels
+                - Do not reveal plot points beyond what the user is currently reading
+                - If unsure about spoilers, err on the side of caution
+                """
+            }
+
+            instructions = bookInfo + seriesSpoilerInstructions + """
+
             CRITICAL INSTRUCTIONS FOR ANY BOOK:
-            
+
             Context: The user is actively reading '\(book.title)' by \(book.author).
             They are using Epilogue's ambient mode to ask questions while reading.
-            
+
             Core Rules:
             1. DEFAULT ASSUMPTION: Every question is about '\(book.title)' unless explicitly about something else
             2. NEVER REFUSE: Do not say "I can't assist" or "I cannot help" - always provide useful information
-            3. NO SPOILER CONCERNS: The user is currently reading this book - answer everything
-            4. STAY IN CONTEXT: Focus on THIS specific book, not other books in a series unless asked
-            
+            3. NO SPOILER CONCERNS FOR THIS BOOK: The user is currently reading this book - answer everything about THIS book
+            4. STAY IN CONTEXT: Focus on THIS specific book, respecting spoiler boundaries for future books in the series
+
             Response Guidelines:
             - If you know the answer from the book, provide it with confidence
-            - If you're uncertain, say "Based on what I recall from '\(book.title)'..." 
+            - If you're uncertain, say "Based on what I recall from '\(book.title)'..."
             - If genuinely unsure, say "I don't have that specific detail about '\(book.title)'"
             - NEVER make up facts or claim events happen in different books
             - Draw from your general knowledge about '\(book.title)' even without specific context
-            
+
             Answer Structure:
             - Start with a direct answer to the question
             - Provide supporting details and context
             - Connect to themes or character development when relevant
             - Aim for 2-3 paragraphs for substantial questions
-            
+
             Remember: You are a knowledgeable reading companion for '\(book.title)'.
             The user trusts you to enhance their reading experience with accurate information.
             """
@@ -540,6 +575,71 @@ class SmartEpilogueAI: ObservableObject {
         await MainActor.run {
             self.isProcessing = false
         }
+    }
+
+    // MARK: - Series Detection Helper
+
+    /// Detects if a book is part of a series and returns (seriesName, bookNumber)
+    private func detectSeriesInformation(title: String, author: String) -> (String, Int)? {
+        // Pattern 1: "Series Name: Book N" or "Series Name, Book N"
+        if let match = title.range(of: #"(.+?)[\s:,]+Book\s+(\d+)"#, options: .regularExpression) {
+            let seriesName = String(title[..<match.lowerBound]).trimmingCharacters(in: .whitespaces)
+            if let bookNumberStr = title[match].components(separatedBy: CharacterSet.decimalDigits.inverted).last,
+               let bookNumber = Int(bookNumberStr) {
+                return (seriesName, bookNumber)
+            }
+        }
+
+        // Pattern 2: "Title (#N in Series)" or "(Book N)"
+        if let match = title.range(of: #"\((?:#|Book\s+)?(\d+)(?:\s+in\s+.+?)?\)"#, options: .regularExpression) {
+            let bookNumberStr = title[match].components(separatedBy: CharacterSet.decimalDigits.inverted).first { !$0.isEmpty } ?? ""
+            if let bookNumber = Int(bookNumberStr) {
+                let seriesName = String(title[..<match.lowerBound]).trimmingCharacters(in: .whitespaces)
+                return (seriesName.isEmpty ? "series" : seriesName, bookNumber)
+            }
+        }
+
+        // Known series patterns by author and title
+        let knownSeries: [(pattern: String, series: String, bookMap: [String: Int])] = [
+            ("harry potter", "Harry Potter", [
+                "philosopher's stone": 1, "sorcerer's stone": 1,
+                "chamber of secrets": 2,
+                "prisoner of azkaban": 3,
+                "goblet of fire": 4,
+                "order of the phoenix": 5,
+                "half-blood prince": 6,
+                "deathly hallows": 7
+            ]),
+            ("lord of the rings", "Lord of the Rings", [
+                "fellowship": 1,
+                "two towers": 2,
+                "return of the king": 3
+            ]),
+            ("hunger games", "Hunger Games", [
+                "hunger games": 1,
+                "catching fire": 2,
+                "mockingjay": 3
+            ]),
+            ("dune", "Dune", [
+                "dune": 1,
+                "dune messiah": 2,
+                "children of dune": 3,
+                "god emperor": 4
+            ])
+        ]
+
+        let lowerTitle = title.lowercased()
+        for (pattern, seriesName, bookMap) in knownSeries {
+            if lowerTitle.contains(pattern) || author.lowercased().contains(pattern) {
+                for (bookKey, bookNum) in bookMap {
+                    if lowerTitle.contains(bookKey) {
+                        return (seriesName, bookNum)
+                    }
+                }
+            }
+        }
+
+        return nil
     }
 }
 

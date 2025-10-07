@@ -180,7 +180,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         )
         
         // Return top results, prioritizing books with covers
+        // Filter out books without cover images to prevent "image not available" placeholders
         return scoredResults
+            .filter { $0.hasCover }  // Only include books with cover images
             .sorted { $0.confidenceScore > $1.confidenceScore }
             .prefix(20)
             .map { $0.book }
@@ -305,7 +307,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             let book = item.book
             
             // Check for cover
-            let hasCover = book.coverImageURL != nil && !book.coverImageURL!.isEmpty
+            let hasCover = book.coverImageURL != nil && !(book.coverImageURL?.isEmpty ?? true)
             if hasCover { score += 40 }
             // Bigger images are preferred
             if let links = volumeInfo.imageLinks, (links.extraLarge ?? links.large ?? links.medium ?? links.small) != nil {
@@ -475,7 +477,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             }
             
             // Description exists
-            if volumeInfo.description != nil && !volumeInfo.description!.isEmpty {
+            if let description = volumeInfo.description, !description.isEmpty {
                 score += 5
             }
             
@@ -604,9 +606,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }
         
         // Strategy 3: Title with year
-        if candidates.isEmpty && publishedYear != nil {
+        if candidates.isEmpty, let year = publishedYear {
             candidates.append(contentsOf: await searchBooksWithRanking(
-                query: "\(title) \(publishedYear!)",
+                query: "\(title) \(year)",
                 preferISBN: isbn,
                 publisherHint: preferredPublisher
             ))

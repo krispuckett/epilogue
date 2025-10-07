@@ -260,8 +260,12 @@ class SmartContentBuffer: ObservableObject {
             fragments.map { $0.confidence }.reduce(0, +) / Float(fragments.count)
         
         // Calculate processing time
-        let processingTime = fragments.isEmpty ? 0 :
-            fragments.last!.timestamp.timeIntervalSince(fragments.first!.timestamp)
+        let processingTime: TimeInterval
+        if let lastFragment = fragments.last, let firstFragment = fragments.first {
+            processingTime = lastFragment.timestamp.timeIntervalSince(firstFragment.timestamp)
+        } else {
+            processingTime = 0
+        }
         
         // Add to recent sentences for context
         recentSentences.append(cleanedContent)

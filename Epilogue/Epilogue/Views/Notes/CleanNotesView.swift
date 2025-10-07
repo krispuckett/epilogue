@@ -27,7 +27,15 @@ struct CleanNotesView: View {
     @State private var isSelectionMode = false
     @State private var selectedItems: Set<UUID> = []
     @State private var scrollOffset: CGFloat = 0
+    @State private var quoteShareData: QuoteShareData?
     @Namespace private var animation
+
+    struct QuoteShareData: Identifiable {
+        let id = UUID()
+        let text: String
+        let author: String?
+        let bookTitle: String?
+    }
     
     // Toast notification state
     @State private var toastMessage = ""
@@ -192,6 +200,8 @@ struct CleanNotesView: View {
                     .font(.system(size: 16))
                     .foregroundStyle(.white)
                     .autocorrectionDisabled()
+                    .accessibilityLabel("Search notes and quotes")
+                    .accessibilityHint("Type to search through your notes and quotes")
                 
                 if !searchText.isEmpty {
                     Button {
@@ -201,6 +211,8 @@ struct CleanNotesView: View {
                             .font(.system(size: 14))
                             .foregroundStyle(DesignSystem.Colors.textQuaternary)
                     }
+                    .accessibilityLabel("Clear search")
+                    .accessibilityHint("Double tap to clear search text")
                 }
             }
             .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
@@ -302,6 +314,7 @@ struct CleanNotesView: View {
                         // Show edit sheet for the note
                         editingNote = note
                         editedText = note.content ?? ""
+                        notesViewModel.isEditingNote = true
                         showEditSheet = true
 
                         // Clear the navigation flag
@@ -318,6 +331,7 @@ struct CleanNotesView: View {
                         // Show edit sheet for the quote
                         editingQuote = quote
                         editedText = quote.text ?? ""
+                        notesViewModel.isEditingNote = true
                         showEditSheet = true
 
                         // Clear the navigation flag
@@ -379,6 +393,8 @@ struct CleanNotesView: View {
                             .symbolRenderingMode(.hierarchical)
                             .contentTransition(.symbolEffect(.replace))
                     }
+                    .accessibilityLabel(showSearchBar ? "Close search" : "Search notes")
+                    .accessibilityHint("Double tap to \(showSearchBar ? "close" : "open") search bar")
                 }
                 
                 // Fixed spacer between search and layout menu
@@ -405,7 +421,7 @@ struct CleanNotesView: View {
                                 }
                             }
                         }
-                        
+
                         // Selection mode section
                         Section {
                             Button {
@@ -422,13 +438,13 @@ struct CleanNotesView: View {
                                     systemImage: isSelectionMode ? "checkmark.circle" : "checkmark.circle.badge.xmark"
                                 )
                             }
-                            
+
                             // Delete selected button (only show when items are selected)
                             if isSelectionMode && !selectedItems.isEmpty {
                                 Button(role: .destructive) {
                                     deleteSelectedItems()
                                 } label: {
-                                    Label("Delete \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")", 
+                                    Label("Delete \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")",
                                           systemImage: "trash")
                                 }
                             }
@@ -445,6 +461,8 @@ struct CleanNotesView: View {
                         .foregroundStyle(DesignSystem.Colors.primaryAccent)
                         .symbolRenderingMode(.hierarchical)
                     }
+                    .accessibilityLabel("Filter and actions menu, \(allItems.count) total items")
+                    .accessibilityHint("Double tap to filter notes and quotes or select multiple items")
                 }
             }
         }
@@ -482,8 +500,15 @@ struct CleanNotesView: View {
                 }
             }
         }
+        .sheet(item: $quoteShareData) { data in
+            QuoteShareSheet(
+                quote: data.text,
+                author: data.author,
+                bookTitle: data.bookTitle
+            )
+        }
     }
-    
+
     // Removed headerView - now using navigation title
     // Removed filterPopoverButton - now integrated in toolbar
     
@@ -549,8 +574,11 @@ struct CleanNotesView: View {
     private func noteCard(note: Note) -> some View {
         let capturedNote = capturedNotes.first { $0.id == note.id }
         let isSelected = selectedItems.contains(note.id)
-        
+
         return NoteCardView(note: note, capturedNote: capturedNote)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Note: \(note.content)")
+            .accessibilityHint(isSelectionMode ? (isSelected ? "Selected, double tap to deselect" : "Double tap to select") : "Tap to show timestamp, long press for options")
             .overlay(alignment: .topLeading) {
                 // Selection checkbox when in selection mode
                 if isSelectionMode {
@@ -647,10 +675,14 @@ struct CleanNotesView: View {
             dateCreated: quote.timestamp ?? Date(),
             id: quote.id ?? UUID()
         )
-        
+
         let isSelected = selectedItems.contains(quote.id ?? UUID())
-        
+        let accessibilityText = "\(quote.text ?? ""), \(quote.author.map { "by \($0)" } ?? "")"
+
         return SimpleQuoteCard(note: note, capturedQuote: quote)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Quote: \(accessibilityText)")
+            .accessibilityHint(isSelectionMode ? (isSelected ? "Selected, double tap to deselect" : "Double tap to select") : "Tap to show timestamp, long press for options")
             .overlay(alignment: .topLeading) {
                 // Selection checkbox when in selection mode
                 if isSelectionMode {
@@ -750,6 +782,8 @@ struct CleanNotesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 100)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No notes yet. Start capturing your thoughts, quotes, and questions from your reading journey")
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -790,7 +824,19 @@ struct CleanNotesView: View {
     private func startEdit(quote: CapturedQuote) {
         editingQuote = quote
         editingNote = nil
-        editedText = quote.text ?? ""
+
+        // Build editable text with quote + attribution
+        var text = quote.text ?? ""
+        if let author = quote.author {
+            text += " by \(author)"
+            if let bookTitle = quote.book?.title {
+                text += ", \(bookTitle)"
+            }
+        } else if let bookTitle = quote.book?.title {
+            text += " from \(bookTitle)"
+        }
+
+        editedText = text
         notesViewModel.isEditingNote = true
         showEditSheet = true
         SensoryFeedback.light()
@@ -802,7 +848,92 @@ struct CleanNotesView: View {
             try? modelContext.save()
             SensoryFeedback.success()
         } else if let quote = editingQuote {
-            quote.text = editedText
+            // Parse attribution from the edited text using NLP
+            var quoteText = editedText
+            var quoteAuthor: String? = nil
+            var parsedBookTitle: String? = nil
+
+            // Attribution parsing patterns (same as AmbientModeView)
+            let attributionPatterns = [
+                // "by Author" or "by Author, Book"
+                try? NSRegularExpression(pattern: "\\s+by\\s+([^,]+)(?:,\\s*(.+))?\\s*$", options: .caseInsensitive),
+                // "from Book" or "from Book by Author"
+                try? NSRegularExpression(pattern: "\\s+from\\s+(.+?)(?:\\s+by\\s+(.+))?\\s*$", options: .caseInsensitive),
+                // "- Author" or "- Author, Book"
+                try? NSRegularExpression(pattern: "\\s*[-—–]\\s*([^,]+)(?:,\\s*(.+))?\\s*$", options: []),
+                // ", Author" at the end
+                try? NSRegularExpression(pattern: ",\\s+([^,]+)\\s*$", options: [])
+            ]
+
+            for (index, pattern) in attributionPatterns.compactMap({ $0 }).enumerated() {
+                let range = NSRange(quoteText.startIndex..., in: quoteText)
+                if let match = pattern.firstMatch(in: quoteText, range: range) {
+                    if index == 1 {
+                        // "from Book" pattern - first capture is book, second is author
+                        if let bookRange = Range(match.range(at: 1), in: quoteText) {
+                            let extractedBook = String(quoteText[bookRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !extractedBook.isEmpty && extractedBook.count > 2 {
+                                parsedBookTitle = extractedBook
+                            }
+                        }
+                        if match.numberOfRanges > 2, let authorRange = Range(match.range(at: 2), in: quoteText) {
+                            let extractedAuthor = String(quoteText[authorRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !extractedAuthor.isEmpty && extractedAuthor.count > 2 {
+                                quoteAuthor = extractedAuthor
+                            }
+                        }
+                    } else {
+                        // "by Author" pattern - first capture is author, second is book
+                        if let authorRange = Range(match.range(at: 1), in: quoteText) {
+                            let extractedAuthor = String(quoteText[authorRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !extractedAuthor.isEmpty && extractedAuthor.count > 2 {
+                                quoteAuthor = extractedAuthor
+                            }
+                        }
+                        if match.numberOfRanges > 2, let bookRange = Range(match.range(at: 2), in: quoteText) {
+                            let extractedBook = String(quoteText[bookRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !extractedBook.isEmpty && extractedBook.count > 2 {
+                                parsedBookTitle = extractedBook
+                            }
+                        }
+                    }
+
+                    // Remove attribution from quote text
+                    if let matchRange = Range(match.range, in: quoteText) {
+                        quoteText = String(quoteText[..<matchRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    break
+                }
+            }
+
+            // Update quote text
+            quote.text = quoteText
+
+            // Update author
+            quote.author = quoteAuthor
+
+            // Update or create book if we have a parsed title
+            if let bookTitle = parsedBookTitle {
+                let descriptor = FetchDescriptor<BookModel>(
+                    predicate: #Predicate { book in
+                        book.title == bookTitle
+                    }
+                )
+
+                if let existingBook = try? modelContext.fetch(descriptor).first {
+                    quote.book = existingBook
+                } else {
+                    // Create new book
+                    let newBook = BookModel(
+                        id: UUID().uuidString,
+                        title: bookTitle,
+                        author: quoteAuthor ?? "Unknown"
+                    )
+                    modelContext.insert(newBook)
+                    quote.book = newBook
+                }
+            }
+
             try? modelContext.save()
             SensoryFeedback.success()
         }
@@ -829,12 +960,26 @@ struct CleanNotesView: View {
     }
     
     private func deleteNote(_ note: CapturedNote) {
+        // Remove from Spotlight index
+        if let noteId = note.id {
+            Task {
+                await SpotlightIndexingService.shared.deindexNote(noteId)
+            }
+        }
+
         modelContext.delete(note)
         try? modelContext.save()
         SensoryFeedback.success()
     }
-    
+
     private func deleteQuote(_ quote: CapturedQuote) {
+        // Remove from Spotlight index
+        if let quoteId = quote.id {
+            Task {
+                await SpotlightIndexingService.shared.deindexQuote(quoteId)
+            }
+        }
+
         modelContext.delete(quote)
         try? modelContext.save()
         SensoryFeedback.success()
@@ -843,8 +988,16 @@ struct CleanNotesView: View {
     private func deleteSelectedItems() {
         for id in selectedItems {
             if let note = capturedNotes.first(where: { $0.id == id }) {
+                // Remove from Spotlight index
+                Task {
+                    await SpotlightIndexingService.shared.deindexNote(id)
+                }
                 modelContext.delete(note)
             } else if let quote = capturedQuotes.first(where: { $0.id == id }) {
+                // Remove from Spotlight index
+                Task {
+                    await SpotlightIndexingService.shared.deindexQuote(id)
+                }
                 modelContext.delete(quote)
             }
         }
@@ -887,8 +1040,25 @@ struct CleanNotesView: View {
     }
     
     private func shareQuote(_ quote: CapturedQuote) {
+        print("🔵 shareQuote called")
+        print("🔵 Quote text: \(quote.text ?? "nil")")
+        print("🔵 Quote author: \(quote.author ?? "nil")")
+
+        // Create share data struct - this ensures all data is captured atomically
+        quoteShareData = QuoteShareData(
+            text: quote.text ?? "No quote text",
+            author: quote.author,
+            bookTitle: quote.book?.title
+        )
+
+        print("🔵 Created share data with text: \(quoteShareData?.text ?? "nil")")
+
+        SensoryFeedback.light()
+
+        // Old plain text sharing (kept as fallback)
+        /*
         var shareText = "\"\(quote.text)\""
-        
+
         if let author = quote.author {
             shareText += "\n\n— \(author)"
         }
@@ -896,19 +1066,20 @@ struct CleanNotesView: View {
         if let book = quote.book {
             shareText += ", \(book.title)"
         }
-        
+
         let activityController = UIActivityViewController(
             activityItems: [shareText],
             applicationActivities: nil
         )
-        
+
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first,
            let rootViewController = window.rootViewController {
             rootViewController.present(activityController, animated: true)
         }
-        
+
         SensoryFeedback.light()
+        */
     }
     
     // MARK: - Note/Quote Creation
@@ -929,18 +1100,25 @@ struct CleanNotesView: View {
                 bookModel = existingBookModel
             } else if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
                 // Create a new BookModel from the library book
-                bookModel = BookModel(from: existingBook)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: existingBook)
+                modelContext.insert(newBookModel)
+                bookModel = newBookModel
             }
         }
-        
+
         let capturedNote = CapturedNote(content: content, book: bookModel)
         modelContext.insert(capturedNote)
-        
+
         do {
             try modelContext.save()
             print("✅ Note saved successfully to SwiftData")
-            let message = bookTitle != nil ? "Note saved to \(bookTitle!)" : "Note saved successfully"
+
+            // Index for Spotlight search
+            Task {
+                await SpotlightIndexingService.shared.indexNote(capturedNote)
+            }
+
+            let message = bookTitle.map { "Note saved to \($0)" } ?? "Note saved successfully"
             showToast(message: message)
             SensoryFeedback.success()
         } catch {
@@ -969,33 +1147,35 @@ struct CleanNotesView: View {
                 bookModel = existingBookModel
             } else if let existingBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
                 // Create a new BookModel from the library book
-                bookModel = BookModel(from: existingBook)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: existingBook)
+                modelContext.insert(newBookModel)
+                bookModel = newBookModel
             }
         }
-        
+
         // If no bookModel yet but we have bookTitle, create a minimal BookModel
         // This handles quotes with book attribution but no selected book from library
-        if bookModel == nil && bookTitle != nil {
+        if bookModel == nil, let title = bookTitle {
             // First check if a BookModel with this title already exists
             let descriptor = FetchDescriptor<BookModel>(
                 predicate: #Predicate { book in
-                    book.title == bookTitle!
+                    book.title == title
                 }
             )
-            
+
             if let existingBookModel = try? modelContext.fetch(descriptor).first {
                 bookModel = existingBookModel
             } else {
-                bookModel = BookModel(
+                let newBookModel = BookModel(
                     id: UUID().uuidString, // Generate a unique ID for quotes without library books
-                    title: bookTitle!,
+                    title: title,
                     author: bookAuthor ?? attribution ?? "Unknown"
                 )
-                modelContext.insert(bookModel!)
+                modelContext.insert(newBookModel)
+                bookModel = newBookModel
             }
         }
-        
+
         let capturedQuote = CapturedQuote(
             text: content,
             book: bookModel,
@@ -1004,12 +1184,18 @@ struct CleanNotesView: View {
             timestamp: Date(),
             source: .manual
         )
-        
+
         modelContext.insert(capturedQuote)
-        
+
         do {
             try modelContext.save()
-            let message = bookTitle != nil ? "Quote saved to \(bookTitle!)" : "Quote saved successfully"
+
+            // Index for Spotlight search
+            Task {
+                await SpotlightIndexingService.shared.indexQuote(capturedQuote)
+            }
+
+            let message = bookTitle.map { "Quote saved to \($0)" } ?? "Quote saved successfully"
             showToast(message: message)
             SensoryFeedback.success()
         } catch {

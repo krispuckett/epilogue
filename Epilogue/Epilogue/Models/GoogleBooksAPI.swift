@@ -249,7 +249,7 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         print("  📗 ISBN: \(isbn ?? "nil")")
         
         description = try container.decodeIfPresent(String.self, forKey: .description)
-        print("  📝 Description: \(description != nil ? "Present (\(description!.prefix(50))...)" : "nil")")
+        print("  📝 Description: \(description.map { "Present (\($0.prefix(50))...)" } ?? "nil")")
         
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount)
         if GOOGLE_API_VERBOSE { print("  📄 Page Count: \(pageCount?.description ?? "nil")") }

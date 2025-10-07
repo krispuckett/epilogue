@@ -21,6 +21,10 @@ struct SettingsView: View {
     @State private var showingCacheClearedToast = false
     @State private var toastMessage = ""
 
+    // Batch enrichment state
+    @State private var isEnriching = false
+    @State private var enrichmentProgress: (current: Int, total: Int, title: String)?
+
     // Hidden developer mode activation
     @State private var developerModeUnlocked = false
     @State private var versionTapCount = 0
@@ -47,15 +51,18 @@ struct SettingsView: View {
                         ThemeSelectionView()
                     } label: {
                         HStack {
-                            Label("Gradient Theme", systemImage: "paintbrush.pointed.fill")
+                            Label(L10n.Settings.gradientTheme, systemImage: "paintbrush.pointed.fill")
                                 .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                             Spacer()
                             Text(ThemeManager.shared.currentTheme.displayName)
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .accessibilityLabel("Gradient theme, currently \(ThemeManager.shared.currentTheme.displayName)")
+                    .accessibilityHint("Double tap to change gradient theme")
+                    .accessibilityIdentifier("settings.gradientTheme")
                 } header: {
-                    Text("Appearance")
+                    Text(L10n.Settings.Section.appearance)
                 }
 
                 // MARK: - Library Management
@@ -64,25 +71,104 @@ struct SettingsView: View {
                         CleanGoodreadsImportView()
                             .environmentObject(libraryViewModel)
                     } label: {
-                        Label("Import from Goodreads", systemImage: "books.vertical.fill")
+                        Label(L10n.Settings.importFromGoodreads, systemImage: "books.vertical.fill")
                             .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                     }
+                    .accessibilityLabel("Import from Goodreads")
+                    .accessibilityHint("Double tap to import your books from Goodreads")
+                    .accessibilityIdentifier("settings.goodreadsImport")
                 } header: {
-                    Text("Library")
+                    Text(L10n.Settings.Section.library)
+                }
+
+                // MARK: - Data & Enrichment
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Enrichment stats
+                        let stats = BatchEnrichmentService.shared.getEnrichmentStats(modelContext: modelContext)
+
+                        HStack {
+                            Label("AI Book Summaries", systemImage: "sparkles.rectangle.stack")
+                                .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                            Spacer()
+                            if stats.total > 0 {
+                                Text("\(stats.enriched)/\(stats.total)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if stats.pending > 0 {
+                            Text("\(stats.pending) book\(stats.pending == 1 ? "" : "s") need AI-generated summaries")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if stats.total > 0 {
+                            Text("All books have AI-generated summaries")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+
+                        // Progress indicator
+                        if let progress = enrichmentProgress {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Enriching: \(progress.title)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+
+                                ProgressView(value: Double(progress.current), total: Double(progress.total))
+                                    .tint(ThemeManager.shared.currentTheme.primaryAccent)
+
+                                Text("\(progress.current) of \(progress.total)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.top, 4)
+                        }
+
+                        // Enrich button
+                        if stats.pending > 0 {
+                            Button {
+                                enrichAllBooks()
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if isEnriching {
+                                        ProgressView()
+                                            .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                                        Text("Enriching...")
+                                    } else {
+                                        Image(systemName: "wand.and.stars")
+                                        Text("Enrich All Books")
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .disabled(isEnriching)
+                            .buttonStyle(.borderedProminent)
+                            .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                            .padding(.top, 8)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Data & Enrichment")
+                } footer: {
+                    Text("AI-generated summaries provide spoiler-free context, themes, and character info for your books. New books are enriched automatically in the background.")
                 }
 
                 // MARK: - AI Assistant
                 Section {
                     HStack {
                         Label {
-                            Text("AI Provider")
+                            Text(L10n.Settings.aiProvider)
                         } icon: {
                             // Use the new SVG-accurate logo
                             PerplexityLogoSVG(size: 20)
                                 .drawingGroup()  // Flatten view hierarchy
                         }
                         Spacer()
-                        Text("Perplexity")
+                        Text("settings.ai_provider.perplexity".localized())
                             .foregroundStyle(.secondary)
                     }
 
@@ -91,46 +177,56 @@ struct SettingsView: View {
                         set: { perplexityModel = $0 ? "sonar-pro" : "sonar" }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Use Sonar Pro")
+                            Text(L10n.Settings.useSonarPro)
                                 .font(.subheadline)
-                            Text("More advanced reasoning")
+                            Text(L10n.Settings.sonarProDescription)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                     .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                    .accessibilityLabel("Use Sonar Pro model for more advanced reasoning")
+                    .accessibilityIdentifier("settings.useSonarPro")
                 } header: {
-                    Text("AI Assistant")
+                    Text(L10n.Settings.Section.aiAssistant)
                 }
 
                 // MARK: - Ambient Mode
                 Section {
-                    Toggle("Real-time Questions", isOn: $realTimeQuestions)
+                    Toggle(L10n.Settings.realtimeQuestions, isOn: $realTimeQuestions)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
                         .id("realtime")  // Stable identity
+                        .accessibilityLabel("Real-time questions")
+                        .accessibilityIdentifier("settings.realtimeQuestions")
 
-                    Toggle("Audio Responses", isOn: $audioFeedback)
+                    Toggle(L10n.Settings.audioResponses, isOn: $audioFeedback)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
                         .id("audio")  // Stable identity
+                        .accessibilityLabel("Audio responses")
+                        .accessibilityIdentifier("settings.audioResponses")
 
-                    Picker("Default Capture", selection: $defaultCaptureType) {
-                        Label("Quote", systemImage: "quote.opening")
+                    Picker(L10n.Settings.defaultCapture, selection: $defaultCaptureType) {
+                        Label("settings.capture.quote".localized(), systemImage: "quote.opening")
                             .tag("quote")
-                        Label("Note", systemImage: "note.text")
+                        Label("settings.capture.note".localized(), systemImage: "note.text")
                             .tag("note")
-                        Label("Question", systemImage: "questionmark.circle")
+                        Label("settings.capture.question".localized(), systemImage: "questionmark.circle")
                             .tag("question")
                     }
 
-                    Toggle("Show Live Transcription", isOn: $showLiveTranscriptionBubble)
+                    Toggle(L10n.Settings.showLiveTranscription, isOn: $showLiveTranscriptionBubble)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
                         .id("transcription")  // Stable identity
-                    
-                    Toggle("Always Show Input", isOn: $alwaysShowInput)
+                        .accessibilityLabel("Show live transcription")
+                        .accessibilityIdentifier("settings.showLiveTranscription")
+
+                    Toggle(L10n.Settings.alwaysShowInput, isOn: $alwaysShowInput)
                         .tint(ThemeManager.shared.currentTheme.primaryAccent)
                         .id("alwaysShowInput")  // Stable identity
+                        .accessibilityLabel("Always show input")
+                        .accessibilityIdentifier("settings.alwaysShowInput")
                 } header: {
-                    Text("Ambient Mode")
+                    Text(L10n.Settings.Section.ambientMode)
                 }
 
                 // MARK: - Developer Options (Hidden unless unlocked)
@@ -169,10 +265,10 @@ struct SettingsView: View {
                                 let safetyCheck = CloudKitSafetyCheck.shared
                                 let summary = await safetyCheck.getMigrationSummary(for: modelContext.container)
                                 print("📋 Migration Safety Check:\n\(summary)")
-                                
+
                                 // Backup data before migration
                                 await safetyCheck.backupCriticalData(from: modelContext.container)
-                                
+
                                 // Proceed with migration
                                 CloudKitMigrationService.shared.resetMigration()
                                 await CloudKitMigrationService.shared.checkAndPerformMigration(container: modelContext.container)
@@ -180,6 +276,20 @@ struct SettingsView: View {
                         } label: {
                             Label("Reset CloudKit Migration", systemImage: "arrow.clockwise.icloud")
                                 .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                        }
+
+                        NavigationLink {
+                            WidgetDesignLab()
+                        } label: {
+                            Label("Widget Design Lab", systemImage: "rectangle.3.group.fill")
+                                .foregroundStyle(.orange)
+                        }
+
+                        NavigationLink {
+                            AmbientOrbExporter()
+                        } label: {
+                            Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
+                                .foregroundStyle(.orange)
                         }
                     } header: {
                         Text("Developer Options")
@@ -196,22 +306,25 @@ struct SettingsView: View {
                     Button {
                         exportData()
                     } label: {
-                        Label("Export All Data", systemImage: "square.and.arrow.up")
+                        Label(L10n.Settings.exportAllData, systemImage: "square.and.arrow.up")
                             .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                     }
-                    
+                    .accessibilityLabel("Export all data")
+                    .accessibilityHint("Double tap to export your books, notes, and settings")
+                    .accessibilityIdentifier("settings.exportData")
+
                     Button {
                         Task { @MainActor in
                             // Clear all caches
                             SharedBookCoverManager.shared.clearAllCaches()
                             DisplayedImageStore.clearAllCaches()
-                            
+
                             // Show confirmation toast
-                            toastMessage = "Image caches cleared"
+                            toastMessage = "toast.image_caches_cleared".localized()
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 showingCacheClearedToast = true
                             }
-                            
+
                             // Hide toast after delay
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                                 withAnimation {
@@ -220,27 +333,29 @@ struct SettingsView: View {
                             }
                         }
                     } label: {
-                        Label("Clear Image Caches", systemImage: "trash")
+                        Label(L10n.Settings.clearImageCaches, systemImage: "trash")
                             .foregroundStyle(.orange)
                     }
 
                     Button(role: .destructive) {
                         showingDeleteConfirmation = true
                     } label: {
-                        Label("Delete All Data", systemImage: "trash")
+                        Label(L10n.Settings.deleteAllData, systemImage: "trash")
                             .foregroundStyle(.red)
                     }
+                    .accessibilityLabel("Delete all data")
+                    .accessibilityIdentifier("settings.deleteAllData")
                 } header: {
-                    Text("Data")
+                    Text(L10n.Settings.Section.data)
                 } footer: {
-                    Text("Clear Image Caches forces all book covers to reload from the server.")
+                    Text("settings.clear_caches_footer".localized())
                 }
 
                 // MARK: - About
                 Section {
                     // Hidden gesture: Tap version 7 times to unlock developer mode
                     HStack {
-                        Text("Version")
+                        Text(L10n.Settings.version)
                         Spacer()
                         Text("\(appVersion) (\(buildNumber))")
                             .foregroundStyle(.secondary)
@@ -252,7 +367,7 @@ struct SettingsView: View {
 
                     Link(destination: URL(string: "https://readepilogue.com/privacy")!) {
                         HStack {
-                            Text("Privacy Policy")
+                            Text(L10n.Settings.privacyPolicy)
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .font(.caption)
@@ -262,7 +377,7 @@ struct SettingsView: View {
 
                     Link(destination: URL(string: "https://readepilogue.com/terms")!) {
                         HStack {
-                            Text("Terms of Service")
+                            Text(L10n.Settings.termsOfService)
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .font(.caption)
@@ -273,7 +388,7 @@ struct SettingsView: View {
                     NavigationLink {
                         CreditsView()
                     } label: {
-                        Text("Credits")
+                        Text(L10n.Settings.credits)
                     }
 
                     Button {
@@ -286,37 +401,40 @@ struct SettingsView: View {
                         dismiss()
                     } label: {
                         HStack {
-                            Text("Replay Onboarding")
+                            Text(L10n.Settings.replayOnboarding)
                             Spacer()
                             Image(systemName: "play.circle")
                                 .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                         }
                     }
+                    .accessibilityLabel("Replay onboarding")
+                    .accessibilityHint("Double tap to view the app introduction again")
+                    .accessibilityIdentifier("settings.replayOnboarding")
                 } header: {
-                    Text("About")
+                    Text(L10n.Settings.Section.about)
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(L10n.Settings.title)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                    Button(L10n.Action.done) {
                         dismiss()
                     }
                 }
             }
-            .alert("Delete All Data?", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
+            .alert("alert.delete_data.title".localized(), isPresented: $showingDeleteConfirmation) {
+                Button(L10n.Action.cancel, role: .cancel) { }
+                Button(L10n.Action.delete, role: .destructive) {
                     deleteAllData()
                 }
             } message: {
-                Text("This will permanently delete all your books, notes, and reading data. This action cannot be undone.")
+                Text("alert.delete_data.message".localized())
             }
-            .alert("Export Complete", isPresented: $showingExportSuccess) {
-                Button("OK") { }
+            .alert("alert.export_complete.title".localized(), isPresented: $showingExportSuccess) {
+                Button(L10n.General.ok) { }
             } message: {
-                Text("Your data has been exported successfully.")
+                Text("alert.export_complete.message".localized())
             }
             .modifier(GlassToastModifier(isShowing: $showingCacheClearedToast, message: toastMessage))
         }
@@ -538,6 +656,31 @@ struct SettingsView: View {
                 await MainActor.run {
                     SensoryFeedback.error()
                 }
+            }
+        }
+    }
+
+    private func enrichAllBooks() {
+        guard !isEnriching else { return }
+
+        print("🎨 [SETTINGS] Starting batch enrichment...")
+        isEnriching = true
+        enrichmentProgress = nil
+
+        Task {
+            await BatchEnrichmentService.shared.enrichAllBooks(
+                modelContext: modelContext,
+                progressHandler: { current, total, title in
+                    enrichmentProgress = (current, total, title)
+                }
+            )
+
+            await MainActor.run {
+                isEnriching = false
+                enrichmentProgress = nil
+                toastMessage = "All books enriched!"
+                showingCacheClearedToast = true
+                print("✅ [SETTINGS] Batch enrichment complete")
             }
         }
     }

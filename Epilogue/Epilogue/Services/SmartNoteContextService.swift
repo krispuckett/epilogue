@@ -69,7 +69,11 @@ class SmartNoteContextService {
             // Find book in library
             if score > 0 {
                 if let book = library.first(where: { $0.title.contains(bookTitle) }) {
-                    if bestMatch == nil || score > bestMatch!.score {
+                    if let currentBest = bestMatch {
+                        if score > currentBest.score {
+                            bestMatch = (book, score)
+                        }
+                    } else {
                         bestMatch = (book, score)
                     }
                 }

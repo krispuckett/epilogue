@@ -60,6 +60,47 @@ class BookAdditionService {
         // Generate AI context for instant responses
         await BookContextCache.shared.generateContextForBook(book)
 
+        // Enrich book with AI-generated context (spoiler-free synopsis, themes, characters, series info)
+        // Run INLINE to catch errors and ensure completion
+        if let context = modelContext {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.id == book.id }
+            )
+            if let bookModel = try? context.fetch(descriptor).first {
+                #if DEBUG
+                print("🎨 Starting enrichment for: \(book.title)")
+                #endif
+
+                // Run enrichment INLINE so errors are visible
+                await BookEnrichmentService.shared.enrichBook(bookModel)
+
+                #if DEBUG
+                if bookModel.isEnriched {
+                    print("✅ Enrichment SUCCESS for: \(book.title)")
+                    print("   Synopsis: \(bookModel.smartSynopsis?.prefix(100) ?? "nil")")
+                } else {
+                    print("❌ Enrichment FAILED for: \(book.title) - still not enriched")
+                }
+                #endif
+            } else {
+                #if DEBUG
+                print("⚠️ Could not find BookModel for enrichment: \(book.title)")
+                #endif
+            }
+        } else {
+            #if DEBUG
+            print("⚠️ No modelContext provided - skipping enrichment for: \(book.title)")
+            #endif
+        }
+
+        // Index for Spotlight search
+        let coverImage: UIImage? = if let coverURL = book.coverImageURL {
+            await SharedBookCoverManager.shared.loadThumbnail(from: coverURL)
+        } else {
+            nil
+        }
+        await SpotlightIndexingService.shared.indexBook(book, coverImage: coverImage)
+
         #if DEBUG
         print("✅ Successfully added: \(book.title)")
         #endif

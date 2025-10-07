@@ -1,0 +1,281 @@
+/* Navigation - Tab Bar */
+"tab.library" = "Library";
+"tab.notes" = "Notes";
+"tab.sessions" = "Sessions";
+
+/* Reading Status */
+"reading_status.want_to_read" = "Want to Read";
+"reading_status.currently_reading" = "Currently Reading";
+"reading_status.read" = "Read";
+
+/* Common Actions */
+"action.save" = "Save";
+"action.cancel" = "Cancel";
+"action.delete" = "Delete";
+"action.add" = "Add";
+"action.edit" = "Edit";
+"action.done" = "Done";
+"action.share" = "Share";
+"action.search" = "Search";
+
+/* Settings - Section Headers */
+"settings.title" = "Settings";
+"settings.section.appearance" = "Appearance";
+"settings.section.library" = "Library";
+"settings.section.ai_assistant" = "AI Assistant";
+"settings.section.ambient_mode" = "Ambient Mode";
+"settings.section.developer_options" = "Developer Options";
+"settings.section.icloud_sync" = "iCloud Sync";
+"settings.section.data" = "Data";
+"settings.section.about" = "About";
+
+/* Settings - Appearance */
+"settings.gradient_theme" = "Gradient Theme";
+
+/* Settings - Library */
+"settings.import_from_goodreads" = "Import from Goodreads";
+
+/* Settings - AI Assistant */
+"settings.ai_provider" = "AI Provider";
+"settings.ai_provider.perplexity" = "Perplexity";
+"settings.use_sonar_pro" = "Use Sonar Pro";
+"settings.sonar_pro_description" = "More advanced reasoning";
+
+/* Settings - Ambient Mode */
+"settings.realtime_questions" = "Real-time Questions";
+"settings.audio_responses" = "Audio Responses";
+"settings.default_capture" = "Default Capture";
+"settings.show_live_transcription" = "Show Live Transcription";
+"settings.always_show_input" = "Always Show Input";
+
+/* Settings - Default Capture Options */
+"settings.capture.quote" = "Quote";
+"settings.capture.note" = "Note";
+"settings.capture.question" = "Question";
+
+/* Settings - Developer Options */
+"settings.gandalf_mode" = "Gandalf Mode";
+"settings.gandalf_mode_description" = "Unlimited testing (no quota limits)";
+"settings.gandalf_mode_active" = "Testing mode active - quotas disabled";
+"settings.reset_cloudkit_migration" = "Reset CloudKit Migration";
+"settings.developer_footer" = "Gandalf mode disables all API quotas for testing. Use responsibly!\n\nReset CloudKit Migration will re-run the sync process for all local data.";
+
+/* Settings - Data */
+"settings.export_all_data" = "Export All Data";
+"settings.clear_image_caches" = "Clear Image Caches";
+"settings.delete_all_data" = "Delete All Data";
+"settings.clear_caches_footer" = "Clear Image Caches forces all book covers to reload from the server.";
+
+/* Settings - About */
+"settings.version" = "Version";
+"settings.privacy_policy" = "Privacy Policy";
+"settings.terms_of_service" = "Terms of Service";
+"settings.credits" = "Credits";
+"settings.replay_onboarding" = "Replay Onboarding";
+
+/* Alerts - Delete Data */
+"alert.delete_data.title" = "Delete All Data?";
+"alert.delete_data.message" = "This will permanently delete all your books, notes, and reading data. This action cannot be undone.";
+
+/* Alerts - Export */
+"alert.export_complete.title" = "Export Complete";
+"alert.export_complete.message" = "Your data has been exported successfully.";
+
+/* Toast Messages */
+"toast.image_caches_cleared" = "Image caches cleared";
+
+/* Library View */
+"library.title" = "Library";
+"library.view_mode.grid" = "Grid View";
+"library.view_mode.list" = "List View";
+"library.filter.all_books" = "All Books";
+"library.filter.currently_reading" = "Currently Reading";
+"library.filter.unread" = "Unread";
+"library.filter.finished" = "Finished";
+"library.reorder_books" = "Reorder Books";
+"library.done_reordering" = "Done Reordering";
+"library.search_web" = "Search Web";
+
+/* Library - Book Actions */
+"library.mark_as_read" = "Mark as Read";
+"library.mark_as_want_to_read" = "Mark as Want to Read";
+"library.change_cover" = "Change Cover";
+"library.delete_from_library" = "Delete from Library";
+
+/* Library - Empty State */
+"library.empty.title" = "No Books Yet";
+"library.empty.message" = "Add your first book to get started";
+"library.empty.add_book" = "Add Book";
+"library.empty.import_goodreads" = "Import from Goodreads";
+
+/* Library - Book Card */
+"library.pages" = "%d pages";
+
+/* Notes View */
+"notes.title" = "Notes";
+
+/* Book Detail */
+"book_detail.reading_status" = "Reading Status";
+"book_detail.your_notes" = "Your Notes";
+"book_detail.no_notes" = "No notes yet";
+"book_detail.add_note" = "Add a note";
+"book_detail.page_progress" = "Page %d of %d";
+"book_detail.start_reading" = "Start Reading";
+"book_detail.continue_reading" = "Continue Reading";
+
+/* Empty States */
+"empty.no_books.title" = "No books yet";
+"empty.no_books.message" = "Start building your library";
+"empty.no_notes.title" = "No notes";
+"empty.no_notes.message" = "Capture your thoughts while reading";
+"empty.no_sessions.title" = "No sessions";
+"empty.no_sessions.message" = "Start an ambient reading session";
+
+/* Onboarding */
+"onboarding.welcome" = "Welcome to Epilogue";
+"onboarding.get_started" = "Get Started";
+"onboarding.skip" = "Skip";
+"onboarding.next" = "Next";
+"onboarding.continue" = "Continue";
+
+/* Ambient Mode */
+"ambient.start_session" = "Start Session";
+"ambient.end_session" = "End Session";
+"ambient.listening" = "Listening...";
+"ambient.processing" = "Processing...";
+
+/* Errors - User-facing only */
+"error.generic" = "Something went wrong";
+"error.network" = "Check your internet connection";
+"error.save_failed" = "Failed to save changes";
+"error.load_failed" = "Failed to load data";
+
+/* CloudKit Status */
+"cloudkit.status.available" = "iCloud Available";
+"cloudkit.status.syncing" = "Syncing...";
+"cloudkit.status.error" = "Sync Error";
+"cloudkit.status.not_available" = "iCloud Not Available";
+
+/* Context Menu */
+"context.share" = "Share";
+"context.edit" = "Edit";
+"context.delete" = "Delete";
+
+/* General */
+"general.loading" = "Loading...";
+"general.saving" = "Saving...";
+"general.syncing" = "Syncing...";
+"general.ok" = "OK";
+"general.yes" = "Yes";
+"general.no" = "No";
+
+/* Accessibility - Tab Bar */
+"accessibility.tab.library" = "Library";
+"accessibility.tab.library.hint" = "Double tap to view your book library";
+"accessibility.tab.notes" = "Notes";
+"accessibility.tab.notes.hint" = "Double tap to view your reading notes";
+"accessibility.tab.sessions" = "Sessions";
+"accessibility.tab.sessions.hint" = "Double tap to view your reading sessions";
+
+/* Accessibility - Library */
+"accessibility.library.viewOptions" = "View and filter options";
+"accessibility.library.viewOptions.hint" = "Double tap to change view mode or filter books";
+"accessibility.library.settings" = "Settings";
+"accessibility.library.settings.hint" = "Double tap to open app settings";
+"accessibility.library.emptyState" = "Library is empty";
+"accessibility.library.emptyState.hint" = "Add your first book to start building your library";
+"accessibility.library.bookCard.hint" = "Double tap to view book details";
+
+/* Accessibility - Settings */
+"accessibility.settings.gradient_theme" = "Gradient theme";
+"accessibility.settings.gradient_theme.hint" = "Double tap to change gradient theme";
+"accessibility.settings.goodreads_import" = "Import from Goodreads";
+"accessibility.settings.goodreads_import.hint" = "Double tap to import your books from Goodreads";
+"accessibility.settings.use_sonar_pro" = "Use Sonar Pro model";
+"accessibility.settings.realtime_questions" = "Real-time questions";
+"accessibility.settings.audio_responses" = "Audio responses";
+"accessibility.settings.export_data" = "Export all data";
+"accessibility.settings.export_data.hint" = "Double tap to export your books, notes, and settings";
+"accessibility.settings.delete_all_data" = "Delete all data";
+"accessibility.settings.delete_all_data.hint" = "Warning: This will permanently delete all your books, notes, and reading data";
+"accessibility.settings.replay_onboarding" = "Replay onboarding";
+"accessibility.settings.replay_onboarding.hint" = "Double tap to view the app introduction again";
+"accessibility.settings.gradientTheme.hint" = "Double tap to change gradient theme";
+"accessibility.settings.goodreadsImport" = "Import from Goodreads";
+"accessibility.settings.goodreadsImport.hint" = "Double tap to import your books from Goodreads";
+"accessibility.settings.sonarPro" = "Use Sonar Pro model";
+"accessibility.settings.sonarPro.enabled" = "Currently enabled, more advanced reasoning";
+"accessibility.settings.sonarPro.disabled" = "Currently disabled, tap to enable advanced reasoning";
+"accessibility.settings.realtimeQuestions" = "Real-time questions";
+"accessibility.settings.realtimeQuestions.enabled" = "Enabled, questions are answered immediately";
+"accessibility.settings.realtimeQuestions.disabled" = "Disabled, tap to enable real-time question answering";
+"accessibility.settings.audioResponses" = "Audio responses";
+"accessibility.settings.audioResponses.enabled" = "Enabled, responses will be spoken aloud";
+"accessibility.settings.audioResponses.disabled" = "Disabled, tap to enable audio responses";
+"accessibility.settings.liveTranscription" = "Show live transcription";
+"accessibility.settings.liveTranscription.enabled" = "Enabled, live transcription will be shown";
+"accessibility.settings.liveTranscription.disabled" = "Disabled, tap to show live transcription";
+"accessibility.settings.alwaysShowInput" = "Always show input";
+"accessibility.settings.alwaysShowInput.enabled" = "Enabled, input field is always visible";
+"accessibility.settings.alwaysShowInput.disabled" = "Disabled, tap to always show input field";
+"accessibility.settings.exportData" = "Export all data";
+"accessibility.settings.exportData.hint" = "Double tap to export your books, notes, and settings";
+"accessibility.settings.deleteData" = "Delete all data";
+"accessibility.settings.deleteData.hint" = "Warning: This will permanently delete all your books, notes, and reading data. Double tap to confirm deletion";
+"accessibility.settings.replayOnboarding" = "Replay onboarding";
+"accessibility.settings.replayOnboarding.hint" = "Double tap to view the app introduction again";
+
+/* Accessibility - Book Detail */
+"accessibility.book.end_session" = "End reading session";
+"accessibility.book.end_session.hint" = "Double tap to end your current reading session";
+"accessibility.book.start_session" = "Start quick reading session";
+"accessibility.book.start_session.hint" = "Double tap to begin a new reading session for this book";
+"accessibility.book.reading_status" = "Reading status";
+"accessibility.book.reading_status.hint" = "Double tap to change reading status";
+"accessibility.bookDetail.readingProgress" = "Reading progress";
+"accessibility.bookDetail.readingProgress.hint" = "Adjust your current page in the book";
+"accessibility.bookDetail.startReading" = "Start reading";
+"accessibility.bookDetail.startReading.hint" = "Double tap to begin reading this book";
+"accessibility.bookDetail.continueReading" = "Continue reading";
+"accessibility.bookDetail.continueReading.hint" = "Double tap to continue reading from page";
+
+/* Accessibility - Ambient Mode */
+"accessibility.ambient.recordButton" = "Voice input";
+"accessibility.ambient.recordButton.hint" = "Double tap to start recording your voice";
+"accessibility.ambient.recording" = "Recording";
+"accessibility.ambient.recording.hint" = "Currently recording, double tap to stop";
+"accessibility.ambient.sendMessage" = "Send message";
+"accessibility.ambient.sendMessage.hint" = "Double tap to send your message";
+"accessibility.ambient.bookContext" = "Book context";
+"accessibility.ambient.bookContext.hint" = "Currently discussing";
+
+/* Accessibility - Notes */
+"accessibility.notes.search" = "Search notes and quotes";
+"accessibility.notes.search.hint" = "Type to search through your notes and quotes";
+"accessibility.notes.clear_search" = "Clear search";
+"accessibility.notes.clear_search.hint" = "Double tap to clear search text";
+"accessibility.notes.filter_menu" = "Filter and actions menu";
+"accessibility.notes.filter_menu.hint" = "Double tap to filter notes and quotes or select multiple items";
+"accessibility.notes.close_search" = "Close search";
+"accessibility.notes.open_search" = "Search notes";
+"accessibility.notes.empty_state" = "No notes yet. Start capturing your thoughts, quotes, and questions from your reading journey";
+"accessibility.notes.addNote" = "Add note";
+"accessibility.notes.addNote.hint" = "Double tap to create a new note";
+"accessibility.notes.editNote" = "Edit note";
+"accessibility.notes.editNote.hint" = "Double tap to edit this note";
+"accessibility.notes.deleteNote" = "Delete note";
+"accessibility.notes.deleteNote.hint" = "Double tap to delete this note";
+
+/* Accessibility - General Actions */
+"accessibility.action.close" = "Close";
+"accessibility.action.close.hint" = "Double tap to close";
+"accessibility.action.done" = "Done";
+"accessibility.action.done.hint" = "Double tap to finish";
+"accessibility.action.cancel" = "Cancel";
+"accessibility.action.cancel.hint" = "Double tap to cancel";
+"accessibility.action.edit" = "Edit";
+"accessibility.action.edit.hint" = "Double tap to edit";
+"accessibility.action.delete" = "Delete";
+"accessibility.action.delete.hint" = "Double tap to delete";
+"accessibility.action.share" = "Share";
+"accessibility.action.share.hint" = "Double tap to share";

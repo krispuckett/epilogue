@@ -1038,7 +1038,10 @@ public class TrueAmbientProcessor: ObservableObject {
                 throw CancellationError()
             }
             
-            let result = try await group.next()!
+            guard let result = try await group.next() else {
+                group.cancelAll()
+                throw CancellationError()
+            }
             group.cancelAll()
             return result
         }
@@ -1242,13 +1245,19 @@ public class TrueAmbientProcessor: ObservableObject {
     
     private func saveAudioToFile(_ samples: [Float], url: URL) throws {
         // Create a simple WAV file
-        let audioFormat = AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1)!
+        guard let audioFormat = AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1) else {
+            throw NSError(domain: "TrueAmbientProcessor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio format"])
+        }
         let audioFile = try AVAudioFile(forWriting: url, settings: audioFormat.settings)
-        
-        let buffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: AVAudioFrameCount(samples.count))!
+
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: AVAudioFrameCount(samples.count)) else {
+            throw NSError(domain: "TrueAmbientProcessor", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio buffer"])
+        }
         buffer.frameLength = buffer.frameCapacity
-        
-        let channelData = buffer.floatChannelData![0]
+
+        guard let channelData = buffer.floatChannelData?[0] else {
+            throw NSError(domain: "TrueAmbientProcessor", code: -3, userInfo: [NSLocalizedDescriptionKey: "Failed to access audio channel data"])
+        }
         for (index, sample) in samples.enumerated() {
             channelData[index] = sample
         }
@@ -1515,15 +1524,16 @@ public class TrueAmbientProcessor: ObservableObject {
                     model.localId == book.localId.uuidString
                 }
             )
-            
+
             if let existingBook = try? modelContext.fetch(fetchRequest).first {
                 bookModel = existingBook
             } else {
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: book)
+                modelContext.insert(newBookModel)
+                bookModel = newBookModel
             }
         }
-        
+
         let quote = CapturedQuote(
             text: content.text,
             book: bookModel,
@@ -1577,15 +1587,16 @@ public class TrueAmbientProcessor: ObservableObject {
                     model.localId == book.localId.uuidString
                 }
             )
-            
+
             if let existingBook = try? modelContext.fetch(fetchRequest).first {
                 bookModel = existingBook
             } else {
-                bookModel = BookModel(from: book)
-                modelContext.insert(bookModel!)
+                let newBookModel = BookModel(from: book)
+                modelContext.insert(newBookModel)
+                bookModel = newBookModel
             }
         }
-        
+
         let note = CapturedNote(
             content: content.text,
             book: bookModel,
@@ -2290,7 +2301,28 @@ extension TrueAmbientProcessor {
         let startTime = Date()
         
         do {
-            for try await chunk in OptimizedPerplexityService.shared.streamSonarResponse(enhancedQuestion, bookContext: bookContext) {
+            // Look up enrichment data from BookModel
+            let enrichment = getEnrichmentFromBook(bookContext)
+
+            // Look up previous session summaries for continuity
+            let sessionHistory = getPreviousSessionInsights(for: bookContext)
+
+            // Get user's current page and personal context
+            let currentPage = getCurrentPage(for: bookContext)
+            let userNotes = getNotesUpToCurrentPage(for: bookContext, currentPage: currentPage)
+            let userQuotes = getQuotesUpToCurrentPage(for: bookContext, currentPage: currentPage)
+            let userQuestions = getQuestionsUpToCurrentPage(for: bookContext, currentPage: currentPage)
+
+            for try await chunk in OptimizedPerplexityService.shared.streamSonarResponse(
+                enhancedQuestion,
+                bookContext: bookContext,
+                enrichment: enrichment,
+                sessionHistory: sessionHistory,
+                userNotes: userNotes,
+                userQuotes: userQuotes,
+                userQuestions: userQuestions,
+                currentPage: currentPage
+            ) {
                 streamedResponse = chunk.text
                 
                 // Wait at least 2 seconds before showing first response (keep thinking animation)
@@ -2358,10 +2390,37 @@ extension TrueAmbientProcessor {
             }
             
         } catch {
-            logger.error("❌ Streaming error: \(error)")
-            let errorMessage = error.localizedDescription
+            logger.error("❌ Perplexity failed: \(error)")
+
+            // Try local AI fallback for graceful degradation
+            logger.info("🔄 Attempting SmartEpilogueAI fallback...")
+
+            var fallbackResponse = ""
+
+            do {
+                // Set book context for SmartEpilogueAI
+                if let book = bookContext {
+                    SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
+                }
+
+                // Query local AI
+                fallbackResponse = await SmartEpilogueAI.shared.smartQuery(question)
+
+                if !fallbackResponse.isEmpty {
+                    logger.info("✅ SmartEpilogueAI fallback succeeded")
+                    streamedResponse = fallbackResponse
+                } else {
+                    logger.warning("⚠️ SmartEpilogueAI returned empty response")
+                    streamedResponse = "I'm having trouble answering right now. Please check your connection and try again."
+                }
+            } catch let fallbackError {
+                logger.error("❌ SmartEpilogueAI fallback also failed: \(fallbackError)")
+                streamedResponse = error.localizedDescription
+            }
+
+            // Update UI with fallback response or error
             await MainActor.run {
-                if questionIndexToUpdate < self.detectedContent.count && 
+                if questionIndexToUpdate < self.detectedContent.count &&
                    self.detectedContent[questionIndexToUpdate].type == .question {
                     let oldContent = self.detectedContent[questionIndexToUpdate]
                     self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
@@ -2369,7 +2428,7 @@ extension TrueAmbientProcessor {
                         type: oldContent.type,
                         timestamp: oldContent.timestamp,
                         confidence: oldContent.confidence,
-                        response: errorMessage,
+                        response: streamedResponse,
                         bookTitle: oldContent.bookTitle,
                         bookAuthor: oldContent.bookAuthor
                     )
@@ -2405,8 +2464,29 @@ extension TrueAmbientProcessor {
             // Direct streaming call - no routing, no complexity
             var streamedResponse = ""
             let startTime_old = Date()
-            
-            for try await chunk in OptimizedPerplexityService.shared.streamSonarResponse(contextualQuestion, bookContext: bookContext) {
+
+            // Look up enrichment data from BookModel
+            let enrichment = getEnrichmentFromBook(bookContext)
+
+            // Look up previous session summaries for continuity
+            let sessionHistory = getPreviousSessionInsights(for: bookContext)
+
+            // Get user's current page and personal context
+            let currentPage = getCurrentPage(for: bookContext)
+            let userNotes = getNotesUpToCurrentPage(for: bookContext, currentPage: currentPage)
+            let userQuotes = getQuotesUpToCurrentPage(for: bookContext, currentPage: currentPage)
+            let userQuestions = getQuestionsUpToCurrentPage(for: bookContext, currentPage: currentPage)
+
+            for try await chunk in OptimizedPerplexityService.shared.streamSonarResponse(
+                contextualQuestion,
+                bookContext: bookContext,
+                enrichment: enrichment,
+                sessionHistory: sessionHistory,
+                userNotes: userNotes,
+                userQuotes: userQuotes,
+                userQuestions: userQuestions,
+                currentPage: currentPage
+            ) {
                 streamedResponse = chunk.text
                 
                 // Update UI with partial response immediately
@@ -2750,6 +2830,260 @@ extension TrueAmbientProcessor {
                 }
             }
         }
+    }
+
+    // MARK: - Enrichment Helper
+
+    /// Looks up enrichment data from BookModel for the given Book
+    private func getEnrichmentFromBook(_ book: Book?) -> (synopsis: String, characters: [String], themes: [String], setting: String)? {
+        guard let book = book,
+              let modelContext = modelContext else {
+            return nil
+        }
+
+        // Look up BookModel by localId
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.localId == book.localId.uuidString
+            }
+        )
+
+        guard let bookModel = try? modelContext.fetch(fetchRequest).first,
+              bookModel.isEnriched else {
+            return nil
+        }
+
+        // Return enrichment data
+        return (
+            synopsis: bookModel.smartSynopsis ?? "",
+            characters: bookModel.majorCharacters ?? [],
+            themes: bookModel.keyThemes ?? [],
+            setting: bookModel.setting ?? ""
+        )
+    }
+
+    /// Fetches previous session insights for cross-session continuity
+    private func getPreviousSessionInsights(for book: Book?) -> [String]? {
+        guard let book = book,
+              let modelContext = modelContext else {
+            return nil
+        }
+
+        // Look up BookModel by localId
+        let bookFetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.localId == book.localId.uuidString
+            }
+        )
+
+        guard let bookModel = try? modelContext.fetch(bookFetchRequest).first else {
+            return nil
+        }
+
+        // Fetch all sessions, we'll filter in Swift (predicate with optional is tricky)
+        let sessionFetchRequest = FetchDescriptor<AmbientSession>(
+            sortBy: [SortDescriptor(\.startTime, order: .reverse)]
+        )
+
+        guard let allSessions = try? modelContext.fetch(sessionFetchRequest) else {
+            return nil
+        }
+
+        // Filter for this book's sessions
+        let bookSessions = allSessions.filter { session in
+            session.bookModel?.localId == bookModel.localId
+        }
+
+        // Extract insights from last 3 sessions (skip the very first one if it's current)
+        let insights = bookSessions
+            .prefix(4) // Get 4 in case current session is in there
+            .compactMap { $0.generatedInsight }
+            .filter { !$0.isEmpty }
+            .prefix(3) // Take max 3 previous insights
+
+        return insights.isEmpty ? nil : Array(insights)
+    }
+
+    /// Get the user's current page in the book
+    private func getCurrentPage(for book: Book?) -> Int? {
+        guard let book = book,
+              let modelContext = modelContext else {
+            return nil
+        }
+
+        // Look up BookModel by localId
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.localId == book.localId.uuidString
+            }
+        )
+
+        guard let bookModel = try? modelContext.fetch(fetchRequest).first else {
+            return nil
+        }
+
+        // Return currentPage if > 0, otherwise try to get from latest ReadingSession
+        if bookModel.currentPage > 0 {
+            return bookModel.currentPage
+        }
+
+        // Fallback: get from most recent reading session
+        if let sessions = bookModel.readingSessions,
+           let latestSession = sessions.sorted(by: { $0.startDate > $1.startDate }).first {
+            return latestSession.endPage > 0 ? latestSession.endPage : nil
+        }
+
+        return nil
+    }
+
+    /// Fetches user's notes up to their current page (prevents spoilers from future notes)
+    private func getNotesUpToCurrentPage(for book: Book?, currentPage: Int?) -> [(content: String, page: Int?)]? {
+        guard let book = book,
+              let modelContext = modelContext else {
+            return nil
+        }
+
+        // Look up BookModel by localId
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.localId == book.localId.uuidString
+            }
+        )
+
+        guard let bookModel = try? modelContext.fetch(fetchRequest).first,
+              let notes = bookModel.notes,
+              !notes.isEmpty else {
+            return nil
+        }
+
+        // Filter notes up to current page (if we have a current page)
+        let filteredNotes: [CapturedNote]
+        if let currentPage = currentPage {
+            filteredNotes = notes.filter { note in
+                if let pageNumber = note.pageNumber {
+                    return pageNumber <= currentPage
+                }
+                // Include notes without page numbers (they're safe)
+                return true
+            }
+        } else {
+            // No current page tracking - include all notes
+            filteredNotes = Array(notes)
+        }
+
+        // Sort by page number (notes without page numbers go first)
+        let sortedNotes = filteredNotes.sorted { note1, note2 in
+            let page1 = note1.pageNumber ?? -1
+            let page2 = note2.pageNumber ?? -1
+            return page1 < page2
+        }
+
+        // Extract content and page numbers
+        let noteData = sortedNotes.compactMap { note -> (content: String, page: Int?)? in
+            guard let content = note.content, !content.isEmpty else { return nil }
+            return (content: content, page: note.pageNumber)
+        }
+
+        return noteData.isEmpty ? nil : noteData
+    }
+
+    /// Fetches user's quotes up to their current page (prevents spoilers from future quotes)
+    private func getQuotesUpToCurrentPage(for book: Book?, currentPage: Int?) -> [(text: String, page: Int?, notes: String?)]? {
+        guard let book = book,
+              let modelContext = modelContext else {
+            return nil
+        }
+
+        // Look up BookModel by localId
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.localId == book.localId.uuidString
+            }
+        )
+
+        guard let bookModel = try? modelContext.fetch(fetchRequest).first,
+              let quotes = bookModel.quotes,
+              !quotes.isEmpty else {
+            return nil
+        }
+
+        // Filter quotes up to current page
+        let filteredQuotes: [CapturedQuote]
+        if let currentPage = currentPage {
+            filteredQuotes = quotes.filter { quote in
+                if let pageNumber = quote.pageNumber {
+                    return pageNumber <= currentPage
+                }
+                // Include quotes without page numbers
+                return true
+            }
+        } else {
+            filteredQuotes = Array(quotes)
+        }
+
+        // Sort by page number
+        let sortedQuotes = filteredQuotes.sorted { quote1, quote2 in
+            let page1 = quote1.pageNumber ?? -1
+            let page2 = quote2.pageNumber ?? -1
+            return page1 < page2
+        }
+
+        // Extract quote data
+        let quoteData = sortedQuotes.compactMap { quote -> (text: String, page: Int?, notes: String?)? in
+            guard let text = quote.text, !text.isEmpty else { return nil }
+            return (text: text, page: quote.pageNumber, notes: quote.notes)
+        }
+
+        return quoteData.isEmpty ? nil : quoteData
+    }
+
+    /// Fetches user's questions up to their current page
+    private func getQuestionsUpToCurrentPage(for book: Book?, currentPage: Int?) -> [(question: String, page: Int?, answer: String?)]? {
+        guard let book = book,
+              let modelContext = modelContext else {
+            return nil
+        }
+
+        // Look up BookModel by localId
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.localId == book.localId.uuidString
+            }
+        )
+
+        guard let bookModel = try? modelContext.fetch(fetchRequest).first,
+              let questions = bookModel.questions,
+              !questions.isEmpty else {
+            return nil
+        }
+
+        // Filter questions up to current page
+        let filteredQuestions: [CapturedQuestion]
+        if let currentPage = currentPage {
+            filteredQuestions = questions.filter { question in
+                if let pageNumber = question.pageNumber {
+                    return pageNumber <= currentPage
+                }
+                return true
+            }
+        } else {
+            filteredQuestions = Array(questions)
+        }
+
+        // Sort by page number
+        let sortedQuestions = filteredQuestions.sorted { q1, q2 in
+            let page1 = q1.pageNumber ?? -1
+            let page2 = q2.pageNumber ?? -1
+            return page1 < page2
+        }
+
+        // Extract question data
+        let questionData = sortedQuestions.compactMap { question -> (question: String, page: Int?, answer: String?)? in
+            guard let content = question.content, !content.isEmpty else { return nil }
+            return (question: content, page: question.pageNumber, answer: question.answer)
+        }
+
+        return questionData.isEmpty ? nil : questionData
     }
 }
 

@@ -18,6 +18,9 @@ class BookEnrichmentService {
         let setting: String
         let tone: [String]
         let style: String
+        let seriesName: String?
+        let seriesOrder: Int?
+        let totalBooksInSeries: Int?
     }
 
     // MARK: - Main Enrichment Function
@@ -51,11 +54,17 @@ class BookEnrichmentService {
                 book.setting = enrichment.setting
                 book.tone = enrichment.tone
                 book.literaryStyle = enrichment.style
+                book.seriesName = enrichment.seriesName
+                book.seriesOrder = enrichment.seriesOrder
+                book.totalBooksInSeries = enrichment.totalBooksInSeries
                 book.enrichedAt = Date()
 
                 print("💾 [ENRICHMENT] Data saved to BookModel")
                 print("   isEnriched now: \(book.isEnriched)")
                 print("   smartSynopsis: \(book.smartSynopsis?.prefix(50) ?? "nil")")
+                if let series = enrichment.seriesName, let order = enrichment.seriesOrder {
+                    print("   Series: \(series) #\(order)")
+                }
             }
 
             print("✅ [ENRICHMENT] Complete for '\(book.title)'")
@@ -105,7 +114,10 @@ class BookEnrichmentService {
           "characters": ["Name1", "Name2", "Name3"],
           "setting": "Time period and world/location OR subject area in one sentence",
           "tone": ["adjective1", "adjective2", "adjective3", "adjective4"],
-          "style": "Genre and writing style in one sentence"
+          "style": "Genre and writing style in one sentence",
+          "seriesName": "Series name if part of a series, otherwise null",
+          "seriesOrder": Book number in series (e.g., 1, 2, 3) or null if standalone,
+          "totalBooksInSeries": Total number of books in the series or null if unknown/standalone
         }
 
         SYNOPSIS WRITING GUIDELINES:
@@ -187,13 +199,23 @@ class BookEnrichmentService {
         // Extract style
         let style = extractField(from: response, fieldName: "style") ?? "Literary fiction"
 
+        // Extract series metadata
+        let seriesName = extractField(from: response, fieldName: "seriesName")
+        let seriesOrderString = extractField(from: response, fieldName: "seriesOrder")
+        let seriesOrder = seriesOrderString.flatMap { Int($0) }
+        let totalBooksString = extractField(from: response, fieldName: "totalBooksInSeries")
+        let totalBooks = totalBooksString.flatMap { Int($0) }
+
         return EnrichmentData(
             synopsis: synopsis,
             themes: themes,
             characters: characters,
             setting: setting,
             tone: tone,
-            style: style
+            style: style,
+            seriesName: seriesName,
+            seriesOrder: seriesOrder,
+            totalBooksInSeries: totalBooks
         )
     }
 

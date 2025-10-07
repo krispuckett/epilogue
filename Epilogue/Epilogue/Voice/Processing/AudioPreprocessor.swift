@@ -118,7 +118,9 @@ class AudioPreprocessor: ObservableObject {
         guard samples.count >= fftLength else { return samples }
         
         // Convert to frequency domain
-        let fftSetup = vDSP_create_fftsetup(vDSP_Length(log2(Float(fftLength))), FFTRadix(FFT_RADIX2))!
+        guard let fftSetup = vDSP_create_fftsetup(vDSP_Length(log2(Float(fftLength))), FFTRadix(FFT_RADIX2)) else {
+            return samples
+        }
         defer { vDSP_destroy_fftsetup(fftSetup) }
         
         var real = [Float](repeating: 0, count: fftLength/2)
@@ -133,7 +135,8 @@ class AudioPreprocessor: ObservableObject {
         
         // Perform FFT
         windowedSamples.withUnsafeBufferPointer { ptr in
-            ptr.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: fftLength/2) { complexPtr in
+            guard let baseAddress = ptr.baseAddress else { return }
+            baseAddress.withMemoryRebound(to: DSPComplex.self, capacity: fftLength/2) { complexPtr in
                 var splitComplex = DSPSplitComplex(realp: &real, imagp: &imag)
                 vDSP_ctoz(complexPtr, 2, &splitComplex, 1, vDSP_Length(fftLength/2))
                 vDSP_fft_zrip(fftSetup, &splitComplex, 1, vDSP_Length(log2(Float(fftLength))), FFTDirection(FFT_FORWARD))
@@ -160,7 +163,8 @@ class AudioPreprocessor: ObservableObject {
         
         var result = [Float](repeating: 0, count: fftLength)
         result.withUnsafeMutableBufferPointer { ptr in
-            ptr.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: fftLength/2) { complexPtr in
+            guard let baseAddress = ptr.baseAddress else { return }
+            baseAddress.withMemoryRebound(to: DSPComplex.self, capacity: fftLength/2) { complexPtr in
                 vDSP_ztoc(&splitComplex, 1, complexPtr, 2, vDSP_Length(fftLength/2))
             }
         }

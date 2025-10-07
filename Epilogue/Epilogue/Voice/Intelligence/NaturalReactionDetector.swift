@@ -165,7 +165,11 @@ class NaturalReactionDetector: ObservableObject {
             )
             
             if confidence > sensitivityLevel {
-                if bestMatch == nil || confidence > bestMatch!.confidence {
+                if let currentBest = bestMatch {
+                    if confidence > currentBest.confidence {
+                        bestMatch = (reactionType, confidence)
+                    }
+                } else {
                     bestMatch = (reactionType, confidence)
                 }
             }

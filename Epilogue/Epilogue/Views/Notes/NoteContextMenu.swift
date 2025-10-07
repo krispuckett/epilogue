@@ -152,23 +152,9 @@ struct NoteContextMenu: View {
     
     private func shareAsImage() {
         SensoryFeedback.medium()
-        // Create shareable image view
-        let shareView = ShareableQuoteView(note: note)
-        let renderer = ImageRenderer(content: shareView)
-        renderer.scale = 3.0 // High resolution
-        
-        if let image = renderer.uiImage {
-            let activityController = UIActivityViewController(
-                activityItems: [image],
-                applicationActivities: nil
-            )
-            
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let rootViewController = windowScene.windows.first?.rootViewController {
-                activityController.popoverPresentationController?.sourceView = rootViewController.view
-                rootViewController.present(activityController, animated: true)
-            }
-        }
+        // TODO: Fix ImageRenderer API for iOS 26 - currently broken
+        // Temporarily disabled - need to update to new iOS 26 ImageRenderer API
+        copyText() // Fallback to text copy for now
     }
     
     private func copyText() {
