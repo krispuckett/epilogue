@@ -28,6 +28,11 @@ final class BookModel {
     var literaryStyle: String?        // "High fantasy, allegorical"
     var enrichedAt: Date?             // When enrichment was fetched
 
+    // Series metadata (from enrichment)
+    var seriesName: String?           // "Harry Potter", "Lord of the Rings"
+    var seriesOrder: Int?             // 1, 2, 3, etc.
+    var totalBooksInSeries: Int?      // Total books in series
+
     // Reading status
     var isInLibrary: Bool = false  // Default for CloudKit
     var readingStatus: String = ReadingStatus.wantToRead.rawValue // Store as string for SwiftData
@@ -164,7 +169,16 @@ enum ReadingStatus: String, Codable, CaseIterable {
         case .read: return "checkmark.circle"
         }
     }
-    
+
+    /// Localized display name for UI
+    var displayName: String {
+        switch self {
+        case .wantToRead: return "Want to Read"
+        case .currentlyReading: return "Currently Reading"
+        case .read: return "Read"
+        }
+    }
+
     var color: Color {
         switch self {
         case .wantToRead: return .blue
