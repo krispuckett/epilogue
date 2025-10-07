@@ -2,7 +2,7 @@
 //  ReadingStreakWidget.swift
 //  EpilogueWidgets
 //
-//  Shows daily reading streak
+//  Shows daily reading streak - matching WidgetDesignLab
 //
 
 import WidgetKit
@@ -10,7 +10,7 @@ import SwiftUI
 
 struct ReadingStreakProvider: TimelineProvider {
     func placeholder(in context: Context) -> ReadingStreakEntry {
-        ReadingStreakEntry(date: Date(), streakDays: 7, readToday: true)
+        ReadingStreakEntry(date: Date(), streakDays: 18)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ReadingStreakEntry) -> ()) {
@@ -29,42 +29,53 @@ struct ReadingStreakProvider: TimelineProvider {
 struct ReadingStreakEntry: TimelineEntry {
     let date: Date
     let streakDays: Int
-    let readToday: Bool
 }
 
 struct ReadingStreakWidgetView: View {
     var entry: ReadingStreakProvider.Entry
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Flame icon
-            ZStack {
-                Circle()
-                    .fill(.orange.opacity(0.2))
-                    .frame(width: 60, height: 60)
+        ZStack {
+            Color.black
 
-                Image(systemName: entry.readToday ? "flame.fill" : "flame")
-                    .font(.system(size: 30))
-                    .foregroundStyle(.orange)
-            }
+            // Ambient gradient
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(1.0), location: 0.0),
+                    .init(color: Color(red: 0.98, green: 0.4, blue: 0.2).opacity(0.8), location: 0.15),
+                    .init(color: Color(red: 0.9, green: 0.35, blue: 0.18).opacity(0.5), location: 0.3),
+                    .init(color: Color(red: 0.85, green: 0.3, blue: 0.15).opacity(0.3), location: 0.45),
+                    .init(color: Color.clear, location: 0.55)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .blur(radius: 40)
 
-            VStack(spacing: 4) {
-                Text("\(entry.streakDays)")
-                    .font(.system(size: 32, weight: .bold))
+            VStack(spacing: 8) {
+                Spacer()
 
-                Text(entry.streakDays == 1 ? "Day Streak" : "Days Streak")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                // Number with blur effect (glow)
+                ZStack {
+                    // Glow/blur layer
+                    Text("\(entry.streakDays)")
+                        .font(.system(size: 64, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.6))
+                        .blur(radius: 12)
 
-            if !entry.readToday {
-                Text("Read today to continue")
-                    .font(.caption2)
-                    .foregroundStyle(.orange.opacity(0.8))
+                    // Sharp layer on top
+                    Text("\(entry.streakDays)")
+                        .font(.system(size: 64, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                }
+
+                Text(entry.streakDays == 1 ? "day streak" : "day streak")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+
+                Spacer()
             }
         }
-        .padding()
-        .containerBackground(.fill.tertiary, for: .widget)
     }
 }
 

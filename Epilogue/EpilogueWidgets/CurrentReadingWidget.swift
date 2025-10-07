@@ -2,7 +2,7 @@
 //  CurrentReadingWidget.swift
 //  EpilogueWidgets
 //
-//  Simple reading progress widget
+//  Beautiful reading progress widget matching WidgetDesignLab design
 //
 
 import WidgetKit
@@ -26,8 +26,6 @@ struct CurrentReadingProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        // For now, just use placeholder data
-        // TODO: Fetch real data from SwiftData once App Groups are set up
         let entry = placeholder(in: context)
         let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
         completion(timeline)
@@ -74,45 +72,58 @@ struct CurrentReadingWidgetView: View {
         let entry: CurrentReadingEntry
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Currently Reading")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            ZStack {
+                Color.black
 
-                Text(entry.bookTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(2)
+                // Atmospheric gradient
+                atmosphericGradient
 
-                Spacer()
+                VStack(spacing: 8) {
+                    // Book cover placeholder
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(.white.opacity(0.1))
+                        .frame(width: 55, height: 82)
+                        .overlay(
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.3))
+                        )
+                        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
 
-                // Progress ring
-                HStack(spacing: 12) {
+                    Spacer()
+
+                    // Circular progress ring
                     ZStack {
+                        // Background ring
                         Circle()
-                            .stroke(.white.opacity(0.2), lineWidth: 3)
-                            .frame(width: 44, height: 44)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 3)
+                            .frame(width: 54, height: 54)
 
+                        // Progress ring
                         Circle()
                             .trim(from: 0, to: entry.progress)
-                            .stroke(.orange, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .frame(width: 44, height: 44)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.549, blue: 0.259),
+                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.7)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
+                            )
+                            .frame(width: 54, height: 54)
                             .rotationEffect(.degrees(-90))
 
-                        Text("\(Int(entry.progress * 100))%")
-                            .font(.system(size: 11, weight: .bold))
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(entry.currentPage)")
-                            .font(.system(size: 16, weight: .bold))
-                        Text("of \(entry.totalPages)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        // Percentage - MONOSPACED
+                        Text("\(Int(entry.progress * 100))")
+                            .font(.system(size: 17, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
                     }
                 }
+                .padding(.vertical, 16)
             }
-            .padding()
-            .containerBackground(.fill.tertiary, for: .widget)
         }
     }
 
@@ -121,59 +132,65 @@ struct CurrentReadingWidgetView: View {
         let entry: CurrentReadingEntry
 
         var body: some View {
-            HStack(spacing: 16) {
-                // Book cover placeholder
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.white.opacity(0.1))
-                    .frame(width: 80, height: 110)
-                    .overlay(
-                        Image(systemName: "book.fill")
-                            .font(.system(size: 30))
-                            .foregroundStyle(.white.opacity(0.3))
-                    )
+            ZStack {
+                Color.black
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Currently Reading")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                // Atmospheric gradient
+                atmosphericGradient
 
-                    Text(entry.bookTitle)
-                        .font(.system(size: 16, weight: .semibold))
-                        .lineLimit(2)
+                HStack(spacing: 16) {
+                    // Book cover placeholder
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(.white.opacity(0.1))
+                        .frame(width: 75, height: 112)
+                        .overlay(
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 30))
+                                .foregroundStyle(.white.opacity(0.3))
+                        )
+                        .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
 
-                    Text(entry.bookAuthor)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Book title - Georgia
+                        Text(entry.bookTitle)
+                            .font(.custom("Georgia", size: 21))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
 
-                    Spacer()
+                        Spacer()
+                            .frame(height: 4)
 
-                    // Progress bar
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Page \(entry.currentPage)")
-                                .font(.caption2)
-                            Spacer()
-                            Text("\(entry.pagesRemaining) left")
-                                .font(.caption2)
+                        // Progress slider
+                        progressSlider(progress: entry.progress)
+
+                        Spacer()
+                            .frame(height: 2)
+
+                        // Page count - MONOSPACED
+                        HStack(spacing: 4) {
+                            Text("\(entry.currentPage)")
+                                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white)
+
+                            Text("/")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+
+                            Text("\(entry.totalPages)")
+                                .font(.system(size: 16, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.6))
+
+                            Text("pages")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .padding(.leading, 2)
                         }
-                        .foregroundStyle(.secondary)
-
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(.white.opacity(0.15))
-
-                                Capsule()
-                                    .fill(.orange)
-                                    .frame(width: geo.size.width * entry.progress)
-                            }
-                        }
-                        .frame(height: 6)
                     }
+                    .frame(height: 112)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .padding(20)
             }
-            .padding()
-            .containerBackground(.fill.tertiary, for: .widget)
         }
     }
 
@@ -182,75 +199,159 @@ struct CurrentReadingWidgetView: View {
         let entry: CurrentReadingEntry
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Currently Reading")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            ZStack {
+                Color.black
 
-                HStack(spacing: 16) {
-                    // Book cover
-                    RoundedRectangle(cornerRadius: 8)
+                // Atmospheric gradient
+                atmosphericGradient
+
+                VStack(spacing: 0) {
+                    Spacer()
+                        .frame(height: 32)
+
+                    // Book cover placeholder
+                    RoundedRectangle(cornerRadius: 7)
                         .fill(.white.opacity(0.1))
-                        .frame(width: 100, height: 140)
+                        .frame(width: 70, height: 105)
                         .overlay(
                             Image(systemName: "book.fill")
-                                .font(.system(size: 40))
+                                .font(.system(size: 32))
                                 .foregroundStyle(.white.opacity(0.3))
                         )
+                        .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    Spacer()
+                        .frame(height: 12)
+
+                    // Title and author
+                    VStack(spacing: 4) {
                         Text(entry.bookTitle)
-                            .font(.system(size: 18, weight: .semibold))
-                            .lineLimit(2)
+                            .font(.custom("Georgia", size: 17))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
 
                         Text(entry.bookAuthor)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
                     }
-                }
+                    .multilineTextAlignment(.center)
 
-                Spacer()
+                    Spacer()
+                        .frame(height: 20)
 
-                // Progress section
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("\(Int(entry.progress * 100))%")
-                                .font(.system(size: 32, weight: .bold))
-                            Text("Complete")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                    // Progress ring
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.12), lineWidth: 3)
+                            .frame(width: 100, height: 100)
 
-                        Spacer()
+                        Circle()
+                            .trim(from: 0, to: entry.progress)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.647, blue: 0.0),
+                                        Color(red: 1.0, green: 0.549, blue: 0.259)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
+                            )
+                            .frame(width: 100, height: 100)
+                            .rotationEffect(.degrees(-90))
+                            .shadow(
+                                color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.5),
+                                radius: 6,
+                                x: 0,
+                                y: 0
+                            )
 
-                        VStack(alignment: .trailing) {
+                        Text("\(Int(entry.progress * 100))%")
+                            .font(.system(size: 28, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer()
+                        .frame(height: 24)
+
+                    // Stats - MONOSPACED
+                    HStack(alignment: .bottom, spacing: 40) {
+                        VStack(spacing: 3) {
                             Text("\(entry.pagesRemaining)")
-                                .font(.system(size: 24, weight: .semibold))
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white)
+
                             Text("pages left")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+
+                        VStack(spacing: 3) {
+                            Text("14h 46m")
+                                .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+
+                            Text("remaining")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.65))
                         }
                     }
 
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(.white.opacity(0.15))
-
-                            Capsule()
-                                .fill(.orange)
-                                .frame(width: geo.size.width * entry.progress)
-                        }
-                    }
-                    .frame(height: 8)
+                    Spacer()
+                        .frame(height: 28)
                 }
             }
-            .padding()
-            .containerBackground(.fill.tertiary, for: .widget)
         }
+    }
+
+    // MARK: - Shared Components
+    private static var atmosphericGradient: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 1.0, green: 0.549, blue: 0.259).opacity(1.0), location: 0.0),
+                .init(color: Color(red: 0.98, green: 0.4, blue: 0.2).opacity(0.8), location: 0.15),
+                .init(color: Color(red: 0.9, green: 0.35, blue: 0.18).opacity(0.5), location: 0.3),
+                .init(color: Color(red: 0.85, green: 0.3, blue: 0.15).opacity(0.3), location: 0.45),
+                .init(color: Color.clear, location: 0.55)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .blur(radius: 40)
+    }
+
+    private static func progressSlider(progress: Double) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Base track
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(height: 4)
+
+                // Progress fill
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.549, blue: 0.259),
+                                Color(red: 1.0, green: 0.647, blue: 0.0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: geometry.size.width * progress, height: 4)
+
+                // Glass handle
+                Circle()
+                    .fill(.white)
+                    .frame(width: 20, height: 20)
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .offset(x: (geometry.size.width - 20) * progress)
+            }
+        }
+        .frame(height: 20)
     }
 }
 
