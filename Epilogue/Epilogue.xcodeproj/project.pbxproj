@@ -79,12 +79,20 @@
 			);
 			target = 015D10F12E318D5D002633FE /* ReadEpilogue */;
 		};
+		01E35EB72E95A2EF002A2B65 /* Exceptions for "EpilogueWidgets" folder in "ReadEpilogue" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				WidgetDataHelper.swift,
+			);
+			target = 015D10F12E318D5D002633FE /* ReadEpilogue */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		01509B492E95911000139963 /* EpilogueWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				01E35EB72E95A2EF002A2B65 /* Exceptions for "EpilogueWidgets" folder in "ReadEpilogue" target */,
 				01509B5C2E95911100139963 /* Exceptions for "EpilogueWidgets" folder in "EpilogueWidgetsExtension" target */,
 			);
 			path = EpilogueWidgets;
@@ -602,6 +610,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = EpilogueWidgets/EpilogueWidgetsExtension.entitlements;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = KWJNMWT2B9;
@@ -668,6 +677,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = EpilogueWidgets/EpilogueWidgetsExtension.entitlements;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = KWJNMWT2B9;

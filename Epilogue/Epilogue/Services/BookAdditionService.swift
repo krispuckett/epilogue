@@ -54,7 +54,7 @@ class BookAdditionService {
 
         // Extract colors
         if extractColors {
-            await extractAndCacheColors(for: book)
+            await extractAndCacheColors(for: book, modelContext: modelContext)
         }
 
         // Generate AI context for instant responses
@@ -150,7 +150,7 @@ class BookAdditionService {
             print("🎨 Starting batch color extraction...")
             #endif
             progressHandler?(0, books.count, "Extracting colors...")
-            await extractColorsInBatch(for: books, progressHandler: progressHandler)
+            await extractColorsInBatch(for: books, modelContext: modelContext, progressHandler: progressHandler)
         }
 
         #if DEBUG
@@ -160,7 +160,7 @@ class BookAdditionService {
     
     // MARK: - Color Extraction
     
-    private func extractAndCacheColors(for book: Book) async {
+    private func extractAndCacheColors(for book: Book, modelContext: ModelContext? = nil) async {
         guard let coverURL = book.coverImageURL else { return }
         
         let bookID = book.localId.uuidString
@@ -212,7 +212,34 @@ class BookAdditionService {
             
             // Cache the result
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: coverURL)
-            
+
+            // Save to BookModel for widgets
+            if let context = modelContext {
+                let descriptor = FetchDescriptor<BookModel>(
+                    predicate: #Predicate { $0.id == book.id }
+                )
+                if let bookModel = try? context.fetch(descriptor).first {
+                    bookModel.extractedColors = [
+                        palette.primary.toHexString(),
+                        palette.secondary.toHexString(),
+                        palette.accent.toHexString(),
+                        palette.background.toHexString()
+                    ]
+
+                    #if DEBUG
+                    print("✅ Saved \(bookModel.extractedColors?.count ?? 0) colors to BookModel for widgets")
+                    #endif
+
+                    // Update widgets if this is the currently reading book
+                    if bookModel.readingStatus == "Currently Reading" {
+                        BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                        #if DEBUG
+                        print("📱 Updated widget with colors for currently reading book")
+                        #endif
+                    }
+                }
+            }
+
             #if DEBUG
             print("✅ Colors extracted and cached for: \(book.title) with ID: \(bookID)")
             #endif
@@ -223,6 +250,7 @@ class BookAdditionService {
     
     private func extractColorsInBatch(
         for books: [Book],
+        modelContext: ModelContext? = nil,
         progressHandler: ((Int, Int, String) -> Void)? = nil
     ) async {
         // Process in batches to avoid memory pressure
@@ -235,10 +263,10 @@ class BookAdditionService {
             await withTaskGroup(of: Void.self) { group in
                 for book in batch {
                     group.addTask {
-                        await self.extractAndCacheColors(for: book)
+                        await self.extractAndCacheColors(for: book, modelContext: modelContext)
                     }
                 }
-                
+
                 // Wait for batch to complete
                 await group.waitForAll()
             }
@@ -258,7 +286,7 @@ class BookAdditionService {
     // MARK: - Utility Methods
     
     /// Pre-warm color cache for visible books in library
-    func warmColorCache(for books: [Book]) async {
+    func warmColorCache(for books: [Book], modelContext: ModelContext? = nil) async {
         #if DEBUG
         print("🔥 Warming color cache for \(books.count) books")
         #endif
@@ -277,7 +305,7 @@ class BookAdditionService {
             #if DEBUG
             print("📊 \(booksNeedingColors.count) books need color extraction")
             #endif
-            await extractColorsInBatch(for: booksNeedingColors)
+            await extractColorsInBatch(for: booksNeedingColors, modelContext: modelContext)
         } else {
             #if DEBUG
             print("✅ All books already have cached colors")

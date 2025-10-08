@@ -1922,6 +1922,18 @@ struct BookDetailView: View {
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
+
+                // Save cached colors to BookModel for widgets if not already saved
+                if let bookModel = bookModel, bookModel.extractedColors == nil || bookModel.extractedColors?.isEmpty == true {
+                    bookModel.extractedColors = [
+                        cachedPalette.primary.toHexString(),
+                        cachedPalette.secondary.toHexString(),
+                        cachedPalette.accent.toHexString(),
+                        cachedPalette.background.toHexString()
+                    ]
+                    print("✅ Saved \(bookModel.extractedColors?.count ?? 0) cached colors to BookModel for widgets")
+                    BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                }
             }
             return
         }
@@ -1945,14 +1957,30 @@ struct BookDetailView: View {
             
             await MainActor.run {
                 self.colorPalette = palette
-                
+
                 print("🎨 Low-res extracted colors:")
                 print("  Primary: \(palette.primary)")
                 print("  Secondary: \(palette.secondary)")
                 print("  Accent: \(palette.accent)")
                 print("  Background: \(palette.background)")
+
+                // Save to BookModel for widgets
+                if let bookModel = bookModel {
+                    bookModel.extractedColors = [
+                        palette.primary.toHexString(),
+                        palette.secondary.toHexString(),
+                        palette.accent.toHexString(),
+                        palette.background.toHexString()
+                    ]
+                    print("✅ Saved \(bookModel.extractedColors?.count ?? 0) colors to BookModel for widgets")
+
+                    // Update widgets with new color data
+                    BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                } else {
+                    print("⚠️ Could not find BookModel to save colors")
+                }
             }
-            
+
             // Cache the result with localId
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
         } catch {
@@ -1968,6 +1996,18 @@ struct BookDetailView: View {
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
+
+                // Save cached colors to BookModel for widgets if not already saved
+                if let bookModel = bookModel, bookModel.extractedColors == nil || bookModel.extractedColors?.isEmpty == true {
+                    bookModel.extractedColors = [
+                        cachedPalette.primary.toHexString(),
+                        cachedPalette.secondary.toHexString(),
+                        cachedPalette.accent.toHexString(),
+                        cachedPalette.background.toHexString()
+                    ]
+                    print("✅ Saved \(bookModel.extractedColors?.count ?? 0) cached colors to BookModel for widgets")
+                    BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                }
             }
             return
         }
@@ -2026,8 +2066,24 @@ struct BookDetailView: View {
                 print("  Secondary: \(palette.secondary)")
                 print("  Accent: \(palette.accent)")
                 print("  Background: \(palette.background)")
+
+                // Save to BookModel for widgets
+                if let bookModel = bookModel {
+                    bookModel.extractedColors = [
+                        palette.primary.toHexString(),
+                        palette.secondary.toHexString(),
+                        palette.accent.toHexString(),
+                        palette.background.toHexString()
+                    ]
+                    print("✅ Saved \(bookModel.extractedColors?.count ?? 0) colors to BookModel for widgets")
+
+                    // Update widgets with new color data
+                    BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                } else {
+                    print("⚠️ Could not find BookModel to save colors")
+                }
             }
-            
+
             // Cache the result outside of MainActor.run
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
             

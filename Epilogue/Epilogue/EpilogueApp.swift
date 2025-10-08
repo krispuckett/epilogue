@@ -46,6 +46,16 @@ struct EpilogueApp: App {
                                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                                 await OfflineCoverCacheService.shared.cacheAllLibraryCovers()
                             }
+
+                            // Migrate cached colors to BookModel for widgets (one-time)
+                            Task { @MainActor in
+                                await migrateCachedColorsToBookModel(context: context)
+                            }
+
+                            // Update widgets with current book data
+                            Task { @MainActor in
+                                updateWidgetData(context: context)
+                            }
                         }
                     }
                     .alert("iCloud Sync", isPresented: $showingCloudKitAlert) {
@@ -280,6 +290,35 @@ struct EpilogueApp: App {
         }
     }
     
+    private func updateWidgetData(context: ModelContext) {
+        print("📱 Updating widget data...")
+
+        // First, check ALL books to see what we have
+        let allBooksDescriptor = FetchDescriptor<BookModel>()
+        if let allBooks = try? context.fetch(allBooksDescriptor) {
+            print("📚 Total books in library: \(allBooks.count)")
+            for book in allBooks.prefix(5) {
+                print("   - '\(book.title)' status: \(book.readingStatus)")
+            }
+        }
+
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.readingStatus == "Currently Reading" },
+            sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
+        )
+
+        guard let currentBook = try? context.fetch(descriptor).first else {
+            print("❌ No currently reading book for widgets")
+            BookWidgetUpdater.shared.clearCurrentBook()
+            return
+        }
+
+        print("✅ Found currently reading book: \(currentBook.title)")
+        print("   Cover URL: \(currentBook.coverImageURL ?? "none")")
+        print("   Colors: \(currentBook.extractedColors?.count ?? 0) colors")
+        BookWidgetUpdater.shared.updateCurrentBook(from: currentBook)
+    }
+
     @MainActor
     private func checkCloudKitStatus() {
         // Check if CloudKit initialization failed
@@ -309,5 +348,47 @@ struct EpilogueApp: App {
                 UserDefaults.standard.set(false, forKey: "cloudKitInitializationFailed")
             }
         }
+    }
+
+    @MainActor
+    private func migrateCachedColorsToBookModel(context: ModelContext) async {
+        // Check if migration already ran
+        if UserDefaults.standard.bool(forKey: "didMigrateCachedColorsToBookModel") {
+            return
+        }
+
+        print("🎨 Migrating cached colors to BookModel for widgets...")
+
+        let descriptor = FetchDescriptor<BookModel>()
+        guard let allBooks = try? context.fetch(descriptor) else {
+            return
+        }
+
+        var migratedCount = 0
+
+        for bookModel in allBooks {
+            // Skip if already has colors
+            if let colors = bookModel.extractedColors, !colors.isEmpty {
+                continue
+            }
+
+            // Check if there's a cached palette
+            let bookID = bookModel.localId
+            if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+                bookModel.extractedColors = [
+                    cachedPalette.primary.toHexString(),
+                    cachedPalette.secondary.toHexString(),
+                    cachedPalette.accent.toHexString(),
+                    cachedPalette.background.toHexString()
+                ]
+                migratedCount += 1
+                print("  ✅ Migrated colors for: \(bookModel.title)")
+            }
+        }
+
+        print("🎨 Migration complete: \(migratedCount) books updated with colors")
+
+        // Mark migration as complete
+        UserDefaults.standard.set(true, forKey: "didMigrateCachedColorsToBookModel")
     }
 }

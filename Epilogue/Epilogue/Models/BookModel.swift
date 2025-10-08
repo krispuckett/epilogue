@@ -33,6 +33,9 @@ final class BookModel {
     var seriesOrder: Int?             // 1, 2, 3, etc.
     var totalBooksInSeries: Int?      // Total books in series
 
+    // Color extraction for gradients (cached from cover)
+    var extractedColors: [String]?  // Hex color strings
+
     // Reading status
     var isInLibrary: Bool = false  // Default for CloudKit
     var readingStatus: String = ReadingStatus.wantToRead.rawValue // Store as string for SwiftData

@@ -2,7 +2,7 @@
 //  AmbientModeWidget.swift
 //  EpilogueWidgets
 //
-//  EXACT match to WidgetDesignLab ambient designs
+//  Ambient launcher - will use exported orb image
 //
 
 import WidgetKit
@@ -35,92 +35,81 @@ struct AmbientModeWidgetView: View {
 
     var body: some View {
         Link(destination: URL(string: "epilogue://ambient")!) {
-            ZStack {
-                Color.black
+            if family == .systemSmall {
+                VStack(spacing: 12) {
+                    // Ambient orb (exported Metal shader)
+                    if let uiImage = UIImage(named: "ambient-orb") {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 100, height: 100)
+                    } else {
+                        // Fallback: show placeholder
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 100, height: 100)
+                            .overlay(
+                                Text("No Orb\nImage")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                            )
+                    }
 
-                // Ambient atmospheric gradient (NOT enhanced)
-                ambientAtmosphericGradient
+                    Text("Ask")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
 
-                if family == .systemSmall {
-                    // Small widget - EXACT match to WidgetDesignLab
-                    VStack(spacing: 12) {
-                        // Orb (can't use Metal shader in widgets, use radial gradient)
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [
-                                            Color(red: 1.0, green: 0.8, blue: 0.4),
-                                            Color(red: 1.0, green: 0.549, blue: 0.259),
-                                            Color(red: 0.8, green: 0.4, blue: 0.1)
-                                        ],
-                                        center: .center,
-                                        startRadius: 15,
-                                        endRadius: 40
-                                    )
-                                )
-                                .frame(width: 80, height: 80)
-                                .blur(radius: 8)
+                    Text("Epilogue")
+                        .font(.custom("Georgia", size: 14))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            } else {
+                HStack(spacing: 20) {
+                    // Ambient orb (exported Metal shader)
+                    if let uiImage = UIImage(named: "ambient-orb") {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 110, height: 110)
+                    } else {
+                        // Fallback: show placeholder
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 110, height: 110)
+                            .overlay(
+                                Text("No Orb\nImage")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                            )
+                    }
 
-                            Image(systemName: "mic.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.white)
-                        }
-
-                        Text("Ask")
-                            .font(.system(size: 16, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Ask Epilogue")
+                            .font(.system(size: 22, weight: .semibold))
                             .foregroundStyle(.white)
 
-                        Text("Epilogue")
-                            .font(.custom("Georgia", size: 14))
-                            .foregroundStyle(.white.opacity(0.8))
+                        Text("Tap to open Ambient Mode")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
                     }
-                } else {
-                    // Medium widget - EXACT match to WidgetDesignLab
-                    HStack(spacing: 20) {
-                        // Larger orb
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [
-                                            Color(red: 1.0, green: 0.8, blue: 0.4),
-                                            Color(red: 1.0, green: 0.549, blue: 0.259),
-                                            Color(red: 0.8, green: 0.4, blue: 0.1)
-                                        ],
-                                        center: .center,
-                                        startRadius: 20,
-                                        endRadius: 45
-                                    )
-                                )
-                                .frame(width: 90, height: 90)
-                                .blur(radius: 8)
 
-                            Image(systemName: "mic.fill")
-                                .font(.system(size: 28))
-                                .foregroundStyle(.white)
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Ask Epilogue")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.white)
-
-                            Text("Tap to open Ambient Mode")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-
-                        Spacer()
-                    }
-                    .padding(20)
+                    Spacer()
                 }
+                .padding(20)
             }
+        }
+        .containerBackground(for: .widget) {
+            ZStack {
+                Color.black
+                Self.ambientAtmosphericGradient
+            }
+            .ignoresSafeArea()
         }
     }
 
-    // EXACT ambient gradient from WidgetDesignLab (no color enhancement)
-    private var ambientAtmosphericGradient: some View {
+    private static var ambientAtmosphericGradient: some View {
         let amberColors = defaultGradientColors
 
         return LinearGradient(
@@ -135,9 +124,10 @@ struct AmbientModeWidgetView: View {
             endPoint: .bottom
         )
         .blur(radius: 40)
+        .ignoresSafeArea()
     }
 
-    private var defaultGradientColors: [Color] {
+    private static var defaultGradientColors: [Color] {
         [
             Color(red: 1.0, green: 0.549, blue: 0.259),
             Color(red: 0.98, green: 0.4, blue: 0.2),

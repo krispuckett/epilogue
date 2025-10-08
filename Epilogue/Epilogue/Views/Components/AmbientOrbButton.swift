@@ -320,6 +320,43 @@ class OrbMetalRenderer: NSObject {
         commandBuffer.present(drawable)
         commandBuffer.commit()
     }
+
+    // Render to a custom texture (for exporting)
+    func renderToTexture(_ texture: MTLTexture, commandQueue: MTLCommandQueue, size: CGSize) {
+        guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+            return
+        }
+
+        let renderPassDescriptor = MTLRenderPassDescriptor()
+        renderPassDescriptor.colorAttachments[0].texture = texture
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        renderPassDescriptor.colorAttachments[0].loadAction = .clear
+        renderPassDescriptor.colorAttachments[0].storeAction = .store
+
+        guard let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
+            return
+        }
+
+        renderEncoder.setRenderPipelineState(pipelineState)
+
+        // Pass uniforms
+        let currentTime = Float(CACurrentMediaTime() - startTime)
+        var time = currentTime
+        var resolution = SIMD2<Float>(Float(size.width), Float(size.height))
+        var pressed = Float(isPressed ? 1.0 : 0.0)
+        var themeColorCopy = themeColor
+
+        renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.size, index: 0)
+        renderEncoder.setFragmentBytes(&resolution, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
+        renderEncoder.setFragmentBytes(&pressed, length: MemoryLayout<Float>.size, index: 2)
+        renderEncoder.setFragmentBytes(&themeColorCopy, length: MemoryLayout<SIMD3<Float>>.size, index: 3)
+
+        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        renderEncoder.endEncoding()
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+    }
 }
 
 // MARK: - Ambient Orb Button with Glass

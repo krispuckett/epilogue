@@ -2,7 +2,7 @@
 //  ReadingStreakWidget.swift
 //  EpilogueWidgets
 //
-//  EXACT match to WidgetDesignLab streak widget
+//  EXACT match with MASSIVE glow effect
 //
 
 import WidgetKit
@@ -34,40 +34,44 @@ struct ReadingStreakWidgetView: View {
     var entry: ReadingStreakProvider.Entry
 
     var body: some View {
-        ZStack {
-            Color.black
+        VStack(spacing: 8) {
+            Spacer()
 
-            // Ambient gradient (same as ambient widget)
-            ambientAtmosphericGradient
+            // MASSIVE glow effect - layered for intensity
+            ZStack {
+                // Multiple blur layers for INTENSE glow
+                Text("\(entry.streakDays)")
+                    .font(.system(size: 64, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.6))
+                    .blur(radius: 20)
 
-            VStack(spacing: 8) {
-                Spacer()
+                Text("\(entry.streakDays)")
+                    .font(.system(size: 64, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.6))
+                    .blur(radius: 12)
 
-                // Number with blur effect (glow) - EXACT from WidgetDesignLab
-                ZStack {
-                    // Glow/blur layer
-                    Text("\(entry.streakDays)")
-                        .font(.system(size: 64, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.6))
-                        .blur(radius: 12)
-
-                    // Sharp layer on top
-                    Text("\(entry.streakDays)")
-                        .font(.system(size: 64, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
-                }
-
-                Text("day streak")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-
-                Spacer()
+                // Sharp layer on top
+                Text("\(entry.streakDays)")
+                    .font(.system(size: 64, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
             }
+
+            Text("day streak")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.7))
+
+            Spacer()
+        }
+        .containerBackground(for: .widget) {
+            ZStack {
+                Color.black
+                Self.ambientAtmosphericGradient
+            }
+            .ignoresSafeArea()
         }
     }
 
-    // EXACT ambient gradient from WidgetDesignLab (no color enhancement)
-    private var ambientAtmosphericGradient: some View {
+    private static var ambientAtmosphericGradient: some View {
         let amberColors = defaultGradientColors
 
         return LinearGradient(
@@ -82,9 +86,10 @@ struct ReadingStreakWidgetView: View {
             endPoint: .bottom
         )
         .blur(radius: 40)
+        .ignoresSafeArea()
     }
 
-    private var defaultGradientColors: [Color] {
+    private static var defaultGradientColors: [Color] {
         [
             Color(red: 1.0, green: 0.549, blue: 0.259),
             Color(red: 0.98, green: 0.4, blue: 0.2),
