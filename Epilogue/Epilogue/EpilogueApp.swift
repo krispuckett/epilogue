@@ -9,6 +9,7 @@ struct EpilogueApp: App {
     @State private var modelContainer: ModelContainer?
     @State private var showingCloudKitAlert = false
     @State private var cloudKitErrorMessage = ""
+    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,11 @@ struct EpilogueApp: App {
                     .preferredColorScheme(.dark)
                     .modelContainer(container)
                     // .runSwiftDataMigrations() // DISABLED - causing data loss
+                    .task {
+                        // Load StoreKit products and check subscription status on app start
+                        await storeKit.loadProducts()
+                        await storeKit.checkSubscriptionStatus()
+                    }
                     .onAppear {
                         // API key is now built-in, no setup needed
 

@@ -351,7 +351,10 @@ public class SharedBookCoverManager: ObservableObject {
             for attempt in 1...3 {
                 do {
                     #if DEBUG
-                    print("📥 Loading book cover from: \(url.absoluteString.suffix(100)) (attempt \(attempt))")
+                    let displayURL = url.absoluteString.count > 100
+                        ? "...\(url.absoluteString.suffix(80))"
+                        : url.absoluteString
+                    print("📥 Loading book cover from: \(displayURL) (attempt \(attempt))")
                     #endif
                     
                     // Create request with timeout

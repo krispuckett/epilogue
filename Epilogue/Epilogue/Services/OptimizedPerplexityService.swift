@@ -865,6 +865,16 @@ class OptimizedPerplexityService: ObservableObject {
         - "What is the theme?" → Answer about the themes in "\(book.title)"
 
         NEVER give generic definitions. ALWAYS give book-specific answers about "\(book.title)".
+
+        RESPONSE TONE:
+        - Be natural and conversational, like a knowledgeable friend
+        - Avoid overly formal or literary language ("Thus...", "Indeed...", "One might say...")
+        - Use direct, clear sentences
+        - Be helpful and informative without being pompous
+        - NO emojis in responses
+        - NO sycophantic language ("You're right!", "Great question!", "Excellent observation!")
+        - NO cliche AI responses ("As an AI...", "I'm here to help...", generic pleasantries)
+        - Just answer the question directly and naturally
         """
 
         return context

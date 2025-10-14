@@ -291,6 +291,29 @@ struct SettingsView: View {
                             Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
                                 .foregroundStyle(.orange)
                         }
+
+                        NavigationLink {
+                            PremiumPaywallView()
+                        } label: {
+                            Label("Preview Premium Paywall", systemImage: "crown.fill")
+                                .foregroundStyle(.yellow)
+                        }
+
+                        Toggle(isOn: Binding(
+                            get: { UserDefaults.standard.bool(forKey: "devShowConversationCounter") },
+                            set: { UserDefaults.standard.set($0, forKey: "devShowConversationCounter") }
+                        )) {
+                            Label("Show Conversation Counter", systemImage: "circle.dotted.circle")
+                                .foregroundStyle(.cyan)
+                        }
+
+                        Button {
+                            SimplifiedStoreKitManager.shared.resetMonthlyCount()
+                            SensoryFeedback.light()
+                        } label: {
+                            Label("Reset Conversation Count", systemImage: "arrow.counterclockwise")
+                                .foregroundStyle(.green)
+                        }
                     } header: {
                         Text("Developer Options")
                     } footer: {

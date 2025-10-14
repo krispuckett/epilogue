@@ -33,5 +33,7 @@
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Epilogue</string>
+	<key>SKStoreKitVersion</key>
+	<integer>2</integer>
 </dict>
 </plist>

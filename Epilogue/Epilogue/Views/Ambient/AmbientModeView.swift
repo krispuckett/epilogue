@@ -117,6 +117,7 @@ struct AmbientModeView: View {
     @StateObject private var bookDetector = AmbientBookDetector.shared
     @StateObject private var microInteractionManager = MicroInteractionManager.shared
     @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
 
     // Namespace for matched geometry morphing animation
     @Namespace private var buttonMorphNamespace
@@ -155,6 +156,7 @@ struct AmbientModeView: View {
     @State private var isTranscriptionDissolving = false
     @State private var currentSession: AmbientSession?
     @State private var showingSessionSummary = false
+    @State private var showPaywall = false
     @State private var sessionStartTime: Date?
     @State private var isEditingTranscription = false
     @State private var editableTranscription = ""
@@ -381,7 +383,7 @@ struct AmbientModeView: View {
                 // Bottom gradient - ALWAYS VISIBLE, ALWAYS FULL STRENGTH
                 voiceGradientOverlay
                     .allowsHitTesting(false) // Ensure gradient doesn't block touches
-                
+
                 // Input controls overlay on top of gradient
                 bottomInputArea
                     .frame(maxWidth: .infinity, alignment: .bottom)  // Removed maxHeight to not fill entire space
@@ -680,6 +682,9 @@ struct AmbientModeView: View {
                 voiceManager.transcribedText = ""
             }
         }
+        .sheet(isPresented: $showPaywall) {
+            PremiumPaywallView()
+        }
         .onReceive(voiceManager.$transcribedText) { text in
             // CRITICAL: Only update if actually recording AND voice mode is enabled
             guard isRecording && isVoiceModeEnabled else {
@@ -972,7 +977,7 @@ struct AmbientModeView: View {
                                             onToggle: {
                                                 // Refined haptic feedback
                                                 SensoryFeedback.selection()
-                                                
+
                                                 withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.86, blendDuration: 0)) {
                                                     if expandedMessageIds.contains(message.id) {
                                                         expandedMessageIds.remove(message.id)
@@ -986,13 +991,14 @@ struct AmbientModeView: View {
                                                 keyboardText = questionText
                                                 editingMessageId = message.id
                                                 editingMessageType = message.messageType
-                                                
+
                                                 // Switch to text input mode
                                                 withAnimation(DesignSystem.Animation.springStandard) {
                                                     inputMode = .textInput
                                                     isKeyboardFocused = true
                                                 }
-                                            } : nil
+                                            } : nil,
+                                            showPaywall: $showPaywall
                                         )
                                     }
                                 }
@@ -2410,10 +2416,10 @@ struct AmbientModeView: View {
     
     private func sendTextMessage() {
         guard !keyboardText.isEmpty else { return }
-        
+
         let messageText = keyboardText.trimmingCharacters(in: .whitespacesAndNewlines)
         keyboardText = "" // Clear immediately
-        
+
         // Check if we're editing an existing message
         if let editingId = editingMessageId {
             // Find and update the message
@@ -2491,9 +2497,17 @@ struct AmbientModeView: View {
         }
         
         // Normal message processing (not editing)
+
+        // Check conversation limit BEFORE processing new messages
+        if !storeKit.canStartConversation() {
+            SensoryFeedback.warning()
+            showPaywall = true
+            return
+        }
+
         // Check for page mentions in typed text too
         detectPageMention(in: messageText)
-        
+
         // Smart content type detection
         let contentType = determineContentType(messageText)
         
@@ -2681,6 +2695,13 @@ struct AmbientModeView: View {
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
 
+        // Check conversation limit BEFORE sending
+        if !storeKit.canStartConversation() {
+            SensoryFeedback.warning()
+            showPaywall = true
+            return
+        }
+
         // Hide onboarding on first interaction
         if showOnboarding {
             fadeOutOnboarding()
@@ -2693,11 +2714,11 @@ struct AmbientModeView: View {
             bookContext: currentBookContext
         )
         messages.append(message)
-        
+
         Task {
             await getAIResponse(for: messageText)
         }
-        
+
         messageText = ""
     }
     
@@ -3168,9 +3189,49 @@ struct AmbientModeView: View {
         } catch {
             await MainActor.run {
                 // Update thinking message to show error
+                var errorContent: String
+
+                // Check if it's a rate limit error
+                if let perplexityError = error as? PerplexityError,
+                   case .rateLimitExceeded(_, _) = perplexityError {
+                    errorContent = """
+                    **\(text)**
+
+                    **Monthly Conversation Limit Reached.**
+
+                    You've used all your free ambient conversations this month.
+
+                    **Want unlimited conversations?**
+
+                    Upgrade to Epilogue+ for unlimited ambient AI conversations.
+
+                    [UPGRADE_BUTTON]
+                    """
+                } else {
+                    // Check for rate limit in error description
+                    let errorDesc = error.localizedDescription
+                    if errorDesc.contains("rateLimitExceeded") || errorDesc.contains("rate limit") {
+                        errorContent = """
+                        **\(text)**
+
+                        **Monthly Conversation Limit Reached.**
+
+                        You've used all your free ambient conversations this month.
+
+                        **Want unlimited conversations?**
+
+                        Upgrade to Epilogue+ for unlimited ambient AI conversations.
+
+                        [UPGRADE_BUTTON]
+                        """
+                    } else {
+                        errorContent = "**\(text)**\n\nSorry, I couldn't process your message right now. Please try again."
+                    }
+                }
+
                 if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
                     let updatedMessage = UnifiedChatMessage(
-                        content: "**\(text)**\n\nSorry, I couldn't process your message.",
+                        content: errorContent,
                         isUser: false,
                         timestamp: messages[thinkingIndex].timestamp,
                         bookContext: currentBookContext
@@ -3178,7 +3239,7 @@ struct AmbientModeView: View {
                     messages[thinkingIndex] = updatedMessage
                 } else {
                     let errorMessage = UnifiedChatMessage(
-                        content: "Sorry, I couldn't process your message.",
+                        content: errorContent,
                         isUser: false,
                         timestamp: Date(),
                         bookContext: currentBookContext
@@ -3186,6 +3247,7 @@ struct AmbientModeView: View {
                     messages.append(errorMessage)
                 }
                 pendingQuestion = nil
+                print("❌ Failed to process message: \(error)")
             }
         }
     }
@@ -3294,29 +3356,65 @@ struct AmbientModeView: View {
                     
                     // Check if it's a rate limit error
                     if let perplexityError = error as? PerplexityError,
-                       case .rateLimitExceeded(let remaining, let resetTime) = perplexityError {
-                        // Show rate limit message with remaining questions
-                        let formatter = DateFormatter()
-                        formatter.timeStyle = .short
-                        let resetTimeStr = formatter.string(from: resetTime)
-                        
+                       case .rateLimitExceeded(_, let resetTime) = perplexityError {
+                        // Show rate limit message for Epilogue+ conversation limit
+                        let storeKit = SimplifiedStoreKitManager.shared
+                        let remaining = storeKit.conversationsRemaining() ?? 0
+
+                        let calendar = Calendar.current
+                        let now = Date()
+
+                        // Calculate time until next month (first day of next month)
+                        let nextMonth = calendar.date(byAdding: .month, value: 1, to: now)!
+                        let firstOfNextMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: nextMonth))!
+
+                        let components = calendar.dateComponents([.day, .hour], from: now, to: firstOfNextMonth)
+                        let daysUntilReset = components.day ?? 0
+                        let hoursUntilReset = components.hour ?? 0
+
+                        let resetTimeStr: String
+                        if daysUntilReset > 0 {
+                            resetTimeStr = "\(daysUntilReset)d \(hoursUntilReset)h"
+                        } else {
+                            resetTimeStr = "\(hoursUntilReset)h"
+                        }
+
                         errorContent = """
                         **\(text)**
-                        
-                        📊 **Daily Question Limit Reached**
-                        
-                        You've used all 10 free questions for today. Your limit resets at \(resetTimeStr).
-                        
-                        *Your question has been saved and you can try again tomorrow.*
-                        
-                        💡 **Tip**: Questions are precious! Make them count by:
-                        • Combining related questions into one
-                        • Using quotes and notes (unlimited) to capture insights
-                        • Reflecting before asking
+
+                        **Monthly Conversation Limit Reached.**
+
+                        You've used both of your free ambient conversations this month. Your limit resets in \(resetTimeStr) (on the 1st of next month).
+
+                        Your question has been saved and you can try again when your limit resets.
+
+                        **Want unlimited conversations?**
+
+                        Upgrade to Epilogue+ for unlimited ambient AI conversations with your books.
+
+                        [UPGRADE_BUTTON]
                         """
                     } else {
-                        // Generic error message
-                        errorContent = "**\(text)**\n\n⚠️ Sorry, I couldn't process your message. \(error.localizedDescription)"
+                        // Generic error message with better formatting
+                        let errorDesc = error.localizedDescription
+                        if errorDesc.contains("rateLimitExceeded") {
+                            // Fallback for rate limit errors that don't match the pattern
+                            errorContent = """
+                            **\(text)**
+
+                            **Monthly Conversation Limit Reached.**
+
+                            You've used all your free ambient conversations this month.
+
+                            **Want unlimited conversations?**
+
+                            Upgrade to Epilogue+ for unlimited ambient AI conversations.
+
+                            [UPGRADE_BUTTON]
+                            """
+                        } else {
+                            errorContent = "**\(text)**\n\nSorry, I couldn't process your message right now. Please try again."
+                        }
                     }
                     
                     let updatedMessage = UnifiedChatMessage(
@@ -4080,6 +4178,7 @@ struct AmbientMessageThreadView: View {
     let streamingText: String?
     let onToggle: () -> Void
     let onEdit: ((String) -> Void)?
+    @Binding var showPaywall: Bool
     
     @State private var messageOpacity: Double = 0.3
     @State private var messageBlur: Double = 12
@@ -4237,9 +4336,49 @@ struct AmbientMessageThreadView: View {
                             .fill(Color.white.opacity(0.10))
                             .frame(height: 0.5)
 
-                        SmartFormattedText(text: content.answer, isUser: false)
+                        // Check if content has upgrade button
+                        let hasUpgradeButton = content.answer.contains("[UPGRADE_BUTTON]")
+                        let cleanAnswer = content.answer.replacingOccurrences(of: "[UPGRADE_BUTTON]", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        Text(formatResponseText(cleanAnswer))
+                            .font(.custom("Georgia", size: 17))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineSpacing(8)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 0)
+                            .padding(.trailing, 20)
+                            .padding(.vertical, 12)
+                            .padding(.bottom, hasUpgradeButton ? 0 : 4)
+
+                        // Upgrade button if present
+                        if hasUpgradeButton {
+                            Button {
+                                SensoryFeedback.light()
+                                showPaywall = true
+                            } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
+                                        .glassEffect(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .strokeBorder(
+                                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.4),
+                                                    lineWidth: 1.5
+                                                )
+                                        }
+
+                                    Text("Upgrade to Epilogue+")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                                .frame(height: 48)
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 12)
                             .padding(.bottom, 4)
+                        }
                     }
                     .opacity(isExpanded ? answerOpacity : 0)
                     .blur(radius: isExpanded ? answerBlur : 8)
@@ -4284,6 +4423,7 @@ struct AmbientMessageThreadView: View {
         // Clean and format text with refined typography
         var cleanText = text
             .replacingOccurrences(of: "**", with: "") // Remove markdown bold
+            .replacingOccurrences(of: "##", with: "") // Remove markdown headers
             .replacingOccurrences(of: "  ", with: " ") // Clean double spaces
             .replacingOccurrences(of: "..", with: ".") // Fix double periods
         

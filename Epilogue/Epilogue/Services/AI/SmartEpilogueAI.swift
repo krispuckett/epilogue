@@ -176,6 +176,16 @@ class SmartEpilogueAI: ObservableObject {
 
             Remember: You are a knowledgeable reading companion for '\(book.title)'.
             The user trusts you to enhance their reading experience with accurate information.
+
+            RESPONSE TONE:
+            - Be natural and conversational, like a knowledgeable friend
+            - Avoid overly formal or literary language ("Thus...", "Indeed...", "One might say...")
+            - Use direct, clear sentences
+            - Be helpful and informative without being pompous
+            - NO emojis in responses
+            - NO sycophantic language ("You're right!", "Great question!", "Excellent observation!")
+            - NO cliche AI responses ("As an AI...", "I'm here to help...", generic pleasantries)
+            - Just answer the question directly and naturally
             """
         }
         
@@ -460,7 +470,41 @@ class SmartEpilogueAI: ObservableObject {
             
             return response
         } catch {
-            lastResponse = "Unable to fetch external information: \(error.localizedDescription)"
+            // Check if it's a rate limit error and provide better messaging
+            if let perplexityError = error as? PerplexityError,
+               case .rateLimitExceeded(_, _) = perplexityError {
+                // This is Epilogue+ conversation limit, not Perplexity API limit
+                lastResponse = """
+                **Monthly Conversation Limit Reached.**
+
+                You've used all your free ambient conversations this month.
+
+                **Want unlimited conversations?**
+
+                Upgrade to Epilogue+ for unlimited ambient AI conversations with your books.
+
+                [UPGRADE_BUTTON]
+                """
+            } else {
+                // Check for rate limit in error description as fallback
+                let errorDesc = error.localizedDescription
+                if errorDesc.contains("rateLimitExceeded") || errorDesc.contains("rate limit") || errorDesc.contains("Too many requests") {
+                    lastResponse = """
+                    **Monthly Conversation Limit Reached.**
+
+                    You've used all your free ambient conversations this month.
+
+                    **Want unlimited conversations?**
+
+                    Upgrade to Epilogue+ for unlimited ambient AI conversations.
+
+                    [UPGRADE_BUTTON]
+                    """
+                } else {
+                    // Generic error - keep it friendly
+                    lastResponse = "Sorry, I couldn't process your message right now. Please try again."
+                }
+            }
             return lastResponse
         }
     }

@@ -156,8 +156,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             let booksWithCovers = allResults.filter { item in
                 item.volumeInfo.imageLinks?.thumbnail != nil
             }
-            
-            if booksWithCovers.count >= 5 {
+
+            // Increased threshold to account for placeholder images
+            if booksWithCovers.count >= 15 {
                 break
             }
         }

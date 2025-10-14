@@ -1,0 +1,101 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "DED1D61C",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6751764862",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "KWJNMWT2B9",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 781815068.92495799,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "epilogue_plus",
+      "localizations" : [
+
+      ],
+      "name" : "Epilogue Plus",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "7.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6751764863",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited AI conversations with your books",
+              "displayName" : "Epilogue+ Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.epilogue.plus.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Epilogue Plus Monthly",
+          "subscriptionGroupID" : "epilogue_plus",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "67.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6751764864",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited AI conversations — Save 30%",
+              "displayName" : "Epilogue+ Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.epilogue.plus.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Epilogue Plus Annual",
+          "subscriptionGroupID" : "epilogue_plus",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
