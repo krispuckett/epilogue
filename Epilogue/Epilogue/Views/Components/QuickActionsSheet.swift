@@ -1,4 +1,5 @@
 import SwiftUI
+import VisionKit
 
 // MARK: - Standardized Search Field
 struct StandardizedSearchField: View {
@@ -251,8 +252,30 @@ struct QuickActionsSheet: View {
             isFocused = true
         }
         .sheet(isPresented: $showBookScanner) {
-            BookScannerView()
-                .environmentObject(libraryViewModel)
+            if #available(iOS 16.0, *) {
+                PerfectBookScanner { book in
+                    // Add book to library
+                    libraryViewModel.addBook(book)
+
+                    // Show success toast
+                    NotificationCenter.default.post(
+                        name: Notification.Name("ShowBookAddedToast"),
+                        object: ["message": "Added \(book.title)"]
+                    )
+                    SensoryFeedback.success()
+
+                    showBookScanner = false
+                }
+                .onAppear {
+                    print("🔷 QuickActionsSheet: Loading PERFECT SCANNER")
+                }
+            } else {
+                BookScannerView()
+                    .environmentObject(libraryViewModel)
+                    .onAppear {
+                        print("⚠️ QuickActionsSheet: Loading OLD SCANNER")
+                    }
+            }
         }
     }
     

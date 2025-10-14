@@ -122,6 +122,13 @@ struct LibraryView: View {
         viewModel.addBook(book)
         print("   ✅ UserDefaults updated")
 
+        // Show success toast
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowBookAddedToast"),
+            object: ["message": "Added \(book.title)"]
+        )
+        SensoryFeedback.success()
+
         // 2. Create/update BookModel in SwiftData + enrich
         print("2️⃣ Starting SwiftData Task...")
         Task { @MainActor in
@@ -441,13 +448,21 @@ struct LibraryView: View {
     @ViewBuilder
     private var enhancedScannerSheet: some View {
         if #available(iOS 16.0, *) {
-            UltraFastBookScanner { book in
-                print("🟢 UltraFastBookScanner.onBookAdded TRIGGERED for: \(book.title)")
-                print("   modelContext: \(modelContext)")
+            ZStack {
+                PerfectBookScanner { book in
+                    print("🟢 PerfectBookScanner.onBookAdded TRIGGERED for: \(book.title)")
+                    print("   modelContext: \(modelContext)")
 
-                // Unified book addition: syncs UserDefaults + SwiftData
-                addBookUnified(book, context: modelContext)
-                // Don't dismiss - allow continuous scanning
+                    // Unified book addition: syncs UserDefaults + SwiftData
+                    addBookUnified(book, context: modelContext)
+                    // Don't dismiss - allow continuous scanning
+                }
+                .onAppear {
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    print("✅ LibraryView: Loading PERFECT SCANNER")
+                    print("   iOS: \(ProcessInfo.processInfo.operatingSystemVersion)")
+                    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                }
             }
         } else {
             // Fallback for iOS 15
@@ -455,6 +470,9 @@ struct LibraryView: View {
                 // Unified book addition: syncs UserDefaults + SwiftData
                 addBookUnified(book, context: modelContext)
                 appState.showingEnhancedScanner = false
+            }
+            .onAppear {
+                print("⚠️ LibraryView: Loading OLD SCANNER (iOS < 16)")
             }
         }
     }

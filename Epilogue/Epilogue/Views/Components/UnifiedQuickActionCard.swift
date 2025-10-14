@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import VisionKit
 
 // MARK: - Unified Quick Action Card (Clean, No Microphone)
 struct UnifiedQuickActionCard: View {
@@ -345,8 +346,44 @@ struct UnifiedQuickActionCard: View {
             }
         }
         .sheet(isPresented: $showBookScanner) {
-            BookScannerView()
-                .environmentObject(libraryViewModel)
+            if #available(iOS 16.0, *) {
+                PerfectBookScanner { book in
+                    print("📚 UnifiedQuickActionCard: Book added - \(book.title)")
+
+                    // Add to UserDefaults
+                    libraryViewModel.addBook(book)
+
+                    // Create BookModel in SwiftData + enrich
+                    Task {
+                        let descriptor = FetchDescriptor<BookModel>(
+                            predicate: #Predicate<BookModel> { $0.id == book.id }
+                        )
+
+                        if let existingModel = try? modelContext.fetch(descriptor).first {
+                            if !existingModel.isEnriched {
+                                await BookEnrichmentService.shared.enrichBook(existingModel)
+                            }
+                        } else {
+                            let bookModel = BookModel(from: book)
+                            modelContext.insert(bookModel)
+                            try? modelContext.save()
+                            await BookEnrichmentService.shared.enrichBook(bookModel)
+                        }
+                    }
+
+                    showToast("Added \(book.title)")
+                    // Don't close scanner - allow continuous scanning
+                }
+                .onAppear {
+                    print("🚀 UnifiedQuickActionCard: PERFECT SCANNER LOADED!")
+                }
+            } else {
+                BookScannerView()
+                    .environmentObject(libraryViewModel)
+                    .onAppear {
+                        print("⚠️ UnifiedQuickActionCard: OLD SCANNER (iOS < 16)")
+                    }
+            }
         }
         .sheet(isPresented: $showTextCapture) {
             // Use AmbientTextCapture for OCR - exact same as ambient mode
