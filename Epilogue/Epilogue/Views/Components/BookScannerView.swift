@@ -132,7 +132,9 @@ struct BookScannerView: View {
     private var topBar: some View {
         HStack {
             Button {
+                #if DEBUG
                 print("🔴 Close button tapped")
+                #endif
                 countdownTimer?.invalidate()
                 cameraManager.stopSession()
                 scanner.reset()
@@ -328,7 +330,9 @@ struct BookScannerView: View {
             }
         case .denied, .restricted:
             // Handle permission denied
+            #if DEBUG
             print("Camera permission denied")
+            #endif
         @unknown default:
             break
         }
@@ -399,7 +403,9 @@ struct BookScannerView: View {
     }
     
     private func performCapture() {
+        #if DEBUG
         print("🟢 performCapture called")
+        #endif
         
         // Add haptic feedback
         SensoryFeedback.medium()
@@ -407,14 +413,18 @@ struct BookScannerView: View {
         // Freeze the camera preview for a smoother transition
         cameraManager.capturePhoto { image in
             guard let image = image else { 
+                #if DEBUG
                 print("🔴 Failed to capture photo")
+                #endif
                 withAnimation(DesignSystem.Animation.springStandard) {
                     scanState = .scanning
                 }
                 return 
             }
             
+            #if DEBUG
             print("🟢 Photo captured successfully")
+            #endif
             capturedImage = image
             
             // Smooth transition to processing
@@ -426,7 +436,9 @@ struct BookScannerView: View {
             
             // Process with BookScannerService
             Task {
+                #if DEBUG
                 print("🔵 Processing captured image...")
+                #endif
                 
                 // Ensure minimum processing time for smooth UX
                 let startTime = Date()
@@ -438,10 +450,14 @@ struct BookScannerView: View {
                     try? await Task.sleep(nanoseconds: UInt64((0.8 - elapsed) * 1_000_000_000))
                 }
                 
+                #if DEBUG
                 print("🔵 Extracted book info successfully")
+                #endif
                 
                 if info.hasValidInfo {
+                    #if DEBUG
                     print("🔵 Valid info found, preparing search...")
+                    #endif
                     
                     // Set up the search
                     await scanner.searchWithExtractedInfo(info)
@@ -454,7 +470,9 @@ struct BookScannerView: View {
                         }
                     }
                 } else {
+                    #if DEBUG
                     print("🔴 No valid info extracted")
+                    #endif
                     await MainActor.run {
                         withAnimation(DesignSystem.Animation.springStandard) {
                             scanState = .scanning
@@ -470,7 +488,9 @@ struct BookScannerView: View {
     }
     
     private func showManualSearchOption() {
+        #if DEBUG
         print("🟡 No text detected, dismissing scanner")
+        #endif
         scanState = .scanning
         // Reset and dismiss
         scanner.reset()
@@ -617,7 +637,9 @@ class BookCameraManager: NSObject, ObservableObject {
         // Add camera input
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: camera) else { 
+            #if DEBUG
             print("❌ Failed to get camera device")
+            #endif
             return 
         }
         
@@ -636,7 +658,9 @@ class BookCameraManager: NSObject, ObservableObject {
             }
             camera.unlockForConfiguration()
         } catch {
+            #if DEBUG
             print("❌ Failed to configure camera: \(error)")
+            #endif
         }
         
         // Add photo output
@@ -673,21 +697,29 @@ class BookCameraManager: NSObject, ObservableObject {
     }
     
     func capturePhoto(completion: @escaping (UIImage?) -> Void) {
+        #if DEBUG
         print("📸 capturePhoto called")
+        #endif
         
         // Check if running on simulator
         #if targetEnvironment(simulator)
+        #if DEBUG
         print("⚠️ Running on simulator - using mock capture")
+        #endif
         // For simulator testing, just return a mock success after delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            #if DEBUG
             print("📸 Mock capture complete (simulator)")
+            #endif
             // Return nil to trigger manual search in simulator
             completion(nil)
         }
         #else
         
         guard session.isRunning else {
+            #if DEBUG
             print("❌ Session not running")
+            #endif
             completion(nil)
             return
         }
@@ -695,11 +727,15 @@ class BookCameraManager: NSObject, ObservableObject {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
         
+        #if DEBUG
         print("📸 Capturing photo with settings...")
+        #endif
         
         // Store delegate to prevent deallocation
         photoCaptureDelegate = PhotoCaptureDelegate { [weak self] image in
+            #if DEBUG
             print("📸 Photo delegate called with image: \(image != nil)")
+            #endif
             DispatchQueue.main.async {
                 completion(image)
                 self?.photoCaptureDelegate = nil // Clean up
@@ -745,27 +781,37 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        #if DEBUG
         print("📸 PhotoCaptureDelegate - didFinishProcessingPhoto called")
+        #endif
         
         if let error = error {
+            #if DEBUG
             print("❌ Photo capture error: \(error)")
+            #endif
             completion(nil)
             return
         }
         
         guard let data = photo.fileDataRepresentation() else {
+            #if DEBUG
             print("❌ No photo data")
+            #endif
             completion(nil)
             return
         }
         
         guard let image = UIImage(data: data) else {
+            #if DEBUG
             print("❌ Failed to create UIImage from data")
+            #endif
             completion(nil)
             return
         }
         
+        #if DEBUG
         print("✅ Photo captured successfully, size: \(image.size)")
+        #endif
         completion(image)
     }
 }

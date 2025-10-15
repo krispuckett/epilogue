@@ -140,9 +140,13 @@ struct WidgetDesignLab: View {
         )
         if let quote = try? modelContext.fetch(quotesDescriptor).first {
             demoQuote = quote
+            #if DEBUG
             print("📱 WidgetDesignLab: Using real quote: \(quote.text?.prefix(50) ?? "")")
+            #endif
         } else {
+            #if DEBUG
             print("📱 WidgetDesignLab: No quotes in database, using hardcoded demo")
+            #endif
         }
 
         // Extract gradient colors from demo book cover
@@ -151,13 +155,19 @@ struct WidgetDesignLab: View {
                 let extractor = OKLABColorExtractor()
                 let palette = try await extractor.extractPalette(from: image, imageSource: "demo-widget")
                 bookGradientColors = [palette.primary, palette.secondary, palette.accent, palette.background]
+                #if DEBUG
                 print("🎨 WidgetDesignLab: Extracted gradient colors from \(demoBook.title)")
+                #endif
             } catch {
+                #if DEBUG
                 print("⚠️ WidgetDesignLab: Failed to extract colors, using defaults")
+                #endif
                 bookGradientColors = defaultGradientColors
             }
         } else {
+            #if DEBUG
             print("⚠️ WidgetDesignLab: Failed to load cover image, using defaults")
+            #endif
             bookGradientColors = defaultGradientColors
         }
     }

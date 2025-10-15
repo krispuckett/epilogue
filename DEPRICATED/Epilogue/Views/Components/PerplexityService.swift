@@ -31,7 +31,9 @@ class PerplexityService: ObservableObject {
         }
         
         self.apiKey = apiKey
+        #if DEBUG
         print("✅ Perplexity Service initialized")
+        #endif
     }
     
     // MARK: - Chat Methods

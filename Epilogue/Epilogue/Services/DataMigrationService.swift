@@ -17,19 +17,25 @@ final class DataMigrationService {
     func performMigrationIfNeeded(newContainer: ModelContainer) async {
         // Check if recovery is needed
         if MigrationRecovery.shared.shouldAttemptRecovery() {
+            #if DEBUG
             print("🔄 Attempting migration recovery...")
+            #endif
             MigrationRecovery.shared.resetMigrationState()
         }
         
         // Skip if already migrated
         if UserDefaults.standard.bool(forKey: migrationKey) {
+            #if DEBUG
             print("✅ Data migration already completed")
+            #endif
             return
         }
         
         // Prevent duplicate migrations
         if UserDefaults.standard.bool(forKey: migrationInProgressKey) {
+            #if DEBUG
             print("⚠️ Migration already in progress, skipping")
+            #endif
             return
         }
         
@@ -42,7 +48,9 @@ final class DataMigrationService {
         do {
             // Check if old data exists
             if await hasOldData() {
+                #if DEBUG
                 print("🔄 Old data detected, starting migration...")
+                #endif
                 let oldContainer = createOldSchemaContainer()
                 try await migrateData(to: newContainer)
                 
@@ -56,23 +64,33 @@ final class DataMigrationService {
                 case .success:
                     // Mark migration as complete
                     UserDefaults.standard.set(true, forKey: migrationKey)
+                    #if DEBUG
                     print("✅ Migration completed and validated successfully")
+                    #endif
                     
                 case .dataLoss:
+                    #if DEBUG
                     print("⚠️ Warning: \(validation.description)")
+                    #endif
                     // Still mark as complete but log the issue
                     UserDefaults.standard.set(true, forKey: migrationKey)
                     
                 default:
+                    #if DEBUG
                     print("❌ Migration validation failed: \(validation.description)")
+                    #endif
                     throw MigrationError.validationFailed
                 }
             } else {
+                #if DEBUG
                 print("ℹ️ No old data found, skipping migration")
+                #endif
                 UserDefaults.standard.set(true, forKey: migrationKey)
             }
         } catch {
+            #if DEBUG
             print("❌ Migration failed: \(error)")
+            #endif
             // Don't mark as complete so it can be retried
             
             // Send a notification to user about migration failure
@@ -102,7 +120,9 @@ final class DataMigrationService {
             let books = try context.fetch(bookDescriptor)
             return !books.isEmpty
         } catch {
+            #if DEBUG
             print("⚠️ Error checking for old data: \(error)")
+            #endif
             return false
         }
     }
@@ -128,7 +148,9 @@ final class DataMigrationService {
         do {
             return try ModelContainer(for: oldSchema, configurations: [configuration])
         } catch {
+            #if DEBUG
             print("⚠️ Could not create old schema container: \(error)")
+            #endif
             return nil
         }
     }
@@ -152,7 +174,9 @@ final class DataMigrationService {
         let oldBooks = try oldContext.fetch(bookDescriptor)
         stats.totalBooks = oldBooks.count
         
+        #if DEBUG
         print("📚 Found \(oldBooks.count) books to migrate")
+        #endif
         
         // 2. Migrate each book
         var bookMapping: [UUID: BookModel] = [:]
@@ -196,7 +220,9 @@ final class DataMigrationService {
                 }
                 
             } catch {
+                #if DEBUG
                 print("❌ Failed to migrate book '\(oldBook.title)': \(error)")
+                #endif
                 stats.failedBooks += 1
             }
         }
@@ -326,9 +352,13 @@ final class DataMigrationService {
         
         do {
             try imageData.write(to: imagePath)
+            #if DEBUG
             print("✅ Migrated cover image for '\(book.title)'")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to migrate cover image for '\(book.title)': \(error)")
+            #endif
         }
     }
     
@@ -389,7 +419,9 @@ final class DataMigrationService {
             let orphanedQuotes = try oldContext.fetch(descriptor)
             
             if !orphanedQuotes.isEmpty {
+                #if DEBUG
                 print("📝 Found \(orphanedQuotes.count) orphaned quotes")
+                #endif
                 
                 // Create or get "Unknown Book" for orphaned items
                 let unknownBook = await getOrCreateUnknownBook(context: newContext)
@@ -403,7 +435,9 @@ final class DataMigrationService {
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to migrate orphaned quotes: \(error)")
+            #endif
         }
     }
     
@@ -419,7 +453,9 @@ final class DataMigrationService {
             let orphanedNotes = try oldContext.fetch(descriptor)
             
             if !orphanedNotes.isEmpty {
+                #if DEBUG
                 print("📋 Found \(orphanedNotes.count) orphaned notes")
+                #endif
                 
                 // Create or get "Unknown Book" for orphaned items
                 let unknownBook = await getOrCreateUnknownBook(context: newContext)
@@ -433,7 +469,9 @@ final class DataMigrationService {
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to migrate orphaned notes: \(error)")
+            #endif
         }
     }
     
@@ -477,14 +515,14 @@ final class DataMigrationService {
         let newQuoteCount = try newContext.fetchCount(FetchDescriptor<CapturedQuote>())
         let newNoteCount = try newContext.fetchCount(FetchDescriptor<CapturedNote>())
         
+        #if DEBUG
         print("""
-        
         📊 Migration Verification:
         Books: \(oldBookCount) → \(newBookCount) (migrated: \(stats.migratedBooks), failed: \(stats.failedBooks))
         Quotes: \(oldQuoteCount) → \(newQuoteCount) (migrated: \(stats.migratedQuotes), failed: \(stats.failedQuotes))
         Notes: \(oldNoteCount) → \(newNoteCount) (migrated: \(stats.migratedNotes), failed: \(stats.failedNotes))
-        
         """)
+        #endif
         
         // Verify counts match (allowing for some failures)
         if stats.failedBooks == 0 && newBookCount != oldBookCount {
@@ -494,14 +532,14 @@ final class DataMigrationService {
     
     /// Logs migration results
     private func logMigrationResults(_ stats: MigrationStats) {
+        #if DEBUG
         print("""
-        
         ✅ Migration Complete:
         - Books: \(stats.migratedBooks) migrated, \(stats.failedBooks) failed
-        - Quotes: \(stats.migratedQuotes) migrated, \(stats.failedQuotes) failed  
+        - Quotes: \(stats.migratedQuotes) migrated, \(stats.failedQuotes) failed
         - Notes: \(stats.migratedNotes) migrated, \(stats.failedNotes) failed
-        
         """)
+        #endif
         
         // Save stats to UserDefaults for potential debugging
         let encoder = JSONEncoder()
@@ -551,16 +589,16 @@ extension DataMigrationService {
         UserDefaults.standard.set(error.localizedDescription, forKey: "com.epilogue.migrationError")
         
         // Log detailed error
+        #if DEBUG
         print("""
-        
         ❌ MIGRATION FAILURE DETAILS:
         Error: \(error)
         Description: \(error.localizedDescription)
         Time: \(Date())
-        
+
         Please contact support if this persists.
-        
         """)
+        #endif
     }
 }
 

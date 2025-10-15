@@ -79,14 +79,18 @@ final class CloudKitMigrationService: ObservableObject {
             let totalCount = bookCount + noteCount + quoteCount + questionCount + sessionCount
             
             if totalCount > 0 {
+                #if DEBUG
                 print("📊 Found local data: \(bookCount) books, \(noteCount) notes, \(quoteCount) quotes, \(questionCount) questions, \(sessionCount) sessions")
+                #endif
                 UserDefaults.standard.set(true, forKey: localDataExistsKey)
                 return true
             }
             
             return false
         } catch {
+            #if DEBUG
             print("❌ Error checking for local data: \(error)")
+            #endif
             return false
         }
     }
@@ -215,15 +219,21 @@ final class CloudKitMigrationService: ObservableObject {
             // Force CloudKit sync
             SyncStatusManager.shared.forceSyncWithCloudKit()
             
+            #if DEBUG
             print("✅ Migration completed successfully!")
+            #endif
+            #if DEBUG
             print("📊 Migrated: \(books.count) books, \(notes.count) notes, \(quotes.count) quotes, \(questions.count) questions, \(sessions.count) sessions")
+            #endif
             
             // Hide UI after a short delay
             try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             showMigrationUI = false
             
         } catch {
+            #if DEBUG
             print("❌ Migration failed: \(error)")
+            #endif
             migrationState = .failed(error)
         }
     }

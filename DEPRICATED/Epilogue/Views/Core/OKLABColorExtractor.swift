@@ -35,13 +35,21 @@ public class OKLABColorExtractor {
     
     /// Extract color palette from UIImage
     public func extractPalette(from image: UIImage, imageSource: String = "Unknown") async throws -> ColorPalette {
+        #if DEBUG
         print("🎨 Starting OKLAB color extraction...")
+        #endif
+        #if DEBUG
         print("📊 Original image size: \(image.size)")
+        #endif
+        #if DEBUG
         print("📍 Image source: \(imageSource)")
+        #endif
         
         // Calculate checksum
         let checksum = calculateChecksum(for: image)
+        #if DEBUG
         print("🔐 EXTRACTED Image checksum: \(checksum)")
+        #endif
         
         // Save for debugging
         saveImageForDebug(image, suffix: "EXTRACTED_\(imageSource)")
@@ -49,12 +57,16 @@ public class OKLABColorExtractor {
         // 1. SAMPLE EVERY PIXEL (with smart downsampling)
         let targetSize = CGSize(width: 100, height: 100)  // Small enough to process every pixel
         guard let resized = await image.resized(to: targetSize) else {
+            #if DEBUG
             print("❌ Failed to resize image")
+            #endif
             return createFallbackPalette()
         }
         
         guard let cgImage = resized.cgImage else {
+            #if DEBUG
             print("❌ No CGImage available")
+            #endif
             return createFallbackPalette()
         }
         
@@ -65,7 +77,9 @@ public class OKLABColorExtractor {
         let bytesPerRow = bytesPerPixel * width
         let bitsPerComponent = 8
         
+        #if DEBUG
         print("📐 Processing image: \(width)x\(height) pixels")
+        #endif
         
         var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -79,7 +93,9 @@ public class OKLABColorExtractor {
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
+            #if DEBUG
             print("❌ Failed to create bitmap context")
+            #endif
             return createFallbackPalette()
         }
         
@@ -103,7 +119,9 @@ public class OKLABColorExtractor {
                 
                 // Debug first 10 pixels
                 if totalPixelsProcessed < 10 {
+                    #if DEBUG
                     print("  Pixel \(totalPixelsProcessed): R=\(r) G=\(g) B=\(b) A=\(a)")
+                    #endif
                 }
                 
                 totalPixelsProcessed += 1
@@ -151,19 +169,37 @@ public class OKLABColorExtractor {
             }
         }
         
+        #if DEBUG
         print("\n📊 Pixel Processing Summary:")
+        #endif
+        #if DEBUG
         print("  Total pixels: \(totalPixelsProcessed)")
+        #endif
+        #if DEBUG
         print("  Skipped white: \(skippedWhite)")
+        #endif
+        #if DEBUG
         print("  Skipped black: \(skippedBlack)")
+        #endif
+        #if DEBUG
         print("  Skipped transparent: \(skippedTransparent)")
+        #endif
+        #if DEBUG
         print("  Colors found: \(colorHistogram.count)")
+        #endif
         
         // Quality detection
         let blackPercentage = Double(skippedBlack) * 100.0 / Double(totalPixelsProcessed)
         if blackPercentage > 70 {
+            #if DEBUG
             print("  ⚠️ WARNING: \(String(format: "%.1f", blackPercentage))% of image is black!")
+            #endif
+            #if DEBUG
             print("  This suggests a low-quality image with black borders.")
+            #endif
+            #if DEBUG
             print("  Consider using a higher zoom parameter.")
+            #endif
         }
         
         // 6. INTELLIGENT COLOR SELECTION
@@ -176,22 +212,38 @@ public class OKLABColorExtractor {
         // Filter out colors that appear too infrequently
         let significantColors = sortedColors.filter { $0.value >= minColorThreshold }
         
+        #if DEBUG
         print("\n🎨 Color Analysis:")
+        #endif
+        #if DEBUG
         print("  Unique colors found: \(sortedColors.count)")
+        #endif
+        #if DEBUG
         print("  Significant colors (>1% of pixels): \(significantColors.count)")
+        #endif
+        #if DEBUG
         print("  Minimum pixel threshold: \(minColorThreshold)")
+        #endif
         
         // Debug: Print top colors
         if significantColors.isEmpty {
+            #if DEBUG
             print("  ⚠️ NO SIGNIFICANT COLORS FOUND! All colors were below threshold.")
+            #endif
+            #if DEBUG
             print("  This suggests the image is mostly black/white or very low quality.")
+            #endif
         } else {
+            #if DEBUG
             print("\n  Top 5 significant colors by frequency:")
+            #endif
             for (index, (color, count)) in significantColors.prefix(5).enumerated() {
                 var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
                 color.getRed(&r, green: &g, blue: &b, alpha: nil)
                 let percentage = Double(count) * 100.0 / Double(totalPixelsProcessed - skippedWhite - skippedBlack - skippedTransparent)
+                #if DEBUG
                 print("    \(index + 1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - \(count) pixels (\(String(format: "%.1f", percentage))%)")
+                #endif
             }
         }
         
@@ -209,7 +261,9 @@ public class OKLABColorExtractor {
         
         // 7. BUILD SMART PALETTE
         if significantColors.isEmpty {
+            #if DEBUG
             print("\n❌ No significant colors extracted - using fallback palette")
+            #endif
             // Low quality image or pure black/white
             return ColorPalette(
                 primary: .black,
@@ -311,12 +365,16 @@ public class OKLABColorExtractor {
             
             do {
                 try data.write(to: tempURL)
+                #if DEBUG
                 print("💾 Saved extracted image to: \(tempURL.path)")
+                #endif
                 
                 // Save to Photos for easy inspection
                 UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
             } catch {
+                #if DEBUG
                 print("❌ Failed to save extracted image: \(error)")
+                #endif
             }
         }
     }
@@ -338,21 +396,43 @@ extension OKLABColorExtractor {
     /// Test extraction with a book cover
     public func testExtraction(with image: UIImage) async {
         do {
+            #if DEBUG
             print("🧪 Testing OKLAB Color Extraction...")
+            #endif
             let palette = try await extractPalette(from: image)
             
+            #if DEBUG
             print("\n📊 Extraction Results:")
+            #endif
+            #if DEBUG
             print("Primary: \(palette.primary.description)")
+            #endif
+            #if DEBUG
             print("Secondary: \(palette.secondary.description)")
+            #endif
+            #if DEBUG
             print("Accent: \(palette.accent.description)")
+            #endif
+            #if DEBUG
             print("Background: \(palette.background.description)")
+            #endif
+            #if DEBUG
             print("Text Color: \(palette.textColor.description)")
+            #endif
+            #if DEBUG
             print("Luminance: \(String(format: "%.2f", palette.luminance))")
+            #endif
+            #if DEBUG
             print("Monochromatic: \(palette.isMonochromatic)")
+            #endif
+            #if DEBUG
             print("Quality: \(String(format: "%.2f", palette.extractionQuality))")
+            #endif
             
         } catch {
+            #if DEBUG
             print("❌ Extraction failed: \(error.localizedDescription)")
+            #endif
         }
     }
 }

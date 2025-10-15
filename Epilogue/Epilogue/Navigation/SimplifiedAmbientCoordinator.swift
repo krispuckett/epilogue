@@ -27,7 +27,9 @@ public class EpilogueAmbientCoordinator: ObservableObject {
         // Use voiceModeStart instead of ambientModeStart
         HapticManager.shared.voiceModeStart()
         
+        #if DEBUG
         print("🚀 Launching ambient mode from: \(context)")
+        #endif
     }
     
     func dismiss() {
@@ -85,7 +87,9 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
     /// Open ambient reading - optionally with a pre-selected book, initial question, or existing session
     func openAmbientReading(with book: Book? = nil, initialQuestion: String? = nil, existingSession: AmbientSession? = nil) {
         logger.info("🎙️ Opening ambient reading via SimplifiedAmbientCoordinator")
+        #if DEBUG
         print("🎙️ DEBUG: SimplifiedAmbientCoordinator.openAmbientReading() called")
+        #endif
 
         // Set initial book context if provided
         if let book = book {
@@ -113,7 +117,9 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
             EpilogueAmbientCoordinator.shared.initialBook = book
             EpilogueAmbientCoordinator.shared.initialQuestion = initialQuestion
             EpilogueAmbientCoordinator.shared.existingSession = existingSession
+            #if DEBUG
             print("🎙️ DEBUG: isPresented set to true, initial book: \(book?.title ?? "none")")
+            #endif
         }
     }
     
@@ -195,8 +201,12 @@ struct SimplifiedAmbientPresentationModifier: ViewModifier {
                 .preferredColorScheme(.dark)
                 .statusBarHidden(true)
                 .onAppear {
+                    #if DEBUG
                     print("🎨 UNIFIED CHAT: Beautiful gradient ambient mode active!")
+                    #endif
+                    #if DEBUG
                     print("🎨 Voice-responsive gradients with book context")
+                    #endif
                 }
             }
     }

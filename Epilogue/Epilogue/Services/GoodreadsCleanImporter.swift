@@ -118,12 +118,22 @@ class GoodreadsCleanImporter: ObservableObject {
                 
                 #if DEBUG
                 print("  ✅ Found on Google Books: \(book.title)")
+                #if DEBUG
                 print("  📖 Cover URL: \(book.coverImageURL ?? "NO COVER")")
+                #endif
+                #if DEBUG
                 print("  🆔 Book LocalID: \(enrichedBook.localId.uuidString)")
+                #endif
                 
+                #if DEBUG
                 print("  ⭐ Rating: \(enrichedBook.userRating ?? 0)")
+                #endif
+                #if DEBUG
                 print("  📝 Notes: \(enrichedBook.userNotes ?? "None")")
+                #endif
+                #if DEBUG
                 print("  📚 Status: \(enrichedBook.readingStatus.rawValue)")
+                #endif
                 #endif
                 
                 // (Verbose debug removed)
@@ -167,8 +177,12 @@ class GoodreadsCleanImporter: ObservableObject {
         #if DEBUG
         #if DEBUG
         print("\n✅ Import complete!")
+        #if DEBUG
         print("  Imported: \(importedBooks.count)")
+        #endif
+        #if DEBUG
         print("  Failed: \(failedBooks.count)")
+        #endif
         #endif
         #endif
         

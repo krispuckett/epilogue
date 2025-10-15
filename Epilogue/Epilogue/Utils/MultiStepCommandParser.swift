@@ -302,20 +302,28 @@ class MultiStepCommandExecutor {
         case .addBooks(let titles):
             for title in titles {
                 // TODO: Search for book via API and add to library
+                #if DEBUG
                 print("Adding book: \(title)")
+                #endif
             }
             
         case .markAsStatus(let titles, let status):
             // TODO: Update reading status for books
+            #if DEBUG
             print("Marking \(titles) as \(status)")
+            #endif
             
         case .setReadingGoal(let book, let pagesPerDay):
             // TODO: Create reading goal in SwiftData
+            #if DEBUG
             print("Setting goal of \(pagesPerDay) pages/day for \(book.title)")
+            #endif
             
         case .createReminder(let text, let date):
             // TODO: Schedule notification
+            #if DEBUG
             print("Creating reminder: '\(text)' for \(date)")
+            #endif
             
         case .batchNote(let note, let books):
             for book in books {

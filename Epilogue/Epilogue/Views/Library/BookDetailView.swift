@@ -266,7 +266,9 @@ struct BookDetailView: View {
         // Launch ambient mode with current book and transfer session
         SimplifiedAmbientCoordinator.shared.openAmbientReading(with: book)
 
+        #if DEBUG
         print("🎙️ Upgraded to Ambient Mode - Session transferred")
+        #endif
     }
     
     var bookQuotes: [Note] {
@@ -503,17 +505,27 @@ struct BookDetailView: View {
             // Enrich book with smart synopsis/themes if not already done
             if let bookModel = bookModel {
                 if !bookModel.isEnriched {
+                    #if DEBUG
                     print("📖 Triggering enrichment for: \(bookModel.title)")
+                    #endif
                     Task {
                         await BookEnrichmentService.shared.enrichBook(bookModel)
+                        #if DEBUG
                         print("✅ Enrichment completed for: \(bookModel.title)")
+                        #endif
+                        #if DEBUG
                         print("   Synopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
+                        #endif
                     }
                 } else {
+                    #if DEBUG
                     print("ℹ️ Book already enriched: \(bookModel.title)")
+                    #endif
                 }
             } else {
+                #if DEBUG
                 print("⚠️ Could not find BookModel for: \(book.title)")
+                #endif
             }
         }
         .onDisappear {
@@ -927,9 +939,15 @@ struct BookDetailView: View {
                         .lineSpacing(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onAppear {
+                            #if DEBUG
                             print("📱 [UI] Displaying ENRICHED synopsis for '\(book.title)'")
+                            #endif
+                            #if DEBUG
                             print("   Length: \(synopsis.count) chars")
+                            #endif
+                            #if DEBUG
                             print("   Preview: \(synopsis.prefix(80))...")
+                            #endif
                         }
                 } else {
                     // Fallback to Google Books description
@@ -942,9 +960,15 @@ struct BookDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .transition(.opacity)
                             .onAppear {
+                                #if DEBUG
                                 print("📱 [UI] Displaying GOOGLE BOOKS description for '\(book.title)' (expanded)")
+                                #endif
+                                #if DEBUG
                                 print("   BookModel enriched: \(bookModel?.isEnriched ?? false)")
+                                #endif
+                                #if DEBUG
                                 print("   SmartSynopsis: \(bookModel?.smartSynopsis?.prefix(30) ?? "nil")")
+                                #endif
                             }
                     } else {
                         Text(description)
@@ -956,9 +980,15 @@ struct BookDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .transition(.opacity)
                             .onAppear {
+                                #if DEBUG
                                 print("📱 [UI] Displaying GOOGLE BOOKS description for '\(book.title)' (collapsed)")
+                                #endif
+                                #if DEBUG
                                 print("   BookModel enriched: \(bookModel?.isEnriched ?? false)")
+                                #endif
+                                #if DEBUG
                                 print("   SmartSynopsis: \(bookModel?.smartSynopsis?.prefix(30) ?? "nil")")
+                                #endif
                             }
                     }
                 }
@@ -1931,7 +1961,9 @@ struct BookDetailView: View {
                         cachedPalette.accent.toHexString(),
                         cachedPalette.background.toHexString()
                     ]
+                    #if DEBUG
                     print("✅ Saved \(bookModel.extractedColors?.count ?? 0) cached colors to BookModel for widgets")
+                    #endif
                     BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
                 }
             }
@@ -1941,13 +1973,21 @@ struct BookDetailView: View {
         // Set extracting state
         isExtractingColors = true
         
+        #if DEBUG
         print("🎨 Extracting colors from DISPLAYED image for: \(book.title)")
+        #endif
+        #if DEBUG
         print("📐 Displayed image size: \(displayedImage.size)")
+        #endif
+        #if DEBUG
         print("🔍 This is the EXACT SAME IMAGE shown in the UI")
+        #endif
         
         // Verify this is a full cover, not cropped
         if displayedImage.size.width < 100 || displayedImage.size.height < 100 {
+            #if DEBUG
             print("⚠️ WARNING: Displayed image is too small, may be cropped!")
+            #endif
         }
         
         do {
@@ -1958,11 +1998,21 @@ struct BookDetailView: View {
             await MainActor.run {
                 self.colorPalette = palette
 
+                #if DEBUG
                 print("🎨 Low-res extracted colors:")
+                #endif
+                #if DEBUG
                 print("  Primary: \(palette.primary)")
+                #endif
+                #if DEBUG
                 print("  Secondary: \(palette.secondary)")
+                #endif
+                #if DEBUG
                 print("  Accent: \(palette.accent)")
+                #endif
+                #if DEBUG
                 print("  Background: \(palette.background)")
+                #endif
 
                 // Save to BookModel for widgets
                 if let bookModel = bookModel {
@@ -1972,19 +2022,25 @@ struct BookDetailView: View {
                         palette.accent.toHexString(),
                         palette.background.toHexString()
                     ]
+                    #if DEBUG
                     print("✅ Saved \(bookModel.extractedColors?.count ?? 0) colors to BookModel for widgets")
+                    #endif
 
                     // Update widgets with new color data
                     BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
                 } else {
+                    #if DEBUG
                     print("⚠️ Could not find BookModel to save colors")
+                    #endif
                 }
             }
 
             // Cache the result with localId
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
         } catch {
+            #if DEBUG
             print("❌ Error in color extraction: \(error)")
+            #endif
         }
         
         isExtractingColors = false
@@ -2005,7 +2061,9 @@ struct BookDetailView: View {
                         cachedPalette.accent.toHexString(),
                         cachedPalette.background.toHexString()
                     ]
+                    #if DEBUG
                     print("✅ Saved \(bookModel.extractedColors?.count ?? 0) cached colors to BookModel for widgets")
+                    #endif
                     BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
                 }
             }
@@ -2015,11 +2073,15 @@ struct BookDetailView: View {
         // Set extracting state
         isExtractingColors = true
         
+        #if DEBUG
         print("🎨 Starting OKLAB color extraction for book: \(book.title)")
+        #endif
         
         // Try to load the book cover image
         guard let coverURLString = book.coverImageURL else {
+            #if DEBUG
             print("❌ No cover URL")
+            #endif
             isExtractingColors = false
             return
         }
@@ -2038,7 +2100,9 @@ struct BookDetailView: View {
             .replacingOccurrences(of: "zoom=2", with: "")
             .replacingOccurrences(of: "zoom=1", with: "")
         guard let coverURL = URL(string: secureURLString) else {
+            #if DEBUG
             print("❌ Invalid cover URL")
+            #endif
             isExtractingColors = false
             return
         }
@@ -2047,7 +2111,9 @@ struct BookDetailView: View {
             // Load image directly from URL like AmbientMode does
             let (imageData, _) = try await URLSession.shared.data(from: coverURL)
             guard let uiImage = UIImage(data: imageData) else {
+                #if DEBUG
                 print("❌ Failed to create image from data")
+                #endif
                 isExtractingColors = false
                 return
             }
@@ -2061,11 +2127,21 @@ struct BookDetailView: View {
             
             await MainActor.run {
                 self.colorPalette = palette
+                #if DEBUG
                 print("🎨 High-res extracted colors (final):")
+                #endif
+                #if DEBUG
                 print("  Primary: \(palette.primary)")
+                #endif
+                #if DEBUG
                 print("  Secondary: \(palette.secondary)")
+                #endif
+                #if DEBUG
                 print("  Accent: \(palette.accent)")
+                #endif
+                #if DEBUG
                 print("  Background: \(palette.background)")
+                #endif
 
                 // Save to BookModel for widgets
                 if let bookModel = bookModel {
@@ -2075,12 +2151,16 @@ struct BookDetailView: View {
                         palette.accent.toHexString(),
                         palette.background.toHexString()
                     ]
+                    #if DEBUG
                     print("✅ Saved \(bookModel.extractedColors?.count ?? 0) colors to BookModel for widgets")
+                    #endif
 
                     // Update widgets with new color data
                     BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
                 } else {
+                    #if DEBUG
                     print("⚠️ Could not find BookModel to save colors")
+                    #endif
                 }
             }
 
@@ -2090,31 +2170,55 @@ struct BookDetailView: View {
             // Debug print moved inside MainActor block above
             
         } catch {
+            #if DEBUG
             print("❌ Failed to extract colors: \(error.localizedDescription)")
+            #endif
         }
         
         isExtractingColors = false
     }
     
     private func testImageConsistency() async {
+        #if DEBUG
         print("\n🧪 TESTING IMAGE CONSISTENCY")
+        #endif
+        #if DEBUG
         print("Book: \(book.title)")
+        #endif
+        #if DEBUG
         print("Cover URL: \(book.coverImageURL ?? "nil")")
+        #endif
         
         // Wait for images to be saved
         try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
+        #if DEBUG
         print("\n📊 TEST RESULTS:")
+        #endif
+        #if DEBUG
         print("1. Check console logs for checksums")
+        #endif
+        #if DEBUG
         print("2. Check Photos app for saved images:")
+        #endif
+        #if DEBUG
         print("   - DISPLAYED_* images (what you see)")
+        #endif
+        #if DEBUG
         print("   - EXTRACTED_* images (what color extractor uses)")
+        #endif
+        #if DEBUG
         print("3. Both checksums should match if using same image")
+        #endif
+        #if DEBUG
         print("\n⚠️ If checksums differ, the images are different!")
+        #endif
     }
     
     private func runColorDiagnostic() async {
+        #if DEBUG
         print("🔬 Running color diagnostic for: \(book.title)")
+        #endif
         
         // Try to get the cover image
         if coverImage != nil {
@@ -2136,12 +2240,16 @@ struct BookDetailView: View {
                 .replacingOccurrences(of: "zoom=2", with: "")
                 .replacingOccurrences(of: "zoom=1", with: "")
             guard URL(string: secureURLString) != nil else {
+                #if DEBUG
                 print("❌ Invalid cover URL for diagnostic")
+                #endif
                 return
             }
             
             guard await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) != nil else {
+                #if DEBUG
                 print("❌ Could not load image for diagnostic from SharedBookCoverManager")
+                #endif
                 return
             }
             
@@ -2149,7 +2257,9 @@ struct BookDetailView: View {
             // let diagnostic = ColorExtractionDiagnostic()
             // await diagnostic.runDiagnostic(on: uiImage, bookTitle: book.title)
         } else {
+            #if DEBUG
             print("❌ No cover image available for diagnostic")
+            #endif
         }
     }
     
@@ -2718,7 +2828,9 @@ struct CompactSessionHUD: View {
             if let bookModel = session.bookModel {
                 bookModel.currentPage = pageNumber
             }
+            #if DEBUG
             print("📖 Updated session page to: \(pageNumber)")
+            #endif
         }
     }
 
@@ -2897,8 +3009,12 @@ struct EndSessionSheet: View {
                     if let bookModel = session.bookModel {
                         bookModel.currentPage = finalPage
                         try? modelContext.save()
+                        #if DEBUG
                         print("📊 Session ended - Updated currentPage to \(finalPage)")
+                        #endif
+                        #if DEBUG
                         print("📊 Book total pages: \(bookModel.pageCount ?? 0)")
+                        #endif
                     }
                     // Also update the Book struct through LibraryViewModel
                     libraryViewModel.updateCurrentPage(for: book, to: finalPage)

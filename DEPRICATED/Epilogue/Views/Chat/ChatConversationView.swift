@@ -277,7 +277,9 @@ struct ChatConversationView: View {
                 isLoadingResponse = false
                 
             } catch {
+                #if DEBUG
                 print("❌ API Error: \(error.localizedDescription)")
+                #endif
                 isLoadingResponse = false
                 
                 // Use fallback response

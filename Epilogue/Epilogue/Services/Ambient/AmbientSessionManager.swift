@@ -41,7 +41,9 @@ class AmbientLifecycleManager: ObservableObject {
         // Begin background task for extended processing
         beginBackgroundTask()
         
+        #if DEBUG
         print("🎬 Ambient session manager started")
+        #endif
     }
     
     func endSession() {
@@ -60,7 +62,9 @@ class AmbientLifecycleManager: ObservableObject {
         resetAudioSession()
         
         let duration = sessionDuration
+        #if DEBUG
         print("🎬 Ambient session ended - Duration: \(formatDuration(duration))")
+        #endif
         
         // Reset
         sessionDuration = 0
@@ -69,12 +73,16 @@ class AmbientLifecycleManager: ObservableObject {
     
     func pauseSession() {
         sessionTimer?.invalidate()
+        #if DEBUG
         print("⏸️ Ambient session paused")
+        #endif
     }
     
     func resumeSession() {
         startSessionTimer()
+        #if DEBUG
         print("▶️ Ambient session resumed")
+        #endif
     }
     
     // MARK: - Audio Configuration
@@ -91,9 +99,13 @@ class AmbientLifecycleManager: ObservableObject {
                 options: [.defaultToSpeaker, .allowBluetoothA2DP, .mixWithOthers]
             )
             try audioSession?.setActive(true)
+            #if DEBUG
             print("🔊 Audio session configured for ambient mode")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to configure audio session: \(error)")
+            #endif
         }
     }
     
@@ -101,7 +113,9 @@ class AmbientLifecycleManager: ObservableObject {
         do {
             try audioSession?.setActive(false)
         } catch {
+            #if DEBUG
             print("❌ Failed to reset audio session: \(error)")
+            #endif
         }
     }
     
@@ -114,7 +128,9 @@ class AmbientLifecycleManager: ObservableObject {
         
         if backgroundTask != .invalid {
             backgroundModeActive = true
+            #if DEBUG
             print("📱 Background task started")
+            #endif
         }
     }
     
@@ -124,7 +140,9 @@ class AmbientLifecycleManager: ObservableObject {
         UIApplication.shared.endBackgroundTask(backgroundTask)
         backgroundTask = .invalid
         backgroundModeActive = false
+        #if DEBUG
         print("📱 Background task ended")
+        #endif
     }
     
     // MARK: - Timer Management

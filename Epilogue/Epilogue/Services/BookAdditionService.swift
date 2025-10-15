@@ -76,10 +76,16 @@ class BookAdditionService {
 
                 #if DEBUG
                 if bookModel.isEnriched {
+                    #if DEBUG
                     print("✅ Enrichment SUCCESS for: \(book.title)")
+                    #endif
+                    #if DEBUG
                     print("   Synopsis: \(bookModel.smartSynopsis?.prefix(100) ?? "nil")")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("❌ Enrichment FAILED for: \(book.title) - still not enriched")
+                    #endif
                 }
                 #endif
             } else {
@@ -183,7 +189,9 @@ class BookAdditionService {
         
         #if DEBUG
         print("🎨 Extracting colors for: \(book.title)")
+        #if DEBUG
         print("📔 Book ID for caching: \(bookID)")
+        #endif
         #endif
         
         // Load the full image for color extraction
@@ -203,11 +211,21 @@ class BookAdditionService {
             
             #if DEBUG
             print("🎨 Extracted palette for \(book.title):")
+            #if DEBUG
             print("  Primary: \(palette.primary)")
+            #endif
+            #if DEBUG
             print("  Secondary: \(palette.secondary)")
+            #endif
+            #if DEBUG
             print("  Accent: \(palette.accent)")
+            #endif
+            #if DEBUG
             print("  Background: \(palette.background)")
+            #endif
+            #if DEBUG
             print("  Is Monochromatic: \(palette.isMonochromatic)")
+            #endif
             #endif
             
             // Cache the result

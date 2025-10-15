@@ -153,7 +153,9 @@ struct UnifiedSearchView: View {
                     isSearching = false
                 }
             } catch {
+                #if DEBUG
                 print("Search error: \(error)")
+                #endif
                 isSearching = false
             }
         }

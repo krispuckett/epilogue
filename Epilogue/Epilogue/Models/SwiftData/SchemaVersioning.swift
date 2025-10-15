@@ -95,16 +95,24 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
         fromVersion: EpilogueSchemaV1.self,
         toVersion: EpilogueSchemaV2.self,
         willMigrate: { context in
+            #if DEBUG
             print("🔄 Starting migration from V1 to V2...")
+            #endif
+            #if DEBUG
             print("📊 Preserving all existing data...")
+            #endif
         },
         didMigrate: { context in
+            #if DEBUG
             print("✅ Migration complete - all data preserved")
+            #endif
 
             // Count records to verify nothing was lost
             let descriptor = FetchDescriptor<ReadingSession>()
             let sessions = try? context.fetch(descriptor)
+            #if DEBUG
             print("📚 ReadingSessions after migration: \(sessions?.count ?? 0)")
+            #endif
         }
     )
 
@@ -113,8 +121,12 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
         fromVersion: EpilogueSchemaV2.self,
         toVersion: EpilogueSchemaV3.self,
         willMigrate: { context in
+            #if DEBUG
             print("🔄 Starting migration from V2 to V3...")
+            #endif
+            #if DEBUG
             print("📊 Adding coverImageData field to BookModel (optional, external storage)...")
+            #endif
 
             // Count existing records BEFORE migration
             let bookDescriptor = FetchDescriptor<BookModel>()
@@ -129,13 +141,23 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             let sessionsBeforeMigration = try? context.fetch(sessionDescriptor)
             let sessionCount = sessionsBeforeMigration?.count ?? 0
 
+            #if DEBUG
             print("📊 Pre-migration counts:")
+            #endif
+            #if DEBUG
             print("   Books: \(bookCount)")
+            #endif
+            #if DEBUG
             print("   Notes: \(noteCount)")
+            #endif
+            #if DEBUG
             print("   Sessions: \(sessionCount)")
+            #endif
         },
         didMigrate: { context in
+            #if DEBUG
             print("✅ V3 Migration complete - coverImageData field added")
+            #endif
 
             // Verify data preserved after migration
             let bookDescriptor = FetchDescriptor<BookModel>()
@@ -150,23 +172,37 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             let sessionsAfterMigration = try? context.fetch(sessionDescriptor)
             let sessionCount = sessionsAfterMigration?.count ?? 0
 
+            #if DEBUG
             print("📊 Post-migration counts:")
+            #endif
+            #if DEBUG
             print("   Books: \(bookCount)")
+            #endif
+            #if DEBUG
             print("   Notes: \(noteCount)")
+            #endif
+            #if DEBUG
             print("   Sessions: \(sessionCount)")
+            #endif
 
             // Verify at least some data exists if this isn't a fresh install
             if bookCount > 0 {
+                #if DEBUG
                 print("✅ Data preserved successfully!")
+                #endif
 
                 // Sample check: verify book fields intact
                 if let sampleBook = booksAfterMigration?.first {
                     let hasTitle = !sampleBook.title.isEmpty
                     let hasAuthor = !sampleBook.author.isEmpty
+                    #if DEBUG
                     print("   Sample book check: title=\(hasTitle), author=\(hasAuthor)")
+                    #endif
                 }
             } else {
+                #if DEBUG
                 print("ℹ️  No existing data (fresh install or new user)")
+                #endif
             }
         }
     )

@@ -61,11 +61,15 @@ class BookContextCache {
     func generateContextForBook(_ book: Book) async {
         // Check if we already have context
         if getContext(for: book) != nil {
+            #if DEBUG
             print("📚 Context already cached for: \(book.title)")
+            #endif
             return
         }
         
+        #if DEBUG
         print("🔄 Generating context for: \(book.title)")
+        #endif
         
         // For now, use known book data
         // Later this could call an API to get rich context
@@ -77,17 +81,23 @@ class BookContextCache {
             self?.saveCachedContexts()
         }
         
+        #if DEBUG
         print("✅ Context cached for: \(book.title)")
+        #endif
     }
     
     func generateContextForAllBooks(_ books: [Book]) async {
+        #if DEBUG
         print("🔄 Generating context for \(books.count) books...")
+        #endif
         
         for book in books {
             await generateContextForBook(book)
         }
         
+        #if DEBUG
         print("✅ Generated context for all books")
+        #endif
     }
     
     // MARK: - Context Generation
@@ -180,16 +190,22 @@ class BookContextCache {
             let encoder = JSONEncoder()
             let data = try encoder.encode(contextCache)
             try data.write(to: url)
+            #if DEBUG
             print("💾 Saved \(contextCache.count) book contexts to cache")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to save context cache: \(error)")
+            #endif
         }
     }
     
     private func loadCachedContexts() {
         guard let url = cacheFileURL,
               FileManager.default.fileExists(atPath: url.path) else {
+            #if DEBUG
             print("📚 No existing context cache found")
+            #endif
             return
         }
         
@@ -197,9 +213,13 @@ class BookContextCache {
             let data = try Data(contentsOf: url)
             let decoder = JSONDecoder()
             contextCache = try decoder.decode([String: BookContext].self, from: data)
+            #if DEBUG
             print("📚 Loaded \(contextCache.count) book contexts from cache")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to load context cache: \(error)")
+            #endif
         }
     }
     
@@ -217,6 +237,8 @@ class BookContextCache {
             self?.contextCache.removeAll()
             self?.saveCachedContexts()
         }
+        #if DEBUG
         print("🗑️ Context cache cleared")
+        #endif
     }
 }

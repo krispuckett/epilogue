@@ -8,7 +8,9 @@ class DisplayedImageStore {
     
     func store(image: UIImage, for url: String) {
         displayedImages[url] = image
+        #if DEBUG
         print("📸 Stored displayed image for URL: \(url)")
+        #endif
     }
     
     func getImage(for url: String) -> UIImage? {
@@ -17,22 +19,32 @@ class DisplayedImageStore {
     
     // Clear all caches
     static func clearAllCaches() {
+        #if DEBUG
         print("🧹 Clearing all image caches...")
+        #endif
         shared.displayedImages.removeAll()
         URLCache.shared.removeAllCachedResponses()
         
         // Also clear AsyncImage cache
         URLSession.shared.configuration.urlCache?.removeAllCachedResponses()
         
+        #if DEBUG
         print("✅ All image caches cleared")
+        #endif
     }
     
     // Debug method to list all cached URLs
     func debugPrintCache() {
+        #if DEBUG
         print("📋 Cached images:")
+        #endif
         for (url, image) in displayedImages {
+            #if DEBUG
             print("  - URL: \(url)")
+            #endif
+            #if DEBUG
             print("    Size: \(image.size)")
+            #endif
         }
     }
 }
@@ -74,14 +86,28 @@ struct SharedBookCoverView: View {
         // Debug logging for import issue
         if LOG_COVER_DEBUG {
             if let url = coverURL {
+                #if DEBUG
                 print("🖼️ SharedBookCoverView init:")
+                #endif
+                #if DEBUG
                 print("   Original URL: \(url)")
+                #endif
+                #if DEBUG
                 print("   Contains zoom? \(url.contains("zoom="))")
+                #endif
+                #if DEBUG
                 print("   URL is empty string? \(url.isEmpty)")
+                #endif
+                #if DEBUG
                 print("   URL length: \(url.count)")
+                #endif
             } else {
+                #if DEBUG
                 print("🖼️ SharedBookCoverView init with NIL URL")
+                #endif
+                #if DEBUG
                 print("   ⚠️ This will result in no cover image!")
+                #endif
             }
         }
         self.coverURL = coverURL
@@ -134,24 +160,42 @@ struct SharedBookCoverView: View {
         
         // If we're already loading this exact URL, don't start another load
         if currentLoadingURL == urlString && isLoading {
+            #if DEBUG
             print("⏭️ Already loading: \(urlString)")
+            #endif
             return
         }
         
+        #if DEBUG
         print("\n🔍 SharedBookCoverView.loadImage() called:")
+        #endif
+        #if DEBUG
         print("   Raw URL: \(urlString)")
+        #endif
+        #if DEBUG
         print("   Contains zoom? \(urlString.contains("zoom="))")
+        #endif
+        #if DEBUG
         print("   Starts with http? \(urlString.starts(with: "http://"))")
+        #endif
+        #if DEBUG
         print("   isLibraryView: \(isLibraryView)")
+        #endif
+        #if DEBUG
         print("   loadFullImage: \(loadFullImage)")
+        #endif
         
         // Optional debug URL test removed for performance
         
         // Clean URL to match SharedBookCoverManager's cache key format
         let cleanedURL = cleanURL(urlString)
         if LOG_COVER_DEBUG {
+            #if DEBUG
             print("   Cleaned URL: \(cleanedURL)")
+            #endif
+            #if DEBUG
             print("   URL changed? \(urlString != cleanedURL)")
+            #endif
         }
         
         // Check quick cache first for immediate display
@@ -292,7 +336,9 @@ struct SharedBookCoverView: View {
         quickImageCache.removeObject(forKey: thumbKey)
         quickImageCache.removeObject(forKey: fullKey)
         
+        #if DEBUG
         print("🧹 Cleared cache for URL: \(urlString)")
+        #endif
     }
     
     var body: some View {
@@ -301,14 +347,20 @@ struct SharedBookCoverView: View {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
                 .onAppear {
+                    #if DEBUG
                     print("🎨 SharedBookCoverView.onAppear - URL: \(coverURL ?? "nil")")
+                    #endif
                     if coverURL == nil {
+                        #if DEBUG
                         print("   ⚠️ WARNING: SharedBookCoverView received nil URL!")
+                        #endif
                     }
                     loadImage()
                 }
                 .onChange(of: coverURL) { oldURL, newURL in
+                    #if DEBUG
                     print("🔄 SharedBookCoverView URL changed from: \(oldURL ?? "nil") to: \(newURL ?? "nil")")
+                    #endif
                     // Only reload if URL actually changed
                     if newURL != oldURL {
                         // Clear old cache entries if URL changed

@@ -149,7 +149,9 @@ struct MigrationStatusView: View {
             quoteCount = try modelContext.fetchCount(FetchDescriptor<CapturedQuote>())
             questionCount = try modelContext.fetchCount(FetchDescriptor<CapturedQuestion>())
         } catch {
+            #if DEBUG
             print("Failed to count data: \(error)")
+            #endif
         }
         
         isLoading = false

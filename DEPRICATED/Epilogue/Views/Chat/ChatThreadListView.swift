@@ -157,14 +157,20 @@ struct ChatThreadListView: View {
     
     // MARK: - Helper Methods
     private func handleBookSelection(_ book: Book) {
+        #if DEBUG
         print("Selected book: \(book.title)")
+        #endif
+        #if DEBUG
         print("Book cover URL: \(book.coverImageURL ?? "nil")")
+        #endif
         
         if let existingThread = threads.first(where: { $0.bookId == book.localId }) {
             navigationPath.append(existingThread)
         } else {
             let newThread = ChatThread(book: book)
+            #if DEBUG
             print("New thread cover URL: \(newThread.bookCoverURL ?? "nil")")
+            #endif
             modelContext.insert(newThread)
             try? modelContext.save()
             navigationPath.append(newThread)

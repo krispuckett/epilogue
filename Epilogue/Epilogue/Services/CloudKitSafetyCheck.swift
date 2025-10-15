@@ -28,9 +28,13 @@ final class CloudKitSafetyCheck: ObservableObject {
                 let quoteCount = try context.fetchCount(FetchDescriptor<CapturedQuote>())
                 newDataCount = bookCount + noteCount + quoteCount
                 hasNewSchema = true
+                #if DEBUG
                 print("✅ Found new schema with \(newDataCount) items")
+                #endif
             } catch {
+                #if DEBUG
                 print("⚠️ New schema not found: \(error)")
+                #endif
             }
             
             // We can't check for old schema directly due to type conflicts
@@ -110,7 +114,9 @@ final class CloudKitSafetyCheck: ObservableObject {
                 backup["quoteCount"] = quotes.count
                 
             } catch {
+                #if DEBUG
                 print("⚠️ Could not backup current schema data: \(error)")
+                #endif
             }
             
             // Save backup to UserDefaults with timestamp
@@ -119,11 +125,15 @@ final class CloudKitSafetyCheck: ObservableObject {
             
             if let data = try? JSONSerialization.data(withJSONObject: backup) {
                 UserDefaults.standard.set(data, forKey: "cloudkit_safety_backup")
+                #if DEBUG
                 print("✅ Created safety backup with \(backup["books"] as? [[String: Any]])?.count ?? 0) books")
+                #endif
             }
             
         } catch {
+            #if DEBUG
             print("❌ Backup failed: \(error)")
+            #endif
         }
     }
     

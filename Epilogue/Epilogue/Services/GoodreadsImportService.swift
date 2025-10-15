@@ -352,9 +352,15 @@ class GoodreadsImportService: ObservableObject {
             isImporting = false
             #if DEBUG
             print("\n📊 Cover Selection Stats:")
+            #if DEBUG
             print("  🎯 Google colorful: \(coverStats.selectedGoogleColorful)")
+            #endif
+            #if DEBUG
             print("  🚫 Google grayscale skipped: \(coverStats.grayscaleGoogleSkipped)")
+            #endif
+            #if DEBUG
             print("  🔄 Open Library fallback used: \(coverStats.openLibraryFallback)")
+            #endif
             #endif
             
             return result
@@ -467,8 +473,12 @@ class GoodreadsImportService: ObservableObject {
 
             #if DEBUG
             // Log progress
+            #if DEBUG
             print("📚 Batch \(index + 1)/\(totalBatches): \(batch.count) books in \(String(format: "%.1f", batchTime))s")
+            #endif
+            #if DEBUG
             print("   Cache hits: \(batchResult.cacheHits), API calls: \(batchResult.apiCalls)")
+            #endif
             #endif
 
             // Adaptive delay between batches
@@ -694,7 +704,9 @@ class GoodreadsImportService: ObservableObject {
         
         #if DEBUG
         print("📚 Found \(headers.count) columns in CSV")
+        #if DEBUG
         print("📚 Processing \(lines.count - 1) rows")
+        #endif
         #endif
         
         var books: [GoodreadsBook] = []
@@ -1348,25 +1360,49 @@ class GoodreadsImportService: ObservableObject {
             coverURL = url.replacingOccurrences(of: "http://", with: "https://")
             #if DEBUG
             if let secureURL = coverURL {
+                #if DEBUG
                 print("   🔒 Converted to HTTPS: \(secureURL)")
+                #endif
             }
             #endif
         }
         
         if verboseLogging {
+            #if DEBUG
             print("📚 Creating BookModel for: \(volumeInfo.title)")
+            #endif
+            #if DEBUG
             print("   Google Books ID: \(googleBook.id)")
+            #endif
+            #if DEBUG
             print("   ImageLinks: \(volumeInfo.imageLinks != nil ? "Present" : "Nil")")
+            #endif
             if let links = volumeInfo.imageLinks {
+                #if DEBUG
                 print("   - thumbnail: \(links.thumbnail ?? "nil")")
+                #endif
+                #if DEBUG
                 print("   - small: \(links.small ?? "nil")")
+                #endif
+                #if DEBUG
                 print("   - medium: \(links.medium ?? "nil")")
+                #endif
+                #if DEBUG
                 print("   - large: \(links.large ?? "nil")")
+                #endif
+                #if DEBUG
                 print("   - extraLarge: \(links.extraLarge ?? "nil")")
+                #endif
             }
+            #if DEBUG
             print("   Final coverURL: \(coverURL ?? "nil")")
+            #endif
+            #if DEBUG
             print("   BookModel.id will be set to: \(googleBook.id)")
+            #endif
+            #if DEBUG
             print("   BookModel.coverImageURL will be set to: \(coverURL ?? "nil")")
+            #endif
         }
         
         // Resolve canonical display URL before creating the model
@@ -1838,74 +1874,136 @@ class GoodreadsImportService: ObservableObject {
         do {
             // Write test CSV to file
             try testCSV.write(to: testFileURL, atomically: true, encoding: .utf8)
+            #if DEBUG
             print("📝 Created test CSV file at: \(testFileURL.path)")
+            #endif
             
             // Test 1: CSV Parsing
+            #if DEBUG
             print("\n🔬 Test 1: CSV Parsing")
+            #endif
+            #if DEBUG
             print(String(repeating: "-", count: 30))
+            #endif
             
             let books = try await parseCSV(from: testFileURL)
+            #if DEBUG
             print("✅ Parsed \(books.count) books from CSV")
+            #endif
             
             for (index, book) in books.enumerated() {
+                #if DEBUG
                 print("\n📖 Book \(index + 1):")
+                #endif
+                #if DEBUG
                 print("  Title: \(book.title)")
+                #endif
+                #if DEBUG
                 print("  Author: \(book.author)")
+                #endif
+                #if DEBUG
                 print("  ISBN: \(book.isbn.isEmpty ? "None" : book.isbn)")
+                #endif
+                #if DEBUG
                 print("  ISBN13: \(book.isbn13.isEmpty ? "None" : book.isbn13)")
+                #endif
+                #if DEBUG
                 print("  Rating: \(book.myRating)")
+                #endif
+                #if DEBUG
                 print("  Status: \(book.exclusiveShelf)")
+                #endif
+                #if DEBUG
                 print("  Has ISBN: \(book.hasISBN)")
+                #endif
                 
                 // Check Excel format handling
                 if book.isbn.contains("=") || book.isbn13.contains("=") {
+                    #if DEBUG
                     print("  ⚠️ Excel formula detected - should be cleaned")
+                    #endif
                 }
                 
                 // Check cleaned ISBN
                 if let cleanedISBN = book.primaryISBN {
+                    #if DEBUG
                     print("  Cleaned ISBN: \(cleanedISBN)")
+                    #endif
                 }
             }
             
             // Test 2: Book Matching with API
+            #if DEBUG
             print("\n🔬 Test 2: Book Matching with Google Books API")
+            #endif
+            #if DEBUG
             print(String(repeating: "-", count: 30))
+            #endif
             
             for book in books.prefix(2) { // Test first 2 books to avoid rate limits
+                #if DEBUG
                 print("\n🔍 Matching: \(book.title)")
+                #endif
                 
                 do {
                     let result = try await matchBookWithCache(book)
                     if let processedBook = result.0 {
+                        #if DEBUG
                         print("  ✅ Matched with Google Books:")
+                        #endif
+                        #if DEBUG
                         print("    ID: \(processedBook.bookModel.id)")
+                        #endif
+                        #if DEBUG
                         print("    Title: \(processedBook.bookModel.title)")
+                        #endif
+                        #if DEBUG
                         print("    Author: \(processedBook.bookModel.author)")
+                        #endif
+                        #if DEBUG
                         print("    Cover URL: \(processedBook.bookModel.coverImageURL ?? "None")")
+                        #endif
+                        #if DEBUG
                         print("    Page Count: \(processedBook.bookModel.pageCount ?? 0)")
+                        #endif
+                        #if DEBUG
                         print("    Match Method: \(processedBook.matchMethod)")
+                        #endif
+                        #if DEBUG
                         print("    Cache hit: \(result.1)")
+                        #endif
                         
                         // Verify high-res cover
                         if let coverURL = processedBook.bookModel.coverImageURL {
                             if coverURL.contains("zoom=1") || coverURL.contains("zoom=2") {
+                                #if DEBUG
                                 print("    ✅ High-res cover URL detected")
+                                #endif
                             } else {
+                                #if DEBUG
                                 print("    ⚠️ Low-res cover URL")
+                                #endif
                             }
                         }
                     } else {
+                        #if DEBUG
                         print("  ❌ No match found")
+                        #endif
                     }
                 } catch {
+                    #if DEBUG
                     print("  ❌ Error: \(error.localizedDescription)")
+                    #endif
                 }
             }
             
             // Test 3: Edge Cases
+            #if DEBUG
             print("\n🔬 Test 3: Edge Case Handling")
+            #endif
+            #if DEBUG
             print(String(repeating: "-", count: 30))
+            #endif
             
             // Test parseCSVLine with various formats
             let testLines = [
@@ -1918,20 +2016,30 @@ class GoodreadsImportService: ObservableObject {
             
             for line in testLines {
                 let parsed = parseCSVLine(line)
+                #if DEBUG
                 print("\nInput: \(line)")
+                #endif
+                #if DEBUG
                 print("Parsed: \(parsed)")
+                #endif
                 
                 // Verify Excel formula cleaning
                 for value in parsed {
                     if value.contains("=") {
+                        #if DEBUG
                         print("  ⚠️ Excel formula not cleaned: \(value)")
+                        #endif
                     }
                 }
             }
             
             // Test 4: Duplicate Detection
+            #if DEBUG
             print("\n🔬 Test 4: Duplicate Detection")
+            #endif
+            #if DEBUG
             print(String(repeating: "-", count: 30))
+            #endif
             
             // Check if books already exist in library
             let descriptor = FetchDescriptor<BookModel>()
@@ -1952,51 +2060,93 @@ class GoodreadsImportService: ObservableObject {
                 }
                 
                 if isDuplicate {
+                    #if DEBUG
                     print("  ⚠️ Duplicate detected: \(book.title)")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("  ✅ Not a duplicate: \(book.title)")
+                    #endif
                 }
             }
             
             // Test 5: Full Import Process
+            #if DEBUG
             print("\n🔬 Test 5: Full Import Process (Small Batch)")
+            #endif
+            #if DEBUG
             print(String(repeating: "-", count: 30))
+            #endif
             
             let result = try await importCSV(
                 from: testFileURL,
                 speed: .fast
             )
             
+            #if DEBUG
             print("\n📊 Import Results:")
+            #endif
+            #if DEBUG
             print("  ✅ Successful: \(result.successful.count)")
+            #endif
+            #if DEBUG
             print("  ⚠️ Needs Matching: \(result.needsMatching.count)")
+            #endif
+            #if DEBUG
             print("  🔄 Duplicates: \(result.duplicates.count)")
+            #endif
+            #if DEBUG
             print("  ❌ Failed: \(result.failed.count)")
+            #endif
+            #if DEBUG
             print("  📚 Total Processed: \(result.totalProcessed)")
+            #endif
+            #if DEBUG
             print("  📈 Success Rate: \(String(format: "%.1f%%", result.successRate * 100))")
+            #endif
             
             // Log details of each result
             for book in result.successful {
+                #if DEBUG
                 print("\n  ✅ Imported: \(book.bookModel.title)")
+                #endif
+                #if DEBUG
                 print("     Status: \(book.goodreadsBook.exclusiveShelf)")
+                #endif
+                #if DEBUG
                 print("     Rating: \(book.goodreadsBook.myRating)")
+                #endif
             }
             
             for unmatched in result.needsMatching {
+                #if DEBUG
                 print("\n  ⚠️ Unmatched: \(unmatched.goodreadsBook.title)")
+                #endif
+                #if DEBUG
                 print("     Reason: No match found")
+                #endif
             }
             
             // Clean up test file
             try FileManager.default.removeItem(at: testFileURL)
+            #if DEBUG
             print("\n🧹 Cleaned up test file")
+            #endif
             
+            #if DEBUG
             print("\n✅ All tests completed successfully!")
+            #endif
+            #if DEBUG
             print(String(repeating: "=", count: 50))
+            #endif
             
         } catch {
+            #if DEBUG
             print("\n❌ Test failed: \(error.localizedDescription)")
+            #endif
+            #if DEBUG
             print(String(repeating: "=", count: 50))
+            #endif
         }
         #endif
     }

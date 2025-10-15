@@ -127,7 +127,9 @@ private struct BookRow: View {
 
 #Preview {
     RecentBooksSheet(isPresented: .constant(true)) { book in
+        #if DEBUG
         print("Selected: \(book.title)")
+        #endif
     }
     .environmentObject(LibraryViewModel())
 }

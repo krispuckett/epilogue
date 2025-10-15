@@ -10,9 +10,15 @@ public class ColorExtractionDiagnostic {
     
     /// Run comprehensive diagnostic on an image
     public func runDiagnostic(on image: UIImage, bookTitle: String) async {
+        #if DEBUG
         print("\n🔬 COLOR EXTRACTION DIAGNOSTIC")
+        #endif
+        #if DEBUG
         print("📖 Book: \(bookTitle)")
+        #endif
+        #if DEBUG
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        #endif
         
         // 1. Image Properties
         await analyzeImageProperties(image)
@@ -25,39 +31,71 @@ public class ColorExtractionDiagnostic {
             await saveDiagnosticImage(diagnosticImage, title: bookTitle)
         }
         
+        #if DEBUG
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+        #endif
     }
     
     // MARK: - Image Properties Analysis
     
     private func analyzeImageProperties(_ image: UIImage) async {
+        #if DEBUG
         print("\n📊 IMAGE PROPERTIES:")
+        #endif
+        #if DEBUG
         print("  Size: \(image.size.width) × \(image.size.height)")
+        #endif
+        #if DEBUG
         print("  Scale: \(image.scale)")
+        #endif
         
         guard let cgImage = image.cgImage else {
+            #if DEBUG
             print("  ❌ No CGImage available")
+            #endif
             return
         }
         
+        #if DEBUG
         print("  Bits per component: \(cgImage.bitsPerComponent)")
+        #endif
+        #if DEBUG
         print("  Bits per pixel: \(cgImage.bitsPerPixel)")
+        #endif
+        #if DEBUG
         print("  Bytes per row: \(cgImage.bytesPerRow)")
+        #endif
+        #if DEBUG
         print("  Alpha info: \(alphaInfoString(cgImage.alphaInfo))")
+        #endif
+        #if DEBUG
         print("  Bitmap info: \(bitmapInfoString(cgImage.bitmapInfo))")
+        #endif
         
         if let colorSpace = cgImage.colorSpace {
+            #if DEBUG
             print("\n🎨 COLOR SPACE:")
+            #endif
+            #if DEBUG
             print("  Name: \((colorSpace.name as String?) ?? "Unknown")")
+            #endif
+            #if DEBUG
             print("  Model: \(colorModelString(colorSpace.model))")
+            #endif
+            #if DEBUG
             print("  Is wide gamut: \(colorSpace.isWideGamutRGB)")
+            #endif
+            #if DEBUG
             print("  Supports output: \(colorSpace.supportsOutput)")
+            #endif
             
             // Check if it's Display P3
             if let cfName = colorSpace.name {
                 let name = cfName as String
                 if name.contains("P3") || name.contains("Display") {
+                    #if DEBUG
                     print("  ⚠️ Display P3 detected - needs special handling!")
+                    #endif
                 }
             }
         }
@@ -66,7 +104,9 @@ public class ColorExtractionDiagnostic {
     // MARK: - Pixel Sampling
     
     private func sampleRandomPixels(from image: UIImage) async {
+        #if DEBUG
         print("\n🔍 SAMPLING 100 RANDOM PIXELS:")
+        #endif
         
         guard let cgImage = image.cgImage else { return }
         
@@ -98,8 +138,12 @@ public class ColorExtractionDiagnostic {
                 let b = data[offset + 2]
                 
                 if i < 10 {  // Print first 10 samples
+                    #if DEBUG
                     print("  Pixel \(i+1) at (\(x),\(y)):")
+                    #endif
+                    #if DEBUG
                     print("    Raw: R=\(r) G=\(g) B=\(b)")
+                    #endif
                     
                     // Convert to normalized values
                     let rf = CGFloat(r) / 255.0
@@ -111,19 +155,29 @@ public class ColorExtractionDiagnostic {
                     let linearG = srgbToLinear(gf)
                     let linearB = srgbToLinear(bf)
                     
+                    #if DEBUG
                     print("    Normalized: R=\(String(format: "%.3f", rf)) G=\(String(format: "%.3f", gf)) B=\(String(format: "%.3f", bf))")
+                    #endif
+                    #if DEBUG
                     print("    Linear RGB: R=\(String(format: "%.3f", linearR)) G=\(String(format: "%.3f", linearG)) B=\(String(format: "%.3f", linearB))")
+                    #endif
                     
                     // Check what happens in our color extraction
                     if rf > 0.95 && gf > 0.95 && bf > 0.95 {
+                        #if DEBUG
                         print("    ⚠️ Would be SKIPPED (near white)")
+                        #endif
                     } else if rf < 0.05 && gf < 0.05 && bf < 0.05 {
+                        #if DEBUG
                         print("    ⚠️ Would be SKIPPED (near black)")
+                        #endif
                     } else {
                         let quantizedR = round(rf * 10) / 10
                         let quantizedG = round(gf * 10) / 10
                         let quantizedB = round(bf * 10) / 10
+                        #if DEBUG
                         print("    ✅ Quantized as: R=\(quantizedR) G=\(quantizedG) B=\(quantizedB)")
+                        #endif
                     }
                 }
                 
@@ -133,10 +187,14 @@ public class ColorExtractionDiagnostic {
             }
             
             // Print color distribution
+            #if DEBUG
             print("\n📊 COLOR DISTRIBUTION:")
+            #endif
             let sortedColors = colorCounts.sorted { $0.value > $1.value }
             for (index, (colorKey, count)) in sortedColors.prefix(5).enumerated() {
+                #if DEBUG
                 print("  Top \(index + 1): \(colorKey) - \(count) occurrences")
+                #endif
             }
         }
     }
@@ -342,7 +400,9 @@ public class ColorExtractionDiagnostic {
         // Request photo library permission
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized else {
+            #if DEBUG
             print("❌ Photo library permission denied")
+            #endif
             return
         }
         
@@ -357,9 +417,13 @@ public class ColorExtractionDiagnostic {
                 options.originalFilename = "ColorDiagnostic_\(title.replacingOccurrences(of: " ", with: "_"))_\(Date().timeIntervalSince1970).png"
                 creationRequest.addResource(with: .photo, data: image.pngData() ?? Data(), options: options)
             }
+            #if DEBUG
             print("✅ Diagnostic image saved to Photos")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to save diagnostic image: \(error)")
+            #endif
         }
     }
     

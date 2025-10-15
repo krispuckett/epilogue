@@ -134,7 +134,9 @@ struct UltraFastBookScanner: View {
                     // Validate ISBN
                     let cleanISBN = payloadString.replacingOccurrences(of: "-", with: "").replacingOccurrences(of: " ", with: "")
                     if cleanISBN.count == 13 || cleanISBN.count == 10 {
+                        #if DEBUG
                         print("📚 ISBN detected: \(cleanISBN)")
+                        #endif
                         scanner.processISBN(cleanISBN)
                         return
                     }
@@ -161,7 +163,9 @@ class UltraFastScannerCoordinator: ObservableObject {
     func processISBN(_ isbn: String) {
         // Prevent duplicate scans
         guard lastScannedISBN != isbn else {
+            #if DEBUG
             print("⚠️ Ignoring duplicate ISBN scan")
+            #endif
             return
         }
 
@@ -179,7 +183,9 @@ class UltraFastScannerCoordinator: ObservableObject {
             await MainActor.run {
                 if let firstBook = results.first {
                     statusMessage = "Found: \(firstBook.title)"
+                    #if DEBUG
                     print("✅ Auto-adding book: \(firstBook.title)")
+                    #endif
 
                     // Success haptic
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -196,7 +202,9 @@ class UltraFastScannerCoordinator: ObservableObject {
                     }
                 } else {
                     statusMessage = "Book not found"
+                    #if DEBUG
                     print("❌ No book found for ISBN: \(isbn)")
+                    #endif
 
                     // Error haptic
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -224,7 +232,9 @@ class UltraFastScannerCoordinator: ObservableObject {
             device.unlockForConfiguration()
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } catch {
+            #if DEBUG
             print("❌ Torch error: \(error)")
+            #endif
         }
     }
 

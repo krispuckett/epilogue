@@ -86,11 +86,13 @@ final class BookModel {
         self.dateAdded = Date()
         
         // Debug logging
-        if coverImageURL != nil && !coverImageURL!.isEmpty {
-            print("✅ BookModel initialized with cover URL: \(coverImageURL!)")
+        #if DEBUG
+        if let url = coverImageURL, !url.isEmpty {
+            print("✅ BookModel initialized with cover URL: \(url)")
         } else {
             print("⚠️ BookModel initialized WITHOUT cover URL for: \(title)")
         }
+        #endif
     }
     
     // Convert from the existing Book struct
@@ -117,13 +119,15 @@ final class BookModel {
     // Convert to the existing Book struct for compatibility
     var asBook: Book {
         // Debug logging
-        if coverImageURL == nil || coverImageURL!.isEmpty {
+        #if DEBUG
+        if let url = coverImageURL, !url.isEmpty {
+            print("✅ asBook conversion: BookModel has cover URL: \(url)")
+        } else {
             print("⚠️⚠️⚠️ asBook conversion: BookModel has NO cover URL for: \(title)")
             print("   BookModel.coverImageURL = \(coverImageURL ?? "nil")")
-        } else {
-            print("✅ asBook conversion: BookModel has cover URL: \(coverImageURL!)")
         }
-        
+        #endif
+
         var book = Book(
             id: id,
             title: title,
@@ -141,14 +145,16 @@ final class BookModel {
         book.userRating = userRating
         book.userNotes = userNotes
         book.dateAdded = dateAdded
-        
+
         // Final verification
+        #if DEBUG
         if book.coverImageURL != coverImageURL {
             print("❌❌❌ CRITICAL: Cover URL changed during conversion!")
             print("   BookModel.coverImageURL: \(coverImageURL ?? "nil")")
             print("   Book.coverImageURL: \(book.coverImageURL ?? "nil")")
         }
-        
+        #endif
+
         return book
     }
 

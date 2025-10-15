@@ -4,7 +4,9 @@ import Foundation
 @MainActor
 class DirectPerplexityTest {
     static func testDirectAPI() async {
+        #if DEBUG
         print("🧪 Testing DIRECT Perplexity API call...")
+        #endif
         
         let request = """
         {
@@ -28,25 +30,37 @@ class DirectPerplexityTest {
             let (data, response) = try await URLSession.shared.data(for: urlRequest)
             
             if let httpResponse = response as? HTTPURLResponse {
+                #if DEBUG
                 print("📊 Status Code: \(httpResponse.statusCode)")
+                #endif
             }
             
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                #if DEBUG
                 print("✅ Response JSON: \(json)")
+                #endif
                 
                 if let choices = json["choices"] as? [[String: Any]],
                    let message = choices.first?["message"] as? [String: Any],
                    let content = message["content"] as? String {
+                    #if DEBUG
                     print("🎯 Answer: \(content)")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("❌ Could not parse response")
+                    #endif
                 }
             } else {
+                #if DEBUG
                 print("❌ Invalid JSON: \(String(data: data, encoding: .utf8) ?? "nil")")
+                #endif
             }
             
         } catch {
+            #if DEBUG
             print("❌ Request failed: \(error)")
+            #endif
         }
     }
     

@@ -465,6 +465,8 @@ struct EditBookResultRow: View {
         ),
         initialSearchTerm: "Lord of the Rings"
     ) { newBook in
+        #if DEBUG
         print("Replaced with: \(newBook.title)")
+        #endif
     }
 }

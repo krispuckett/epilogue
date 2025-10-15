@@ -34,25 +34,35 @@ class OfflineCoverCacheService {
     func cacheCoverForNewBook(_ bookModel: BookModel) async {
         guard isAutoCacheEnabled else { return }
         guard bookModel.coverImageData == nil else {
+            #if DEBUG
             print("✅ Book already has cached cover data: \(bookModel.title)")
+            #endif
             return
         }
 
         guard let coverURL = bookModel.coverImageURL else {
+            #if DEBUG
             print("⚠️ No cover URL for: \(bookModel.title)")
+            #endif
             return
         }
 
+        #if DEBUG
         print("📥 Caching cover for new book: \(bookModel.title)")
+        #endif
 
         // Load full image and cache it
         if let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURL),
            let data = image.jpegData(compressionQuality: 0.8) {
             bookModel.coverImageData = data
             try? modelContext?.save()
+            #if DEBUG
             print("✅ Cached cover data for: \(bookModel.title) (\(data.count / 1024) KB)")
+            #endif
         } else {
+            #if DEBUG
             print("❌ Failed to load cover for: \(bookModel.title)")
+            #endif
         }
     }
 
@@ -61,24 +71,32 @@ class OfflineCoverCacheService {
     /// Cache all library books' covers in background
     func cacheAllLibraryCovers() async {
         guard isAutoCacheEnabled else {
+            #if DEBUG
             print("⚠️ Auto-cache disabled by user")
+            #endif
             return
         }
 
         guard !isProcessing else {
+            #if DEBUG
             print("⚠️ Already processing cover cache")
+            #endif
             return
         }
 
         guard let context = modelContext else {
+            #if DEBUG
             print("❌ ModelContext not configured")
+            #endif
             return
         }
 
         isProcessing = true
         defer { isProcessing = false }
 
+        #if DEBUG
         print("🔄 Starting library cover cache process...")
+        #endif
 
         // Fetch all library books without cached cover data
         let descriptor = FetchDescriptor<BookModel>(
@@ -91,11 +109,15 @@ class OfflineCoverCacheService {
             let booksNeedingCache = try context.fetch(descriptor)
 
             guard !booksNeedingCache.isEmpty else {
+                #if DEBUG
                 print("✅ All library books already have cached covers")
+                #endif
                 return
             }
 
+            #if DEBUG
             print("📚 Found \(booksNeedingCache.count) books needing cover cache")
+            #endif
 
             // Process in batches to avoid memory pressure
             let batchSize = 3
@@ -114,16 +136,22 @@ class OfflineCoverCacheService {
                 // Save batch
                 try? context.save()
 
+                #if DEBUG
                 print("✅ Cached batch \(i/batchSize + 1) of \((booksNeedingCache.count + batchSize - 1) / batchSize)")
+                #endif
 
                 // Small delay between batches
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             }
 
+            #if DEBUG
             print("✅ Library cover cache complete!")
+            #endif
 
         } catch {
+            #if DEBUG
             print("❌ Error fetching books for caching: \(error)")
+            #endif
         }
     }
 
@@ -133,9 +161,13 @@ class OfflineCoverCacheService {
         if let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURL),
            let data = image.jpegData(compressionQuality: 0.8) {
             book.coverImageData = data
+            #if DEBUG
             print("  ✅ \(book.title): \(data.count / 1024) KB")
+            #endif
         } else {
+            #if DEBUG
             print("  ❌ \(book.title): Failed to load")
+            #endif
         }
     }
 
@@ -161,21 +193,29 @@ class OfflineCoverCacheService {
             let recentBooks = try context.fetch(descriptor)
 
             guard !recentBooks.isEmpty else {
+                #if DEBUG
                 print("✅ All recent books already cached")
+                #endif
                 return
             }
 
+            #if DEBUG
             print("📥 Caching \(recentBooks.count) recently added books...")
+            #endif
 
             for book in recentBooks {
                 await cacheSingleBookCover(book)
             }
 
             try? context.save()
+            #if DEBUG
             print("✅ Recent books cached!")
+            #endif
 
         } catch {
+            #if DEBUG
             print("❌ Error fetching recent books: \(error)")
+            #endif
         }
     }
 
@@ -204,7 +244,9 @@ class OfflineCoverCacheService {
             return (cachedBooks.count, totalBooks.count, sizeInMB)
 
         } catch {
+            #if DEBUG
             print("❌ Error getting cache stats: \(error)")
+            #endif
             return (0, 0, 0)
         }
     }
@@ -225,10 +267,14 @@ class OfflineCoverCacheService {
             }
 
             try context.save()
+            #if DEBUG
             print("✅ Cleared \(booksWithCache.count) cached covers")
+            #endif
 
         } catch {
+            #if DEBUG
             print("❌ Error clearing cache: \(error)")
+            #endif
         }
     }
 }

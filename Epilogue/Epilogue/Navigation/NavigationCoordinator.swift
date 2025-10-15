@@ -52,28 +52,36 @@ final class NavigationCoordinator: ObservableObject {
     // MARK: - Navigation Methods
     
     func navigateToNote(_ note: CapturedNote) {
+        #if DEBUG
         print("[NavigationCoordinator] Navigating to note: \(note.id)")
+        #endif
         highlightedNoteID = note.id
         selectedTab = .notes
         shouldNavigateToNotes = true
     }
     
     func navigateToQuote(_ quote: CapturedQuote) {
+        #if DEBUG
         print("[NavigationCoordinator] Navigating to quote: \(quote.id)")
+        #endif
         highlightedQuoteID = quote.id
         selectedTab = .notes
         shouldNavigateToNotes = true
     }
     
     func navigateToBook(_ bookID: String) {
+        #if DEBUG
         print("[NavigationCoordinator] Navigating to book: \(bookID)")
+        #endif
         scrollToBookID = bookID
         selectedTab = .library
         shouldNavigateToLibrary = true
     }
     
     func navigateToChat(with book: Book? = nil) {
+        #if DEBUG
         print("[NavigationCoordinator] Navigating to chat with book: \(book?.title ?? "none")")
+        #endif
         selectedTab = .chat
         // Book context will be handled by chat view
     }

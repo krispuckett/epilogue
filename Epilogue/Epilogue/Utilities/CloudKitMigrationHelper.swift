@@ -37,7 +37,9 @@ class CloudKitMigrationHelper {
         for fileName in possibleStoreFiles {
             let fileURL = appSupportURL.appendingPathComponent(fileName)
             if fileManager.fileExists(atPath: fileURL.path) {
+                #if DEBUG
                 print("📱 Found local store file: \(fileName)")
+                #endif
                 return true
             }
         }
@@ -47,14 +49,18 @@ class CloudKitMigrationHelper {
     
     /// Migrate data from local store to CloudKit
     func migrateToCloudKit(from localContainer: ModelContainer, to cloudContainer: ModelContainer) async throws {
+        #if DEBUG
         print("🔄 Starting migration to CloudKit...")
+        #endif
         
         let context = localContainer.mainContext
         let cloudContext = cloudContainer.mainContext
         
         // Migrate Books
         let books = try context.fetch(FetchDescriptor<BookModel>())
+        #if DEBUG
         print("📚 Found \(books.count) books to migrate")
+        #endif
         
         for book in books {
             let newBook = BookModel(
@@ -128,9 +134,15 @@ class CloudKitMigrationHelper {
         // Save to CloudKit
         try cloudContext.save()
         
+        #if DEBUG
         print("✅ Migration completed successfully!")
+        #endif
+        #if DEBUG
         print("📊 Migrated:")
+        #endif
+        #if DEBUG
         print("   - \(books.count) books")
+        #endif
         
         // Mark that we're now using CloudKit
         UserDefaults.standard.set(true, forKey: "isUsingCloudKit")
@@ -164,7 +176,9 @@ class CloudKitMigrationHelper {
             try fileManager.copyItem(at: fileURL, to: destURL)
         }
         
+        #if DEBUG
         print("💾 Created backup at: \(backupURL.path)")
+        #endif
         return backupURL
     }
 }

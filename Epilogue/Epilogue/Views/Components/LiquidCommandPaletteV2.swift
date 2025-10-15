@@ -528,6 +528,8 @@ extension View {
         isPresented: .constant(true),
         context: .library
     ) { result in
+        #if DEBUG
         print("Command result: \(result)")
+        #endif
     }
 }

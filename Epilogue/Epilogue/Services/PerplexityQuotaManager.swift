@@ -42,7 +42,9 @@ class PerplexityQuotaManager: ObservableObject {
         UserDefaults.standard.set(0, forKey: questionsUsedKey)
         UserDefaults.standard.set(Date(), forKey: lastResetDateKey)
         remainingQuestions = dailyQuotaLimit
+        #if DEBUG
         print("📊 Daily Perplexity quota reset. Questions remaining: \(remainingQuestions)")
+        #endif
     }
 
     // Load remaining questions
@@ -55,7 +57,9 @@ class PerplexityQuotaManager: ObservableObject {
     var canAskQuestion: Bool {
         // Check Gandalf mode
         if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            #if DEBUG
             print("🧙‍♂️ Gandalf mode active - unlimited questions")
+            #endif
             return true
         }
 
@@ -77,7 +81,9 @@ class PerplexityQuotaManager: ObservableObject {
             UserDefaults.standard.set(questionsUsed + 1, forKey: questionsUsedKey)
             remainingQuestions = max(0, dailyQuotaLimit - (questionsUsed + 1))
 
+            #if DEBUG
             print("📊 Perplexity question tracked. Remaining: \(remainingQuestions)/\(dailyQuotaLimit)")
+            #endif
 
             // Show sheet if quota exhausted
             if remainingQuestions == 0 {
@@ -89,7 +95,9 @@ class PerplexityQuotaManager: ObservableObject {
             return true
         } else {
             // Quota exceeded
+            #if DEBUG
             print("⚠️ Daily Perplexity quota exceeded")
+            #endif
             showQuotaExceededSheet = true
             return false
         }

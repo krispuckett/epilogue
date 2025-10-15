@@ -651,16 +651,34 @@ struct MeshLuminanceGradient: View {
         onAccentColorExtracted?(accentColor)
         
         // Debug print
+        #if DEBUG
         print("📚 Extracted colors for book: \(bookTitle ?? "Unknown")")
+        #endif
+        #if DEBUG
         print("  Genre: \(detectedGenre)")
+        #endif
+        #if DEBUG
         print("  Pattern: \(gradientPattern.description)")
+        #endif
+        #if DEBUG
         print("  Is white cover: \(isWhiteCover)")
+        #endif
+        #if DEBUG
         print("  Is monochromatic: \(isMonochromatic)")
+        #endif
+        #if DEBUG
         print("  Cover brightness: \(coverBrightness)")
+        #endif
+        #if DEBUG
         print("  Color points: \(colorPointCount)")
+        #endif
+        #if DEBUG
         print("  Accent color: \(accentColor.description)")
+        #endif
         for (index, color) in extractedColors.enumerated() {
+            #if DEBUG
             print("  Color \(index): \(color.description)")
+            #endif
         }
     }
     
@@ -924,7 +942,9 @@ struct ImprovedColorAnalyzer {
         
         if isWhiteCover {
             // Smart color logic for white covers using gradient formula
+            #if DEBUG
             print("📚 White cover detected, applying gradient formula...")
+            #endif
             
             // Find the most saturated accent color
             var primaryAccent: Color? = nil

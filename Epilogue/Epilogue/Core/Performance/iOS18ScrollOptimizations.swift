@@ -71,7 +71,9 @@ struct ScrollPerformanceMonitor: ViewModifier {
                 
                 #if DEBUG
                 if frameRate < 100 {
+                    #if DEBUG
                     print("⚠️ Frame drop detected: \(Int(frameRate)) FPS")
+                    #endif
                 }
                 #endif
             }

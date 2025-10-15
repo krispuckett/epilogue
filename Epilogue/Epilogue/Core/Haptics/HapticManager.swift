@@ -135,7 +135,9 @@ final class HapticManager {
             let player = try engine.makePlayer(with: pattern)
             try player.start(atTime: 0)
         } catch {
+            #if DEBUG
             print("Failed to play custom haptic pattern: \(error)")
+            #endif
         }
     }
     

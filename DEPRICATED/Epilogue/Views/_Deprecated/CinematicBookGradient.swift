@@ -279,15 +279,21 @@ struct CinematicBookGradient: View {
     
     // MARK: - Color Extraction with Smart Brightness Detection
     private func extractDominantColors() {
+        #if DEBUG
         print("🎨 CinematicBookGradient - Starting color extraction for: \(bookTitle ?? "Unknown")")
+        #endif
         guard let ciImage = CIImage(image: bookCoverImage) else { 
+            #if DEBUG
             print("❌ Failed to create CIImage")
+            #endif
             return 
         }
         
         // Use original image for better color extraction
         guard let cgImage = bookCoverImage.cgImage else {
+            #if DEBUG
             print("❌ Failed to get CGImage")
+            #endif
             return
         }
         
@@ -295,7 +301,9 @@ struct CinematicBookGradient: View {
         let overallBrightness = analyzeCoverBrightness(cgImage: cgImage)
         coverBrightness = overallBrightness
         isDarkCover = overallBrightness < 0.4
+        #if DEBUG
         print("📊 Cover brightness: \(overallBrightness), isDark: \(isDarkCover)")
+        #endif
         
         // Determine if we need high contrast UI
         // Check if colors are predominantly blue/monochromatic
@@ -319,11 +327,15 @@ struct CinematicBookGradient: View {
                                (overallBrightness > 0.7) ||
                                (overallBrightness > 0.4 && overallBrightness < 0.7 && isMonochromatic)
         onBackgroundAnalyzed?(Double(overallBrightness), needsHighContrast)
+        #if DEBUG
         print("📊 Needs high contrast: \(needsHighContrast), monochromatic: \(isMonochromatic), lightBlueGray: \(isLightBlueGray)")
+        #endif
         
         // Extract ALL unique colors from the image
         var colors = extractAllUniqueColors(from: cgImage)
+        #if DEBUG
         print("🎨 Extracted \(colors.count) unique colors")
+        #endif
         
         // Remove duplicate colors
         colors = removeDuplicateColors(colors)
@@ -356,7 +368,9 @@ struct CinematicBookGradient: View {
             extractedColors = [Color(white: 0.2), Color(white: 0.3), Color(white: 0.15)]
         }
         
+        #if DEBUG
         print("🎨 Final gradient colors: \(extractedColors.count)")
+        #endif
         
         // Call the new callback with extracted colors
         onColorsExtracted?(extractedColors)
@@ -634,7 +648,9 @@ struct CinematicBookGradient: View {
             .map { $0.color }
         
         // Debug: Print the colors we found
+        #if DEBUG
         print("🎨 Top extracted colors for \(bookTitle ?? "Unknown"):")
+        #endif
         var blueCount = 0
         for (index, color) in sortedColors.enumerated() {
             let uiColor = UIColor(color)
@@ -652,11 +668,15 @@ struct CinematicBookGradient: View {
             let isBlue = h > 0.55 && h < 0.7
             if isBlue { blueCount += 1 }
             
+            #if DEBUG
             print("  Color \(index): \(hex) - H:\(String(format: "%.2f", h)) S:\(String(format: "%.2f", s)) B:\(String(format: "%.2f", br))\(isBlue ? " [BLUE]" : "")")
+            #endif
         }
         
         if blueCount > 0 {
+            #if DEBUG
             print("  ⚠️ Found \(blueCount) blue colors in extracted palette")
+            #endif
         }
         
         return Array(sortedColors)

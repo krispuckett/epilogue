@@ -28,23 +28,41 @@ class BookEnrichmentService {
     func enrichBook(_ book: BookModel) async {
         // Skip if already enriched
         guard !book.isEnriched else {
+            #if DEBUG
             print("ℹ️ Book already enriched: \(book.title)")
+            #endif
             return
         }
 
+        #if DEBUG
         print("🎨 [ENRICHMENT] Starting for '\(book.title)' by \(book.author)")
+        #endif
+        #if DEBUG
         print("   Book ID: \(book.id)")
+        #endif
+        #if DEBUG
         print("   Local ID: \(book.localId)")
+        #endif
 
         do {
+            #if DEBUG
             print("🌐 [ENRICHMENT] Fetching from Perplexity API...")
+            #endif
             // Fetch enrichment from Perplexity
             let enrichment = try await fetchEnrichment(for: book)
 
+            #if DEBUG
             print("✅ [ENRICHMENT] API call succeeded!")
+            #endif
+            #if DEBUG
             print("   Synopsis length: \(enrichment.synopsis.count) chars")
+            #endif
+            #if DEBUG
             print("   Themes count: \(enrichment.themes.count)")
+            #endif
+            #if DEBUG
             print("   Characters count: \(enrichment.characters.count)")
+            #endif
 
             // Save to BookModel
             await MainActor.run {
@@ -59,25 +77,49 @@ class BookEnrichmentService {
                 book.totalBooksInSeries = enrichment.totalBooksInSeries
                 book.enrichedAt = Date()
 
+                #if DEBUG
                 print("💾 [ENRICHMENT] Data saved to BookModel")
+                #endif
+                #if DEBUG
                 print("   isEnriched now: \(book.isEnriched)")
+                #endif
+                #if DEBUG
                 print("   smartSynopsis: \(book.smartSynopsis?.prefix(50) ?? "nil")")
+                #endif
                 if let series = enrichment.seriesName, let order = enrichment.seriesOrder {
+                    #if DEBUG
                     print("   Series: \(series) #\(order)")
+                    #endif
                 }
             }
 
+            #if DEBUG
             print("✅ [ENRICHMENT] Complete for '\(book.title)'")
+            #endif
+            #if DEBUG
             print("   Synopsis: \(enrichment.synopsis.prefix(100))...")
+            #endif
+            #if DEBUG
             print("   Themes: \(enrichment.themes.joined(separator: ", "))")
+            #endif
+            #if DEBUG
             print("   Characters: \(enrichment.characters.joined(separator: ", "))")
+            #endif
 
         } catch {
+            #if DEBUG
             print("❌ [ENRICHMENT] FAILED for '\(book.title)'")
+            #endif
+            #if DEBUG
             print("   Error: \(error)")
+            #endif
+            #if DEBUG
             print("   Error details: \(error.localizedDescription)")
+            #endif
             if let urlError = error as? URLError {
+                #if DEBUG
                 print("   URL Error code: \(urlError.code.rawValue)")
+                #endif
             }
         }
     }
@@ -172,8 +214,12 @@ class BookEnrichmentService {
             let enrichment = try JSONDecoder().decode(EnrichmentData.self, from: data)
             return enrichment
         } catch {
+            #if DEBUG
             print("❌ JSON parsing failed: \(error)")
+            #endif
+            #if DEBUG
             print("   Response: \(jsonString)")
+            #endif
 
             // Fallback: try to extract fields manually
             return try parseManually(from: response)

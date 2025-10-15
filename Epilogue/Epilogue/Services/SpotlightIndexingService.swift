@@ -78,9 +78,13 @@ class SpotlightIndexingService {
         // Index the item
         CSSearchableIndex.default().indexSearchableItems([item]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to index book '\(book.title)': \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Indexed book '\(book.title)'")
+                #endif
             }
         }
     }
@@ -133,9 +137,13 @@ class SpotlightIndexingService {
 
         CSSearchableIndex.default().indexSearchableItems(items) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to batch index books: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Indexed \(books.count) books")
+                #endif
             }
         }
     }
@@ -144,9 +152,13 @@ class SpotlightIndexingService {
     func deindexBook(_ bookId: String) {
         CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ["book-\(bookId)"]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to deindex book: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Deindexed book \(bookId)")
+                #endif
             }
         }
     }
@@ -194,9 +206,13 @@ class SpotlightIndexingService {
 
         CSSearchableIndex.default().indexSearchableItems([item]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to index note: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Indexed note")
+                #endif
             }
         }
     }
@@ -205,9 +221,13 @@ class SpotlightIndexingService {
     func deindexNote(_ noteId: UUID) {
         CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ["note-\(noteId.uuidString)"]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to deindex note: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Deindexed note")
+                #endif
             }
         }
     }
@@ -265,9 +285,13 @@ class SpotlightIndexingService {
 
         CSSearchableIndex.default().indexSearchableItems([item]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to index quote: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Indexed quote")
+                #endif
             }
         }
     }
@@ -276,9 +300,13 @@ class SpotlightIndexingService {
     func deindexQuote(_ quoteId: UUID) {
         CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ["quote-\(quoteId.uuidString)"]) { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to deindex quote: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Deindexed quote")
+                #endif
             }
         }
     }
@@ -287,12 +315,16 @@ class SpotlightIndexingService {
 
     /// Reindex all books, notes, and quotes (call on app launch or after major changes)
     func reindexAll(books: [Book], notes: [CapturedNote], quotes: [CapturedQuote]) {
+        #if DEBUG
         print("🔍 Spotlight: Starting full reindex...")
+        #endif
 
         // Clear existing indices
         CSSearchableIndex.default().deleteAllSearchableItems { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to clear index: \(error.localizedDescription)")
+                #endif
             }
         }
 
@@ -309,16 +341,22 @@ class SpotlightIndexingService {
             indexQuote(quote)
         }
 
+        #if DEBUG
         print("✅ Spotlight: Reindexed \(books.count) books, \(notes.count) notes, \(quotes.count) quotes")
+        #endif
     }
 
     /// Clear all Spotlight indices
     func clearAllIndices() {
         CSSearchableIndex.default().deleteAllSearchableItems { error in
             if let error = error {
+                #if DEBUG
                 print("❌ Spotlight: Failed to clear all indices: \(error.localizedDescription)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Spotlight: Cleared all indices")
+                #endif
             }
         }
     }

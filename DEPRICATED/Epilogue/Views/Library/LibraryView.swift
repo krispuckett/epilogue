@@ -968,14 +968,18 @@ class LibraryViewModel: ObservableObject {
                 if updatedURL.contains("zoom=1") {
                     updatedURL = updatedURL.replacingOccurrences(of: "zoom=1", with: "zoom=3")
                     hasUpdates = true
+                    #if DEBUG
                     print("📚 Updated book cover URL for '\(books[index].title)': zoom=1 → zoom=3")
+                    #endif
                 }
                 
                 // Replace zoom=2 with zoom=3
                 if updatedURL.contains("zoom=2") {
                     updatedURL = updatedURL.replacingOccurrences(of: "zoom=2", with: "zoom=3")
                     hasUpdates = true
+                    #if DEBUG
                     print("📚 Updated book cover URL for '\(books[index].title)': zoom=2 → zoom=3")
+                    #endif
                 }
                 
                 // Add zoom=3 if no zoom parameter exists (for Google Books URLs)
@@ -983,7 +987,9 @@ class LibraryViewModel: ObservableObject {
                    !updatedURL.contains("zoom=") {
                     updatedURL += updatedURL.contains("?") ? "&zoom=3" : "?zoom=3"
                     hasUpdates = true
+                    #if DEBUG
                     print("📚 Added zoom=3 to book cover URL for '\(books[index].title)'")
+                    #endif
                 }
                 
                 // Remove edge=curl if present
@@ -997,10 +1003,14 @@ class LibraryViewModel: ObservableObject {
         }
         
         if hasUpdates {
+            #if DEBUG
             print("✅ Updated cover URLs for higher quality images")
+            #endif
             saveBooks()
         } else {
+            #if DEBUG
             print("ℹ️ All book cover URLs already optimized")
+            #endif
         }
     }
     
@@ -1088,17 +1098,23 @@ class LibraryViewModel: ObservableObject {
     func findMatchingBook(title: String, author: String? = nil) -> Book? {
         guard !title.isEmpty else { return nil }
         
+        #if DEBUG
         print("🔎 findMatchingBook called with title: '\(title)', author: '\(author ?? "nil")'")
+        #endif
         
         let normalizedTitle = normalizeTitle(title)
+        #if DEBUG
         print("📝 Normalized search title: '\(normalizedTitle)'")
+        #endif
         
         var bestMatch: Book? = nil
         var bestScore: Double = 0.0
         
         for book in books {
             let normalizedBookTitle = normalizeTitle(book.title)
+            #if DEBUG
             print("📚 Checking against book: '\(book.title)' -> normalized: '\(normalizedBookTitle)'")
+            #endif
             
             let score = calculateMatchScore(
                 searchTitle: normalizedTitle,
@@ -1107,19 +1123,27 @@ class LibraryViewModel: ObservableObject {
                 bookAuthor: book.author.lowercased()
             )
             
+            #if DEBUG
             print("   Score: \(score)")
+            #endif
             
             if score > bestScore && score > 0.6 { // Lowered threshold for better fuzzy matching
                 bestScore = score
                 bestMatch = book
+                #if DEBUG
                 print("   ✅ New best match!")
+                #endif
             }
         }
         
         if let match = bestMatch {
+            #if DEBUG
             print("🎯 Final match: '\(match.title)' with score: \(bestScore)")
+            #endif
         } else {
+            #if DEBUG
             print("❌ No match found (best score was: \(bestScore))")
+            #endif
         }
         
         return bestMatch
@@ -1285,6 +1309,8 @@ class LibraryViewModel: ObservableObject {
     func addNoteToBook(_ localId: UUID, note: Note) {
         // This could be expanded to store book-specific notes if needed
         // For now, we rely on the bookId in the note itself
+        #if DEBUG
         print("📚 Linked note '\(note.content.prefix(50))...' to book with localId: \(localId)")
+        #endif
     }
 }

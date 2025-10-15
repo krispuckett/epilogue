@@ -63,9 +63,15 @@ struct PerfectBookScanner: View {
                     .buttonStyle(.borderedProminent)
                 }
                 .onAppear {
+                    #if DEBUG
                     print("❌ DataScanner not available")
+                    #endif
+                    #if DEBUG
                     print("   isSupported: \(DataScannerViewController.isSupported)")
+                    #endif
+                    #if DEBUG
                     print("   isAvailable: \(DataScannerViewController.isAvailable)")
+                    #endif
                 }
             }
         }
@@ -82,27 +88,45 @@ struct PerfectBookScanner: View {
             )
         }
         .onAppear {
+            #if DEBUG
             print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            #endif
+            #if DEBUG
             print("🚀 PERFECT BOOK SCANNER LOADED!")
+            #endif
+            #if DEBUG
             print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            #endif
+            #if DEBUG
             print("   DataScanner.isSupported: \(DataScannerViewController.isSupported)")
+            #endif
+            #if DEBUG
             print("   DataScanner.isAvailable: \(DataScannerViewController.isAvailable)")
+            #endif
+            #if DEBUG
             print("   iOS Version: \(ProcessInfo.processInfo.operatingSystemVersion)")
+            #endif
+            #if DEBUG
             print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            #endif
 
             // Show immediate visual feedback
             coordinator.statusMessage = "Scan any book - barcode, cover, or spine"
 
             // CHANGED: Stage books first, don't add to library yet
             coordinator.onBookFound = { book in
+                #if DEBUG
                 print("📚 PERFECT SCANNER - Book staged: \(book.title)")
+                #endif
                 coordinator.stageBook(book)  // ← Only stage, don't add yet
                 SensoryFeedback.success()
             }
 
             // Handle batch confirm
             coordinator.onConfirmBooks = { books in
+                #if DEBUG
                 print("✅ Confirming \(books.count) books to library")
+                #endif
                 for book in books {
                     onBookAdded(book)
                 }
@@ -305,11 +329,17 @@ struct PerfectBookScanner: View {
     }
 
     private func handleScannedItems(_ items: [RecognizedItem]) {
+        #if DEBUG
         print("📱 SMART SCANNER: Received \(items.count) items")
+        #endif
+        #if DEBUG
         print("   Is processing: \(coordinator.isProcessing)")
+        #endif
 
         guard !coordinator.isProcessing else {
+            #if DEBUG
             print("   ⚠️ Ignoring - already processing")
+            #endif
             return
         }
 
@@ -318,7 +348,9 @@ struct PerfectBookScanner: View {
         for item in items {
             if case .barcode(let barcode) = item,
                let isbn = barcode.payloadStringValue {
+                #if DEBUG
                 print("   ✅ BARCODE DETECTED: \(isbn)")
+                #endif
                 coordinator.processBarcode(isbn)
                 return  // Process barcode immediately, ignore text
             }
@@ -363,12 +395,16 @@ struct PerfectBookScanner: View {
 
         // 3. Process best text match if found
         if let text = bestText, bestConfidence > 25 {  // Much higher threshold to reduce false positives
+            #if DEBUG
             print("   ✅ TEXT DETECTED: \(text) (confidence: \(bestConfidence))")
+            #endif
             coordinator.processText(text)
             return
         }
 
+        #if DEBUG
         print("   ⏭️ No valid barcode or text found")
+        #endif
     }
 
     // Helper to detect likely book titles
@@ -444,7 +480,9 @@ class ScannerCoordinator: ObservableObject {
     func stageBook(_ book: Book) {
         // Prevent duplicate staging
         guard !scannedBooksInSession.contains(where: { $0.id == book.id }) else {
+            #if DEBUG
             print("⚠️ Book already staged: \(book.title)")
+            #endif
             return
         }
 
@@ -458,13 +496,17 @@ class ScannerCoordinator: ObservableObject {
             }
         }
 
+        #if DEBUG
         print("📋 Staged book: \(book.title) (total: \(booksScannedThisSession))")
+        #endif
     }
 
     func confirmAllBooks() {
         guard !scannedBooksInSession.isEmpty else { return }
 
+        #if DEBUG
         print("✅ Confirming \(scannedBooksInSession.count) books")
+        #endif
         onConfirmBooks?(scannedBooksInSession)
 
         // Clear session
@@ -483,7 +525,9 @@ class ScannerCoordinator: ObservableObject {
         guard index < scannedBooksInSession.count else { return }
 
         let removedBook = scannedBooksInSession[index]
+        #if DEBUG
         print("🗑️ Removing staged book: \(removedBook.title)")
+        #endif
 
         scannedBooksInSession.remove(at: index)
         booksScannedThisSession = scannedBooksInSession.count
@@ -499,7 +543,9 @@ class ScannerCoordinator: ObservableObject {
 
         // Validate ISBN format
         guard isValidISBN(cleanISBN) else {
+            #if DEBUG
             print("⚠️ Invalid ISBN format: \(cleanISBN)")
+            #endif
             statusMessage = "Invalid barcode"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
 
@@ -514,11 +560,15 @@ class ScannerCoordinator: ObservableObject {
 
         // Duplicate check
         guard canProcess(cleanISBN) else {
+            #if DEBUG
             print("⚠️ Ignoring duplicate ISBN scan: \(cleanISBN)")
+            #endif
             return
         }
 
+        #if DEBUG
         print("📚 ISBN detected: \(cleanISBN)")
+        #endif
 
         isProcessing = true
         statusMessage = "Looking up ISBN..."
@@ -532,7 +582,9 @@ class ScannerCoordinator: ObservableObject {
             await MainActor.run {
                 if let book = results.first {
                     statusMessage = "Found: \(book.title)"
+                    #if DEBUG
                     print("✅ Auto-adding book: \(book.title)")
+                    #endif
 
                     // Success haptic
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -549,7 +601,9 @@ class ScannerCoordinator: ObservableObject {
                     }
                 } else {
                     statusMessage = "Book not found"
+                    #if DEBUG
                     print("❌ No book found for ISBN: \(cleanISBN)")
+                    #endif
 
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
 
@@ -568,7 +622,9 @@ class ScannerCoordinator: ObservableObject {
         // Duplicate check
         guard canProcess(text) else { return }
 
+        #if DEBUG
         print("📖 Text detected: \(text)")
+        #endif
 
         isProcessing = true
         statusMessage = "Searching for book..."
@@ -627,7 +683,9 @@ class ScannerCoordinator: ObservableObject {
             device.unlockForConfiguration()
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } catch {
+            #if DEBUG
             print("❌ Torch error: \(error)")
+            #endif
         }
     }
 
@@ -744,7 +802,9 @@ class SpineTextRecognizer {
     }
 
     func recognizeSpineFromImage(_ image: UIImage) async -> String? {
+        #if DEBUG
         print("📸 Starting multi-rotation spine recognition...")
+        #endif
 
         var allRecognizedText: [(text: String, confidence: Float, rotation: CGFloat)] = []
 
@@ -752,7 +812,9 @@ class SpineTextRecognizer {
         let rotations: [CGFloat] = [0, 90, 180, 270]
 
         for rotation in rotations {
+            #if DEBUG
             print("  🔄 Trying rotation: \(rotation)°")
+            #endif
 
             if let rotatedImage = image.rotated(by: rotation),
                let preprocessed = preprocessSpineImage(rotatedImage) {
@@ -777,11 +839,15 @@ class SpineTextRecognizer {
         }
 
         if let best = sorted.first {
+            #if DEBUG
             print("✅ Best match: '\(best.text)' (rotation: \(best.rotation)°, confidence: \(best.confidence))")
+            #endif
             return best.text
         }
 
+        #if DEBUG
         print("❌ No text recognized from spine")
+        #endif
         return nil
     }
 
@@ -867,7 +933,9 @@ class SpineTextRecognizer {
 
             return recognizedText.isEmpty ? nil : recognizedText
         } catch {
+            #if DEBUG
             print("❌ Text recognition error: \(error)")
+            #endif
             return nil
         }
     }

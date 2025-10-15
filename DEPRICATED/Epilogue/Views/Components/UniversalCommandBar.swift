@@ -492,8 +492,12 @@ struct UniversalCommandBar: View {
                                 }
                                 
                                 detectedIntent = CommandParser.parse(updatedText, books: libraryViewModel.books, notes: notesViewModel.notes)
+                                #if DEBUG
                                 print("UniversalCommandBar: Detected intent: \(detectedIntent), composerMode: \(composerMode)")
+                                #endif
+                                #if DEBUG
                                 print("UniversalCommandBar: Button should show: '\(detectedIntent.actionText)'")
+                                #endif
                                 suggestions = CommandSuggestion.suggestions(for: updatedText)
                                 showSuggestions = !updatedText.isEmpty
                                 
@@ -522,7 +526,9 @@ struct UniversalCommandBar: View {
                                 }
                             }
                             .onSubmit {
+                                #if DEBUG
                                 print("UniversalCommandBar: onSubmit called")
+                                #endif
                                 executeCommand()
                             }
                         
@@ -534,7 +540,9 @@ struct UniversalCommandBar: View {
                                     .foregroundColor(.red)
                                 
                                 Button(action: {
+                                    #if DEBUG
                                     print("UniversalCommandBar: Button tapped!")
+                                    #endif
                                     executeCommand()
                                 }) {
                                     Text(detectedIntent.actionText)
@@ -685,10 +693,14 @@ struct UniversalCommandBar: View {
     
     private func executeCommand() {
         HapticManager.shared.lightTap()
+        #if DEBUG
         print("UniversalCommandBar: Executing command with intent: \(detectedIntent)")
+        #endif
         switch detectedIntent {
         case .addBook:
+            #if DEBUG
             print("UniversalCommandBar: Opening book search")
+            #endif
             showBookSearch = true
         case .createQuote(let text):
             saveQuote(text)
@@ -702,14 +714,18 @@ struct UniversalCommandBar: View {
             searchAll(query)
         case .existingBook(let book):
             // Navigate to book detail
+            #if DEBUG
             print("UniversalCommandBar: Navigate to book: \(book.title)")
+            #endif
             selectedTab = 0  // Switch to library tab
             // TODO: Implement navigation to specific book
             HapticManager.shared.success()
             collapse()
         case .existingNote(let note):
             // Navigate to notes and highlight/edit note
+            #if DEBUG
             print("UniversalCommandBar: Open note: \(note.content)")
+            #endif
             selectedTab = 1  // Switch to notes tab
             // TODO: Implement note highlighting/editing
             HapticManager.shared.success()
@@ -858,11 +874,15 @@ struct UniversalCommandBar: View {
         var pageNumber: Int? = nil
         
         // Check if this is a quote format: "content" author, book, page
+        #if DEBUG
         print("🔍 Attempting to parse quote from: \(text)")
+        #endif
         
         // Debug: Check what quote characters we have
         if let firstChar = text.first {
+            #if DEBUG
             print("📊 First character: '\(firstChar)' (Unicode: U+\(String(format: "%04X", firstChar.unicodeScalars.first!.value)))")
+            #endif
         }
         
         // Try multiple quote patterns - ORDER MATTERS!
@@ -874,7 +894,9 @@ struct UniversalCommandBar: View {
         ]
         
         for (index, pattern) in quotePatterns.enumerated() {
+            #if DEBUG
             print("🧪 Trying pattern \(index + 1): \(pattern)")
+            #endif
             if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
                 let range = NSRange(location: 0, length: text.utf16.count)
                 if let match = regex.firstMatch(in: text, options: [], range: range) {
@@ -884,7 +906,9 @@ struct UniversalCommandBar: View {
                         let quoteContent = String(text[contentRange]).trimmingCharacters(in: .whitespaces)
                         let attribution = String(text[attributionRange]).trimmingCharacters(in: .whitespaces)
                         
+                        #if DEBUG
                         print("✅ Matched! Content: '\(quoteContent)', Attribution: '\(attribution)'")
+                        #endif
                         
                         // Parse the attribution
                         // First check if it uses comma separation
@@ -971,7 +995,9 @@ struct UniversalCommandBar: View {
                             }
                         }
                         
+                        #if DEBUG
                         print("📚 Parsed - Author: \(author ?? "nil"), Book: \(bookTitle ?? "nil"), Page: \(pageNumber?.description ?? "nil")")
+                        #endif
                         
                         return (content: quoteContent, author: author, bookTitle: bookTitle, pageNumber: pageNumber)
                     }
@@ -979,7 +1005,9 @@ struct UniversalCommandBar: View {
             }
         }
         
+        #if DEBUG
         print("❌ No quote pattern matched")
+        #endif
         
         // If no quote pattern matched, return the original text as content
         return (content: text, author: nil, bookTitle: nil, pageNumber: nil)
@@ -1018,17 +1046,25 @@ struct UniversalCommandBar: View {
         case .quote:
             let parsed = parseFullTextForQuote(commandText)
             
+            #if DEBUG
             print("📝 Quote parsed - Content: '\(parsed.content)', Author: '\(parsed.author ?? "nil")', Book: '\(parsed.bookTitle ?? "nil")', Page: \(parsed.pageNumber?.description ?? "nil")")
+            #endif
             
             // Try to match with a book in the library
             var matchedBook: Book? = nil
             if let bookTitle = parsed.bookTitle {
+                #if DEBUG
                 print("🔍 Attempting to match book title: '\(bookTitle)' with author: '\(parsed.author ?? "nil")'")
+                #endif
                 matchedBook = libraryViewModel.findMatchingBook(title: bookTitle, author: parsed.author)
                 if let book = matchedBook {
+                    #if DEBUG
                     print("✅ Found matching book: '\(book.title)' by '\(book.author)'")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("❌ No matching book found in library")
+                    #endif
                 }
             }
             

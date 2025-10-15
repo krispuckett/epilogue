@@ -73,7 +73,9 @@ struct UnifiedChatInputBar: View {
                     HStack(spacing: 8) {
                         // Waveform button - starts ambient mode
                         Button {
+                            #if DEBUG
                             print("🎤 UnifiedChatInputBar: Starting ambient mode")
+                            #endif
                             // Start ambient reading mode with current book context
                             if let book = currentBook {
                                 SimplifiedAmbientCoordinator.shared.openAmbientReading(with: book)

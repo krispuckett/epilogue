@@ -135,7 +135,9 @@ enum URLValidator {
             } else {
                 #if DEBUG
                 print("🔒 URLValidator: Host not in trusted list: \(host)")
+                #if DEBUG
                 print("   URL: \(url.absoluteString)")
+                #endif
                 #endif
             }
         }

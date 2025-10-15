@@ -44,7 +44,9 @@ struct AmbientOrbExporter: View {
 
                 VStack(spacing: 16) {
                     Button {
+                        #if DEBUG
                         print("🔵 Button tapped!")
+                        #endif
                         SensoryFeedback.selection()
                         captureOrb()
                     } label: {
@@ -91,15 +93,21 @@ struct AmbientOrbExporter: View {
     }
 
     private func captureOrb() {
+        #if DEBUG
         print("🎨 Starting Metal shader capture...")
+        #endif
 
         guard let device = MTLCreateSystemDefaultDevice() else {
+            #if DEBUG
             print("❌ Metal device not available")
+            #endif
             return
         }
 
         guard let commandQueue = device.makeCommandQueue() else {
+            #if DEBUG
             print("❌ Failed to create command queue")
+            #endif
             return
         }
 
@@ -114,7 +122,9 @@ struct AmbientOrbExporter: View {
         textureDescriptor.storageMode = .shared // Allow CPU access
 
         guard let renderTexture = device.makeTexture(descriptor: textureDescriptor) else {
+            #if DEBUG
             print("❌ Failed to create render texture")
+            #endif
             return
         }
 
@@ -126,7 +136,9 @@ struct AmbientOrbExporter: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             // Render the shader directly to our texture
             renderer.renderToTexture(renderTexture, commandQueue: commandQueue, size: CGSize(width: 300, height: 300))
+            #if DEBUG
             print("✅ Rendered to texture")
+            #endif
 
             // Now read back the texture
             let bytesPerRow = 4 * renderTexture.width
@@ -145,7 +157,9 @@ struct AmbientOrbExporter: View {
                 mipmapLevel: 0
             )
 
+            #if DEBUG
             print("✅ Copied texture to buffer")
+            #endif
 
             // Create CGImage from buffer - Metal uses BGRA premultiplied
             let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -171,11 +185,21 @@ struct AmbientOrbExporter: View {
                 let topRightAlpha = pixelData[(renderTexture.width - 1) * 4 + 3]
                 let centerAlpha = pixelData[((renderTexture.width * (renderTexture.height / 2)) + renderTexture.width / 2) * 4 + 3]
 
+                #if DEBUG
                 print("✅ Metal shader captured successfully!")
+                #endif
+                #if DEBUG
                 print("   Alpha info: \(cgImage.alphaInfo.rawValue)")
+                #endif
+                #if DEBUG
                 print("   Top-left corner alpha: \(topLeftAlpha)/255")
+                #endif
+                #if DEBUG
                 print("   Top-right corner alpha: \(topRightAlpha)/255")
+                #endif
+                #if DEBUG
                 print("   Center alpha: \(centerAlpha)/255")
+                #endif
 
                 // Post-process: Threshold alpha to remove faint bloom/glow
                 let processedImage = self.thresholdAlpha(UIImage(cgImage: cgImage), threshold: 0.15)
@@ -184,7 +208,9 @@ struct AmbientOrbExporter: View {
                 self.showCaptureButton = false
                 SensoryFeedback.success()
             } else {
+                #if DEBUG
                 print("❌ Failed to create CGImage from Metal texture")
+                #endif
             }
         }
     }

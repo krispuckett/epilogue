@@ -282,15 +282,21 @@ struct UniversalInputBarOverlay: View {
                 isInputFocused: $isFocused,
                 context: .quickActions,
                 onSubmit: { text in
+                    #if DEBUG
                     print("Submitted: \(text)")
+                    #endif
                 },
                 onMicrophoneTap: {
+                    #if DEBUG
                     print("Microphone tapped")
+                    #endif
                 },
                 colorPalette: nil,
                 showingCommandPalette: false,
                 onCommandPaletteTap: {
+                    #if DEBUG
                     print("Command palette tapped")
+                    #endif
                 }
             )
         }

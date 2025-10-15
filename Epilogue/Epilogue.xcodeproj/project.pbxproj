@@ -14,6 +14,7 @@
 		015808272E383E72006DC492 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 015808262E383E72006DC492 /* Config.xcconfig */; };
 		015D13B02E3353A7002633FE /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13AF2E3353A7002633FE /* WhisperKit */; };
 		015D13B22E3353A7002633FE /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 015D13B12E3353A7002633FE /* whisperkit-cli */; };
+		01E35EC72E998D1B002A2B65 /* Epilogue.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 01E35EC62E998D1B002A2B65 /* Epilogue.storekit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +63,7 @@
 		015D10F22E318D5D002633FE /* ReadEpilogue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReadEpilogue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		015D11032E318D5E002633FE /* EpilogueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		015D110D2E318D5E002633FE /* EpilogueUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EpilogueUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		01E35EC62E998D1B002A2B65 /* Epilogue.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Epilogue.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -167,6 +169,7 @@
 		015D10E92E318D5D002633FE = {
 			isa = PBXGroup;
 			children = (
+				01E35EC62E998D1B002A2B65 /* Epilogue.storekit */,
 				015D10F42E318D5D002633FE /* Epilogue */,
 				015D11062E318D5E002633FE /* EpilogueTests */,
 				015D11102E318D5E002633FE /* EpilogueUITests */,
@@ -371,6 +374,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				01E35EC72E998D1B002A2B65 /* Epilogue.storekit in Resources */,
 				015808272E383E72006DC492 /* Config.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -70,7 +70,9 @@ class CommandProcessingManager: ObservableObject {
                 
             case .addBook(let query):
                 // CRITICAL FIX: Pass the query to the BookSearchSheet via notification
+                #if DEBUG
                 print("📚 CommandProcessingManager: Opening BookSearch with query: '\(query)'")
+                #endif
                 NotificationCenter.default.post(
                     name: Notification.Name("ShowBookSearch"),
                     object: query
@@ -124,7 +126,9 @@ class CommandProcessingManager: ObservableObject {
                 processBatchBookAdditions(titles)
                 
             case .unknown:
+                #if DEBUG
                 print("Unknown command: \(commandText)")
+                #endif
             }
     }
     
@@ -171,7 +175,9 @@ class CommandProcessingManager: ObservableObject {
         // Save to SwiftData
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Quote saved via command")
+            #endif
             
             // Post success notification
             let bookInfo = bookTitle ?? "your collection"
@@ -180,7 +186,9 @@ class CommandProcessingManager: ObservableObject {
                 object: ["message": "Quote saved to \(bookInfo)"]
             )
         } catch {
+            #if DEBUG
             print("Failed to save quote: \(error)")
+            #endif
         }
     }
     
@@ -192,7 +200,9 @@ class CommandProcessingManager: ObservableObject {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Note saved via command")
+            #endif
             
             // Post success notification
             NotificationCenter.default.post(
@@ -200,7 +210,9 @@ class CommandProcessingManager: ObservableObject {
                 object: ["message": "Note saved successfully"]
             )
         } catch {
+            #if DEBUG
             print("Error saving note: \(error)")
+            #endif
         }
     }
     
@@ -277,7 +289,9 @@ class CommandProcessingManager: ObservableObject {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Note saved with book context: \(book.title)")
+            #endif
             
             // Post success notification
             NotificationCenter.default.post(
@@ -285,7 +299,9 @@ class CommandProcessingManager: ObservableObject {
                 object: ["message": "Note saved to \(book.title)"]
             )
         } catch {
+            #if DEBUG
             print("Failed to save note: \(error)")
+            #endif
         }
     }
     
@@ -320,7 +336,9 @@ class CommandProcessingManager: ObservableObject {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Quote saved with book context: \(book.title)")
+            #endif
             
             // Post success notification
             NotificationCenter.default.post(
@@ -328,7 +346,9 @@ class CommandProcessingManager: ObservableObject {
                 object: ["message": "Quote saved from \(book.title)"]
             )
         } catch {
+            #if DEBUG
             print("Failed to save quote: \(error)")
+            #endif
         }
     }
     
@@ -337,7 +357,9 @@ class CommandProcessingManager: ObservableObject {
             switch command {
             case .addBooks(let titles):
                 for title in titles {
+                    #if DEBUG
                     print("Adding book: \(title)")
+                    #endif
                     // Post notification to show book search
                     await MainActor.run {
                         NotificationCenter.default.post(
@@ -348,7 +370,9 @@ class CommandProcessingManager: ObservableObject {
                 }
                 
             case .markAsStatus(let titles, let status):
+                #if DEBUG
                 print("Marking \(titles) as \(status)")
+                #endif
                 // TODO: Implement status update
                 
             case .setReadingGoal(let book, let pagesPerDay):
@@ -394,9 +418,13 @@ class CommandProcessingManager: ObservableObject {
         
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
+                #if DEBUG
                 print("Failed to schedule reminder: \(error)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Reminder scheduled for \(date)")
+                #endif
                 
                 // Post success notification
                 let formatter = DateFormatter()
@@ -415,7 +443,9 @@ class CommandProcessingManager: ObservableObject {
         let goalKey = "readingGoal_\(book.localId)"
         UserDefaults.standard.set(pagesPerDay, forKey: goalKey)
         
+        #if DEBUG
         print("✅ Reading goal set: \(pagesPerDay) pages/day for \(book.title)")
+        #endif
         
         // Post notification to update UI
         NotificationCenter.default.post(
@@ -443,7 +473,9 @@ class CommandProcessingManager: ObservableObject {
             object: titles
         )
         
+        #if DEBUG
         print("📚 Queued \(titles.count) books for batch addition: \(titles.joined(separator: ", "))")
+        #endif
         
         // Post success notification
         NotificationCenter.default.post(
@@ -466,7 +498,9 @@ class CommandProcessingManager: ObservableObject {
             object: nextBook
         )
         
+        #if DEBUG
         print("📖 Processing book search: \(nextBook). Remaining: \(pendingBookSearches.count)")
+        #endif
     }
     
     func clearBookQueue() {

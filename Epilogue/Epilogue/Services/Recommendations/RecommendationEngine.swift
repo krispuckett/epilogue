@@ -31,11 +31,15 @@ class RecommendationEngine {
     // MARK: - Generate Recommendations
 
     func generateRecommendations(for profile: LibraryTasteAnalyzer.TasteProfile) async throws -> [Recommendation] {
+        #if DEBUG
         print("🎯 Generating recommendations from taste profile...")
+        #endif
 
         // Build Perplexity prompt from taste profile
         let prompt = buildPrompt(from: profile)
+        #if DEBUG
         print("📝 Prompt: \(prompt.prefix(200))...")
+        #endif
 
         // Query Perplexity
         let response = try await OptimizedPerplexityService.shared.chat(
@@ -43,12 +47,16 @@ class RecommendationEngine {
             bookContext: nil as Book?
         )
 
+        #if DEBUG
         print("✅ Received recommendation response")
+        #endif
 
         // Parse response into structured recommendations
         let recommendations = parseRecommendations(from: response)
 
+        #if DEBUG
         print("📚 Parsed \(recommendations.count) recommendations")
+        #endif
 
         // Enrich with Google Books data (cover images, years)
         let enriched = await enrichRecommendations(recommendations)
@@ -151,7 +159,9 @@ class RecommendationEngine {
 
         // Fallback: Try to parse numbered list format (1. Title by Author - Reason)
         if recommendations.isEmpty {
+            #if DEBUG
             print("⚠️ Structured format not found, trying numbered list...")
+            #endif
             recommendations = parseNumberedList(from: response)
         }
 
@@ -197,7 +207,9 @@ class RecommendationEngine {
     // MARK: - Enrichment (Google Books Data)
 
     private func enrichRecommendations(_ recommendations: [Recommendation]) async -> [Recommendation] {
+        #if DEBUG
         print("🔍 Enriching \(recommendations.count) recommendations with Google Books data...")
+        #endif
 
         let booksService = EnhancedGoogleBooksService()
         var enriched: [Recommendation] = []
@@ -217,11 +229,15 @@ class RecommendationEngine {
                     year: firstResult.publishedYear,
                     coverURL: firstResult.coverImageURL
                 ))
+                #if DEBUG
                 print("✅ Enriched: \(rec.title) with cover")
+                #endif
             } else {
                 // Keep original if no match found
                 enriched.append(rec)
+                #if DEBUG
                 print("⚠️ No Google Books match for: \(rec.title)")
+                #endif
             }
         }
 

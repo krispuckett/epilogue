@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct NoteContextMenu: View {
     let note: Note
@@ -152,9 +153,48 @@ struct NoteContextMenu: View {
     
     private func shareAsImage() {
         SensoryFeedback.medium()
-        // TODO: Fix ImageRenderer API for iOS 26 - currently broken
-        // Temporarily disabled - need to update to new iOS 26 ImageRenderer API
-        copyText() // Fallback to text copy for now
+
+        // Create a styled note view for rendering
+        let noteView = NoteImageView(
+            content: note.content,
+            author: note.author,
+            bookTitle: note.bookTitle,
+            pageNumber: note.pageNumber,
+            type: note.type
+        )
+
+        // Render to image using modern iOS 16+ API (works on iOS 26)
+        let image = ImageRenderer.renderModern(
+            view: noteView,
+            size: CGSize(width: 1080, height: 1080),
+            scale: 3.0
+        )
+
+        // Share the image
+        let activityVC = UIActivityViewController(
+            activityItems: [image],
+            applicationActivities: nil
+        )
+
+        // Present from key window
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            // Find topmost presented view controller
+            var topVC = rootVC
+            while let presented = topVC.presentedViewController {
+                topVC = presented
+            }
+
+            // Configure for iPad
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = window
+                popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+
+            topVC.present(activityVC, animated: true)
+        }
     }
     
     private func copyText() {
@@ -183,6 +223,90 @@ struct NoteContextMenu: View {
         SensoryFeedback.warning()
         // Use sync-aware deletion
         notesViewModel.deleteNoteWithSync(note)
+    }
+}
+
+// MARK: - Note Image View for Sharing
+private struct NoteImageView: View {
+    let content: String
+    let author: String?
+    let bookTitle: String?
+    let pageNumber: Int?
+    let type: NoteType
+
+    var body: some View {
+        ZStack {
+            // Elegant gradient background
+            LinearGradient(
+                colors: [
+                    Color(red: 0.05, green: 0.05, blue: 0.1),
+                    Color(red: 0.1, green: 0.08, blue: 0.12)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 32) {
+                Spacer()
+
+                // Main content
+                if type == .quote {
+                    // Opening quote
+                    Text("\u{201C}")
+                        .font(.system(size: 80, weight: .light, design: .serif))
+                        .foregroundStyle(.white.opacity(0.2))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 60)
+                        .offset(y: 20)
+
+                    Text(content)
+                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(8)
+                        .padding(.horizontal, 80)
+                } else {
+                    Text(content)
+                        .font(.system(size: 26, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(8)
+                        .padding(.horizontal, 80)
+                }
+
+                Spacer()
+
+                // Attribution
+                VStack(spacing: 8) {
+                    if let author = author {
+                        Text("— \(author)")
+                            .font(.system(size: 18, weight: .medium, design: .serif))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    if let bookTitle = bookTitle {
+                        Text(bookTitle)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+
+                    if let pageNumber = pageNumber {
+                        Text("Page \(pageNumber)")
+                            .font(.system(size: 14, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+
+                // Branding
+                Text("EPILOGUE")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .tracking(4)
+                    .foregroundStyle(.white.opacity(0.3))
+                    .padding(.top, 32)
+            }
+            .padding(.vertical, 80)
+        }
+        .frame(width: 1080, height: 1080)
     }
 }
 

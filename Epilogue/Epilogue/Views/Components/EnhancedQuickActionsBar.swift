@@ -168,7 +168,9 @@ struct EnhancedQuickActionsBar: View {
         }
         .scaleEffect(waveformScale)
         .onTapGesture {
+            #if DEBUG
             print("🎤 DEBUG: Voice button tap detected")
+            #endif
             handleVoiceInput()
         }
         .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.7), trigger: waveformGlow)
@@ -192,22 +194,30 @@ struct EnhancedQuickActionsBar: View {
     }
     
     private func handleSingleTap() {
+        #if DEBUG
         print("🎯 DEBUG: Ambient orb tap detected")
+        #endif
         SensoryFeedback.light()
         startGlowAnimation()
 
         // Check if we're viewing a specific book
         if let currentBook = libraryViewModel.currentDetailBook {
+            #if DEBUG
             print("📚 Opening ambient mode with book: \(currentBook.title)")
+            #endif
             SimplifiedAmbientCoordinator.shared.openAmbientReading(with: currentBook)
         } else {
+            #if DEBUG
             print("🎯 DEBUG: Opening generic ambient mode")
+            #endif
             SimplifiedAmbientCoordinator.shared.openAmbientReading()
         }
     }
 
     private func handleVoiceInput() {
+        #if DEBUG
         print("🎤 Starting voice input for commands")
+        #endif
         SensoryFeedback.light()
         startGlowAnimation()
 

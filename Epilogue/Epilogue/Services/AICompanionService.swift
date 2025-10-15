@@ -454,10 +454,18 @@ class AICompanionService: ObservableObject {
     func debugProcessMessage(_ message: String, bookContext: Book?) async {
         #if DEBUG
         print("AI Service Debug")
+        #if DEBUG
         print("Message: \(message)")
+        #endif
+        #if DEBUG
         print("Book: \(bookContext?.title ?? "None")")
+        #endif
+        #if DEBUG
         print("🔧 Provider: \(currentProvider.rawValue)")
+        #endif
+        #if DEBUG
         print("Configured: \(isConfigured())")
+        #endif
         #endif
         
         do {
@@ -484,15 +492,25 @@ class AICompanionService: ObservableObject {
                 #if DEBUG
                 print("🌐 Testing Perplexity service...")
                 if isConfigured() {
+                    #if DEBUG
                     print("Perplexity API key is configured")
+                    #endif
                     let response = try await processMessage(message, bookContext: bookContext)
+                    #if DEBUG
                     print("📤 Response received [\(response.count) characters]")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("Perplexity API key NOT configured")
+                    #endif
                     if Bundle.main.object(forInfoDictionaryKey: "PERPLEXITY_API_KEY") is String {
+                        #if DEBUG
                         print("🔑 API Key validation failed")
+                        #endif
                     } else {
+                        #if DEBUG
                         print("🔑 No API key found in Info.plist")
+                        #endif
                     }
                 }
                 #endif
@@ -501,14 +519,18 @@ class AICompanionService: ObservableObject {
                 #if DEBUG
                 print("🍎 Testing Apple Intelligence (Foundation Models)...")
                 let response = try await processMessage(message, bookContext: bookContext)
+                #if DEBUG
                 print("📤 Response received [\(response.count) characters]")
+                #endif
                 #endif
             }
             
         } catch {
             #if DEBUG
             print("Error during debug: \(error)")
+            #if DEBUG
             print("Error details: \(error.localizedDescription)")
+            #endif
             #endif
         }
     }

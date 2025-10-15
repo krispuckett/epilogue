@@ -216,7 +216,9 @@ class AmbientLiveActivityManager {
     func startActivity() async {
         // Check if activities are enabled
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            #if DEBUG
             print("Live Activities not enabled")
+            #endif
             return
         }
         
@@ -239,9 +241,13 @@ class AmbientLiveActivityManager {
             // Start update timer for duration
             startUpdateTimer()
             
+            #if DEBUG
             print("✅ Live Activity started: \(currentActivity?.id ?? "unknown")")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to start Live Activity: \(error)")
+            #endif
         }
     }
     
@@ -283,7 +289,9 @@ class AmbientLiveActivityManager {
         await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .after(Date().addingTimeInterval(5)))
         
         currentActivity = nil
+        #if DEBUG
         print("✅ Live Activity ended")
+        #endif
     }
     
     private func startUpdateTimer() {

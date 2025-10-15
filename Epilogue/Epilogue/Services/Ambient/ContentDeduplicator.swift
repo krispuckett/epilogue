@@ -30,14 +30,18 @@ public class ContentDeduplicator {
         
         // 1. Exact match check (O(1))
         if exactMatchCache.object(forKey: normalized as NSString) != nil {
+            #if DEBUG
             print("🔁 Exact duplicate found: \(text.prefix(30))...")
+            #endif
             return true
         }
         
         // 2. Fuzzy match only for recent items (O(10) max)
         for recent in recentContent.suffix(maxRecentItems) {
             if isSimilar(normalized, to: recent.text) {
+                #if DEBUG
                 print("🔄 Similar content found: \(text.prefix(30))...")
+                #endif
                 return true
             }
         }
@@ -164,7 +168,9 @@ extension ContentDeduplicator {
         let cutoff = Date().addingTimeInterval(-timeWindow)
         for recent in recentContent.suffix(10) where recent.timestamp > cutoff {
             if recent.text == normalized {
+                #if DEBUG
                 print("⚠️ Blocking exact duplicate question within \(timeWindow)s")
+                #endif
                 return true
             }
         }

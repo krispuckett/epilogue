@@ -129,7 +129,9 @@ extension View {
             .foregroundStyle(.white)
         
         WaveformHeroButton {
+            #if DEBUG
             print("Hero transition completed!")
+            #endif
         }
         
         Spacer()

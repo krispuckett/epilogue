@@ -313,8 +313,12 @@ struct CleanGoodreadsImportView: View {
                                         height: 105
                                     )
                                     .onAppear {
+                                        #if DEBUG
                                         print("📚 Import preview - Book: \(book.title)")
+                                        #endif
+                                        #if DEBUG
                                         print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                                        #endif
                                     }
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
@@ -521,7 +525,9 @@ struct CleanGoodreadsImportView: View {
             }
             
         case .failure(let error):
+            #if DEBUG
             print("❌ File selection error: \(error)")
+            #endif
         }
     }
 }
@@ -580,10 +586,14 @@ struct ImportBookCoverView: View {
                         self.isLoading = false
                     }
                 }
+                #if DEBUG
                 print("✅ Loaded import preview cover from: \(urlString)")
+                #endif
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to load import preview cover: \(error)")
+            #endif
             await MainActor.run {
                 isLoading = false
             }

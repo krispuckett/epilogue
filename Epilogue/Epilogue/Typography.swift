@@ -245,7 +245,9 @@ class NotesViewModel: ObservableObject {
     private func loadNotes() {
         #if DEBUG
         print("🔍 DEBUG: loadNotes() called")
+        #if DEBUG
         print("🔍 DEBUG: UserDefaults key: \(notesKey)")
+        #endif
         #endif
         
         if let data = userDefaults.data(forKey: notesKey) {
@@ -269,7 +271,9 @@ class NotesViewModel: ObservableObject {
             } catch {
                 #if DEBUG
                 print("❌ DEBUG: Failed to decode notes: \(error)")
+                #if DEBUG
                 print("❌ DEBUG: Error details: \(error.localizedDescription)")
+                #endif
                 #endif
                 // Load sample data on decode error
                 loadSampleData()
@@ -290,8 +294,12 @@ class NotesViewModel: ObservableObject {
     private func saveNotes() {
         #if DEBUG
         print("💾 DEBUG: saveNotes() called")
+        #if DEBUG
         print("💾 DEBUG: Attempting to save \(notes.count) notes")
+        #endif
+        #if DEBUG
         print("💾 DEBUG: UserDefaults key: \(notesKey)")
+        #endif
         #endif
         
         do {
@@ -310,15 +318,21 @@ class NotesViewModel: ObservableObject {
             // Verify the save
             #if DEBUG
             if let verifyData = userDefaults.data(forKey: notesKey) {
+                #if DEBUG
                 print("✅ DEBUG: Verified data saved to UserDefaults, size: \(verifyData.count) bytes")
+                #endif
             } else {
+                #if DEBUG
                 print("❌ DEBUG: Failed to verify data in UserDefaults after save")
+                #endif
             }
             #endif
         } catch {
             #if DEBUG
             print("❌ DEBUG: Failed to encode notes: \(error)")
+            #if DEBUG
             print("❌ DEBUG: Error details: \(error.localizedDescription)")
+            #endif
             #endif
         }
     }
@@ -326,8 +340,12 @@ class NotesViewModel: ObservableObject {
     func addNote(_ note: Note) {
         #if DEBUG
         print("➕ DEBUG: addNote() called")
+        #if DEBUG
         print("➕ DEBUG: Adding note - type: \(note.type.rawValue), [\(note.content.count) characters]")
+        #endif
+        #if DEBUG
         print("➕ DEBUG: Notes count before: \(notes.count)")
+        #endif
         #endif
         
         notes.append(note)
@@ -341,7 +359,9 @@ class NotesViewModel: ObservableObject {
     func deleteNote(_ note: Note) {
         #if DEBUG
         print("🗑 DEBUG: deleteNote() called for note ID: \(note.id)")
+        #if DEBUG
         print("🗑 DEBUG: Notes count before: \(notes.count)")
+        #endif
         #endif
         
         notes.removeAll { $0.id == note.id }
@@ -412,7 +432,9 @@ class NotesViewModel: ObservableObject {
     // Remove this - it causes ambiguity issues with Note type
     /*
     func syncWithSwiftData(quotes: [CapturedQuote], notes: [CapturedNote]) {
+        #if DEBUG
         print("🔄 Syncing with SwiftData: \(quotes.count) quotes, \(notes.count) notes")
+        #endif
         
         // Convert SwiftData quotes to Note model
         for quote in quotes {
@@ -498,30 +520,46 @@ class NotesViewModel: ObservableObject {
     // Debug method to check UserDefaults
     #if DEBUG
     func debugUserDefaults() {
+        #if DEBUG
         print("🔍 DEBUG: Checking UserDefaults diagnostics")
+        #endif
+        #if DEBUG
         print("🔍 DEBUG: UserDefaults suite: \(userDefaults)")
+        #endif
         
         // Check all keys
         let allKeys = userDefaults.dictionaryRepresentation().keys
+        #if DEBUG
         print("🔍 DEBUG: All UserDefaults keys: \(allKeys)")
+        #endif
         
         // Check our specific key
         if let data = userDefaults.data(forKey: notesKey) {
+            #if DEBUG
             print("🔍 DEBUG: Found data for key '\(notesKey)': \(data.count) bytes")
+            #endif
             
             // Try to decode to see if there's an issue
             do {
                 let notes = try JSONDecoder().decode([Note].self, from: data)
+                #if DEBUG
                 print("🔍 DEBUG: Successfully decoded \(notes.count) notes from UserDefaults")
+                #endif
             } catch {
+                #if DEBUG
                 print("❌ DEBUG: Failed to decode from UserDefaults: \(error)")
+                #endif
             }
         } else {
+            #if DEBUG
             print("❌ DEBUG: No data found for key '\(notesKey)'")
+            #endif
         }
         
         // Try clearing and re-saving to test
+        #if DEBUG
         print("🔍 DEBUG: Testing save/load cycle...")
+        #endif
         let testNote = Note(type: .note, content: "Test note", dateCreated: Date())
         let testNotes = [testNote]
         
@@ -530,10 +568,14 @@ class NotesViewModel: ObservableObject {
             userDefaults.synchronize()
             
             if userDefaults.data(forKey: "com.epilogue.testNotes") != nil {
+                #if DEBUG
                 print("✅ DEBUG: Test save/load successful")
+                #endif
                 userDefaults.removeObject(forKey: "com.epilogue.testNotes")
             } else {
+                #if DEBUG
                 print("❌ DEBUG: Test save/load failed")
+                #endif
             }
         }
     }

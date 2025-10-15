@@ -300,29 +300,39 @@ struct UnifiedQuickActionCard: View {
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(searchQuery: searchText) { book in
+                #if DEBUG
                 print("📚 [INPUT BAR] Book selected: \(book.title)")
+                #endif
 
                 // Add to UserDefaults
                 libraryViewModel.addBook(book)
 
                 // Create BookModel in SwiftData + enrich
                 Task {
+                    #if DEBUG
                     print("📚 [INPUT BAR] Creating BookModel...")
+                    #endif
                     let descriptor = FetchDescriptor<BookModel>(
                         predicate: #Predicate<BookModel> { $0.id == book.id }
                     )
 
                     if let existingModel = try? modelContext.fetch(descriptor).first {
+                        #if DEBUG
                         print("✅ BookModel exists, enriching...")
+                        #endif
                         if !existingModel.isEnriched {
                             await BookEnrichmentService.shared.enrichBook(existingModel)
                         }
                     } else {
+                        #if DEBUG
                         print("📝 Creating new BookModel...")
+                        #endif
                         let bookModel = BookModel(from: book)
                         modelContext.insert(bookModel)
                         try? modelContext.save()
+                        #if DEBUG
                         print("✅ BookModel saved, enriching...")
+                        #endif
                         await BookEnrichmentService.shared.enrichBook(bookModel)
                     }
                 }
@@ -348,7 +358,9 @@ struct UnifiedQuickActionCard: View {
         .sheet(isPresented: $showBookScanner) {
             if #available(iOS 16.0, *) {
                 PerfectBookScanner { book in
+                    #if DEBUG
                     print("📚 UnifiedQuickActionCard: Book added - \(book.title)")
+                    #endif
 
                     // Add to UserDefaults
                     libraryViewModel.addBook(book)
@@ -375,13 +387,17 @@ struct UnifiedQuickActionCard: View {
                     // Don't close scanner - allow continuous scanning
                 }
                 .onAppear {
+                    #if DEBUG
                     print("🚀 UnifiedQuickActionCard: PERFECT SCANNER LOADED!")
+                    #endif
                 }
             } else {
                 BookScannerView()
                     .environmentObject(libraryViewModel)
                     .onAppear {
+                        #if DEBUG
                         print("⚠️ UnifiedQuickActionCard: OLD SCANNER (iOS < 16)")
+                        #endif
                     }
             }
         }
@@ -663,14 +679,20 @@ struct UnifiedQuickActionCard: View {
         guard !trimmed.isEmpty else { return }
 
         // USE SMART COMMANDPARSER FOR CONSISTENT BEHAVIOR
+        #if DEBUG
         print("🔍 UnifiedQuickActionCard: Processing input: '\(trimmed)'")
+        #endif
         let intent = CommandParser.parse(trimmed, books: libraryViewModel.books, notes: notesViewModel.notes)
+        #if DEBUG
         print("🔍 UnifiedQuickActionCard: Detected intent: \(intent)")
+        #endif
 
         switch intent {
         case .addBook(let query):
             // Open book search sheet with query
+            #if DEBUG
             print("📚 UnifiedQuickActionCard: Opening book search with query: '\(query)'")
+            #endif
             NotificationCenter.default.post(
                 name: Notification.Name("ShowBookSearch"),
                 object: query
@@ -875,7 +897,9 @@ struct UnifiedQuickActionCard: View {
     }
 
     private func createNote(_ text: String) {
+        #if DEBUG
         print("📝 UnifiedQuickActionCard: Creating note with text: \(text)")
+        #endif
         
         // Use selected book context if available, otherwise current detail book
         let book = selectedBookContext ?? libraryViewModel.currentDetailBook
@@ -890,12 +914,18 @@ struct UnifiedQuickActionCard: View {
             noteData["bookId"] = book.localId.uuidString
             noteData["bookTitle"] = book.title
             noteData["bookAuthor"] = book.author
+            #if DEBUG
             print("📝 Note has book context: \(book.title)")
+            #endif
         } else {
+            #if DEBUG
             print("📝 Note has no book context")
+            #endif
         }
         
+        #if DEBUG
         print("📝 Posting CreateNewNote notification with data: \(noteData)")
+        #endif
         
         // Post the notification with a small delay to ensure the view is ready
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

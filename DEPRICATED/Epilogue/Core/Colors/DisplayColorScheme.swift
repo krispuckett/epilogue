@@ -57,8 +57,12 @@ class DisplayColorScheme {
         // Debug logging
         #if DEBUG
         print("🎨 DisplayColorScheme updated:")
+        #if DEBUG
         print("  Average luminance: \(String(format: "%.2f", averageGradientLuminance))")
+        #endif
+        #if DEBUG
         print("  Text color: \(primaryTextColor == .black ? "black" : "white")")
+        #endif
         #endif
     }
     
@@ -142,9 +146,15 @@ class DisplayColorScheme {
         
         #if DEBUG
         if !meetsWCAG {
+            #if DEBUG
             print("⚠️ CONTRAST WARNING: \(String(format: "%.2f", contrast)) (needs 4.5+)")
+            #endif
+            #if DEBUG
             print("  Text luminance: \(String(format: "%.2f", luminance(of: primaryTextColor)))")
+            #endif
+            #if DEBUG
             print("  Bg luminance: \(String(format: "%.2f", luminance(of: averageGradientColor)))")
+            #endif
         }
         #endif
         
@@ -211,7 +221,9 @@ class DisplayColorScheme {
         
         #if DEBUG
         let finalContrast = calculateContrast(text: primaryTextColor, background: averageGradientColor)
+        #if DEBUG
         print("✅ Final contrast: \(String(format: "%.2f", finalContrast))")
+        #endif
         #endif
     }
     
@@ -276,9 +288,15 @@ struct ContrastValidator: ViewModifier {
                 )
                 
                 if contrast < 4.5 {
+                    #if DEBUG
                     print("⚠️ CONTRAST FAILURE: \(String(format: "%.2f", contrast)) (needs 4.5+)")
+                    #endif
+                    #if DEBUG
                     print("  Text: \(textColor.description)")
+                    #endif
+                    #if DEBUG
                     print("  Background: \(backgroundColor.description)")
+                    #endif
                 }
             }
             .overlay(alignment: .topTrailing) {

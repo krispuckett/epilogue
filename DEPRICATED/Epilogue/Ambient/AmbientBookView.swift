@@ -85,7 +85,9 @@ struct AmbientBookView: View {
         .onChange(of: palette) { newPalette in
             if let palette = newPalette {
                 onPaletteExtracted(palette)
+                #if DEBUG
                 print("🎨 Palette extracted with luminance: \(palette.luminance)")
+                #endif
             }
         }
     }
@@ -103,7 +105,9 @@ struct AmbientBookView: View {
         
         // Load cover image
         guard let image = await loadCoverImage() else {
+            #if DEBUG
             print("Failed to load cover image for \(book.title)")
+            #endif
             isLoading = false
             return
         }
@@ -123,24 +127,32 @@ struct AmbientBookView: View {
         }
         
         // Debug logging
+        #if DEBUG
         print("🎨 COLORS FOR \(book.title):")
+        #endif
         for (i, color) in extractedPalette.colors.enumerated() {
             let ui = UIColor(color)
             var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
             ui.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+            #if DEBUG
             print("  Color \(i): H:\(Int(h*360))° S:\(Int(s*100))% B:\(Int(b*100))%")
+            #endif
         }
         
         // Notify immediately when palette is loaded
         DispatchQueue.main.async {
             self.onPaletteExtracted(extractedPalette)
+            #if DEBUG
             print("🎨 Initial palette extracted with luminance: \(extractedPalette.luminance)")
+            #endif
         }
     }
     
     private func loadCoverImage() async -> UIImage? {
         guard let urlString = book.coverImageURL else { 
+            #if DEBUG
             print("❌ No cover URL available for book: \(book.title)")
+            #endif
             return nil 
         }
         
@@ -165,19 +177,27 @@ struct AmbientBookView: View {
         }
         
         guard let url = URL(string: httpsURLString) else { 
+            #if DEBUG
             print("❌ Invalid URL: \(httpsURLString)")
+            #endif
             return nil 
         }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             if let image = UIImage(data: data) {
+                #if DEBUG
                 print("✅ Image loaded successfully for \(book.title), size: \(image.size)")
+                #endif
+                #if DEBUG
                 print("   URL: \(httpsURLString)")
+                #endif
                 return image
             }
         } catch {
+            #if DEBUG
             print("❌ Error loading image: \(error)")
+            #endif
         }
         
         return nil

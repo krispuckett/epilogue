@@ -267,20 +267,24 @@ struct QuickActionsSheet: View {
                     showBookScanner = false
                 }
                 .onAppear {
+                    #if DEBUG
                     print("🔷 QuickActionsSheet: Loading PERFECT SCANNER")
+                    #endif
                 }
             } else {
                 BookScannerView()
                     .environmentObject(libraryViewModel)
                     .onAppear {
+                        #if DEBUG
                         print("⚠️ QuickActionsSheet: Loading OLD SCANNER")
+                        #endif
                     }
             }
         }
     }
     
     // MARK: - Command Row
-    
+
     private func commandRow(command: Command) -> some View {
         HStack(spacing: 16) {
             // Icon
@@ -288,29 +292,33 @@ struct QuickActionsSheet: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.white.opacity(0.8))
                 .frame(width: 32, height: 32)
-            
+
             // Text
             VStack(alignment: .leading, spacing: 2) {
                 Text(command.title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
-                
+
                 if let description = command.description {
                     Text(description)
                         .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.6))
                 }
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(command.description ?? command.title)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to \(command.title.lowercased())")
     }
     
     // MARK: - Book Row
-    
+
     private func bookRow(book: Book) -> some View {
         HStack(spacing: 16) {
             // Book cover
@@ -321,29 +329,34 @@ struct QuickActionsSheet: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-            
+            .accessibilityHidden(true)
+
             // Book info
             VStack(alignment: .leading, spacing: 2) {
                 Text(book.title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                
+
                 Text(book.author)
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(book.title) by \(book.author)")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to view book details")
     }
     
     // MARK: - Note Row
-    
+
     private func noteRow(note: Note) -> some View {
         HStack(spacing: 16) {
             // Icon
@@ -351,14 +364,14 @@ struct QuickActionsSheet: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.white.opacity(0.8))
                 .frame(width: 32, height: 32)
-            
+
             // Note preview
             VStack(alignment: .leading, spacing: 2) {
                 Text(note.content)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(2)
-                
+
                 if let bookTitle = note.bookTitle {
                     Text(bookTitle)
                         .font(.system(size: 14))
@@ -366,12 +379,16 @@ struct QuickActionsSheet: View {
                         .lineLimit(1)
                 }
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(note.type == .quote ? "Quote" : "Note"): \(note.content)\(note.bookTitle.map { " from \($0)" } ?? "")")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to view \(note.type == .quote ? "quote" : "note") details")
     }
     
     // MARK: - Actions
@@ -450,7 +467,9 @@ struct QuickActionsSheet: View {
         QuickActionsSheet(
             isPresented: .constant(true),
             onActionSelected: { action in
+                #if DEBUG
                 print("Selected: \(action)")
+                #endif
             }
         )
         .environmentObject(LibraryViewModel())

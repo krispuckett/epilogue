@@ -159,13 +159,17 @@ extension KeychainManager {
         }
         
         try savePerplexityAPIKey(apiKey)
+        #if DEBUG
         print("✅ API key securely stored in Keychain")
+        #endif
     }
     
     /// Remove legacy API key storage (one-time migration)
     func removeLegacyAPIKeyStorage() {
         // This method is for cleanup only - no actual migration
         // since we no longer store keys in Info.plist or Config files
+        #if DEBUG
         print("✅ Legacy API key storage check complete")
+        #endif
     }
 }

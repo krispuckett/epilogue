@@ -8,7 +8,9 @@ class DisplayedImageStore {
     
     func store(image: UIImage, for url: String) {
         displayedImages[url] = image
+        #if DEBUG
         print("📸 Stored displayed image for URL: \(url)")
+        #endif
     }
     
     func getImage(for url: String) -> UIImage? {
@@ -31,7 +33,9 @@ struct SharedBookCoverView: View {
         self.width = width
         self.height = height
         self.onImageLoaded = onImageLoaded
+        #if DEBUG
         print("📚 SharedBookCoverView init - URL: \(coverURL ?? "nil"), dimensions: \(width)x\(height)")
+        #endif
     }
     
     // Simplified URL enhancement
@@ -43,14 +47,22 @@ struct SharedBookCoverView: View {
         
         // Log to verify zoom parameter
         if enhanced.contains("zoom=1") {
+            #if DEBUG
             print("⚠️ WARNING: URL still has zoom=1: \(enhanced)")
+            #endif
         } else if enhanced.contains("zoom=3") {
+            #if DEBUG
             print("✅ URL correctly has zoom=3: \(enhanced)")
+            #endif
         } else {
+            #if DEBUG
             print("⚠️ URL has no zoom parameter: \(enhanced)")
+            #endif
         }
         
+        #if DEBUG
         print("🔗 Final URL: \(enhanced)")
+        #endif
         return URL(string: enhanced)
     }
     
@@ -68,12 +80,16 @@ struct SharedBookCoverView: View {
             
             do {
                 try data.write(to: tempURL)
+                #if DEBUG
                 print("💾 Saved displayed image to: \(tempURL.path)")
+                #endif
                 
                 // Save to Photos for easy inspection
                 UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
             } catch {
+                #if DEBUG
                 print("❌ Failed to save displayed image: \(error)")
+                #endif
             }
         }
     }
@@ -107,9 +123,15 @@ struct SharedBookCoverView: View {
                                 Task {
                                     if let uiImage = await convertToUIImage(image: image) {
                                         let checksum = calculateChecksum(for: uiImage)
+                                        #if DEBUG
                                         print("✅ DISPLAYED Image loaded - Checksum: \(checksum)")
+                                        #endif
+                                        #if DEBUG
                                         print("   URL: \(url.absoluteString)")
+                                        #endif
+                                        #if DEBUG
                                         print("   Size: \(uiImage.size)")
+                                        #endif
                                         
                                         // Store the image
                                         displayedImage = uiImage
@@ -130,8 +152,12 @@ struct SharedBookCoverView: View {
                             .font(.system(size: min(width, height) * 0.25))
                             .foregroundStyle(.white.opacity(0.2))
                             .onAppear {
+                                #if DEBUG
                                 print("❌ Failed to load image from URL: \(url)")
+                                #endif
+                                #if DEBUG
                                 print("   Error: \(error)")
+                                #endif
                             }
                     @unknown default:
                         EmptyView()

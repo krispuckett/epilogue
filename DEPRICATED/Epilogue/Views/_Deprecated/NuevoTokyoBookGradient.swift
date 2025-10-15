@@ -113,7 +113,9 @@ struct NuevoTokyoBookGradient: View {
     
     // MARK: - Color Extraction
     private func extractDominantColors() {
+        #if DEBUG
         print("🎌 Extracting colors for Nuevo Tokyo gradient")
+        #endif
         
         // Resize image for processing
         let targetSize = CGSize(width: 200, height: 300)
@@ -127,12 +129,16 @@ struct NuevoTokyoBookGradient: View {
         // Extract ALL vibrant colors
         let colors = extractAllVibrantColors(from: cgImage)
         
+        #if DEBUG
         print("🎌 Found \(colors.count) colors before processing")
+        #endif
         
         // Apply Japanese-inspired color processing
         extractedColors = processColorsForNuevoTokyo(colors)
         
+        #if DEBUG
         print("🎌 Final Nuevo Tokyo colors: \(extractedColors.count)")
+        #endif
         
         // Use SmartAccentColorExtractor for intelligent accent color detection
         let smartAccent = SmartAccentColorExtractor.extractAccentColor(

@@ -8,7 +8,9 @@ struct MetalLiteraryView: UIViewRepresentable {
         let mtkView = MTKView()
         
         guard let device = MTLCreateSystemDefaultDevice() else {
+            #if DEBUG
             print("Metal is not supported on this device")
+            #endif
             return mtkView
         }
         
@@ -53,13 +55,17 @@ struct MetalLiteraryView: UIViewRepresentable {
         
         func setupMetal(mtkView: MTKView) {
             guard let device = mtkView.device else {
+                #if DEBUG
                 print("Metal device not available")
+                #endif
                 return
             }
             metalDevice = device
             
             guard let commandQueue = device.makeCommandQueue() else {
+                #if DEBUG
                 print("Failed to create command queue")
+                #endif
                 return
             }
             metalCommandQueue = commandQueue
@@ -70,7 +76,9 @@ struct MetalLiteraryView: UIViewRepresentable {
         
         func setupShaders() {
             guard let device = metalDevice else {
+                #if DEBUG
                 print("Metal device not available")
+                #endif
                 return
             }
             
@@ -86,27 +94,37 @@ struct MetalLiteraryView: UIViewRepresentable {
                 do {
                     library = try device.makeDefaultLibrary(bundle: bundle)
                 } catch {
+                    #if DEBUG
                     print("Failed to load library from bundle: \(error)")
+                    #endif
                 }
             }
             
             guard let defaultLibrary = library else {
+                #if DEBUG
                 print("Failed to create Metal library - check that LiteraryCompanion.metal is added to the target")
+                #endif
                 return
             }
             
             // List all functions in the library for debugging
             let functionNames = defaultLibrary.functionNames
+            #if DEBUG
             print("Available Metal functions: \(functionNames)")
+            #endif
             
             // Create render pipeline
             guard let vertexFunction = defaultLibrary.makeFunction(name: "ambientVertex") else {
+                #if DEBUG
                 print("Failed to find ambientVertex function in Metal shader")
+                #endif
                 return
             }
             
             guard let fragmentFunction = defaultLibrary.makeFunction(name: "ambientFragment") else {
+                #if DEBUG
                 print("Failed to find ambientFragment function in Metal shader")
+                #endif
                 return
             }
             
@@ -118,7 +136,9 @@ struct MetalLiteraryView: UIViewRepresentable {
             do {
                 pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
             } catch {
+                #if DEBUG
                 print("Failed to create render pipeline state: \(error)")
+                #endif
             }
         }
         
@@ -128,14 +148,18 @@ struct MetalLiteraryView: UIViewRepresentable {
         
         func draw(in view: MTKView) {
             guard isInitialized else {
+                #if DEBUG
                 print("Metal not initialized yet")
+                #endif
                 return
             }
             
             guard let device = metalDevice,
                   let commandQueue = metalCommandQueue,
                   let pipelineState = pipelineState else {
+                #if DEBUG
                 print("Metal components missing - device: \(metalDevice != nil), queue: \(metalCommandQueue != nil), pipeline: \(pipelineState != nil)")
+                #endif
                 return
             }
             

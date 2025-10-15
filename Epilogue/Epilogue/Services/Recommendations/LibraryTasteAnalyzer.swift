@@ -43,7 +43,9 @@ class LibraryTasteAnalyzer {
     // MARK: - Analysis
 
     func analyzeLibrary(books: [BookModel]) async -> TasteProfile {
+        #if DEBUG
         print("📊 Analyzing library of \(books.count) books...")
+        #endif
 
         // Extract genres
         let genreFrequency = extractGenres(from: books)
@@ -73,11 +75,21 @@ class LibraryTasteAnalyzer {
             createdAt: Date()
         )
 
+        #if DEBUG
         print("✅ Taste profile created:")
+        #endif
+        #if DEBUG
         print("   Top genres: \(profile.genres.sorted(by: { $0.value > $1.value }).prefix(3).map { $0.key })")
+        #endif
+        #if DEBUG
         print("   Top authors: \(profile.authors.sorted(by: { $0.value > $1.value }).prefix(3).map { $0.key })")
+        #endif
+        #if DEBUG
         print("   Themes: \(profile.themes.prefix(5))")
+        #endif
+        #if DEBUG
         print("   Reading level: \(profile.readingLevel.rawValue)")
+        #endif
 
         return profile
     }

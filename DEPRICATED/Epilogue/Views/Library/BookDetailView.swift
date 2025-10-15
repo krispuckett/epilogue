@@ -271,7 +271,9 @@ struct BookDetailView: View {
                 height: 270,
                 onImageLoaded: { uiImage in
                     // Store the actual displayed image
+                    #if DEBUG
                     print("🖼️ BookDetailView: Received displayed image")
+                    #endif
                     self.coverImage = uiImage
                     
                     // Extract colors from the SAME image that's displayed
@@ -737,8 +739,12 @@ struct BookDetailView: View {
         // Set extracting state
         isExtractingColors = true
         
+        #if DEBUG
         print("🎨 Extracting colors from DISPLAYED image for: \(book.title)")
+        #endif
+        #if DEBUG
         print("📐 Displayed image size: \(displayedImage.size)")
+        #endif
         
         do {
             // Extract colors using OKLAB from the displayed image
@@ -752,13 +758,25 @@ struct BookDetailView: View {
             }
             
             // Debug print
+            #if DEBUG
             print("🎨 Extracted colors from displayed image:")
+            #endif
+            #if DEBUG
             print("  Primary: \(palette.primary.description)")
+            #endif
+            #if DEBUG
             print("  Secondary: \(palette.secondary.description)")
+            #endif
+            #if DEBUG
             print("  Accent: \(palette.accent.description)")
+            #endif
+            #if DEBUG
             print("  Background: \(palette.background.description)")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to extract colors from displayed image: \(error)")
+            #endif
         }
         
         isExtractingColors = false
@@ -768,11 +786,15 @@ struct BookDetailView: View {
         // Set extracting state
         isExtractingColors = true
         
+        #if DEBUG
         print("🎨 Starting OKLAB color extraction for book: \(book.title)")
+        #endif
         
         // Try to load the book cover image
         guard let coverURLString = book.coverImageURL else {
+            #if DEBUG
             print("❌ No cover URL")
+            #endif
             isExtractingColors = false
             return
         }
@@ -780,7 +802,9 @@ struct BookDetailView: View {
         // Convert HTTP to HTTPS for security
         let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
         guard let coverURL = URL(string: secureURLString) else {
+            #if DEBUG
             print("❌ Invalid cover URL")
+            #endif
             isExtractingColors = false
             return
         }
@@ -789,7 +813,9 @@ struct BookDetailView: View {
             // Download the image
             let (imageData, _) = try await URLSession.shared.data(from: coverURL)
             guard let uiImage = UIImage(data: imageData) else {
+                #if DEBUG
                 print("❌ Could not create UIImage from data")
+                #endif
                 isExtractingColors = false
                 return
             }
@@ -808,42 +834,84 @@ struct BookDetailView: View {
             }
             
             // Debug print
+            #if DEBUG
             print("🎨 Extracted colors from \(book.title):")
+            #endif
+            #if DEBUG
             print("  Primary: \(palette.primary.description)")
+            #endif
+            #if DEBUG
             print("  Secondary: \(palette.secondary.description)")
+            #endif
+            #if DEBUG
             print("  Accent: \(palette.accent.description)")
+            #endif
+            #if DEBUG
             print("  Background: \(palette.background.description)")
+            #endif
+            #if DEBUG
             print("  Text Color: \(palette.textColor.description)")
+            #endif
+            #if DEBUG
             print("  Luminance: \(String(format: "%.2f", palette.luminance))")
+            #endif
+            #if DEBUG
             print("  Monochromatic: \(palette.isMonochromatic)")
+            #endif
+            #if DEBUG
             print("  Quality: \(String(format: "%.2f%%", palette.extractionQuality * 100))")
+            #endif
             
         } catch {
+            #if DEBUG
             print("❌ Failed to extract colors: \(error.localizedDescription)")
+            #endif
         }
         
         isExtractingColors = false
     }
     
     private func testImageConsistency() async {
+        #if DEBUG
         print("\n🧪 TESTING IMAGE CONSISTENCY")
+        #endif
+        #if DEBUG
         print("Book: \(book.title)")
+        #endif
+        #if DEBUG
         print("Cover URL: \(book.coverImageURL ?? "nil")")
+        #endif
         
         // Wait for images to be saved
         try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
+        #if DEBUG
         print("\n📊 TEST RESULTS:")
+        #endif
+        #if DEBUG
         print("1. Check console logs for checksums")
+        #endif
+        #if DEBUG
         print("2. Check Photos app for saved images:")
+        #endif
+        #if DEBUG
         print("   - DISPLAYED_* images (what you see)")
+        #endif
+        #if DEBUG
         print("   - EXTRACTED_* images (what color extractor uses)")
+        #endif
+        #if DEBUG
         print("3. Both checksums should match if using same image")
+        #endif
+        #if DEBUG
         print("\n⚠️ If checksums differ, the images are different!")
+        #endif
     }
     
     private func runColorDiagnostic() async {
+        #if DEBUG
         print("🔬 Running color diagnostic for: \(book.title)")
+        #endif
         
         // Try to get the cover image
         if let coverImage = coverImage {
@@ -853,24 +921,32 @@ struct BookDetailView: View {
             // Download the image if we don't have it
             let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
             guard let coverURL = URL(string: secureURLString) else {
+                #if DEBUG
                 print("❌ Invalid cover URL for diagnostic")
+                #endif
                 return
             }
             
             do {
                 let (imageData, _) = try await URLSession.shared.data(from: coverURL)
                 guard let uiImage = UIImage(data: imageData) else {
+                    #if DEBUG
                     print("❌ Could not create UIImage for diagnostic")
+                    #endif
                     return
                 }
                 
                 let diagnostic = ColorExtractionDiagnostic()
                 await diagnostic.runDiagnostic(on: uiImage, bookTitle: book.title)
             } catch {
+                #if DEBUG
                 print("❌ Failed to download image for diagnostic: \(error)")
+                #endif
             }
         } else {
+            #if DEBUG
             print("❌ No cover image available for diagnostic")
+            #endif
         }
     }
     

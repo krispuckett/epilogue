@@ -193,12 +193,16 @@ extension OptimizedPerplexityService {
         
         // Check cache first
         if let cachedResponse = await ResponseCache.shared.getResponse(for: message, bookTitle: bookTitle) {
+            #if DEBUG
             print("📦 Using cached response for: \(message)")
+            #endif
             return cachedResponse
         }
         
         // Generate new response
+        #if DEBUG
         print("🔄 Generating new response for: \(message)")
+        #endif
         let response = try await shared.chat(message: message, bookContext: bookContext)
         
         // Cache the response

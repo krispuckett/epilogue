@@ -342,7 +342,9 @@ public class SharedBookCoverManager: ObservableObject {
             guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else {
                 #if DEBUG
                 print("❌ Invalid or unsafe URL: \(urlString)")
+                #if DEBUG
                 print("   Failed URL validation for cover image")
+                #endif
                 #endif
                 return nil
             }
@@ -354,7 +356,9 @@ public class SharedBookCoverManager: ObservableObject {
                     let displayURL = url.absoluteString.count > 100
                         ? "...\(url.absoluteString.suffix(80))"
                         : url.absoluteString
+                    #if DEBUG
                     print("📥 Loading book cover from: \(displayURL) (attempt \(attempt))")
+                    #endif
                     #endif
                     
                     // Create request with timeout
@@ -656,7 +660,9 @@ public class SharedBookCoverManager: ObservableObject {
     
     /// Clear all caches (memory and disk)
     public func clearAllCaches() {
+        #if DEBUG
         print("🧹 Clearing ALL SharedBookCoverManager caches...")
+        #endif
         
         // Clear memory caches
         Self.imageCache.removeAllObjects()
@@ -675,10 +681,14 @@ public class SharedBookCoverManager: ObservableObject {
                     for fileURL in contents {
                         try fileManager.removeItem(at: fileURL)
                     }
+                    #if DEBUG
                     print("✅ Cleared \(contents.count) files from disk cache")
+                    #endif
                 }
             } catch {
+                #if DEBUG
                 print("❌ Error clearing disk cache: \(error)")
+                #endif
             }
         }
         
@@ -688,7 +698,9 @@ public class SharedBookCoverManager: ObservableObject {
         // Also clear URLCache
         URLCache.shared.removeAllCachedResponses()
         
+        #if DEBUG
         print("✅ All SharedBookCoverManager caches cleared")
+        #endif
     }
     
     /// Clear cache for specific URL
@@ -719,7 +731,9 @@ public class SharedBookCoverManager: ObservableObject {
             try? FileManager.default.removeItem(at: libraryPath)
         }
         
+        #if DEBUG
         print("🧹 Cleared cache for URL: \(urlString)")
+        #endif
     }
     
     /// Batch preload covers for better performance

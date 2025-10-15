@@ -3,7 +3,9 @@ import SwiftUI
 // Test suite for CommandIntent detection
 struct CommandIntentTests {
     static func runAllTests() {
+        #if DEBUG
         print("\n=== Running CommandIntent Tests ===\n")
+        #endif
         
         // Sample data for testing
         let sampleBooks = [
@@ -65,23 +67,45 @@ struct CommandIntentTests {
             let intentType = getIntentType(intent)
             
             if intentType == expectedType {
+                #if DEBUG
                 print("✅ PASS: \(description)")
+                #endif
+                #if DEBUG
                 print("   Input: '\(input)' → \(intentType)")
+                #endif
                 passed += 1
             } else {
+                #if DEBUG
                 print("❌ FAIL: \(description)")
+                #endif
+                #if DEBUG
                 print("   Input: '\(input)'")
+                #endif
+                #if DEBUG
                 print("   Expected: \(expectedType)")
+                #endif
+                #if DEBUG
                 print("   Got: \(intentType)")
+                #endif
                 failed += 1
             }
         }
         
+        #if DEBUG
         print("\n=== Test Results ===")
+        #endif
+        #if DEBUG
         print("Total: \(passed + failed)")
+        #endif
+        #if DEBUG
         print("Passed: \(passed)")
+        #endif
+        #if DEBUG
         print("Failed: \(failed)")
+        #endif
+        #if DEBUG
         print("Success Rate: \(Int((Double(passed) / Double(passed + failed)) * 100))%")
+        #endif
     }
     
     private static func getIntentType(_ intent: CommandIntent) -> String {

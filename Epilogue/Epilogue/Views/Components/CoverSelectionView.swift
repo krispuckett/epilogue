@@ -113,7 +113,9 @@ struct CoverSelectionView: View {
                 }
                 isLoading = false
                 
+                #if DEBUG
                 print("📚 Found \(uniqueCovers.count) unique covers for \(bookTitle)")
+                #endif
             }
         }
     }

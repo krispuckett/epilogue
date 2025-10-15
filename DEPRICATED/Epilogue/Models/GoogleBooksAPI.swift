@@ -172,20 +172,28 @@ class GoogleBooksService: ObservableObject {
     
     func searchBooks(query: String) async {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { 
+            #if DEBUG
             print("GoogleBooksAPI: Empty query")
+            #endif
             return 
         }
         
+        #if DEBUG
         print("GoogleBooksAPI: Starting search for: '\(query)'")
+        #endif
         isLoading = true
         errorMessage = nil
         
         do {
             let books = try await performSearch(query: query)
+            #if DEBUG
             print("GoogleBooksAPI: Found \(books.count) books")
+            #endif
             searchResults = books
         } catch {
+            #if DEBUG
             print("GoogleBooksAPI: Error - \(error.localizedDescription)")
+            #endif
             errorMessage = error.localizedDescription
             searchResults = []
         }
@@ -214,11 +222,15 @@ class GoogleBooksService: ObservableObject {
         ]
         
         guard let url = components.url else {
+            #if DEBUG
             print("GoogleBooksAPI: Invalid URL")
+            #endif
             throw APIError.invalidURL
         }
         
+        #if DEBUG
         print("GoogleBooksAPI: Making request to: \(url.absoluteString)")
+        #endif
         
         // Perform the request
         let (data, response) = try await session.data(from: url)

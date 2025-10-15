@@ -96,7 +96,9 @@ struct BookSearchSheet: View {
         .presentationCornerRadius(32)
         .presentationBackground(.clear)
         .onAppear {
+            #if DEBUG
             print("📚 BookSearchSheet appeared with query: '\(searchQuery)'")
+            #endif
             refinedSearchQuery = searchQuery
             if searchQuery.isEmpty {
                 // Start not loading to show bestsellers immediately
@@ -324,11 +326,21 @@ struct BookSearchSheet: View {
                     ], spacing: 20) {
                         ForEach(books, id: \.id) { book in
                             BestsellerBookCard(book: book) {
+                                #if DEBUG
                                 print("🔥 DEBUG: Book selected from trending/bestsellers:")
+                                #endif
+                                #if DEBUG
                                 print("   ID: \(book.id)")
+                                #endif
+                                #if DEBUG
                                 print("   Title: \(book.title)")
+                                #endif
+                                #if DEBUG
                                 print("   Author: \(book.author)")
+                                #endif
+                                #if DEBUG
                                 print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                                #endif
                                 onBookSelected(book)
                                 dismiss()
                             }
@@ -344,11 +356,21 @@ struct BookSearchSheet: View {
                     ], spacing: 20) {
                         ForEach(bestsellerBooks, id: \.id) { book in
                             BestsellerBookCard(book: book) {
+                                #if DEBUG
                                 print("📚 DEBUG: Book selected from static bestsellers:")
+                                #endif
+                                #if DEBUG
                                 print("   ID: \(book.id)")
+                                #endif
+                                #if DEBUG
                                 print("   Title: \(book.title)")
+                                #endif
+                                #if DEBUG
                                 print("   Author: \(book.author)")
+                                #endif
+                                #if DEBUG
                                 print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                                #endif
                                 onBookSelected(book)
                                 dismiss()
                             }
@@ -495,11 +517,21 @@ struct BookSearchSheet: View {
         LazyVStack(spacing: 0) {
             ForEach(searchResults) { book in
                 BookSearchResultRow(book: book, onAdd: {
+                    #if DEBUG
                     print("🔍 DEBUG: Book selected from search results:")
+                    #endif
+                    #if DEBUG
                     print("   ID: \(book.id)")
+                    #endif
+                    #if DEBUG
                     print("   Title: \(book.title)")
+                    #endif
+                    #if DEBUG
                     print("   Author: \(book.author)")
+                    #endif
+                    #if DEBUG
                     print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                    #endif
                     onBookSelected(book)
                     dismiss()
                 })
@@ -523,34 +555,46 @@ struct BookSearchSheet: View {
     
     @MainActor
     private func search(query: String) async {
+        #if DEBUG
         print("🔍 Starting search for: '\(query)'")
+        #endif
         isLoading = true
         searchError = nil
         
         // Use enhanced service ranking for better results
         // Use the enhanced searchBooksWithRanking method for better results
         searchResults = await booksService.searchBooksWithRanking(query: query)
+        #if DEBUG
         print("📖 Found \(searchResults.count) ranked results for: '\(query)'")
+        #endif
         
         // Re-rank by visual similarity if we have a captured feature print
         if BookScannerService.shared.capturedFeaturePrint != nil {
+            #if DEBUG
             print("🎨 Re-ranking results by cover similarity...")
+            #endif
             searchResults = await BookScannerService.shared.reRankBooksWithFeaturePrint(searchResults)
         }
         
         if searchResults.isEmpty {
             // Try spell correction
             if let correctedQuery = spellCorrect(query), correctedQuery != query {
+                #if DEBUG
                 print("🔤 Trying spell correction: '\(correctedQuery)'")
+                #endif
                 searchResults = await booksService.searchBooksWithRanking(query: correctedQuery)
+                #if DEBUG
                 print("📖 Found \(searchResults.count) results after correction")
+                #endif
             }
         }
         
         // Check for errors
         if let error = booksService.errorMessage {
             searchError = error
+            #if DEBUG
             print("❌ Search error:  (error)")
+            #endif
         }
         
         isLoading = false
@@ -884,14 +928,18 @@ struct BookSearchSheet: View {
         do {
             // Check cache first
             if let cached = await RecommendationCache.shared.load(currentBookCount: allBooks.count) {
+                #if DEBUG
                 print("✅ Using cached recommendations")
+                #endif
                 forYouRecommendations = cached.recommendations
                 isLoadingForYou = false
                 return
             }
 
             // Generate fresh recommendations
+            #if DEBUG
             print("🎯 Generating fresh For You recommendations...")
+            #endif
 
             // Step 1: Analyze library on-device
             let profile = await LibraryTasteAnalyzer.shared.analyzeLibrary(books: allBooks)
@@ -911,10 +959,14 @@ struct BookSearchSheet: View {
                 isLoadingForYou = false
             }
 
+            #if DEBUG
             print("✅ Loaded \(recommendations.count) For You recommendations")
+            #endif
 
         } catch {
+            #if DEBUG
             print("❌ Failed to load For You recommendations: \(error)")
+            #endif
             isLoadingForYou = false
         }
     }
@@ -954,10 +1006,18 @@ struct BookSearchResultRow: View {
             
             // Add button - now the only clickable element
             Button(action: {
+                #if DEBUG
                 print("📚 Book selected for addition:")
+                #endif
+                #if DEBUG
                 print("   ID: \(book.id)")
+                #endif
+                #if DEBUG
                 print("   Title: \(book.title)")
+                #endif
+                #if DEBUG
                 print("   Cover URL: \(book.coverImageURL ?? "nil")")
+                #endif
                 onAdd()
             }) {
                 Image(systemName: "plus")
@@ -1132,11 +1192,15 @@ struct SmartBookCoverView: View {
         }
         
         // Log URL for debugging
+        #if DEBUG
         print("🔍 SmartBookCoverView loading: \(url)")
+        #endif
         
         // First check cache
         if let cached = SharedBookCoverManager.shared.getCachedImage(for: url) {
+            #if DEBUG
             print("✅ Found in cache")
+            #endif
             loadedImage = cached
             isLoading = false
             return
@@ -1146,12 +1210,16 @@ struct SmartBookCoverView: View {
         let targetSize = CGSize(width: width * UIScreen.main.scale, 
                                height: height * UIScreen.main.scale)
         if let image = await SharedBookCoverManager.shared.loadThumbnail(from: url, targetSize: targetSize) {
+            #if DEBUG
             print("✅ Loaded successfully")
+            #endif
             withAnimation(.easeIn(duration: 0.3)) {
                 loadedImage = image
             }
         } else {
+            #if DEBUG
             print("❌ Failed to load cover from: \(url)")
+            #endif
         }
         isLoading = false
     }
@@ -1199,9 +1267,15 @@ struct ForYouRecommendationRow: View {
 
             // Add button
             Button(action: {
+                #if DEBUG
                 print("📚 For You book selected:")
+                #endif
+                #if DEBUG
                 print("   Title: \(recommendation.title)")
+                #endif
+                #if DEBUG
                 print("   Reasoning: \(recommendation.reasoning)")
+                #endif
                 onAdd()
             }) {
                 Image(systemName: "plus")

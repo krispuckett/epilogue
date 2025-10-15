@@ -11,7 +11,9 @@ final class MigrationSafetyCheck {
     
     /// Runs comprehensive safety checks after migration
     func runSafetyChecks(modelContext: ModelContext) async {
+        #if DEBUG
         print("🔍 Running post-migration safety checks...")
+        #endif
         
         var issues: [SafetyIssue] = []
         
@@ -32,11 +34,17 @@ final class MigrationSafetyCheck {
         
         // Report results
         if issues.isEmpty {
+            #if DEBUG
             print("✅ All safety checks passed!")
+            #endif
         } else {
+            #if DEBUG
             print("⚠️ Found \(issues.count) issues during safety check:")
+            #endif
             for issue in issues {
+                #if DEBUG
                 print("  - \(issue.description)")
+                #endif
             }
             
             // Attempt auto-fixes for recoverable issues
@@ -210,7 +218,9 @@ final class MigrationSafetyCheck {
     
     /// Attempt to fix recoverable issues
     private func attemptAutoFixes(issues: [SafetyIssue], modelContext: ModelContext) async {
+        #if DEBUG
         print("🔧 Attempting to auto-fix recoverable issues...")
+        #endif
         
         var fixedCount = 0
         
@@ -243,9 +253,13 @@ final class MigrationSafetyCheck {
         if fixedCount > 0 {
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Auto-fixed \(fixedCount) issues")
+                #endif
             } catch {
+                #if DEBUG
                 print("❌ Failed to save auto-fixes: \(error)")
+                #endif
             }
         }
     }

@@ -265,20 +265,28 @@ struct EnhancedBookScannerView: View {
         
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
+            #if DEBUG
             print("📸 Camera already authorized")
+            #endif
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     if granted {
+                        #if DEBUG
                         print("📸 Camera permission granted")
+                        #endif
                     } else {
+                        #if DEBUG
                         print("❌ Camera permission denied")
+                        #endif
                         detectionStatus = "Camera access required"
                     }
                 }
             }
         case .denied, .restricted:
+            #if DEBUG
             print("❌ Camera access denied or restricted")
+            #endif
             detectionStatus = "Camera access required. Enable in Settings."
         @unknown default:
             break
@@ -371,7 +379,9 @@ class CameraScannerViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        #if DEBUG
         print("📸 CameraScannerViewController viewDidLoad")
+        #endif
         setupCamera()
         setupFeaturePrint()
         
@@ -387,7 +397,9 @@ class CameraScannerViewController: UIViewController {
     }
     
     private func setupCamera() {
+        #if DEBUG
         print("📸 Setting up camera")
+        #endif
         
         // Don't check permission here - just set up
         // Permission will be checked in the SwiftUI view
@@ -396,7 +408,9 @@ class CameraScannerViewController: UIViewController {
         
         guard let captureSession = captureSession,
               let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+            #if DEBUG
             print("❌ Failed to get video device")
+            #endif
             return
         }
         
@@ -446,12 +460,18 @@ class CameraScannerViewController: UIViewController {
             
             if !barcodeTypes.isEmpty {
                 metadataOutput.metadataObjectTypes = barcodeTypes
+                #if DEBUG
                 print("✅ Set barcode types: \(barcodeTypes)")
+                #endif
             } else {
+                #if DEBUG
                 print("❌ No barcode types available")
+                #endif
             }
         } else {
+            #if DEBUG
             print("❌ Could not add metadata output")
+            #endif
         }
         
         // Add photo output for visual book scanning
@@ -465,9 +485,13 @@ class CameraScannerViewController: UIViewController {
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
         if captureSession.canAddOutput(videoOutput) {
             captureSession.addOutput(videoOutput)
+            #if DEBUG
             print("✅ Added video output for rectangle detection")
+            #endif
         } else {
+            #if DEBUG
             print("❌ Could not add video output")
+            #endif
         }
         
         previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
@@ -481,7 +505,9 @@ class CameraScannerViewController: UIViewController {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession?.startRunning()
             DispatchQueue.main.async {
+                #if DEBUG
                 print("✅ Camera session started")
+                #endif
             }
         }
     }
@@ -518,7 +544,9 @@ class CameraScannerViewController: UIViewController {
             
             device.unlockForConfiguration()
         } catch {
+            #if DEBUG
             print("Failed to update camera controls: \(error)")
+            #endif
         }
     }
     
@@ -557,7 +585,9 @@ class CameraScannerViewController: UIViewController {
             impactGenerator.impactOccurred()
             
         } catch {
+            #if DEBUG
             print("Focus error: \(error)")
+            #endif
         }
     }
 }
@@ -612,11 +642,15 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
     private func captureBookPhoto() {
         guard let photoOutput = photoOutput,
               isProcessing?.wrappedValue == false else { 
+            #if DEBUG
             print("⚠️ Already processing or no photo output")
+            #endif
             return 
         }
         
+        #if DEBUG
         print("📸 Capturing book photo...")
+        #endif
         isProcessing?.wrappedValue = true
         detectionStatus?.wrappedValue = "Capturing book cover..."
         
@@ -634,7 +668,9 @@ extension CameraScannerViewController: AVCaptureVideoDataOutputSampleBufferDeleg
 extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
+            #if DEBUG
             print("❌ Photo capture error: \(error)")
+            #endif
             DispatchQueue.main.async { [weak self] in
                 self?.isProcessing?.wrappedValue = false
                 self?.captureSession?.startRunning()
@@ -645,7 +681,9 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
         
         guard let data = photo.fileDataRepresentation(),
               let image = UIImage(data: data) else {
+            #if DEBUG
             print("❌ Failed to get image data")
+            #endif
             DispatchQueue.main.async { [weak self] in
                 self?.isProcessing?.wrappedValue = false
                 self?.captureSession?.startRunning()
@@ -654,7 +692,9 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
             return
         }
         
+        #if DEBUG
         print("✅ Photo captured successfully")
+        #endif
         
         // Stop the session after successful capture
         captureSession?.stopRunning()
@@ -726,10 +766,14 @@ extension CameraScannerViewController: AVCapturePhotoCaptureDelegate {
             if let results = request.results as? [VNFeaturePrintObservation],
                let featurePrint = results.first {
                 self.capturedFeaturePrint = featurePrint
+                #if DEBUG
                 print("✅ Generated feature print for cover matching")
+                #endif
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to generate feature print: \(error)")
+            #endif
         }
     }
 }
@@ -767,24 +811,32 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         
         // Cast to readable code
         guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else {
+            #if DEBUG
             print("❌ Could not cast \(typeString) to readable code")
+            #endif
             return
         }
         
         // Get string value
         guard let stringValue = readableObject.stringValue, !stringValue.isEmpty else {
+            #if DEBUG
             print("❌ No string value in \(typeString)")
+            #endif
             return
         }
         
         // Check if this is actually an ISBN (13 or 10 digits)
         let digitsOnly = stringValue.replacingOccurrences(of: "-", with: "").replacingOccurrences(of: " ", with: "")
         guard digitsOnly.count == 13 || digitsOnly.count == 10 else {
+            #if DEBUG
             print("⚠️ Barcode '\(stringValue)' is not an ISBN (wrong length: \(digitsOnly.count))")
+            #endif
             return
         }
         
+        #if DEBUG
         print("📖 ISBN DETECTED: \(stringValue)")
+        #endif
         
         // Update status
         DispatchQueue.main.async { [weak self] in
@@ -803,7 +855,9 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         
         // Always show search sheet for ISBN to let user choose cover
         Task {
+            #if DEBUG
             print("📚 ISBN \(stringValue) detected - showing search sheet")
+            #endif
             await MainActor.run { [weak self] in
                 self?.detectionStatus?.wrappedValue = "Found ISBN - showing results..."
                 

@@ -394,12 +394,16 @@ struct LayeredBookBackground: View {
         extractedColors = colors
         
         // Debug logging
+        #if DEBUG
         print("🎨 Ray Advanced - Extracted \(colors.count) true colors")
+        #endif
         for (index, color) in colors.enumerated() {
             let uiColor = UIColor(color)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
             uiColor.getRed(&r, green: &g, blue: &b, alpha: nil)
+            #if DEBUG
             print("  Color \(index): R:\(Int(r*255)) G:\(Int(g*255)) B:\(Int(b*255))")
+            #endif
         }
         
         isProcessing = false

@@ -35,7 +35,9 @@ class BookWidgetUpdater {
             // Tell widgets to refresh
             WidgetCenter.shared.reloadAllTimelines()
 
+            #if DEBUG
             print("📱 BookWidgetUpdater: Updated widget with \(book.title)")
+            #endif
         }
     }
 
@@ -44,7 +46,9 @@ class BookWidgetUpdater {
 
         // Get App Group container
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.epilogue.app") else {
+            #if DEBUG
             print("❌ Could not get App Group container for widget cover")
+            #endif
             return nil
         }
 
@@ -53,7 +57,9 @@ class BookWidgetUpdater {
 
         // Check if already cached
         if FileManager.default.fileExists(atPath: coverFileURL.path) {
+            #if DEBUG
             print("✅ Widget cover already cached: \(coverFileURL.path)")
+            #endif
             return coverFileURL.path
         }
 
@@ -63,11 +69,15 @@ class BookWidgetUpdater {
             if let image = UIImage(data: data),
                let jpegData = image.jpegData(compressionQuality: 0.8) {
                 try jpegData.write(to: coverFileURL)
+                #if DEBUG
                 print("✅ Cached widget cover to: \(coverFileURL.path)")
+                #endif
                 return coverFileURL.path
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to cache widget cover: \(error)")
+            #endif
         }
 
         return nil

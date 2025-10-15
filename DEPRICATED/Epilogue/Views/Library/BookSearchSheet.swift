@@ -96,7 +96,9 @@ struct BookSearchSheet: View {
     
     private func performSearch() {
         Task {
+            #if DEBUG
             print("BookSearchSheet: Starting search for query: '\(searchQuery)'")
+            #endif
             isLoading = true
             searchError = nil
             
@@ -105,7 +107,9 @@ struct BookSearchSheet: View {
             searchResults = booksService.searchResults
             searchError = booksService.errorMessage
             isLoading = false
+            #if DEBUG
             print("BookSearchSheet: Search completed. Results: \(searchResults.count), Error: \(searchError ?? "none")")
+            #endif
         }
     }
     
@@ -226,6 +230,8 @@ struct BookSearchResultRow: View {
 
 #Preview {
     BookSearchSheet(searchQuery: "Dune") { book in
+        #if DEBUG
         print("Selected: \(book.title)")
+        #endif
     }
 }

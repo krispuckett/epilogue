@@ -367,7 +367,9 @@ public class UltraFastAmbientProcessor: ObservableObject {
             print("⚡ Instant response in <50ms")
             #endif
         } catch {
+            #if DEBUG
             print("❌ Foundation Models error: \(error)")
+            #endif
             await getFastPerplexityResponse(question)
         }
         #else
@@ -406,9 +408,13 @@ public class UltraFastAmbientProcessor: ObservableObject {
                 detectedContent[index].response = accumulated
             }
             
+            #if DEBUG
             print("🚀 Fast Perplexity response complete")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Perplexity error: \(error)")
+            #endif
             self.instantResponse = "Unable to get response"
         }
     }
@@ -437,9 +443,13 @@ public class UltraFastAmbientProcessor: ObservableObject {
                 self.enhancedResponse = accumulated
             }
             
+            #if DEBUG
             print("✨ Enhanced response complete with citations")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Enhanced response error: \(error)")
+            #endif
         }
     }
 }

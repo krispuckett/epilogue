@@ -549,8 +549,9 @@ class OptimizedPerplexityService: ObservableObject {
             // Direct API authentication with user's key
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         } else {
-            // Proxy authentication
-            request.setValue("epilogue_testflight_2025_secret", forHTTPHeaderField: "X-Epilogue-Auth")
+            // Proxy authentication - read from Info.plist to keep out of source code
+            let proxyToken = Bundle.main.object(forInfoDictionaryKey: "EpilogueProxyAuthToken") as? String ?? ""
+            request.setValue(proxyToken, forHTTPHeaderField: "X-Epilogue-Auth")
         }
         
         // Get or create userId

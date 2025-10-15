@@ -96,13 +96,23 @@ struct GoodreadsImportView: View {
                         Button("Done") {
                             // Add all successfully imported books to the library
                             if let result = importResult, let libraryViewModel = libraryViewModel {
+                                #if DEBUG
                                 print("\n📚📚📚 IMPORT DONE BUTTON CLICKED 📚📚📚")
+                                #endif
+                                #if DEBUG
                                 print("Processing \(result.successful.count) successfully imported books")
+                                #endif
                                 
                                 for (index, processedBook) in result.successful.enumerated() {
+                                    #if DEBUG
                                     print("\n[\(index + 1)/\(result.successful.count)] Processing: \(processedBook.bookModel.title)")
+                                    #endif
+                                    #if DEBUG
                                     print("   BookModel.id: \(processedBook.bookModel.id)")
+                                    #endif
+                                    #if DEBUG
                                     print("   BookModel.coverImageURL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                                    #endif
                                     
                                     // Convert BookModel to Book and add to library
                                     var book = processedBook.bookModel.asBook
@@ -125,19 +135,33 @@ struct GoodreadsImportView: View {
                                         book.readingStatus = .wantToRead
                                     }
                                     
+                                    #if DEBUG
                                     print("   Converted Book.id: \(book.id)")
+                                    #endif
+                                    #if DEBUG
                                     print("   Converted Book.coverImageURL: \(book.coverImageURL ?? "nil")")
+                                    #endif
+                                    #if DEBUG
                                     print("   Book rating: \(book.userRating ?? 0), status: \(book.readingStatus.rawValue)")
+                                    #endif
                                     
                                     if book.coverImageURL == nil {
+                                        #if DEBUG
                                         print("   ❌❌❌ CRITICAL: Book lost URL during asBook conversion!")
+                                        #endif
+                                        #if DEBUG
                                         print("   BookModel had URL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                                        #endif
                                     }
                                     
                                     libraryViewModel.addBook(book, overwriteIfExists: overwriteDuplicates)
                                 }
+                                #if DEBUG
                                 print("\n✅ Added \(result.successful.count) books to library")
+                                #endif
+                                #if DEBUG
                                 print("📚📚📚 IMPORT COMPLETE 📚📚📚\n")
+                                #endif
                             }
                             
                             // Post notification to refresh library
@@ -695,26 +719,44 @@ struct GoodreadsImportView: View {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { 
+                #if DEBUG
                 print("❌ No URL received from file picker")
+                #endif
                 return 
             }
+            #if DEBUG
             print("✅ File selected: \(url.lastPathComponent)")
+            #endif
+            #if DEBUG
             print("📍 File path: \(url.path)")
+            #endif
             startImport(from: url)
         case .failure(let error):
+            #if DEBUG
             print("❌ File selection error: \(error)")
+            #endif
         }
     }
     
     private func startImport(from url: URL) {
+        #if DEBUG
         print("🚀 Starting import process...")
+        #endif
+        #if DEBUG
         print("📊 Import state before: \(importState)")
+        #endif
+        #if DEBUG
         print("📍 URL: \(url)")
+        #endif
+        #if DEBUG
         print("📍 URL exists: \(FileManager.default.fileExists(atPath: url.path))")
+        #endif
         
         Task {
             do {
+                #if DEBUG
                 print("📂 Accessing file at: \(url.path)")
+                #endif
                 
                 // Try to access the file with security scoping
                 let accessing = url.startAccessingSecurityScopedResource()
@@ -724,7 +766,9 @@ struct GoodreadsImportView: View {
                     }
                 }
                 
+                #if DEBUG
                 print("🔐 Security scoped access: \(accessing)")
+                #endif
                 
                 // Update UI on main thread
                 await MainActor.run {
@@ -733,12 +777,18 @@ struct GoodreadsImportView: View {
                     }
                 }
                 
+                #if DEBUG
                 print("📊 Import state after transition: \(importState)")
+                #endif
+                #if DEBUG
                 print("🎯 Calling importService.importCSV...")
+                #endif
                 
                 let result = try await importService.importCSV(from: url, speed: selectedSpeed)
                 
+                #if DEBUG
                 print("✅ Import completed with \(result.successful.count) books")
+                #endif
                 
                 await MainActor.run {
                     self.importResult = result
@@ -748,13 +798,21 @@ struct GoodreadsImportView: View {
                     
                     // Show success toast AND actually add books to the library
                     if result.successful.count > 0 {
+                        #if DEBUG
                         print("📚 Adding \(result.successful.count) books to library")
+                        #endif
                         
                         // Add each successfully imported book to the LibraryViewModel
                         for (index, processedBook) in result.successful.enumerated() {
+                            #if DEBUG
                             print("🔄 Converting BookModel to Book for: \(processedBook.bookModel.title)")
+                            #endif
+                            #if DEBUG
                             print("   BookModel.id: \(processedBook.bookModel.id)")
+                            #endif
+                            #if DEBUG
                             print("   BookModel.coverImageURL: \(processedBook.bookModel.coverImageURL ?? "nil")")
+                            #endif
                             
                             var book = Book(
                                 id: processedBook.bookModel.id,
@@ -768,8 +826,12 @@ struct GoodreadsImportView: View {
                                 localId: UUID(uuidString: processedBook.bookModel.localId) ?? UUID()
                             )
                             
+                            #if DEBUG
                             print("   Resulting Book.id: \(book.id)")
+                            #endif
+                            #if DEBUG
                             print("   Resulting Book.coverImageURL: \(book.coverImageURL ?? "nil")")
+                            #endif
                             
                             // Set additional properties from the imported book
                             book.isInLibrary = true
@@ -782,24 +844,40 @@ struct GoodreadsImportView: View {
                                 book.readingStatus = status
                             }
                             
+                            #if DEBUG
                             print("    📚 Import data for \(book.title):")
+                            #endif
+                            #if DEBUG
                             print("       Rating: \(book.userRating ?? 0) stars")
+                            #endif
+                            #if DEBUG
                             print("       Status: \(book.readingStatus.rawValue)")
+                            #endif
+                            #if DEBUG
                             print("       Notes: \(book.userNotes?.prefix(50) ?? "None")")
+                            #endif
+                            #if DEBUG
                             print("       Added: \(book.dateAdded)")
+                            #endif
                             
                             // Add to library through the view model
                             if let libraryVM = self.libraryViewModel {
                                 libraryVM.addBook(book, overwriteIfExists: self.overwriteDuplicates)
+                                #if DEBUG
                                 print("  ✅ \(self.overwriteDuplicates ? "Updated" : "Added") book \(index + 1)/\(result.successful.count): \(book.title)")
+                                #endif
                             } else {
+                                #if DEBUG
                                 print("  ❌ LibraryViewModel is nil! Cannot add book: \(book.title)")
+                                #endif
                             }
                         }
                         
                         // Verify the books were added
                         if let libraryVM = self.libraryViewModel {
+                            #if DEBUG
                             print("📊 Library now contains \(libraryVM.books.count) total books")
+                            #endif
                         }
                         
                         self.successMessage = "\(result.successful.count) books successfully added to your library"
@@ -809,9 +887,15 @@ struct GoodreadsImportView: View {
                     }
                 }
             } catch {
+                #if DEBUG
                 print("❌ Import error: \(error)")
+                #endif
+                #if DEBUG
                 print("📍 Error type: \(type(of: error))")
+                #endif
+                #if DEBUG
                 print("📍 Error details: \(error.localizedDescription)")
+                #endif
                 
                 let errorDescription: String
                 if let urlError = error as? URLError {
@@ -1086,7 +1170,9 @@ struct ImportedBookRow: View {
 
                         // Update model
                         book.bookModel.coverImageURL = finalURL
+                        #if DEBUG
                         print("📸 Updated cover URL for \(book.bookModel.title): \(finalURL ?? "nil")")
+                        #endif
 
                         // Refresh image caches
                         if let oldURL { _ = await SharedBookCoverManager.shared.refreshCover(for: oldURL) }
@@ -1116,7 +1202,9 @@ struct ImportedBookRow: View {
                 }
             }
         } catch {
+            #if DEBUG
             print("Failed to load cover: \(error)")
+            #endif
         }
     }
 }
@@ -1577,7 +1665,9 @@ struct ManualMatchView: View {
             try modelContext.save()
             dismiss()
         } catch {
+            #if DEBUG
             print("Failed to save matched book: \(error)")
+            #endif
         }
     }
 }

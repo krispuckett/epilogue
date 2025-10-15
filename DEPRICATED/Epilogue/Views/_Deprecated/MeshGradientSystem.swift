@@ -38,15 +38,21 @@ struct AdvancedMeshGradient: View {
     }
     
     private func extractColors(from image: UIImage) {
+        #if DEBUG
         print("🎨 Starting color extraction from image: \(image.size)")
+        #endif
         dominantColors = image.dominantColors(count: 6)
         
+        #if DEBUG
         print("🎨 Extracted colors for gradient:")
+        #endif
         for (index, color) in dominantColors.enumerated() {
             let uiColor = UIColor(color)
             var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0
             uiColor.getRed(&red, green: &green, blue: &blue, alpha: nil)
+            #if DEBUG
             print("  Color \(index): R:\(Int(red*255)) G:\(Int(green*255)) B:\(Int(blue*255))")
+            #endif
         }
     }
     
@@ -191,11 +197,15 @@ struct AnimatedMeshOverlay: View {
 // MARK: - Color Extraction Extension
 extension UIImage {
     func dominantColors(count: Int) -> [Color] {
+        #if DEBUG
         print("🔍 Starting color extraction from image size: \(self.size)")
+        #endif
         
         // Use CIImage for better color extraction
         guard let ciImage = CIImage(image: self) else {
+            #if DEBUG
             print("❌ Failed to create CIImage")
+            #endif
             return AdvancedMeshGradient.fallbackColors
         }
         
@@ -240,7 +250,9 @@ extension UIImage {
             let g = CGFloat(bitmap[1]) / 255.0
             let b = CGFloat(bitmap[2]) / 255.0
             
+            #if DEBUG
             print("  Region \(index) raw color: R:\(Int(r*255)) G:\(Int(g*255)) B:\(Int(b*255))")
+            #endif
             
             // Always add the color, but enhance it significantly
             let uiColor = UIColor(red: r, green: g, blue: b, alpha: 1.0)
@@ -256,7 +268,9 @@ extension UIImage {
             
             var er: CGFloat = 0, eg: CGFloat = 0, eb: CGFloat = 0
             enhancedColor.getRed(&er, green: &eg, blue: &eb, alpha: nil)
+            #if DEBUG
             print("  Enhanced to: R:\(Int(er*255)) G:\(Int(eg*255)) B:\(Int(eb*255))")
+            #endif
         }
         
         // If we didn't get enough colors, add some variations
@@ -291,12 +305,16 @@ extension UIImage {
             }
         }
         
+        #if DEBUG
         print("✅ Final extracted colors:")
+        #endif
         for (index, color) in extractedColors.enumerated() {
             let ui = UIColor(color)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
             ui.getRed(&r, green: &g, blue: &b, alpha: nil)
+            #if DEBUG
             print("  Color \(index): R:\(Int(r*255)) G:\(Int(g*255)) B:\(Int(b*255))")
+            #endif
         }
         
         return extractedColors
@@ -372,25 +390,37 @@ struct BookCoverMeshGradient: View {
         }
         
         do {
+            #if DEBUG
             print("📚 Loading book cover from: \(enhanced)")
+            #endif
             let (data, response) = try await URLSession.shared.data(from: url)
             
             if let httpResponse = response as? HTTPURLResponse {
+                #if DEBUG
                 print("📊 HTTP Response: \(httpResponse.statusCode)")
+                #endif
             }
             
             if let image = UIImage(data: data) {
+                #if DEBUG
                 print("✅ Successfully loaded image: \(image.size)")
+                #endif
+                #if DEBUG
                 print("   Scale: \(image.scale), CGImage size: \(image.cgImage?.width ?? 0)x\(image.cgImage?.height ?? 0)")
+                #endif
                 await MainActor.run {
                     self.coverImage = image
                     self.isLoading = false
                 }
             } else {
+                #if DEBUG
                 print("❌ Failed to create UIImage from data")
+                #endif
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to load cover image: \(error)")
+            #endif
             isLoading = false
         }
     }

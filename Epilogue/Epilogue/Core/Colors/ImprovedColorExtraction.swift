@@ -194,7 +194,9 @@ struct ImprovedColorExtraction {
         #if DEBUG
         print("Color role assignment by vibrancy:")
         for (index, item) in sorted.enumerated() {
+            #if DEBUG
             print("  \(index + 1). \(item.role): H=\(String(format: "%.2f", Double(item.hue))), S=\(String(format: "%.2f", Double(item.saturation))), B=\(String(format: "%.2f", Double(item.brightness))), V=\(String(format: "%.2f", Double(item.vibrancy)))")
+            #endif
         }
         #endif
         
@@ -399,14 +401,24 @@ struct ImprovedColorExtraction {
         // Debug saving disabled - no longer saves to photo library
         /*
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        #if DEBUG
         print("SAVED IMAGE TO PHOTOS for \(bookTitle) - CHECK IF IT MATCHES!")
+        #endif
+        #if DEBUG
         print("   Image size: \(image.size)")
+        #endif
+        #if DEBUG
         print("   Scale: \(image.scale)")
+        #endif
         
         // Verify we have a full cover
         if image.size.width < 100 || image.size.height < 100 {
+            #if DEBUG
             print("⚠️ WARNING: Image too small (\(image.size.width)x\(image.size.height)), likely cropped!")
+            #endif
+            #if DEBUG
             print("   This may be caused by zoom parameter - consider using zoom=0 or zoom=1")
+            #endif
         }
         */
     }
@@ -440,7 +452,9 @@ struct ImprovedColorExtraction {
     // TEMPORARY: Test with known good URL
     /* COMMENTED OUT - Was causing multiple extractions and inconsistent results
     private static func testWithKnownGoodURL(bookTitle: String) async -> ColorPalette? {
+        #if DEBUG
         print("\n🧪 HARD-CODED URL TEST")
+        #endif
         
         // Known good LOTR URLs from Google Books
         let testURLs = [
@@ -450,21 +464,29 @@ struct ImprovedColorExtraction {
         ]
         
         for (index, urlString) in testURLs.enumerated() {
+            #if DEBUG
             print("\n📍 Testing URL \(index + 1): \(urlString)")
+            #endif
             
             guard let url = URL(string: urlString) else {
+                #if DEBUG
                 print("❌ Invalid URL")
+                #endif
                 continue
             }
             
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 guard let image = UIImage(data: data) else {
+                    #if DEBUG
                     print("❌ Could not create image from data")
+                    #endif
                     continue
                 }
                 
+                #if DEBUG
                 print("✅ Downloaded image: \(image.size)")
+                #endif
                 
                 // Save to Photos for inspection - DISABLED
                 // UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
@@ -473,32 +495,50 @@ struct ImprovedColorExtraction {
                 // Try extraction
                 let extractor = OKLABColorExtractor()
                 if let palette = try? await extractor.extractPalette(from: image, imageSource: "LOTR_TEST_\(index + 1)") {
+                    #if DEBUG
                     print("🎨 EXTRACTION SUCCESSFUL!")
+                    #endif
+                    #if DEBUG
                     print("  Primary: \(palette.uiColors.primary)")
+                    #endif
+                    #if DEBUG
                     print("  Secondary: \(palette.uiColors.secondary)")
+                    #endif
+                    #if DEBUG
                     print("  Accent: \(palette.uiColors.accent)")
+                    #endif
                     
                     // If we get good colors (gold/red), return this palette
                     var hue: CGFloat = 0, sat: CGFloat = 0, bri: CGFloat = 0
                     palette.uiColors.primary.getHue(&hue, saturation: &sat, brightness: &bri, alpha: nil)
                     let hueInDegrees = Int(hue * 360)
                     
+                    #if DEBUG
                     print("  Primary hue: \(hueInDegrees)°")
+                    #endif
                     
                     // Gold should be around 45°, red around 0-20°
                     if (hueInDegrees >= 30 && hueInDegrees <= 60) || (hueInDegrees >= 0 && hueInDegrees <= 30) {
+                        #if DEBUG
                         print("✅ FOUND CORRECT COLORS! Using this palette.")
+                        #endif
                         return palette
                     } else {
+                        #if DEBUG
                         print("❌ Still getting wrong colors (hue: \(hueInDegrees)°)")
+                        #endif
                     }
                 }
             } catch {
+                #if DEBUG
                 print("❌ Error downloading: \(error)")
+                #endif
             }
         }
         
+        #if DEBUG
         print("\n❌ All test URLs failed")
+        #endif
         return nil
     }
     */

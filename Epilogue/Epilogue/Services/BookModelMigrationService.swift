@@ -15,14 +15,20 @@ class BookModelMigrationService {
     func migrateIfNeeded(libraryViewModel: LibraryViewModel, modelContext: ModelContext) async {
         // Check if migration already completed
         if UserDefaults.standard.bool(forKey: migrationCompletedKey) {
+            #if DEBUG
             print("✅ [MIGRATION] Already completed, skipping")
+            #endif
             return
         }
 
+        #if DEBUG
         print("🔄 [MIGRATION] Starting UserDefaults → SwiftData migration...")
+        #endif
 
         let userDefaultsBooks = libraryViewModel.books
+        #if DEBUG
         print("📚 [MIGRATION] Found \(userDefaultsBooks.count) books in UserDefaults")
+        #endif
 
         var createdCount = 0
         var skippedCount = 0
@@ -34,10 +40,14 @@ class BookModelMigrationService {
             )
 
             if let existingModel = try? modelContext.fetch(descriptor).first {
+                #if DEBUG
                 print("⏭️ [MIGRATION] BookModel already exists: \(book.title)")
+                #endif
                 skippedCount += 1
             } else {
+                #if DEBUG
                 print("📝 [MIGRATION] Creating BookModel for: \(book.title)")
+                #endif
                 let bookModel = BookModel(from: book)
                 modelContext.insert(bookModel)
                 createdCount += 1
@@ -47,22 +57,34 @@ class BookModelMigrationService {
         // Save all changes
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ [MIGRATION] Complete!")
+            #endif
+            #if DEBUG
             print("   Created: \(createdCount)")
+            #endif
+            #if DEBUG
             print("   Skipped: \(skippedCount)")
+            #endif
+            #if DEBUG
             print("   Total: \(userDefaultsBooks.count)")
+            #endif
 
             // Mark migration as complete
             UserDefaults.standard.set(true, forKey: migrationCompletedKey)
 
         } catch {
+            #if DEBUG
             print("❌ [MIGRATION] Failed to save: \(error)")
+            #endif
         }
     }
 
     /// Reset migration flag (for debugging only)
     func resetMigration() {
         UserDefaults.standard.removeObject(forKey: migrationCompletedKey)
+        #if DEBUG
         print("🔄 [MIGRATION] Reset flag - will re-run on next launch")
+        #endif
     }
 }

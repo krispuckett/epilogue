@@ -36,27 +36,27 @@ struct CloudKitStatusView: View {
                         SensoryFeedback.light()
                     }
                 } label: {
-                    HStack(spacing: 14) {
+                    HStack(spacing: 16) {
                         // Icon
                         ZStack {
                             Circle()
                                 .fill(statusColor.opacity(0.15))
-                                .frame(width: 42, height: 42)
+                                .frame(width: 44, height: 44)
                                 .overlay {
                                     Circle()
                                         .strokeBorder(statusColor.opacity(0.3), lineWidth: 0.5)
                                 }
-                            
+
                             statusIconImage
                         }
-                        
+
                         // Text
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text("iCloud Sync")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.white)
-                            
-                            HStack(spacing: 4) {
+
+                            HStack(spacing: 6) {
                                 switch syncStatus {
                                 case .checking:
                                     Text("Checking...")
@@ -71,7 +71,7 @@ struct CloudKitStatusView: View {
                                     Text(message)
                                         .foregroundStyle(statusColor)
                                 }
-                                
+
                                 if let status = accountStatus, syncStatus == .notSynced {
                                     Text("•")
                                         .foregroundStyle(.white.opacity(0.3))
@@ -81,9 +81,9 @@ struct CloudKitStatusView: View {
                             }
                             .font(.system(size: 14))
                         }
-                        
-                        Spacer()
-                        
+
+                        Spacer(minLength: 0)
+
                         // Chevron
                         if syncStatus == .notSynced || isErrorStatus {
                             Image(systemName: "chevron.right")
@@ -92,8 +92,7 @@ struct CloudKitStatusView: View {
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         }
                     }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
+                    .padding(16)
                 }
                 .buttonStyle(.plain)
                 .disabled(syncStatus == .synced || syncStatus == .checking)
@@ -181,7 +180,6 @@ struct CloudKitStatusView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white.opacity(0.04))

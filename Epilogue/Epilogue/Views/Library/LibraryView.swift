@@ -111,16 +111,30 @@ struct LibraryView: View {
 
     /// Unified book addition: syncs both UserDefaults (legacy) and SwiftData (modern)
     private func addBookUnified(_ book: Book, context: ModelContext) {
+        #if DEBUG
         print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        #endif
+        #if DEBUG
         print("📚 [UNIFIED] CALLED for: \(book.title)")
+        #endif
+        #if DEBUG
         print("   Book ID: \(book.id)")
+        #endif
+        #if DEBUG
         print("   LocalID: \(book.localId)")
+        #endif
+        #if DEBUG
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        #endif
 
         // 1. Add to UserDefaults array (legacy display layer)
+        #if DEBUG
         print("1️⃣ Adding to UserDefaults...")
+        #endif
         viewModel.addBook(book)
+        #if DEBUG
         print("   ✅ UserDefaults updated")
+        #endif
 
         // Show success toast
         NotificationCenter.default.post(
@@ -130,63 +144,113 @@ struct LibraryView: View {
         SensoryFeedback.success()
 
         // 2. Create/update BookModel in SwiftData + enrich
+        #if DEBUG
         print("2️⃣ Starting SwiftData Task...")
+        #endif
         Task { @MainActor in
+            #if DEBUG
             print("   🔹 Task started on MainActor")
+            #endif
 
             // Check if BookModel already exists
             let descriptor = FetchDescriptor<BookModel>(
                 predicate: #Predicate<BookModel> { $0.id == book.id }
             )
+            #if DEBUG
             print("   🔹 Created FetchDescriptor for id: \(book.id)")
+            #endif
 
             do {
                 let results = try context.fetch(descriptor)
+                #if DEBUG
                 print("   🔹 Fetch succeeded, found \(results.count) results")
+                #endif
 
                 if let existingModel = results.first {
+                    #if DEBUG
                     print("   ✅ BookModel ALREADY EXISTS in SwiftData")
+                    #endif
+                    #if DEBUG
                     print("      isEnriched: \(existingModel.isEnriched)")
+                    #endif
+                    #if DEBUG
                     print("      smartSynopsis: \(existingModel.smartSynopsis?.prefix(50) ?? "nil")")
+                    #endif
 
                     if !existingModel.isEnriched {
+                        #if DEBUG
                         print("   🎨 Enriching existing BookModel...")
+                        #endif
                         await BookEnrichmentService.shared.enrichBook(existingModel)
+                        #if DEBUG
                         print("   ✅ Enrichment completed")
+                        #endif
                     } else {
+                        #if DEBUG
                         print("   ⏭️ Already enriched, skipping")
+                        #endif
                     }
                 } else {
+                    #if DEBUG
                     print("   📝 Creating NEW BookModel in SwiftData...")
+                    #endif
                     let bookModel = BookModel(from: book)
+                    #if DEBUG
                     print("      BookModel created in memory")
+                    #endif
 
                     context.insert(bookModel)
+                    #if DEBUG
                     print("      Inserted into context")
+                    #endif
 
                     do {
                         try context.save()
+                        #if DEBUG
                         print("   ✅ BookModel SAVED to SwiftData")
+                        #endif
 
                         // Enrich the new model
+                        #if DEBUG
                         print("   🎨 Starting enrichment for new book...")
+                        #endif
                         await BookEnrichmentService.shared.enrichBook(bookModel)
+                        #if DEBUG
                         print("   ✅ Enrichment completed")
+                        #endif
+                        #if DEBUG
                         print("      isEnriched: \(bookModel.isEnriched)")
+                        #endif
+                        #if DEBUG
                         print("      smartSynopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
+                        #endif
                     } catch {
+                        #if DEBUG
                         print("   ❌ FAILED to save BookModel: \(error)")
+                        #endif
+                        #if DEBUG
                         print("      Error type: \(type(of: error))")
+                        #endif
+                        #if DEBUG
                         print("      Description: \(error.localizedDescription)")
+                        #endif
                     }
                 }
             } catch {
+                #if DEBUG
                 print("   ❌ FAILED to fetch BookModel: \(error)")
+                #endif
+                #if DEBUG
                 print("      Error type: \(type(of: error))")
+                #endif
+                #if DEBUG
                 print("      Description: \(error.localizedDescription)")
+                #endif
             }
 
+            #if DEBUG
             print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+            #endif
         }
     }
 
@@ -216,12 +280,16 @@ struct LibraryView: View {
         
         guard !coverURLs.isEmpty else { return }
         
+        #if DEBUG
         print("📚 Preloading \(coverURLs.count) book covers...")
+        #endif
         
         // Use the batch preload method with throttling
         await SharedBookCoverManager.shared.preloadCovers(coverURLs)
         
+        #if DEBUG
         print("✅ Finished preloading covers")
+        #endif
         
         // Also ensure high-quality images are loaded for visible books
         let visibleBooks = Array(viewModel.books.prefix(20))
@@ -231,7 +299,9 @@ struct LibraryView: View {
                 _ = await SharedBookCoverManager.shared.loadFullImage(from: coverURL)
             }
         }
+        #if DEBUG
         print("✅ Loaded high-quality covers for visible books")
+        #endif
         
         // Don't pre-warm color cache - let BookDetailView handle color extraction
         // This ensures all books use the same color extraction path from displayed images
@@ -390,7 +460,9 @@ struct LibraryView: View {
                 searchQuery: book.title + " " + book.author,
                 onBookSelected: { selected in
                     Task { @MainActor in
+                        #if DEBUG
                         print("📖 Cover change: Selected book '\(selected.title)'")
+                        #endif
                         let oldURL = book.coverImageURL
                         let resolved = await DisplayCoverURLResolver.resolveDisplayURL(
                             googleID: selected.id,
@@ -433,8 +505,12 @@ struct LibraryView: View {
         BookSearchSheet(
             searchQuery: pendingBookSearchQuery,
             onBookSelected: { book in
+                #if DEBUG
                 print("🟢 BookSearchSheet.onBookSelected TRIGGERED for: \(book.title)")
+                #endif
+                #if DEBUG
                 print("   modelContext: \(modelContext)")
+                #endif
 
                 // Unified book addition: syncs UserDefaults + SwiftData
                 addBookUnified(book, context: modelContext)
@@ -450,18 +526,30 @@ struct LibraryView: View {
         if #available(iOS 16.0, *) {
             ZStack {
                 PerfectBookScanner { book in
+                    #if DEBUG
                     print("🟢 PerfectBookScanner.onBookAdded TRIGGERED for: \(book.title)")
+                    #endif
+                    #if DEBUG
                     print("   modelContext: \(modelContext)")
+                    #endif
 
                     // Unified book addition: syncs UserDefaults + SwiftData
                     addBookUnified(book, context: modelContext)
                     // Don't dismiss - allow continuous scanning
                 }
                 .onAppear {
+                    #if DEBUG
                     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    #endif
+                    #if DEBUG
                     print("✅ LibraryView: Loading PERFECT SCANNER")
+                    #endif
+                    #if DEBUG
                     print("   iOS: \(ProcessInfo.processInfo.operatingSystemVersion)")
+                    #endif
+                    #if DEBUG
                     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    #endif
                 }
             }
         } else {
@@ -472,7 +560,9 @@ struct LibraryView: View {
                 appState.showingEnhancedScanner = false
             }
             .onAppear {
+                #if DEBUG
                 print("⚠️ LibraryView: Loading OLD SCANNER (iOS < 16)")
+                #endif
             }
         }
     }
@@ -830,11 +920,19 @@ struct LibraryBookCard: View {
             )
                 .onAppear {
                     if book.coverImageURL == nil {
+                        #if DEBUG
                         print("⚠️⚠️ LibraryBookCard displaying book with NO cover URL: \(book.title)")
+                        #endif
+                        #if DEBUG
                         print("   Book.id: \(book.id)")
+                        #endif
                     } else if let coverURL = book.coverImageURL {
+                        #if DEBUG
                         print("📚 LibraryBookCard showing: \(book.title)")
+                        #endif
+                        #if DEBUG
                         print("   Cover URL: \(coverURL)")
+                        #endif
 
                         // TEST: Try loading this URL directly
                         Task {
@@ -842,13 +940,19 @@ struct LibraryBookCard: View {
                                 do {
                                     let (data, response) = try await URLSession.shared.data(from: url)
                                     if let httpResponse = response as? HTTPURLResponse {
+                                        #if DEBUG
                                         print("   ✅ Direct load test: Status \(httpResponse.statusCode), \(data.count) bytes")
+                                        #endif
                                     }
                                 } catch {
+                                    #if DEBUG
                                     print("   ❌ Direct load test FAILED: \(error)")
+                                    #endif
                                 }
                             } else {
+                                #if DEBUG
                                 print("   ❌ Invalid URL - can't create URL object")
+                                #endif
                             }
                         }
                     }
@@ -1284,7 +1388,9 @@ extension LibraryView {
             let fps = CACurrentMediaTime()
             if fps < 55 { // Below 60fps threshold
                 frameDrops += 1
+                #if DEBUG
                 print("⚠️ Frame drop detected. Total drops: \(frameDrops)")
+                #endif
             }
         }
     }
@@ -1293,7 +1399,9 @@ extension LibraryView {
         performanceTimer?.invalidate()
         performanceTimer = nil
         if frameDrops > 0 {
+            #if DEBUG
             print("📊 Performance Report: \(frameDrops) frame drops detected")
+            #endif
         }
     }
 }
@@ -1566,7 +1674,9 @@ class LibraryViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { _ in
+            #if DEBUG
             print("🔄 RefreshLibrary notification received")
+            #endif
             self.loadBooks()
             // CRITICAL: Also update URLs after import to remove zoom parameters
             self.updateBookCoverURLsToHigherQuality()
@@ -1574,33 +1684,51 @@ class LibraryViewModel: ObservableObject {
     }
     
     private func loadBooks() {
+        #if DEBUG
         print("📚 Loading books from UserDefaults")
+        #endif
+        #if DEBUG
         print("🔍 DEBUG: loadBooks() called from: \(Thread.callStackSymbols[2...5].joined(separator: "\n"))")
+        #endif
         if let data = userDefaults.data(forKey: booksKey) {
+            #if DEBUG
             print("  📦 Found data in UserDefaults, size: \(data.count) bytes")
+            #endif
             do {
                 var decodedBooks = try JSONDecoder().decode([Book].self, from: data)
                 
                 // Apply custom sort order if exists
                 if let orderData = userDefaults.data(forKey: bookOrderKey),
                    let bookOrder = try? JSONDecoder().decode([String].self, from: orderData) {
+                    #if DEBUG
                     print("  📋 Applying custom sort order")
+                    #endif
                     decodedBooks = sortBooksByCustomOrder(decodedBooks, order: bookOrder)
                 }
                 
                 self.books = decodedBooks
+                #if DEBUG
                 print("  ✅ Loaded \(decodedBooks.count) books from UserDefaults")
+                #endif
                 
                 // Log first few books for debugging
                 for (index, book) in decodedBooks.prefix(3).enumerated() {
+                    #if DEBUG
                     print("    Book \(index + 1): \(book.title) by \(book.author)")
+                    #endif
+                    #if DEBUG
                     print("      Cover URL: \(book.coverImageURL ?? "NO COVER")")
+                    #endif
                 }
             } catch {
+                #if DEBUG
                 print("  ❌ Failed to decode books: \(error)")
+                #endif
             }
         } else {
+            #if DEBUG
             print("  ⚠️ No books found in UserDefaults")
+            #endif
             self.books = []
         }
     }
@@ -1627,7 +1755,9 @@ class LibraryViewModel: ObservableObject {
         if let data = try? JSONEncoder().encode(bookIds) {
             userDefaults.set(data, forKey: bookOrderKey)
             userDefaults.synchronize()
+            #if DEBUG
             print("  📋 Saved custom book order")
+            #endif
         }
     }
     
@@ -1652,12 +1782,18 @@ class LibraryViewModel: ObservableObject {
     }
     
     private func saveBooks() {
+        #if DEBUG
         print("💾 Saving \(books.count) books to UserDefaults")
+        #endif
         
         // Debug: Check URLs before encoding
         for (index, book) in books.prefix(3).enumerated() {
+            #if DEBUG
             print("  Book \(index + 1) before save: \(book.title)")
+            #endif
+            #if DEBUG
             print("    Cover URL: \(book.coverImageURL ?? "NO URL")")
+            #endif
         }
         
         do {
@@ -1666,17 +1802,25 @@ class LibraryViewModel: ObservableObject {
             
             // Force immediate save and verify
             let didSync = userDefaults.synchronize()
+            #if DEBUG
             print("  📝 UserDefaults synchronize: \(didSync)")
+            #endif
             
             // Verify the save worked
             if let verifyData = userDefaults.data(forKey: booksKey) {
                 let verifyBooks = try JSONDecoder().decode([Book].self, from: verifyData)
+                #if DEBUG
                 print("  ✅ Verified save: \(verifyBooks.count) books in storage")
+                #endif
             }
             
+            #if DEBUG
             print("  ✅ Successfully saved \(books.count) books")
+            #endif
         } catch {
+            #if DEBUG
             print("  ❌ Failed to save books: \(error)")
+            #endif
             errorMessage = "Failed to save library changes"
         }
     }
@@ -1712,7 +1856,9 @@ class LibraryViewModel: ObservableObject {
                     updatedURL = updatedURL.replacingOccurrences(of: "?zoom=5&", with: "?")
                     
                     hasUpdates = true
+                    #if DEBUG
                     print("📚 Removed zoom parameter from '\(books[index].title)' for full cover")
+                    #endif
                 }
                 */
                 
@@ -1728,33 +1874,61 @@ class LibraryViewModel: ObservableObject {
         }
         
         if hasUpdates {
+            #if DEBUG
             print("✅ Updated \(books.filter { $0.coverImageURL != nil }.count) cover URLs for higher quality images")
+            #endif
             saveBooks()
         } else {
+            #if DEBUG
             print("ℹ️ All book cover URLs already optimized")
+            #endif
         }
     }
     func addBook(_ book: Book, overwriteIfExists: Bool = false) {
+        #if DEBUG
         print("\n📖📖📖 LibraryViewModel.addBook called 📖📖📖")
+        #endif
+        #if DEBUG
         print("  Title: \(book.title)")
+        #endif
+        #if DEBUG
         print("  ID: \(book.id)")
+        #endif
+        #if DEBUG
         print("  🖼️ Cover URL: \(book.coverImageURL ?? "NO COVER URL")")
+        #endif
         if let url = book.coverImageURL {
+            #if DEBUG
             print("  🔍 URL Analysis:")
+            #endif
+            #if DEBUG
             print("    - Contains zoom? \(url.contains("zoom="))")
+            #endif
+            #if DEBUG
             print("    - Contains http? \(url.starts(with: "http://"))")
+            #endif
+            #if DEBUG
             print("    - Full URL: \(url)")
+            #endif
         }
         if book.coverImageURL == nil {
+            #if DEBUG
             print("  ⚠️⚠️⚠️ WARNING: Book being added with NO cover URL!")
+            #endif
         }
+        #if DEBUG
         print("  📊 Book data - Rating: \(book.userRating ?? 0), Status: \(book.readingStatus.rawValue)")
+        #endif
+        #if DEBUG
         print("  📝 Notes: \(book.userNotes?.prefix(50) ?? "None")")
+        #endif
 
         // Check if book already exists
         if let existingIndex = books.firstIndex(where: { $0.id == book.id }) {
             if overwriteIfExists {
+                #if DEBUG
                 print("  🔄 Overwriting existing book: \(book.title)")
+                #endif
                 var updatedBook = book
                 updatedBook.isInLibrary = true
                 // Preserve the original dateAdded if the imported one is today
@@ -1767,10 +1941,14 @@ class LibraryViewModel: ObservableObject {
                 // loadBooks()
 
                 // Toast removed - handled by UnifiedQuickActionCard
+                #if DEBUG
                 print("  ✅ Book updated with new data")
+                #endif
                 return
             } else {
+                #if DEBUG
                 print("  ⚠️ Book already exists in library: \(book.title)")
+                #endif
                 return
             }
         }
@@ -1782,67 +1960,103 @@ class LibraryViewModel: ObservableObject {
             newBook.dateAdded = Date()
         }
         
+        #if DEBUG
         print("  📝 Adding book to array. Current count: \(books.count)")
+        #endif
         books.append(newBook)
+        #if DEBUG
         print("  📝 New count after adding: \(books.count)")
+        #endif
+        #if DEBUG
         print("  ✅ Preserved data - Rating: \(newBook.userRating ?? 0), Status: \(newBook.readingStatus.rawValue)")
+        #endif
 
         saveBooks()
 
         // Verify it was saved
         loadBooks()
+        #if DEBUG
         print("  ✅ Book saved. Library now has \(books.count) books")
+        #endif
 
         // Toast removed - handled by UnifiedQuickActionCard
         
         // Verify the saved book has the correct data
         if let savedBook = books.first(where: { $0.id == book.id }) {
+            #if DEBUG
             print("  🔍 Verified saved book - Rating: \(savedBook.userRating ?? 0), Status: \(savedBook.readingStatus.rawValue)")
+            #endif
+            #if DEBUG
             print("  🔍 Verified saved book - Cover URL: \(savedBook.coverImageURL ?? "NO COVER URL")")
+            #endif
             if savedBook.coverImageURL == nil {
+                #if DEBUG
                 print("  ❌❌❌ ERROR: Saved book lost its cover URL!")
+                #endif
             }
         }
     }
     
     func removeBook(_ book: Book) {
+        #if DEBUG
         print("🗑️ Attempting to remove book: \(book.title) with ID: \(book.id)")
+        #endif
         let countBefore = books.count
         books.removeAll { $0.id == book.id }
         let countAfter = books.count
+        #if DEBUG
         print("  📊 Books before: \(countBefore), after: \(countAfter)")
+        #endif
         
         if countBefore != countAfter {
             saveBooks()
             // Force UI update
             objectWillChange.send()
+            #if DEBUG
             print("  ✅ Book removed successfully")
+            #endif
         } else {
+            #if DEBUG
             print("  ⚠️ Book not found in array")
+            #endif
         }
     }
     
     @MainActor
     func deleteBook(_ book: Book) {
+        #if DEBUG
         print("🗑️ deleteBook called for: \(book.title)")
+        #endif
         
         // Find the index first to ensure we have the right book
         guard let index = books.firstIndex(where: { $0.id == book.id }) else {
+            #if DEBUG
             print("  ⚠️ Book not found in array by ID: \(book.id)")
+            #endif
             // Try matching by localId as fallback
             if let index = books.firstIndex(where: { $0.localId == book.localId }) {
+                #if DEBUG
                 print("  🔄 Found book by localId instead: \(book.localId)")
+                #endif
                 let bookToRemove = books[index]
                 books.remove(at: index)
                 saveBooks()
                 objectWillChange.send()
+                #if DEBUG
                 print("  ✅ Book removed successfully by localId")
+                #endif
             } else {
+                #if DEBUG
                 print("  ❌ Book not found by either ID or localId")
+                #endif
                 // List all book IDs for debugging
+                #if DEBUG
                 print("  📚 Current book IDs in library:")
+                #endif
                 for (idx, b) in books.enumerated() {
+                    #if DEBUG
                     print("    [\(idx)] ID: \(b.id), LocalID: \(b.localId), Title: \(b.title)")
+                    #endif
                 }
             }
             return
@@ -1855,7 +2069,9 @@ class LibraryViewModel: ObservableObject {
 
         // Remove the book
         books.remove(at: index)
+        #if DEBUG
         print("  📊 Removed book at index \(index), \(books.count) books remaining")
+        #endif
 
         // Save immediately
         saveBooks()
@@ -1866,10 +2082,14 @@ class LibraryViewModel: ObservableObject {
         // Reload to ensure consistency
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.loadBooks()
+            #if DEBUG
             print("  🔄 Reloaded library after deletion")
+            #endif
         }
 
+        #if DEBUG
         print("  ✅ Book deleted and UI update triggered")
+        #endif
     }
     
     func toggleReadingStatus(for book: Book) {
@@ -1900,17 +2120,31 @@ class LibraryViewModel: ObservableObject {
     }
     
     func updateBookCover(_ book: Book, newCoverURL: String?) {
+        #if DEBUG
         print("🔄 updateBookCover called")
+        #endif
+        #if DEBUG
         print("  📖 Book: \(book.title)")
+        #endif
+        #if DEBUG
         print("  🆔 Book ID: \(book.id)")
+        #endif
+        #if DEBUG
         print("  🖼️ Old cover URL: \(book.coverImageURL ?? "NO OLD URL")")
+        #endif
+        #if DEBUG
         print("  🖼️ New cover URL: \(newCoverURL ?? "NO NEW URL")")
+        #endif
         
         if let index = books.firstIndex(where: { $0.id == book.id }) {
+            #if DEBUG
             print("  ✅ Found book at index \(index)")
+            #endif
             let oldURL = books[index].coverImageURL
             books[index].coverImageURL = newCoverURL
+            #if DEBUG
             print("  🔄 Updated coverImageURL from '\(oldURL ?? "nil")' to '\(newCoverURL ?? "nil")'")
+            #endif
             
             saveBooks()
             
@@ -1920,9 +2154,13 @@ class LibraryViewModel: ObservableObject {
                 object: nil,
                 userInfo: ["bookId": book.id, "coverURL": newCoverURL as Any]
             )
+            #if DEBUG
             print("  ✅ Cover update complete, notification posted")
+            #endif
         } else {
+            #if DEBUG
             print("  ❌ ERROR: Could not find book with ID \(book.id) in library")
+            #endif
         }
     }
     
@@ -2006,17 +2244,23 @@ class LibraryViewModel: ObservableObject {
     func findMatchingBook(title: String, author: String? = nil) -> Book? {
         guard !title.isEmpty else { return nil }
         
+        #if DEBUG
         print("🔎 findMatchingBook called with title: '\(title)', author: '\(author ?? "nil")'")
+        #endif
         
         let normalizedTitle = normalizeTitle(title)
+        #if DEBUG
         print("📝 Normalized search title: '\(normalizedTitle)'")
+        #endif
         
         var bestMatch: Book? = nil
         var bestScore: Double = 0.0
         
         for book in books {
             let normalizedBookTitle = normalizeTitle(book.title)
+            #if DEBUG
             print("📚 Checking against book: '\(book.title)' -> normalized: '\(normalizedBookTitle)'")
+            #endif
             
             let score = calculateMatchScore(
                 searchTitle: normalizedTitle,
@@ -2025,19 +2269,27 @@ class LibraryViewModel: ObservableObject {
                 bookAuthor: book.author.lowercased()
             )
             
+            #if DEBUG
             print("   Score: \(score)")
+            #endif
             
             if score > bestScore && score > 0.6 { // Lowered threshold for better fuzzy matching
                 bestScore = score
                 bestMatch = book
+                #if DEBUG
                 print("   ✅ New best match!")
+                #endif
             }
         }
         
         if let match = bestMatch {
+            #if DEBUG
             print("🎯 Final match: '\(match.title)' with score: \(bestScore)")
+            #endif
         } else {
+            #if DEBUG
             print("❌ No match found (best score was: \(bestScore))")
+            #endif
         }
         
         return bestMatch
@@ -2208,6 +2460,8 @@ class LibraryViewModel: ObservableObject {
     func addNoteToBook(_ localId: UUID, note: Note) {
         // This could be expanded to store book-specific notes if needed
         // For now, we rely on the bookId in the note itself
+        #if DEBUG
         print("📚 Linked note '\(note.content.prefix(50))...' to book with localId: \(localId)")
+        #endif
     }
 }

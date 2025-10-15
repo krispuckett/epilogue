@@ -106,10 +106,18 @@ class ColorIntelligenceEngine: ObservableObject {
         
         #if DEBUG
         print("🎨 Multi-strategy sampling results:")
+        #if DEBUG
         print("  Edge samples: \(sampleAlongEdges(cgImage, edgeMap: edgeCGImage).count)")
+        #endif
+        #if DEBUG
         print("  High variance samples: \(sampleHighVarianceRegions(cgImage).count)")
+        #endif
+        #if DEBUG
         print("  Golden point samples: \(sampleGoldenPoints(cgImage).count)")
+        #endif
+        #if DEBUG
         print("  Total samples: \(pixelData.count)")
+        #endif
         #endif
         return pixelData
     }

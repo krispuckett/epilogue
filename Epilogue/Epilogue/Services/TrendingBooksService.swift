@@ -134,7 +134,9 @@ class TrendingBooksService: ObservableObject {
             return item.book
             
         } catch {
+            #if DEBUG
             print("Error fetching book: \(error)")
+            #endif
             return nil
         }
     }

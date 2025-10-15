@@ -304,7 +304,9 @@ extension View {
             if let palette = palette {
                 let original = palette.accent ?? palette.primary
                 let analysis = SmartAccentColor.analyzeColorSuitability(original)
+                #if DEBUG
                 print(SmartAccentColor.debugAnalysis(analysis))
+                #endif
             }
             #endif
         }

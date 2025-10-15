@@ -255,7 +255,9 @@ struct GradientTestView: View {
         
         guard let url = URL(string: urlString) else { return }
         
+        #if DEBUG
         print("📚 Loading book cover from: \(urlString)")
+        #endif
         
         // Reset colors and show loading state
         isLoadingColors = true
@@ -263,7 +265,9 @@ struct GradientTestView: View {
         
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
+                #if DEBUG
                 print("❌ Error loading book cover: \(error)")
+                #endif
                 DispatchQueue.main.async {
                     self.isLoadingColors = false
                 }
@@ -271,14 +275,18 @@ struct GradientTestView: View {
             }
             
             if let data = data, let image = UIImage(data: data) {
+                #if DEBUG
                 print("✅ Book cover loaded successfully, size: \(image.size)")
+                #endif
                 DispatchQueue.main.async {
                     self.bookCoverImage = image
                     self.extractColorsFromImage(image)
                     self.isLoadingColors = false
                 }
             } else {
+                #if DEBUG
                 print("❌ Failed to create UIImage from data")
+                #endif
                 DispatchQueue.main.async {
                     self.isLoadingColors = false
                 }
@@ -288,7 +296,9 @@ struct GradientTestView: View {
     
     // MARK: - Extract Colors
     private func extractColorsFromImage(_ image: UIImage) {
+        #if DEBUG
         print("🎨 Starting color extraction for book: \(selectedBook?.title ?? "Unknown")")
+        #endif
         
         var colors: [Color] = []
         
@@ -302,11 +312,15 @@ struct GradientTestView: View {
             colors = extractProperColors(from: image)
         }
         
+        #if DEBUG
         print("🎨 Extracted \(colors.count) colors")
+        #endif
         
         // If we didn't find enough colors, add some defaults
         if colors.isEmpty {
+            #if DEBUG
             print("⚠️ No colors found, using defaults")
+            #endif
             colors = defaultColors
         }
         
@@ -316,20 +330,26 @@ struct GradientTestView: View {
             colors.append(generateComplementaryColor(from: baseColor))
         }
         
+        #if DEBUG
         print("🎨 Final color count: \(colors.count)")
+        #endif
         
         // Force UI update with new ID
         DispatchQueue.main.async {
             self.extractedColors = colors
             self.colorExtractionId = UUID() // Force gradient views to recreate
+            #if DEBUG
             print("✅ Colors updated in UI with new ID: \(self.colorExtractionId)")
+            #endif
             
             // Debug: Print extracted colors
             for (index, color) in colors.enumerated() {
                 let uiColor = UIColor(color)
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                #if DEBUG
                 print("Color \(index): H=\(h * 360)°, S=\(s * 100)%, B=\(b * 100)%")
+                #endif
             }
         }
     }
@@ -490,7 +510,9 @@ struct GradientTestView: View {
     private func extractProperColors(from image: UIImage) -> [Color] {
         // Use CIAreaAverage filter for accurate color extraction
         guard let ciImage = CIImage(image: image) else {
+            #if DEBUG
             print("❌ Failed to create CIImage")
+            #endif
             return []
         }
         
@@ -538,7 +560,9 @@ struct GradientTestView: View {
                 if !((r < 0.1 && g < 0.1 && b < 0.1) || (r > 0.95 && g > 0.95 && b > 0.95) || s < 0.1) {
                     let color = Color(red: Double(r), green: Double(g), blue: Double(b))
                     extractedColors.append(color)
+                    #if DEBUG
                     print("🎨 Region color: R:\(Int(r*255)) G:\(Int(g*255)) B:\(Int(b*255))")
+                    #endif
                 }
             }
         }

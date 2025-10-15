@@ -342,17 +342,25 @@ struct CleanNotesView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { notification in
+                #if DEBUG
                 print("📝 CleanNotesView: Received CreateNewNote notification")
+                #endif
                 if let data = notification.object as? [String: Any],
                    let content = data["content"] as? String {
+                    #if DEBUG
                     print("📝 Note content: \(content)")
+                    #endif
                     let bookId = data["bookId"] as? String
                     let bookTitle = data["bookTitle"] as? String
                     let bookAuthor = data["bookAuthor"] as? String
+                    #if DEBUG
                     print("📝 Book context: ID=\(bookId ?? "nil"), Title=\(bookTitle ?? "nil"), Author=\(bookAuthor ?? "nil")")
+                    #endif
                     createNote(content: content, bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
                 } else {
+                    #if DEBUG
                     print("❌ Failed to parse notification data")
+                    #endif
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
@@ -1040,9 +1048,15 @@ struct CleanNotesView: View {
     }
     
     private func shareQuote(_ quote: CapturedQuote) {
+        #if DEBUG
         print("🔵 shareQuote called")
+        #endif
+        #if DEBUG
         print("🔵 Quote text: \(quote.text ?? "nil")")
+        #endif
+        #if DEBUG
         print("🔵 Quote author: \(quote.author ?? "nil")")
+        #endif
 
         // Create share data struct - this ensures all data is captured atomically
         quoteShareData = QuoteShareData(
@@ -1051,7 +1065,9 @@ struct CleanNotesView: View {
             bookTitle: quote.book?.title
         )
 
+        #if DEBUG
         print("🔵 Created share data with text: \(quoteShareData?.text ?? "nil")")
+        #endif
 
         SensoryFeedback.light()
 
@@ -1111,7 +1127,9 @@ struct CleanNotesView: View {
 
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Note saved successfully to SwiftData")
+            #endif
 
             // Index for Spotlight search
             Task {
@@ -1122,8 +1140,12 @@ struct CleanNotesView: View {
             showToast(message: message)
             SensoryFeedback.success()
         } catch {
+            #if DEBUG
             print("❌ Failed to save note: \(error)")
+            #endif
+            #if DEBUG
             print("❌ Error details: \(error.localizedDescription)")
+            #endif
             // Show error toast to user
             showToast(message: "Failed to save note")
         }
@@ -1199,7 +1221,9 @@ struct CleanNotesView: View {
             showToast(message: message)
             SensoryFeedback.success()
         } catch {
+            #if DEBUG
             print("Failed to save quote: \(error)")
+            #endif
             // Show error toast to user
             showToast(message: "Failed to save quote")
         }

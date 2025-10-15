@@ -160,9 +160,15 @@ struct CommandParser {
     static func parse(_ input: String, books: [Book] = [], notes: [Note] = []) -> CommandIntent {
         let trimmed = input.trimmingCharacters(in: .whitespaces)
         let lowercased = trimmed.lowercased()
+        #if DEBUG
         print("CommandParser: Parsing input: '\(input)' (lowercased: '\(lowercased)')")
+        #endif
+        #if DEBUG
         print("CommandParser: Available books count: \(books.count)")
+        #endif
+        #if DEBUG
         print("CommandParser: Available notes count: \(notes.count)")
+        #endif
         
         // FIRST: Check for @book mentions OR intelligent book context
         if input.contains("@") {
@@ -226,7 +232,9 @@ struct CommandParser {
                 return .createReminder(text: reminderText, date: date)
             } else {
                 // Date parsing failed but it's clearly a reminder intent
+                #if DEBUG
                 print("Warning: Reminder detected but date parsing failed for: \(input)")
+                #endif
                 // Don't fall through to other intents
                 return .unknown
             }
@@ -244,50 +252,72 @@ struct CommandParser {
         
         // Debug: Print first few book titles
         if let firstBook = books.first {
+            #if DEBUG
             print("CommandParser: First book: '\(firstBook.title)'")
+            #endif
             if books.count > 1 {
+                #if DEBUG
                 print("CommandParser: Books in library: \(books.prefix(3).map { $0.title }.joined(separator: ", "))")
+                #endif
             }
         }
         
         // Empty input
         if trimmed.isEmpty {
+            #if DEBUG
             print("CommandParser: Empty input, returning .unknown")
+            #endif
             return .unknown
         }
         
         // Phase 1: Check for exact matches with existing books
         if let matchedBook = findExistingBook(input: trimmed, books: books) {
+            #if DEBUG
             print("CommandParser: Found existing book match: '\(matchedBook.title)'")
+            #endif
             return .existingBook(book: matchedBook)
         }
         
         // Phase 2: Check for exact matches with existing notes
         if let matchedNote = findExistingNote(input: trimmed, notes: notes) {
+            #if DEBUG
             print("CommandParser: Found existing note match")
+            #endif
             return .existingNote(note: matchedNote)
         }
         
         // Phase 3: Note Detection (check notes FIRST - most common use case)
         if isLikelyNote(input: trimmed) {
+            #if DEBUG
             print("CommandParser: Detected note pattern")
+            #endif
             return .createNote(text: input)
         }
         
         // Phase 4: Smart Quote Detection (check quotes after notes)
         if isLikelyQuote(input: trimmed) {
+            #if DEBUG
             print("CommandParser: Detected quote pattern")
+            #endif
             return .createQuote(text: input)
         }
         
         // Phase 5: Smart Book Title Detection - Check for "by" pattern first
         if trimmed.lowercased().contains(" by ") {
             let query = cleanBookQuery(from: input)
+            #if DEBUG
             print("CommandParser: Detected 'by' pattern for book")
+            #endif
+            #if DEBUG
             print("CommandParser: Input was: '\(input)'")
+            #endif
+            #if DEBUG
             print("CommandParser: Query after cleanBookQuery: '\(query)'")
+            #endif
             let result = CommandIntent.addBook(query: query)
+            #if DEBUG
             print("CommandParser: Returning CommandIntent: \(result)")
+            #endif
             return result
         }
         
@@ -295,13 +325,17 @@ struct CommandParser {
         let bookScore = calculateBookTitleScore(input: trimmed)
         let noteScore = calculateNoteScore(input: trimmed)
 
+        #if DEBUG
         print("CommandParser: Scores - Book: \(bookScore), Note: \(noteScore)")
+        #endif
 
         // IMPROVED: Lower threshold and check if input looks like a title
         // If book score is higher than note score OR looks like a title pattern, treat as book
         if (bookScore > noteScore && bookScore > 0.3) || isLikelyBookTitle(input: trimmed) {
             let query = cleanBookQuery(from: input)
+            #if DEBUG
             print("CommandParser: Detected book title (score: \(bookScore)), query: '\(query)'")
+            #endif
             return .addBook(query: query)
         }
         
@@ -311,7 +345,9 @@ struct CommandParser {
             // Check if it matches common book title patterns
             if matchesBookTitlePattern(input: trimmed) {
                 let query = cleanBookQuery(from: input)
+                #if DEBUG
                 print("CommandParser: Detected book title via pattern matching, query: '\(query)'")
+                #endif
                 return .addBook(query: query)
             }
         }
@@ -324,7 +360,9 @@ struct CommandParser {
            lowercased.starts(with: "i'm reading ") ||
            lowercased.starts(with: "currently reading ") {
             let query = cleanBookQuery(from: input)
+            #if DEBUG
             print("CommandParser: Detected explicit book command, query: '\(query)'")
+            #endif
             return .addBook(query: query)
         }
         
@@ -347,7 +385,9 @@ struct CommandParser {
                 for book in books {
                     if book.title.lowercased().contains(trimmed.lowercased()) ||
                        book.author.lowercased().contains(trimmed.lowercased()) {
+                        #if DEBUG
                         print("CommandParser: Found book in final search: '\(book.title)'")
+                        #endif
                         return .existingBook(book: book)
                     }
                 }
@@ -357,21 +397,29 @@ struct CommandParser {
             // open BookSearchSheet instead of generic search
             if isLikelyBookTitle(input: trimmed) || matchesBookTitlePattern(input: trimmed) {
                 let query = cleanBookQuery(from: input)
+                #if DEBUG
                 print("CommandParser: Not in library but looks like book title, opening BookSearchSheet with: '\(query)'")
+                #endif
                 return .addBook(query: query)
             }
 
+            #if DEBUG
             print("CommandParser: Short input without punctuation, returning .searchAll")
+            #endif
             return .searchAll(query: input)
         }
         
         // Very long text defaults to note
         if trimmed.count > 50 {
+            #if DEBUG
             print("CommandParser: Long text, defaulting to .createNote")
+            #endif
             return .createNote(text: input)
         }
         
+        #if DEBUG
         print("CommandParser: Falling back to .unknown")
+        #endif
         return .unknown
     }
     
@@ -547,11 +595,15 @@ struct CommandParser {
     private static func findExistingBook(input: String, books: [Book]) -> Book? {
         let searchTerms = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").map(String.init)
         
+        #if DEBUG
         print("CommandParser: Searching for book with terms: \(searchTerms)")
+        #endif
         
         // First, try exact title match
         if let book = books.first(where: { $0.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == input.lowercased() }) {
+            #if DEBUG
             print("CommandParser: Found exact match: '\(book.title)'")
+            #endif
             return book
         }
         
@@ -567,7 +619,9 @@ struct CommandParser {
                 }
                 
                 if allTermsInTitle {
+                    #if DEBUG
                     print("CommandParser: Found book by title match: '\(book.title)'")
+                    #endif
                     return book
                 }
                 
@@ -577,7 +631,9 @@ struct CommandParser {
                     let authorSearchString = authorSearchTerms.joined(separator: " ")
                     
                     if authorLower.contains(authorSearchString) || authorSearchString.count >= 3 && authorLower.hasPrefix(authorSearchString) {
+                        #if DEBUG
                         print("CommandParser: Found book by author match: '\(book.title)' by '\(book.author)'")
+                        #endif
                         return book
                     }
                 }
@@ -587,32 +643,46 @@ struct CommandParser {
         // Finally, try single partial match if input is long enough
         if input.count >= 3 {
             if let book = books.first(where: { $0.title.lowercased().contains(input.lowercased()) }) {
+                #if DEBUG
                 print("CommandParser: Found book by partial match: '\(book.title)'")
+                #endif
                 return book
             }
         }
         
+        #if DEBUG
         print("CommandParser: No book match found for: '\(input)'")
+        #endif
         return nil
     }
     
     private static func findExistingNote(input: String, notes: [Note]) -> Note? {
         let searchTerms = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").map(String.init)
         
+        #if DEBUG
         print("CommandParser: Searching for note with terms: \(searchTerms)")
+        #endif
+        #if DEBUG
         print("CommandParser: Available notes count: \(notes.count)")
+        #endif
         
         // Debug: Print all note contents to find the issue
         if notes.count > 0 {
+            #if DEBUG
             print("CommandParser: All notes:")
+            #endif
             for (index, note) in notes.enumerated() {
+                #if DEBUG
                 print("  \(index): [Note - \(note.content.count) characters] (type: \(note.type))")
+                #endif
             }
         }
         
         // First, try exact content match
         if let note = notes.first(where: { $0.content.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == input.lowercased() }) {
+            #if DEBUG
             print("CommandParser: Found exact note match")
+            #endif
             return note
         }
         
@@ -627,13 +697,17 @@ struct CommandParser {
                 }
                 
                 if allTermsInContent {
+                    #if DEBUG
                     print("CommandParser: Found note match: '\(note.content.prefix(50))...'")
+                    #endif
                     return note
                 }
                 
                 // Also check if it's a partial match of the beginning
                 if contentLower.hasPrefix(input.lowercased()) {
+                    #if DEBUG
                     print("CommandParser: Found note by prefix match: '\(note.content.prefix(50))...'")
+                    #endif
                     return note
                 }
             }
@@ -642,25 +716,33 @@ struct CommandParser {
         // Finally, try partial match if input is long enough (reduced threshold)
         if input.count >= 3 {
             if let note = notes.first(where: { $0.content.lowercased().contains(input.lowercased()) }) {
+                #if DEBUG
                 print("CommandParser: Found note by partial match: '\(note.content.prefix(50))...'")
+                #endif
                 return note
             }
         }
         
+        #if DEBUG
         print("CommandParser: No note match found for: '\(input)'")
+        #endif
         return nil
     }
     
     static func cleanBookQuery(from input: String) -> String {
         var query = input
+        #if DEBUG
         print("📚 cleanBookQuery - Input: '\(input)'")
+        #endif
         
         // Remove common prefixes
         let prefixes = ["add book ", "add the book ", "add the ", "add ", "reading ", "finished ", "book: ", "i'm reading ", "currently reading "]
         for prefix in prefixes {
             if query.lowercased().starts(with: prefix) {
                 query = String(query.dropFirst(prefix.count))
+                #if DEBUG
                 print("📚 cleanBookQuery - Removed prefix '\(prefix)', now: '\(query)'")
+                #endif
                 break
             }
         }
@@ -673,7 +755,9 @@ struct CommandParser {
             query = String(query.dropLast())
         }
         
+        #if DEBUG
         print("📚 cleanBookQuery - Final output: '\(query)'")
+        #endif
         return query
     }
     

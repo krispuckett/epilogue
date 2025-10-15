@@ -335,11 +335,15 @@ struct LiquidCommandPalette: View {
         // Use CommandParser to detect intent with advanced NLP
         let intent = CommandParser.parse(trimmed, books: libraryViewModel.books, notes: notesViewModel.notes)
         
+        #if DEBUG
         print("🧠 LiquidCommandPalette: Processing command '\(trimmed)' with intent: \(intent)")
+        #endif
         
         // Debug the intent
         if case .addBook(let query) = intent {
+            #if DEBUG
             print("🔴 DEBUG: .addBook intent with query: '\(query)'")
+            #endif
         }
         
         // Handle editing note case
@@ -369,18 +373,26 @@ struct LiquidCommandPalette: View {
             createQuoteWithBookContext(text: text, book: book)
         case .addBook(let query):
             // Open BookSearchSheet with the query (the smart way!)
+            #if DEBUG
             print("🔍 LiquidCommandPalette - .addBook case with query: '\(query)'")
+            #endif
             
             // Ensure we have a non-empty query
             let finalQuery = query.isEmpty ? trimmed : query
+            #if DEBUG
             print("🔍 LiquidCommandPalette - Using finalQuery: '\(finalQuery)'")
+            #endif
             
             // CRITICAL FIX: Set the query and show sheet immediately
             // The delay was causing issues with state capture
             bookSearchQuery = finalQuery
+            #if DEBUG
             print("🔍 LiquidCommandPalette - Set bookSearchQuery to: '\(bookSearchQuery)'")
+            #endif
             showBookSearch = true
+            #if DEBUG
             print("🔍 LiquidCommandPalette - showBookSearch set to true")
+            #endif
             // Don't dismiss palette - let the sheet completion handle it
         case .batchAddBooks(let titles):
             // Handle batch book additions
@@ -445,11 +457,15 @@ struct LiquidCommandPalette: View {
     
     // MARK: - Book Search & Add
     private func searchAndAddBook(query: String) {
+        #if DEBUG
         print("📚 LiquidCommandPalette - Searching for book: '\(query)'")
+        #endif
         
         // Set the search query and show book search sheet
         bookSearchQuery = query
+        #if DEBUG
         print("📝 LiquidCommandPalette - Set bookSearchQuery to: '\(bookSearchQuery)'")
+        #endif
         showBookSearch = true
         
         SensoryFeedback.light()
@@ -457,7 +473,9 @@ struct LiquidCommandPalette: View {
     
     // MARK: - Search Navigation
     private func performSearch(query: String, intent: CommandIntent) {
+        #if DEBUG
         print("🔍 Performing search: \(query) with intent: \(intent)")
+        #endif
         
         // Navigate to appropriate search view
         switch intent {
@@ -540,9 +558,13 @@ struct LiquidCommandPalette: View {
         // Save to SwiftData
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Note saved to SwiftData: \(content)")
+            #endif
         } catch {
+            #if DEBUG
             print("Failed to save note: \(error)")
+            #endif
         }
         
         // Haptic feedback for note saved
@@ -637,9 +659,13 @@ struct LiquidCommandPalette: View {
         // Save to SwiftData
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Quote saved to SwiftData: \(content)")
+            #endif
         } catch {
+            #if DEBUG
             print("Failed to save quote: \(error)")
+            #endif
         }
         
         // Haptic feedback for quote saved
@@ -840,9 +866,13 @@ struct LiquidCommandPalette: View {
         
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
+                #if DEBUG
                 print("Failed to schedule reminder: \(error)")
+                #endif
             } else {
+                #if DEBUG
                 print("✅ Reminder scheduled for \(date)")
+                #endif
                 SensoryFeedback.success()
             }
         }
@@ -855,7 +885,9 @@ struct LiquidCommandPalette: View {
         let goalKey = "readingGoal_\(book.localId)"
         UserDefaults.standard.set(pagesPerDay, forKey: goalKey)
         
+        #if DEBUG
         print("✅ Reading goal set: \(pagesPerDay) pages/day for \(book.title)")
+        #endif
         
         // Post notification to update UI
         NotificationCenter.default.post(

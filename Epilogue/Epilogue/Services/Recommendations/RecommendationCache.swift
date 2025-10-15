@@ -48,9 +48,13 @@ actor RecommendationCache {
         do {
             let data = try JSONEncoder().encode(entry)
             try data.write(to: fileURL)
+            #if DEBUG
             print("✅ Cached recommendations (30 day expiry)")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to cache recommendations: \(error)")
+            #endif
         }
     }
 
@@ -58,7 +62,9 @@ actor RecommendationCache {
 
     func load(currentBookCount: Int) async -> CachedEntry? {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            #if DEBUG
             print("ℹ️ No cached recommendations found")
+            #endif
             return nil
         }
 
@@ -68,27 +74,37 @@ actor RecommendationCache {
 
             // Check expiry
             if entry.isExpired {
+                #if DEBUG
                 print("⏰ Cache expired (30 days old)")
+                #endif
                 await clear()
                 return nil
             }
 
             // Check if library changed significantly
             if entry.needsRefresh(currentBookCount: currentBookCount) {
+                #if DEBUG
                 print("📚 Library changed significantly (+25%), refreshing...")
+                #endif
                 await clear()
                 return nil
             }
 
+            #if DEBUG
             print("✅ Loaded cached recommendations (\(entry.recommendations.count) books)")
+            #endif
             let age = Date().timeIntervalSince(entry.createdAt)
             let daysOld = Int(age / 86400)
+            #if DEBUG
             print("   Cache age: \(daysOld) days old")
+            #endif
 
             return entry
 
         } catch {
+            #if DEBUG
             print("❌ Failed to load cache: \(error)")
+            #endif
             await clear()
             return nil
         }
@@ -98,6 +114,8 @@ actor RecommendationCache {
 
     func clear() async {
         try? FileManager.default.removeItem(at: fileURL)
+        #if DEBUG
         print("🗑️ Cleared recommendation cache")
+        #endif
     }
 }

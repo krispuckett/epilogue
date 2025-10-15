@@ -92,7 +92,9 @@ struct SimpleBookGradient: View {
     }
     
     private func extractColors() {
+        #if DEBUG
         print("🎨 SimpleGradient - Extracting colors from: \(bookTitle ?? "Unknown")")
+        #endif
         
         let size = bookCoverImage.size
         
@@ -116,7 +118,9 @@ struct SimpleBookGradient: View {
                 var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
                 uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
                 let hex = String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+                #if DEBUG
                 print("  Sampled color at \(point): \(hex)")
+                #endif
             }
         }
         
@@ -133,7 +137,9 @@ struct SimpleBookGradient: View {
             extractedColors.append(Color(white: 0.3))
         }
         
+        #if DEBUG
         print("🎨 Final extracted colors: \(extractedColors.count)")
+        #endif
         
         // Use SmartAccentColorExtractor for intelligent accent color detection
         let smartAccent = SmartAccentColorExtractor.extractAccentColor(

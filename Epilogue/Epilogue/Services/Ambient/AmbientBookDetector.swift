@@ -50,29 +50,39 @@ class AmbientBookDetector: ObservableObject {
         isDetecting = true
         detectedBook = nil
         confidence = 0.0
+        #if DEBUG
         print("📚 Book detection started")
+        #endif
     }
     
     func stopDetection() {
         isDetecting = false
+        #if DEBUG
         print("📚 Book detection stopped")
+        #endif
     }
     
     func resetDetection() {
         detectedBook = nil
         confidence = 0.0
+        #if DEBUG
         print("📚 Book detection reset")
+        #endif
     }
     
     // MARK: - Natural Language Processing
     
     func detectBookInText(_ text: String) {
         guard isDetecting else { 
+            #if DEBUG
             print("📚 Book detection not active")
+            #endif
             return 
         }
         
+        #if DEBUG
         print("📚 Detecting book in text: \(text)")
+        #endif
         let lowercased = text.lowercased()
         
         // ALWAYS check against known books first (even without trigger phrases)
@@ -179,18 +189,24 @@ class AmbientBookDetector: ObservableObject {
     
     private func checkAgainstKnownBooks(_ text: String) {
         let lowercased = text.lowercased()
+        #if DEBUG
         print("📚 Checking against \(libraryBooks.count) known books")
+        #endif
         
         // Debug: Print first few book titles to verify library contents
         if libraryBooks.count > 0 {
+            #if DEBUG
             print("📚 Books in library: \(libraryBooks.prefix(6).map { $0.title }.joined(separator: ", "))")
+            #endif
         }
         
         for book in libraryBooks {
             // Check title match
             let titleLower = book.title.lowercased()
             if lowercased.contains(titleLower) {
+                #if DEBUG
                 print("📚 Found exact match: \(book.title)")
+                #endif
                 setDetectedBook(book, confidence: 0.9)
                 return
             }
@@ -202,7 +218,9 @@ class AmbientBookDetector: ObservableObject {
                 .replacingOccurrences(of: "^(a |an |the )", with: "", options: .regularExpression)
             
             if textWithoutArticles.contains(titleWithoutArticles) || titleWithoutArticles.contains(textWithoutArticles) {
+                #if DEBUG
                 print("📚 Found match without articles: \(book.title)")
+                #endif
                 setDetectedBook(book, confidence: 0.85)
                 return
             }
@@ -210,7 +228,9 @@ class AmbientBookDetector: ObservableObject {
             // Special case for "Lord of the Rings" variations
             if titleLower.contains("lord of the rings") || titleLower.contains("fellowship") || titleLower.contains("two towers") || titleLower.contains("return of the king") {
                 if lowercased.contains("lord") && lowercased.contains("rings") {
+                    #if DEBUG
                     print("📚 Found Lord of the Rings match: \(book.title)")
+                    #endif
                     setDetectedBook(book, confidence: 0.85)
                     return
                 }
@@ -221,7 +241,9 @@ class AmbientBookDetector: ObservableObject {
             if titleWords.count >= 2 {
                 let matchingWords = titleWords.filter { lowercased.contains($0) }
                 if Double(matchingWords.count) / Double(titleWords.count) > 0.5 {
+                    #if DEBUG
                     print("📚 Found partial match: \(book.title)")
+                    #endif
                     setDetectedBook(book, confidence: 0.7)
                     return
                 }
@@ -277,7 +299,9 @@ class AmbientBookDetector: ObservableObject {
         // Set synchronously for immediate use
         self.detectedBook = book
         self.confidence = 1.0
+        #if DEBUG
         print("📖 Book context set immediately: \(book.title)")
+        #endif
         
         // Also trigger the async update for UI
         setDetectedBook(book, confidence: 1.0)
@@ -289,14 +313,18 @@ class AmbientBookDetector: ObservableObject {
             
             // CRITICAL: Only set if it's a different book to prevent duplicate triggers
             if self.detectedBook?.localId == book.localId {
+                #if DEBUG
                 print("📖 Book already detected: \(book.title) - skipping duplicate")
+                #endif
                 return
             }
             
             self.detectedBook = book
             self.confidence = confidence
             
+            #if DEBUG
             print("📖 Book detected: \(book.title) (confidence: \(Int(confidence * 100))%)")
+            #endif
             
             // Haptic feedback for successful detection
             if confidence > 0.7 {
@@ -313,13 +341,17 @@ class AmbientBookDetector: ObservableObject {
             let viewModel = LibraryViewModel()
             // ViewModel loads books automatically in init
             self.libraryBooks = viewModel.books
+            #if DEBUG
             print("📚 Loaded \(libraryBooks.count) books for detection")
+            #endif
         }
     }
     
     func updateLibrary(_ books: [Book]) {
         libraryBooks = books
+        #if DEBUG
         print("📚 Updated library with \(books.count) books for detection")
+        #endif
     }
     
     // MARK: - Observers

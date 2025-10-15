@@ -48,7 +48,9 @@ final class MigrationRecovery {
     
     /// Resets migration state for retry
     func resetMigrationState() {
+        #if DEBUG
         print("🔄 Resetting migration state for retry...")
+        #endif
         
         // Clear migration flags
         UserDefaults.standard.removeObject(forKey: "com.epilogue.dataMigrationInProgress")
@@ -60,7 +62,9 @@ final class MigrationRecovery {
     
     /// Emergency reset - use with extreme caution
     func performEmergencyReset() {
+        #if DEBUG
         print("🚨 Performing emergency migration reset...")
+        #endif
         
         // Reset all migration-related keys
         resetMigrationState()
@@ -69,7 +73,9 @@ final class MigrationRecovery {
         UserDefaults.standard.removeObject(forKey: recoveryAttemptKey)
         
         // Note: This does NOT delete any data, just resets migration state
+        #if DEBUG
         print("✅ Emergency reset complete. Migration will be reattempted on next launch.")
+        #endif
     }
     
     /// Gets current counts for comparison

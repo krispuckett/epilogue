@@ -73,7 +73,9 @@ struct GlassOrbSettingsButton_Previews: PreviewProvider {
             Color.black.ignoresSafeArea()
             
             GlassOrbSettingsButton(isPressed: .constant(false)) {
+                #if DEBUG
                 print("Settings tapped")
+                #endif
             }
         }
         .preferredColorScheme(.dark)

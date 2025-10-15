@@ -92,7 +92,9 @@ struct SettingsButton_Previews: PreviewProvider {
         HStack(spacing: 40) {
             // SF Symbol version
             SettingsButton(isPressed: .constant(false)) {
+                #if DEBUG
                 print("Settings tapped")
+                #endif
             }
             
             // Custom icon version

@@ -76,7 +76,9 @@ final class SwiftDataMigrationService {
                 try modelContext.save()
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to fix orphaned sessions: \(error)")
+            #endif
         }
     }
     
@@ -96,11 +98,15 @@ final class SwiftDataMigrationService {
                 if let bookLocalId = note.bookLocalId,
                    let book = try await findBookByLocalId(bookLocalId, modelContext: modelContext) {
                     note.book = book
+                    #if DEBUG
                     print("  ✓ Relinked note to book: \(book.title)")
+                    #endif
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to fix orphaned notes: \(error)")
+            #endif
         }
         
         // Fix orphaned quotes
@@ -117,11 +123,15 @@ final class SwiftDataMigrationService {
                 if let bookLocalId = quote.bookLocalId,
                    let book = try await findBookByLocalId(bookLocalId, modelContext: modelContext) {
                     quote.book = book
+                    #if DEBUG
                     print("  ✓ Relinked quote to book: \(book.title)")
+                    #endif
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to fix orphaned quotes: \(error)")
+            #endif
         }
         
         // Fix orphaned questions
@@ -138,11 +148,15 @@ final class SwiftDataMigrationService {
                 if let bookLocalId = question.bookLocalId,
                    let book = try await findBookByLocalId(bookLocalId, modelContext: modelContext) {
                     question.book = book
+                    #if DEBUG
                     print("  ✓ Relinked question to book: \(book.title)")
+                    #endif
                 }
             }
         } catch {
+            #if DEBUG
             print("❌ Failed to fix orphaned questions: \(error)")
+            #endif
         }
         
         try? modelContext.save()
@@ -173,10 +187,14 @@ final class SwiftDataMigrationService {
             }
             
             try modelContext.save()
+            #if DEBUG
             print("✅ Ensured bidirectional relationships for \(books.count) books")
+            #endif
             
         } catch {
+            #if DEBUG
             print("❌ Failed to ensure bidirectional relationships: \(error)")
+            #endif
         }
     }
     
@@ -217,11 +235,15 @@ final class SwiftDataMigrationService {
             
             if duplicatesRemoved > 0 {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Removed \(duplicatesRemoved) duplicate books")
+                #endif
             }
             
         } catch {
+            #if DEBUG
             print("❌ Failed to remove duplicate books: \(error)")
+            #endif
         }
     }
     

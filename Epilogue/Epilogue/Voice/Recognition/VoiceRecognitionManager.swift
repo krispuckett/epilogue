@@ -708,7 +708,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             // Uncomment for debugging voice patterns
             /*
             if abs(self.voiceIntensity - previousIntensity) > 0.05 || abs(self.voiceFrequency - previousFrequency) > 0.05 {
+                #if DEBUG
                 print("🎵 Voice Patterns - Intensity: \(String(format: "%.2f", self.voiceIntensity)), Frequency: \(String(format: "%.2f", self.voiceFrequency)), Rhythm: \(String(format: "%.2f", self.voiceRhythm))")
+                #endif
             }
             */
         }

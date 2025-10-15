@@ -24,7 +24,9 @@ enum SecureClipboard {
         }
         
         // Log the action (without exposing content)
+        #if DEBUG
         print("📋 Copied to clipboard [\(text.count) characters] - expires in \(Int(expiresAfter ?? 0)) seconds")
+        #endif
     }
     
     /// Copy sensitive content with automatic expiration and warning
@@ -37,14 +39,18 @@ enum SecureClipboard {
     private static func clearIfMatches(_ text: String) {
         if UIPasteboard.general.string == text {
             UIPasteboard.general.string = ""
+            #if DEBUG
             print("📋 Clipboard cleared (expired)")
+            #endif
         }
     }
     
     /// Clear clipboard immediately
     static func clear() {
         UIPasteboard.general.string = ""
+        #if DEBUG
         print("📋 Clipboard cleared")
+        #endif
     }
     
     /// Format quote for clipboard with attribution

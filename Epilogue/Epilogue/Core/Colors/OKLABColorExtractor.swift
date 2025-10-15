@@ -123,16 +123,24 @@ public class OKLABColorExtractor {
         
         #if DEBUG
         print("\nColorCube Extraction for \(imageSource)")
+        #if DEBUG
         print("  🚀 FRESH EXTRACTION STARTING (not from cache)")
+        #endif
+        #if DEBUG
         print("  Processing size: \(width)x\(height) = \(width * height) pixels")
+        #endif
         if originalSize.width > CGFloat(width) {
+            #if DEBUG
             print("  Original size: \(Int(originalSize.width))x\(Int(originalSize.height))")
+            #endif
         }
         #endif
         
         #if DEBUG
         // Add debug logging
+        #if DEBUG
         print("  Creating bitmap context...")
+        #endif
         #endif
         var pixelData = [UInt8](repeating: 0, count: bytesPerRow * height)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -208,7 +216,9 @@ public class OKLABColorExtractor {
         
         #if DEBUG
         print("  Black pixels: \(String(format: "%.1f", blackPercentage))%")
+        #if DEBUG
         print("  Dark cover detected: \(isDarkCover)")
+        #endif
         #endif
         
         // For dark covers, perform multi-scale analysis to find small accent colors
@@ -305,11 +315,15 @@ public class OKLABColorExtractor {
         
         #if DEBUG
         // After sorting peaks
+        #if DEBUG
         print("DEBUG: Sorted peaks for role assignment:")
+        #endif
         for (index, peak) in colorPeaks.prefix(3).enumerated() {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             peak.color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            #if DEBUG
             print("  \(index+1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - Count: \(peak.count)")
+            #endif
         }
         #endif
         
@@ -352,11 +366,21 @@ public class OKLABColorExtractor {
         
         #if DEBUG
         print("\nFinal ColorCube Palette:")
+        #if DEBUG
         print("  Primary: \(colorDescription(roles.primary))")
+        #endif
+        #if DEBUG
         print("  Secondary: \(colorDescription(roles.secondary))")
+        #endif
+        #if DEBUG
         print("  Accent: \(colorDescription(roles.accent))")
+        #endif
+        #if DEBUG
         print("  Background: \(colorDescription(roles.background))")
+        #endif
+        #if DEBUG
         print("  Monochromatic: \(isMonochromatic)")
+        #endif
         #endif
         
         return ColorPalette(
@@ -441,7 +465,9 @@ public class OKLABColorExtractor {
         for (index, (color, count)) in sortedColors.prefix(5).enumerated() {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            #if DEBUG
             print("    \(index + 1). RGB(\(Int(r*255)), \(Int(g*255)), \(Int(b*255))) - Weighted count: \(count)")
+            #endif
         }
         #endif
         
@@ -574,13 +600,27 @@ public class OKLABColorExtractor {
             
             #if DEBUG
             print("🎯 Dark Cover Role Assignment:")
+            #if DEBUG
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
+            #endif
+            #if DEBUG
             print("  Bright peaks: \(brightPeaks.prefix(3).map { colorDescription($0.color) })")
+            #endif
+            #if DEBUG
             print("  Assigned roles:")
+            #endif
+            #if DEBUG
             print("    Primary: \(colorDescription(primary))")
+            #endif
+            #if DEBUG
             print("    Secondary: \(colorDescription(secondary))")
+            #endif
+            #if DEBUG
             print("    Accent: \(colorDescription(accent))")
+            #endif
+            #if DEBUG
             print("    Background: \(colorDescription(background))")
+            #endif
             #endif
             
             return (primary, secondary, accent, background)
@@ -632,12 +672,24 @@ public class OKLABColorExtractor {
             
             #if DEBUG
             print("🎯 Normal Cover Role Assignment (Pure Frequency):")
+            #if DEBUG
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
+            #endif
+            #if DEBUG
             print("  Assigned roles:")
+            #endif
+            #if DEBUG
             print("    Primary: \(colorDescription(primary))")
+            #endif
+            #if DEBUG
             print("    Secondary: \(colorDescription(secondary))")
+            #endif
+            #if DEBUG
             print("    Accent: \(colorDescription(accent))")
+            #endif
+            #if DEBUG
             print("    Background: \(colorDescription(background))")
+            #endif
             #endif
             
             return (primary, secondary, accent, background)

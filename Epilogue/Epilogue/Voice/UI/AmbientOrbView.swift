@@ -155,10 +155,14 @@ struct AmbientOrbView: View {
     private func handleTap() {
         SensoryFeedback.light()
         
+        #if DEBUG
         print("🎤 AmbientOrb: Tap detected, isListening = \(voiceManager.isListening)")
+        #endif
         
         if voiceManager.isListening {
+            #if DEBUG
             print("🎤 AmbientOrb: Stopping listening")
+            #endif
             voiceManager.stopListening()
             withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                 orbScale = 0.8
@@ -167,7 +171,9 @@ struct AmbientOrbView: View {
                 orbScale = 1.0
             }
         } else {
+            #if DEBUG
             print("🎤 AmbientOrb: Starting ambient listening")
+            #endif
             voiceManager.startAmbientListening()
             withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                 orbScale = 1.2
