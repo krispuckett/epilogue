@@ -29,9 +29,15 @@ struct BookAtmosphericGradientView: View {
                     // Toggle to see gradient logs during debugging
                     let LOG_GRADIENT = false
                     let _ = LOG_GRADIENT ? {
+                        #if DEBUG
                         print("🎨 Rendering gradient with intensity: \(intensity)")
+                        #endif
+                        #if DEBUG
                         print("   Primary: \(colorDescription(ColorPalette(primary: palette.primary, secondary: .clear, accent: .clear, background: .clear, textColor: .clear, luminance: 0, isMonochromatic: false, extractionQuality: 0)))")
+                        #endif
+                        #if DEBUG
                         print("   Opacity applied: \(0.8 * intensity)")
+                        #endif
                     }() : ()
                     #endif
                     
@@ -88,14 +94,20 @@ struct BookAtmosphericGradientView: View {
             #if DEBUG
             let LOG_GRADIENT = false
             if LOG_GRADIENT {
+                #if DEBUG
                 print("🌈 BookAtmosphericGradientView.onAppear")
+                #endif
+                #if DEBUG
                 print("   Initial palette: \(colorDescription(colorPalette))")
+                #endif
             }
             #endif
             displayedPalette = processColors(colorPalette)
             #if DEBUG
             if LOG_GRADIENT {
+                #if DEBUG
                 print("   Processed palette: \(colorDescription(displayedPalette ?? colorPalette))")
+                #endif
             }
             #endif
             startSubtleAnimation()
@@ -104,16 +116,24 @@ struct BookAtmosphericGradientView: View {
             #if DEBUG
             let LOG_GRADIENT = false
             if LOG_GRADIENT {
+                #if DEBUG
                 print("🌈 BookAtmosphericGradientView palette changed")
+                #endif
+                #if DEBUG
                 print("   Old: \(colorDescription(oldPalette))")
+                #endif
+                #if DEBUG
                 print("   New: \(colorDescription(newPalette))")
+                #endif
             }
             #endif
             withAnimation(.easeInOut(duration: 0.3)) {
                 displayedPalette = processColors(newPalette)
                 #if DEBUG
                 if LOG_GRADIENT {
+                    #if DEBUG
                     print("   Processed: \(colorDescription(displayedPalette ?? newPalette))")
+                    #endif
                 }
                 #endif
             }
@@ -233,13 +253,13 @@ struct BookAtmosphericGradientView: View {
         var saturation: CGFloat = 0
         var brightness: CGFloat = 0
         var alpha: CGFloat = 0
-        
+
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
+
         // EXACT same enhancement as ambient chat
         saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
         brightness = max(brightness, 0.4)         // Minimum brightness
-        
+
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
     

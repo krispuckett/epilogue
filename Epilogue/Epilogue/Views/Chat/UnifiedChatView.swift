@@ -364,7 +364,9 @@ struct UnifiedChatView: View {
             }
             .onChange(of: showingBookStrip) { oldValue, newValue in
                 if isAmbientMode && newValue {
+                    #if DEBUG
                     print("🛡️ SAFETY: Blocking book strip activation in ambient mode")
+                    #endif
                     showingBookStrip = false
                     return
                 }
@@ -378,7 +380,9 @@ struct UnifiedChatView: View {
                         Button {
                             // SAFETY: Additional check before toggling book strip
                             guard !isAmbientMode else {
+                                #if DEBUG
                                 print("🛡️ SAFETY: Prevented book strip toggle in ambient mode")
+                                #endif
                                 return
                             }
                             withAnimation(DesignSystem.Animation.springStandard) {
@@ -409,7 +413,9 @@ struct UnifiedChatView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowAmbientBookSelector"))) { _ in
                 guard !isAmbientMode else {
+                    #if DEBUG
                     print("🛡️ SAFETY: Blocked ShowAmbientBookSelector in ambient mode")
+                    #endif
                     return
                 }
                 withAnimation(DesignSystem.Animation.springStandard) {
@@ -449,7 +455,9 @@ struct UnifiedChatView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UnifiedProcessorSaved"))) { notification in
                 guard let content = notification.object as? AmbientProcessedContent else { return }
+                #if DEBUG
                 print("💾 Content saved: \(content.type) - \(content.text.prefix(50))...")
+                #endif
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ImmediateQuestionDetected"))) { notification in
                 handleImmediateQuestion(notification: notification)
@@ -498,12 +506,22 @@ struct UnifiedChatView: View {
                     .transition(.opacity)
                     .id(book.localId) // Simplify ID to just book ID
                     .onAppear {
+                        #if DEBUG
                         print("BookAtmosphericGradientView appeared for: \(book.title)")
+                        #endif
+                        #if DEBUG
                         print("Using palette: \(colorPalette != nil ? "extracted" : "placeholder")")
+                        #endif
                         if let cp = colorPalette {
+                            #if DEBUG
                             print("Primary: \(cp.primary)")
+                            #endif
+                            #if DEBUG
                             print("Secondary: \(cp.secondary)")
+                            #endif
+                            #if DEBUG
                             print("Accent: \(cp.accent)")
+                            #endif
                         }
                     }
             }
@@ -799,11 +817,15 @@ struct UnifiedChatView: View {
     private func setupInitialState() {
         if let book = preSelectedBook {
             currentBookContext = book
+            #if DEBUG
             print("onAppear: Setting pre-selected book: \(book.title)")
+            #endif
         }
         
         if let book = currentBookContext {
+            #if DEBUG
             print("onAppear: Found initial book context: \(book.title)")
+            #endif
             Task {
                 await extractColorsForBook(book)
             }
@@ -811,14 +833,18 @@ struct UnifiedChatView: View {
         
         if isAmbientMode {
             showingBookStrip = false
+            #if DEBUG
             print("🛡️ SAFETY: Forcing showingBookStrip = false in ambient mode")
+            #endif
         }
         
         if startInVoiceMode || isAmbientMode {
             if isAmbientMode {
                 voiceManager.updateLibraryBooks(libraryViewModel.books)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    #if DEBUG
                     print("🎙️ Starting ambient session immediately")
+                    #endif
                     startAmbientSession()
                 }
             } else {
@@ -830,17 +856,27 @@ struct UnifiedChatView: View {
     }
     
     private func handleBookContextChange(oldBook: Book?, newBook: Book?) {
+        #if DEBUG
         print("Book context changed from \(oldBook?.title ?? "none") to \(newBook?.title ?? "none")")
+        #endif
+        #if DEBUG
         print("New book ID: \(newBook?.localId.uuidString ?? "none")")
+        #endif
+        #if DEBUG
         print("Cover URL: \(newBook?.coverImageURL ?? "none")")
+        #endif
         
         if let book = newBook {
+            #if DEBUG
             print("Extracting colors for: \(book.title)")
+            #endif
             Task {
                 await extractColorsForBook(book)
             }
         } else {
+            #if DEBUG
             print("Clearing color palette")
+            #endif
             withAnimation(.easeInOut(duration: 0.5)) {
                 colorPalette = nil
                 coverImage = nil
@@ -1116,7 +1152,9 @@ struct UnifiedChatView: View {
         // Save to SwiftData
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Saved note from keyboard: \(noteText)")
+            #endif
             
             // Add system message to chat
             let systemMessage = UnifiedChatMessage(
@@ -1131,7 +1169,9 @@ struct UnifiedChatView: View {
             // Haptic feedback
             SensoryFeedback.success()
         } catch {
+            #if DEBUG
             print("❌ Failed to save note: \(error)")
+            #endif
         }
     }
     
@@ -1188,7 +1228,9 @@ struct UnifiedChatView: View {
         // Save to SwiftData
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Saved quote from keyboard: \(content)")
+            #endif
             
             // Add system message to chat with mini quote card
             let systemMessage = UnifiedChatMessage(
@@ -1203,7 +1245,9 @@ struct UnifiedChatView: View {
             // Haptic feedback
             SensoryFeedback.success()
         } catch {
+            #if DEBUG
             print("❌ Failed to save quote: \(error)")
+            #endif
         }
     }
     
@@ -1279,7 +1323,9 @@ struct UnifiedChatView: View {
                 messages.append(errorMessage)
                 
                 // Log error for debugging
+                #if DEBUG
                 print("Chat AI Error: \(error)")
+                #endif
             }
         }
     }
@@ -1287,12 +1333,18 @@ struct UnifiedChatView: View {
     // MARK: - Ambient Session Handling
     
     private func handleMicrophoneTap() {
+        #if DEBUG
         print("🎤 Microphone button tapped. Current isRecording: \(isRecording)")
+        #endif
         if isRecording {
+            #if DEBUG
             print("🛑 Stopping ambient session...")
+            #endif
             endAmbientSession()
         } else {
+            #if DEBUG
             print("▶️ Starting ambient session...")
+            #endif
             startAmbientSession()
         }
     }
@@ -1321,7 +1373,9 @@ struct UnifiedChatView: View {
         
         // Ensure UI state updates on main thread
         Task { @MainActor in
+            #if DEBUG
             print("▶️ Setting isRecording to true")
+            #endif
             isRecording = true
             liveTranscription = ""
         }
@@ -1738,12 +1792,16 @@ struct UnifiedChatView: View {
             
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Quote saved: \(content.text)")
+                #endif
                 
                 // Track in session
                 trackSessionContent(type: .quote, text: content.text)
             } catch {
+                #if DEBUG
                 print("❌ Failed to save quote: \(error)")
+                #endif
             }
         }
     }
@@ -1822,12 +1880,16 @@ struct UnifiedChatView: View {
             
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Note saved: \(content.text)")
+                #endif
                 
                 // Track in session
                 trackSessionContent(type: content.type == .thought ? .reflection : .insight, text: content.text)
             } catch {
+                #if DEBUG
                 print("❌ Failed to save note: \(error)")
+                #endif
             }
         }
     }
@@ -1886,8 +1948,12 @@ struct UnifiedChatView: View {
     // MARK: - Legacy Transcription Processing (for backward compatibility)
     
     private func processTranscription(_ transcription: String) async -> ProcessedAmbientSession {
+        #if DEBUG
         print("\nTRANSCRIPTION PROCESSING:")
+        #endif
+        #if DEBUG
         print("Raw text: \(transcription)")
+        #endif
         
         var quotes: [ExtractedQuote] = []
         var notes: [ExtractedNote] = []
@@ -1896,7 +1962,9 @@ struct UnifiedChatView: View {
         // Process the entire transcription as one unit instead of splitting by sentences
         let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
+            #if DEBUG
             print("\nProcessing full transcription: \(trimmed)")
+            #endif
             let lowercased = trimmed.lowercased()
             
             // Improved QUOTE detection
@@ -1944,8 +2012,12 @@ struct UnifiedChatView: View {
                         
                         // If we have text after the reaction phrase, it's a quote
                         if !quoteText.isEmpty && quoteText.count > 5 {
+                            #if DEBUG
                             print("   Detected as QUOTE (by reaction pattern: '\(phrase)')")
+                            #endif
+                            #if DEBUG
                             print("   Extracted quote: '\(quoteText)'")
+                            #endif
                             quotes.append(ExtractedQuote(
                                 text: quoteText,
                                 context: "User reaction: \(phrase)",
@@ -1974,7 +2046,9 @@ struct UnifiedChatView: View {
                lowercased.contains("she says") ||
                lowercased.contains("he says") ||
                lowercased.contains("they say")) {
+                #if DEBUG
                 print("   Detected as QUOTE (by keyword)")
+                #endif
                 isQuote = true
                 
                 // Extract the actual quote text
@@ -2009,7 +2083,9 @@ struct UnifiedChatView: View {
                 // Only treat as quote if it has substantial quoted content
                 let quotedContent = extractQuotedContent(from: trimmed)
                 if !quotedContent.isEmpty && quotedContent.count > 10 { // At least 10 chars
+                    #if DEBUG
                     print("   Detected as QUOTE (by quotation marks)")
+                    #endif
                     isQuote = true
                     quotes.append(ExtractedQuote(
                         text: quotedContent,
@@ -2051,7 +2127,9 @@ struct UnifiedChatView: View {
                 
                 for pattern in reflectionPatterns {
                     if lowercased.contains(pattern) {
+                        #if DEBUG
                         print("   Detected as REFLECTION/NOTE")
+                        #endif
                         isReflection = true
                         break
                     }
@@ -2083,7 +2161,9 @@ struct UnifiedChatView: View {
                 lowercased.contains("please explain") ||
                 lowercased.contains("tell me about") ||
                 lowercased.contains("tell me more")) {
+                #if DEBUG
                 print("   Detected as QUESTION")
+                #endif
                 isQuestion = true
                 questions.append(ExtractedQuestion(
                     text: trimmed,
@@ -2124,7 +2204,9 @@ struct UnifiedChatView: View {
                     noteType = .insight
                 }
                 
+                #if DEBUG
                 print("   Detected as NOTE (type: \(noteType))")
+                #endif
                 
                 // Remove "Note:" prefix if present
                 var noteText = trimmed
@@ -2153,10 +2235,18 @@ struct UnifiedChatView: View {
             }
         }  // End of if !trimmed.isEmpty
         
+        #if DEBUG
         print("\nPROCESSING SUMMARY:")
+        #endif
+        #if DEBUG
         print("   - Quotes: \(quotes.count)")
+        #endif
+        #if DEBUG
         print("   - Notes: \(notes.count)")
+        #endif
+        #if DEBUG
         print("   - Questions: \(questions.count)")
+        #endif
         
         return ProcessedAmbientSession(
             quotes: quotes,
@@ -2286,7 +2376,9 @@ struct UnifiedChatView: View {
                 try modelContext.save()
                 SensoryFeedback.success()
             } catch {
+                #if DEBUG
                 print("Failed to update quote: \(error)")
+                #endif
             }
             
         case .note(let note), .noteWithContext(let note, _):
@@ -2296,7 +2388,9 @@ struct UnifiedChatView: View {
                 try modelContext.save()
                 SensoryFeedback.success()
             } catch {
+                #if DEBUG
                 print("Failed to update note: \(error)")
+                #endif
             }
             
         default:
@@ -2329,10 +2423,16 @@ struct UnifiedChatView: View {
     private func extractColorsForBook(_ book: Book) async {
         // Check cache first
         let bookID = book.localId.uuidString
+        #if DEBUG
         print("Checking cache for book ID: \(bookID)")
+        #endif
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+            #if DEBUG
             print("Found cached palette for: \(book.title)")
+            #endif
+            #if DEBUG
             print("Cached colors - Primary: \(cachedPalette.primary), Secondary: \(cachedPalette.secondary)")
+            #endif
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     self.colorPalette = cachedPalette
@@ -2340,27 +2440,37 @@ struct UnifiedChatView: View {
             }
             return
         }
+        #if DEBUG
         print("No cached palette found, will extract colors")
+        #endif
         
         // Extract colors if not cached
         guard let coverURLString = book.coverImageURL else {
+            #if DEBUG
             print("No cover URL for book: \(book.title)")
+            #endif
             return
         }
         
         // Convert HTTP to HTTPS for ATS compliance
         let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
         guard let coverURL = URL(string: secureURLString) else {
+            #if DEBUG
             print("Invalid cover URL for book: \(book.title)")
+            #endif
             return
         }
         
+        #if DEBUG
         print("Starting color extraction from: \(secureURLString)")
+        #endif
         
         do {
             // Use SharedBookCoverManager for cached loading
             guard let uiImage = await SharedBookCoverManager.shared.loadFullImage(from: secureURLString) else {
+                #if DEBUG
                 print("Failed to load image from SharedBookCoverManager")
+                #endif
                 return
             }
             
@@ -2370,12 +2480,18 @@ struct UnifiedChatView: View {
             let extractor = OKLABColorExtractor()
             let palette = try await extractor.extractPalette(from: uiImage, imageSource: book.title)
             
+            #if DEBUG
             print("Extracted new palette for: \(book.title)")
+            #endif
+            #if DEBUG
             print("Extracted colors - Primary: \(palette.primary), Secondary: \(palette.secondary), Accent: \(palette.accent)")
+            #endif
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     self.colorPalette = palette
+                    #if DEBUG
                     print("Palette assigned to colorPalette state")
+                    #endif
                 }
             }
             
@@ -2383,7 +2499,9 @@ struct UnifiedChatView: View {
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
             
         } catch {
+            #if DEBUG
             print("Failed to extract colors: \(error)")
+            #endif
         }
     }
     
@@ -2954,36 +3072,36 @@ struct VoiceResponsiveBottomGradient: View {
 // MARK: - Ambient Chat Gradient (Fallback)
 
 struct AmbientChatGradientView: View {
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
 
     var body: some View {
         ZStack {
             // Base color - darker for daybreak to let gradients show
             Color.black
 
-            let colors = themeManager.currentTheme.gradientColors.map { 
-                themeManager.currentTheme == .daybreak ? $0 : enhanceColor($0) 
+            let colors = themeManager.currentTheme.gradientColors.map {
+                themeManager.currentTheme == .daybreak ? $0 : enhanceColor($0)
             }
 
-            // Theme-aware gradient - top
+            // Theme-aware gradient - top (subtle and moody)
             LinearGradient(
                 stops: [
-                    .init(color: colors[0].opacity(themeManager.currentTheme == .daybreak ? 0.95 : 0.85), location: 0.0),
-                    .init(color: colors[1].opacity(themeManager.currentTheme == .daybreak ? 0.85 : 0.65), location: 0.15),
-                    .init(color: colors[2].opacity(themeManager.currentTheme == .daybreak ? 0.75 : 0.45), location: 0.3),
-                    .init(color: Color.clear, location: 0.6)
+                    .init(color: colors[0].opacity(themeManager.currentTheme == .daybreak ? 0.95 : 0.6), location: 0.0),
+                    .init(color: colors[1].opacity(themeManager.currentTheme == .daybreak ? 0.85 : 0.45), location: 0.15),
+                    .init(color: colors[2].opacity(themeManager.currentTheme == .daybreak ? 0.75 : 0.3), location: 0.3),
+                    .init(color: Color.clear, location: 0.5)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            // Theme-aware gradient - bottom
+            // Theme-aware gradient - bottom (subtle and moody)
             LinearGradient(
                 stops: [
-                    .init(color: Color.clear, location: 0.4),
-                    .init(color: colors[2].opacity(themeManager.currentTheme == .daybreak ? 0.65 : 0.35), location: 0.7),
-                    .init(color: colors[1].opacity(themeManager.currentTheme == .daybreak ? 0.75 : 0.5), location: 0.85),
-                    .init(color: colors[3].opacity(themeManager.currentTheme == .daybreak ? 0.85 : 0.65), location: 1.0)
+                    .init(color: Color.clear, location: 0.5),
+                    .init(color: colors[2].opacity(themeManager.currentTheme == .daybreak ? 0.65 : 0.3), location: 0.7),
+                    .init(color: colors[1].opacity(themeManager.currentTheme == .daybreak ? 0.75 : 0.45), location: 0.85),
+                    .init(color: colors[3].opacity(themeManager.currentTheme == .daybreak ? 0.85 : 0.6), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -2993,20 +3111,20 @@ struct AmbientChatGradientView: View {
         .ignoresSafeArea()
     }
     
-    /// Enhance color - same as ambient chat for consistency
+    /// Enhance color - vibrant boost for atmospheric ambiance
     private func enhanceColor(_ color: Color) -> Color {
         let uiColor = UIColor(color)
         var hue: CGFloat = 0
         var saturation: CGFloat = 0
         var brightness: CGFloat = 0
         var alpha: CGFloat = 0
-        
+
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        // Boost vibrancy and ensure minimum brightness
+
+        // Boost vibrancy and brightness for amber/theme colors
         saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
         brightness = max(brightness, 0.4)         // Minimum brightness
-        
+
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
 }

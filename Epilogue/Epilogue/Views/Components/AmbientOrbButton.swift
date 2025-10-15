@@ -40,7 +40,9 @@ struct MetalShaderView: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
         let mtkView = MTKView()
         guard let device = MTLCreateSystemDefaultDevice() else {
+            #if DEBUG
             print("Metal device not available")
+            #endif
             return mtkView
         }
 
@@ -89,13 +91,15 @@ class OrbMetalRenderer: NSObject {
 
     private func setupMetal() {
         guard let device = MTLCreateSystemDefaultDevice() else {
+            #if DEBUG
             print("Metal device not available")
+            #endif
             return
         }
         self.device = device
         commandQueue = device.makeCommandQueue()
 
-        // Create shader library from source
+        // Ambient Wave shader - high quality production version
         let shaderSource = """
         #include <metal_stdlib>
         using namespace metal;
@@ -107,12 +111,8 @@ class OrbMetalRenderer: NSObject {
 
         vertex VertexOut vertexShader(uint vertexID [[vertex_id]]) {
             float2 positions[6] = {
-                float2(-1.0, -1.0),
-                float2( 1.0, -1.0),
-                float2(-1.0,  1.0),
-                float2( 1.0, -1.0),
-                float2( 1.0,  1.0),
-                float2(-1.0,  1.0)
+                float2(-1.0, -1.0), float2( 1.0, -1.0), float2(-1.0,  1.0),
+                float2( 1.0, -1.0), float2( 1.0,  1.0), float2(-1.0,  1.0)
             };
 
             VertexOut out;
@@ -122,28 +122,65 @@ class OrbMetalRenderer: NSObject {
             return out;
         }
 
-        // Palette function for aurora colors
+        constant float PI = 3.14159265359;
+        constant float TAU = 6.28318530718;
+        constant float ITERATIONS = 36.0;
+        constant float SPEED = 2.40;
+        constant float CIRCLE_SIZE = 0.19;
+        constant float FREQ_MIX = 0.20;
+        constant float BLOOM_INTENSITY = 0.53;
+        constant float SMOOTHING = 1.45;
+        constant float ROTATION_BASE = 0.17;
+
         float3 pal(float t, float3 a, float3 b, float3 c, float3 d) {
-            return a + b * cos(6.28318 * (c * t + d));
+            return a + b * cos(TAU * (c * t + d));
         }
 
-        // Improved turbulence with dynamic rotation
-        float2 turb(float2 pos, float t, float iter) {
-            float freq = mix(2.0, 15.0, 0.67);
-            float amp = 1.0;
-            float time = t * 0.4 + 1.0; // Slightly faster turbulence
+        float3 Tonemap_Reinhard(float3 x) {
+            x *= 4.0;
+            return x / (1.0 + x);
+        }
 
-            for(int i = 0; i < 4; i++) {
-                // Dynamic rotation per iteration for more complexity
-                float angle = 0.6 + float(i) * 0.1;
-                float2x2 rot = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
+        float sdCircle(float2 st, float r) {
+            return length(st) - r;
+        }
 
-                float2 s = sin(freq * (pos * rot) + float(i) * time + iter);
+        float2 turb(float2 pos, float t, float it, float md, float2 mPos) {
+            float2x2 rot = float2x2(0.6, -0.8, 0.8, 0.6);
+            float freq = 2.0 + (15.0 - 2.0) * FREQ_MIX;
+            float amp = 0.27 * md;
+            float xp = 1.4;
+            float time = t * 0.4;
+
+            for(float i = 0.0; i < 4.0; i++) {
+                float2 s = sin(freq * ((pos - mPos) * rot) + (i * time + it));
                 pos += amp * rot[0] * s / freq;
-                amp *= mix(1.0, max(s.y, s.x), 1.0);
-                freq *= 1.4;
+                rot = rot * float2x2(0.6, -0.8, 0.8, 0.6);
+                amp *= max(s.y, s.x);
+                freq *= xp;
             }
             return pos;
+        }
+
+        float luma(float3 color) {
+            return dot(color, float3(0.299, 0.587, 0.114));
+        }
+
+        uint2 pcg2d(uint2 v) {
+            v = v * 1664525u + 1013904223u;
+            v.x += v.y * v.y * 1664525u + 1013904223u;
+            v.y += v.x * v.x * 1664525u + 1013904223u;
+            v ^= v >> 16u;
+            v.x += v.y * v.y * 1664525u + 1013904223u;
+            v.y += v.x * v.x * 1664525u + 1013904223u;
+            return v;
+        }
+
+        float randFibo(float2 p) {
+            uint2 v = as_type<uint2>(p);
+            v = pcg2d(v);
+            uint r = v.x ^ v.y;
+            return float(r) / float(0xffffffffu);
         }
 
         fragment float4 fragmentShader(VertexOut in [[stage_in]],
@@ -152,102 +189,71 @@ class OrbMetalRenderer: NSObject {
                                      constant float &pressed [[buffer(2)]],
                                      constant float3 &themeColor [[buffer(3)]]) {
             float2 uv = in.texCoord;
-            float2 aspect = float2(resolution.x/resolution.y, 1.0);
 
-            // Faster, more dynamic animation with press speed coupling
-            float speedBoost = mix(1.8, 2.2, pressed); // Much faster
-            float pressBoost = mix(1.0, 1.3, pressed);
-
-            // Sine wave distortion (Layer 1)
-            float2 waveCoord = uv * 2.0 - 1.0;
-            float waveTime = time * 1.4 * speedBoost; // Faster waves
-            float frequency = 20.0 * 0.856;
-            float amp = 0.42 * 0.4; // More wave amplitude for drama
-            float waveX = sin((waveCoord.y + 0.5) * frequency + waveTime * 1.047) * amp;
-            float waveY = sin((waveCoord.x - 0.5) * frequency + waveTime * 1.047) * amp;
-            waveCoord += float2(waveX * 0.58, waveY * 0.58);
-
-            // Aurora effect (Layer 2)
-            float2 pos = (uv * aspect - float2(0.5, 0.4991) * aspect);
             float3 pp = float3(0.0);
             float3 bloom = float3(0.0);
-            float t = time * speedBoost * 1.5 + 1.0; // Faster aurora
+            float t = time * SPEED;
 
-            // Faster continuous rotation
-            float rotation = (0.0486 + time * 0.07) * -2.0 * 3.14159;
-            float2x2 rotMatrix = float2x2(cos(rotation), -sin(rotation),
-                                         sin(rotation), cos(rotation));
+            float2 aspect = float2(resolution.x / resolution.y, 1.0);
+            float2 mousePos = float2(0.0);
+            float2 uPos = float2(0.5, 0.5);  // CENTERED
+            float2 pos = (uv * aspect - uPos * aspect);
+            float md = 1.0;
+
+            float rotationAngle = (ROTATION_BASE + t * 0.07) * -2.0 * PI;
+            float2x2 rotMatrix = float2x2(cos(rotationAngle), -sin(rotationAngle),
+                                           sin(rotationAngle), cos(rotationAngle));
             pos = rotMatrix * pos;
 
-            // Aurora iterations - match original
-            const int ITERATIONS = 36;  // Use original iteration count
-            float spacing = mix(1.0, 6.28318, 0.43);
+            float bm = 0.05;
+            float2 prevPos = turb(pos, t, -1.0 / ITERATIONS, md, mousePos);
+            float spacing = TAU;
 
-            for(int i = 1; i < ITERATIONS + 1; i++) {
-                float iter = float(i) / float(ITERATIONS);
-                float2 st = turb(pos, t, iter * spacing);
+            for(float i = 1.0; i < ITERATIONS + 1.0; i++) {
+                float iter = i / ITERATIONS;
+                float2 st = turb(pos, t, iter * spacing, md, mousePos);
 
-                float d = length(st) - 0.224;
-                d = abs(d);
+                float d = abs(sdCircle(st, CIRCLE_SIZE));
+                float pd = distance(st, prevPos);
+                prevPos = st;
 
-                float ds = smoothstep(0.0, 0.02, d);
+                float dynamicBlur = exp2(pd * 2.0 * 1.442695) - 1.0;
+                float ds = smoothstep(0.0, 0.02 * bm + max(dynamicBlur * SMOOTHING, 0.001), d);
 
-                // Use theme color with slight enhancement
-                float3 exactColor = themeColor;
-                // Boost saturation while keeping the hue
-                float colorLength = length(exactColor);
-                exactColor = normalize(exactColor) * colorLength * 1.3; // 30% saturation boost
-                float intensity = (2.5 + iter * 1.2); // Much brighter aurora lines
-                float3 color = exactColor * intensity;
+                float3 color = pal(
+                    iter * 0.19 + 1.0,
+                    float3(0.5),
+                    float3(0.5),
+                    float3(1.0),
+                    float3(0.0, 0.24313725, 0.23137255)
+                );
 
-                float invd = 1.0 / max(d, 0.001);
+                float invd = 1.0 / max(d + dynamicBlur, 0.001);
                 pp += (ds - 1.0) * color;
-                bloom += clamp(invd * 0.3, 0.0, 350.0) * color; // Reduced bloom intensity for sharper lines
+                bloom += clamp(invd * BLOOM_INTENSITY, 0.0, 250.0) * color;
             }
 
-            pp *= 1.0 / float(ITERATIONS);
-            bloom = bloom / (bloom + 5e4); // Less bloom spread
+            pp *= 1.0 / ITERATIONS;
+            bloom = bloom / (bloom + 2e4);
 
-            // Only apply color to the aurora lines, not the background
-            float3 color = (-pp * 2.0 + bloom * 0.8); // Emphasize lines more than bloom
-            
-            // Add subtle fog without expensive blur passes
-            float fogNoise = sin(pos.x * 5.0 + time) * cos(pos.y * 5.0 - time);
-            color *= 1.0 + fogNoise * 0.1;  // Subtle fog variation
-            
-            // Optional fog color tinting with theme awareness
-            float3 fogTint = mix(themeColor, float3(0.8275, 0.3529, 0.0), 0.3); // Blend theme with original fog color
-            color = mix(color, color * fogTint, 0.2);  // Subtle tint
+            float3 color = (-pp + bloom * 3.0 * BLOOM_INTENSITY);
+            color *= 1.2;
+            color += (randFibo(in.position.xy) - 0.5) / 255.0;
+            color = Tonemap_Reinhard(color);
 
-            // Don't boost everything - just the lines
-            color = max(color, 0.0); // Remove negative values that create background
+            // Apply theme color with saturation boost
+            color *= themeColor * 1.5;
 
-            // Light tonemap just for the lines - reduced for more intensity
-            color = color / (1.0 + color * 0.1);
-
-            // Ensure color is only on the bright parts (the lines)
-            color = color * step(0.01, length(color)); // Zero out very dark areas
-
-            // Press animation
+            float pressBoost = mix(1.0, 1.3, pressed);
             color *= pressBoost;
 
-            // Calculate alpha based on aurora brightness
-            float luminance = dot(color, float3(0.299, 0.587, 0.114));
-            float contentAlpha = smoothstep(0.0, 0.1, luminance);
-
-            // Tighter circular mask with less spread
             float2 center = uv - 0.5;
             float dist = length(center);
-            float circleMask = 1.0 - smoothstep(0.25, 0.4, dist); // Tighter bounds
+            float circleMask = 1.0 - smoothstep(0.42, 0.52, dist);  // Even larger visible area
 
-            // Combine with content alpha
-            float alpha = circleMask * contentAlpha;
+            float luminance = luma(color);
+            float alpha = circleMask * smoothstep(0.0, 0.2, luminance);
 
-            // Sharper alpha cutoff for cleaner edges
-            alpha = smoothstep(0.01, 0.1, alpha) * alpha;
-            alpha = clamp(alpha, 0.0, 1.0);
-
-            // Standard blending (not premultiplied)
             return float4(color, alpha);
         }
         """
@@ -271,7 +277,9 @@ class OrbMetalRenderer: NSObject {
 
             pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
         } catch {
+            #if DEBUG
             print("Error creating pipeline state: \(error)")
+            #endif
         }
     }
 
