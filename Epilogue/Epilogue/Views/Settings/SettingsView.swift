@@ -45,6 +45,15 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: - Epilogue+ Upsell Card
+                if !SimplifiedStoreKitManager.shared.isPlus {
+                    Section {
+                        EpiloguePlusUpsellCard()
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                }
+
                 // MARK: - Appearance
                 Section {
                     NavigationLink {
@@ -157,40 +166,6 @@ struct SettingsView: View {
                     Text("AI-generated summaries provide spoiler-free context, themes, and character info for your books. New books are enriched automatically in the background.")
                 }
 
-                // MARK: - AI Assistant
-                Section {
-                    HStack {
-                        Label {
-                            Text(L10n.Settings.aiProvider)
-                        } icon: {
-                            // Use the new SVG-accurate logo
-                            PerplexityLogoSVG(size: 20)
-                                .drawingGroup()  // Flatten view hierarchy
-                        }
-                        Spacer()
-                        Text("settings.ai_provider.perplexity".localized())
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Toggle(isOn: Binding(
-                        get: { perplexityModel == "sonar-pro" },
-                        set: { perplexityModel = $0 ? "sonar-pro" : "sonar" }
-                    )) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L10n.Settings.useSonarPro)
-                                .font(.subheadline)
-                            Text(L10n.Settings.sonarProDescription)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .tint(ThemeManager.shared.currentTheme.primaryAccent)
-                    .accessibilityLabel("Use Sonar Pro model for more advanced reasoning")
-                    .accessibilityIdentifier("settings.useSonarPro")
-                } header: {
-                    Text(L10n.Settings.Section.aiAssistant)
-                }
-
                 // MARK: - Ambient Mode
                 Section {
                     Toggle(L10n.Settings.realtimeQuestions, isOn: $realTimeQuestions)
@@ -246,7 +221,9 @@ struct SettingsView: View {
                             }
                         }
                         .onChange(of: gandalfMode) { _, enabled in
+                            #if DEBUG
                             print("🧙‍♂️ Gandalf mode \(enabled ? "enabled" : "disabled")")
+                            #endif
                             if enabled {
                                 // Haptic feedback for activation
                                 SensoryFeedback.success()
@@ -264,7 +241,9 @@ struct SettingsView: View {
                                 // Safety check before migration
                                 let safetyCheck = CloudKitSafetyCheck.shared
                                 let summary = await safetyCheck.getMigrationSummary(for: modelContext.container)
+                                #if DEBUG
                                 print("📋 Migration Safety Check:\n\(summary)")
+                                #endif
 
                                 // Backup data before migration
                                 await safetyCheck.backupCriticalData(from: modelContext.container)
@@ -314,6 +293,13 @@ struct SettingsView: View {
                             Label("Reset Conversation Count", systemImage: "arrow.counterclockwise")
                                 .foregroundStyle(.green)
                         }
+
+                        NavigationLink {
+                            ShaderPlaygroundView()
+                        } label: {
+                            Label("Shader Playground", systemImage: "wand.and.rays")
+                                .foregroundStyle(.purple)
+                        }
                     } header: {
                         Text("Developer Options")
                     } footer: {
@@ -357,7 +343,7 @@ struct SettingsView: View {
                         }
                     } label: {
                         Label(L10n.Settings.clearImageCaches, systemImage: "trash")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
                     }
 
                     Button(role: .destructive) {
@@ -483,7 +469,9 @@ struct SettingsView: View {
             SensoryFeedback.impact(.heavy)
 
             // Optional: Show a subtle toast or message
+            #if DEBUG
             print("🧙‍♂️ You shall pass! Developer mode unlocked.")
+            #endif
         } else if versionTapCount >= 3 {
             // Give subtle feedback that something might happen
             SensoryFeedback.light()
@@ -510,7 +498,9 @@ struct SettingsView: View {
                     showingExportSuccess = true
                 }
             } catch {
+                #if DEBUG
                 print("Export failed: \(error)")
+                #endif
             }
         }
     }
@@ -663,7 +653,9 @@ struct SettingsView: View {
                 // Force synchronize
                 UserDefaults.standard.synchronize()
 
+                #if DEBUG
                 print("✅ All data deleted successfully")
+                #endif
 
                 await MainActor.run {
                     // Show success feedback
@@ -675,7 +667,9 @@ struct SettingsView: View {
                     }
                 }
             } catch {
+                #if DEBUG
                 print("❌ Error deleting data: \(error)")
+                #endif
                 await MainActor.run {
                     SensoryFeedback.error()
                 }
@@ -686,7 +680,9 @@ struct SettingsView: View {
     private func enrichAllBooks() {
         guard !isEnriching else { return }
 
+        #if DEBUG
         print("🎨 [SETTINGS] Starting batch enrichment...")
+        #endif
         isEnriching = true
         enrichmentProgress = nil
 
@@ -703,7 +699,9 @@ struct SettingsView: View {
                 enrichmentProgress = nil
                 toastMessage = "All books enriched!"
                 showingCacheClearedToast = true
+                #if DEBUG
                 print("✅ [SETTINGS] Batch enrichment complete")
+                #endif
             }
         }
     }
@@ -712,3 +710,141 @@ struct SettingsView: View {
 // MARK: - Supporting Views
 // Removed SyncStatusView and DetailedSyncStatusSheet - already defined in SyncStatusManager.swift
 // CreditsView is now in its own file with beautiful video and glass effects
+
+// MARK: - Epilogue+ Upsell Card
+struct EpiloguePlusUpsellCard: View {
+    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
+    @StateObject private var themeManager = ThemeManager.shared
+    @State private var showingPaywall = false
+
+    var body: some View {
+        Button {
+            showingPaywall = true
+        } label: {
+            ZStack {
+                // Gradient: ambient mode at top, black at bottom
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.clear, location: 0.0),
+                        .init(color: Color.black, location: 0.6)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                // Ambient gradient at top only
+                VStack {
+                    AmbientChatGradientView()
+                        .frame(height: 120)
+                        .blur(radius: 40)
+                        .opacity(0.8)
+                    Spacer()
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header with pricing
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("EPILOGUE+")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .kerning(1.5)
+                            .foregroundStyle(themeManager.currentTheme.primaryAccent)
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 2) {
+                            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                                Text("$7.99")
+                                    .font(.system(size: 24, weight: .bold, design: .default))
+                                    .foregroundStyle(.white)
+                                Text("/mo")
+                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+
+                            Text("or $67/yr  save 30%")
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                .foregroundStyle(themeManager.currentTheme.primaryAccent)
+                        }
+                    }
+
+                    // Main value prop - only 2 features
+                    VStack(alignment: .leading, spacing: 16) {
+                        featureLine(check: true, text: "Unlimited ambient mode conversations")
+                        featureLine(check: true, text: "Advanced AI models")
+                    }
+
+                    // Usage counter - creates urgency
+                    HStack(spacing: 6) {
+                        Text("\(storeKit.conversationsUsed)/8")
+                            .font(.system(size: 15, weight: .bold, design: .monospaced))
+                            .foregroundStyle(themeManager.currentTheme.primaryAccent)
+
+                        Text("free conversations used this month")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+                    .padding(.top, 4)
+
+                    // CTA button
+                    HStack {
+                        Spacer()
+                        Text("Continue with Epilogue+")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(themeManager.currentTheme.primaryAccent.opacity(0.15))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(
+                                        themeManager.currentTheme.primaryAccent.opacity(0.3),
+                                        lineWidth: 1
+                                    )
+                            }
+                    )
+                }
+                .padding(22)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                themeManager.currentTheme.primaryAccent.opacity(0.35),
+                                themeManager.currentTheme.primaryAccent.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Upgrade to Epilogue Plus. $7.99 per month or $67 per year with 30% savings")
+        .accessibilityHint("Double tap to view subscription options. You've used \(storeKit.conversationsUsed) of 8 free conversations.")
+        .sheet(isPresented: $showingPaywall) {
+            PremiumPaywallView()
+        }
+    }
+
+    private func featureLine(check: Bool, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(themeManager.currentTheme.primaryAccent)
+                .frame(width: 16)
+
+            Text(text)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}

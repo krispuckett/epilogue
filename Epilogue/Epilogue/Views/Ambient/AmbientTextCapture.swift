@@ -212,7 +212,7 @@ struct AmbientTextCapture: View {
                                 dismiss()
                             }
                         } label: {
-                            Label("Ask Epilogue", systemImage: "sparkles")
+                            Text("Ask Epilogue")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(Color.orange)
                                 .padding(.horizontal, 16)
@@ -454,10 +454,14 @@ struct FixedLiveTextView: UIViewRepresentable {
                 await MainActor.run {
                     interaction.analysis = analysis
                     self.isAnalyzing = false
+                    #if DEBUG
                     print("✅ Analysis complete")
+                    #endif
                 }
             } catch {
+                #if DEBUG
                 print("❌ Analysis failed: \(error)")
+                #endif
                 await MainActor.run {
                     self.isAnalyzing = false
                 }
@@ -487,7 +491,9 @@ struct FixedLiveTextView: UIViewRepresentable {
             if interaction.hasActiveTextSelection {
                 let text = interaction.selectedText
                 if !text.isEmpty && text != parent?.selectedText {
+                    #if DEBUG
                     print("⏱️ Timer detected selection: \(text)")
+                    #endif
                     DispatchQueue.main.async { [weak self] in
                         self?.parent?.selectedText = text
                     }
@@ -499,25 +505,33 @@ struct FixedLiveTextView: UIViewRepresentable {
         // Use delegate methods instead of polling - MUCH more efficient
 
         func interaction(_ interaction: ImageAnalysisInteraction, shouldBeginAt point: CGPoint, for interactionType: ImageAnalysisInteraction.InteractionTypes) -> Bool {
+            #if DEBUG
             print("🔍 Text selection interaction starting")
+            #endif
             return true
         }
 
         func interaction(_ interaction: ImageAnalysisInteraction, didUpdateHighlightedRanges highlightedRanges: [Range<String.Index>]?) {
             // Called when selection changes
+            #if DEBUG
             print("📝 Selection updated, checking text...")
+            #endif
             updateSelection()
         }
         
         // Implement textSelectionDidChange which is more reliable
         func textSelectionDidChange(_ interaction: ImageAnalysisInteraction) {
+            #if DEBUG
             print("✏️ Text selection changed")
+            #endif
             updateSelection()
         }
 
         func interactionDidEnd(_ interaction: ImageAnalysisInteraction) {
             // Don't clear selection immediately - let user interact with buttons
+            #if DEBUG
             print("🔚 Interaction ended")
+            #endif
         }
 
         private func updateSelection() {
@@ -525,7 +539,9 @@ struct FixedLiveTextView: UIViewRepresentable {
 
             if interaction.hasActiveTextSelection {
                 let text = interaction.selectedText
+                #if DEBUG
                 print("📋 Selected text: \(text)")
+                #endif
                 if !text.isEmpty {
                     DispatchQueue.main.async { [weak self] in
                         self?.parent?.selectedText = text
@@ -535,7 +551,9 @@ struct FixedLiveTextView: UIViewRepresentable {
                 // Only clear if there's truly no selection
                 DispatchQueue.main.async { [weak self] in
                     if self?.parent?.selectedText != "" {
+                        #if DEBUG
                         print("🧹 Clearing selection")
+                        #endif
                         self?.parent?.selectedText = ""
                     }
                 }

@@ -24,15 +24,25 @@ struct GoogleBookItem: Codable, Identifiable {
             ?? volumeInfo.imageLinks?.small 
             ?? volumeInfo.imageLinks?.thumbnail
         
+        #if DEBUG
         print("🏗️ Creating Book from GoogleBookItem:")
+        #endif
+        #if DEBUG
         print("   Google ID: \(id)")
+        #endif
+        #if DEBUG
         print("   Title: \(volumeInfo.title)")
+        #endif
+        #if DEBUG
         print("   Original cover URL: \(imageURL ?? "nil")")
+        #endif
         
         // Enhance Google Books image URL for higher resolution
         if let url = imageURL {
             imageURL = enhanceGoogleBooksImageURL(url)
+            #if DEBUG
             print("   Enhanced cover URL: \(imageURL ?? "nil")")
+            #endif
         }
         
         return Book(
@@ -190,22 +200,48 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         self.pageCount = pageCount
         
         if GOOGLE_API_VERBOSE {
+            #if DEBUG
             print("🆕 DEBUG: Creating new Book instance...")
+            #endif
+            #if DEBUG
             print("  📖 Title: \(title)")
+            #endif
+            #if DEBUG
             print("  ✍️ Author: \(author)")
+            #endif
+            #if DEBUG
             print("  📚 ID: \(id)")
+            #endif
+            #if DEBUG
             print("  🆔 LocalID: \(localId)")
+            #endif
             if let url = coverImageURL {
+                #if DEBUG
                 print("  🖼️ Cover URL: \(url)")
+                #endif
+                #if DEBUG
                 print("  ✅ Book initialized WITH cover URL")
+                #endif
             } else {
+                #if DEBUG
                 print("  ⚠️ Cover URL: nil")
+                #endif
+                #if DEBUG
                 print("  ❌ WARNING: Book '\(title)' initialized WITHOUT cover URL!")
+                #endif
             }
+            #if DEBUG
             print("  📗 ISBN: \(isbn ?? "nil")")
+            #endif
+            #if DEBUG
             print("  📅 Published Year: \(publishedYear ?? "nil")")
+            #endif
+            #if DEBUG
             print("  📄 Page Count: \(pageCount?.description ?? "nil")")
+            #endif
+            #if DEBUG
             print("================================================")
+            #endif
         }
     }
     
@@ -231,25 +267,41 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         if GOOGLE_API_VERBOSE { print("  📖 Title: \(title)") }
         
         author = try container.decode(String.self, forKey: .author)
+        #if DEBUG
         print("  ✍️ Author: \(author)")
+        #endif
         
         publishedYear = try container.decodeIfPresent(String.self, forKey: .publishedYear)
+        #if DEBUG
         print("  📅 Published Year: \(publishedYear ?? "nil")")
+        #endif
         
         coverImageURL = try container.decodeIfPresent(String.self, forKey: .coverImageURL)
         if let url = coverImageURL {
+            #if DEBUG
             print("  🖼️ Cover URL: \(url)")
+            #endif
+            #if DEBUG
             print("  ✅ Cover URL exists and is not nil")
+            #endif
         } else {
+            #if DEBUG
             print("  ⚠️ Cover URL: nil")
+            #endif
+            #if DEBUG
             print("  ❌ WARNING: Book '\(title)' has NO cover URL during decoding!")
+            #endif
         }
         
         isbn = try container.decodeIfPresent(String.self, forKey: .isbn)
+        #if DEBUG
         print("  📗 ISBN: \(isbn ?? "nil")")
+        #endif
         
         description = try container.decodeIfPresent(String.self, forKey: .description)
+        #if DEBUG
         print("  📝 Description: \(description.map { "Present (\($0.prefix(50))...)" } ?? "nil")")
+        #endif
         
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount)
         if GOOGLE_API_VERBOSE { print("  📄 Page Count: \(pageCount?.description ?? "nil")") }
@@ -270,70 +322,118 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         if GOOGLE_API_VERBOSE { print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")") }
         
         dateAdded = try container.decodeIfPresent(Date.self, forKey: .dateAdded) ?? Date()
+        #if DEBUG
         print("  📆 Date Added: \(dateAdded)")
+        #endif
         
+        #if DEBUG
         print("✅ Book decoded successfully: '\(title)' by \(author)")
+        #endif
+        #if DEBUG
         print("================================================")
+        #endif
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
         // Debug logging header
+        #if DEBUG
         print("📤 DEBUG: Encoding Book...")
+        #endif
+        #if DEBUG
         print("  📖 Title: \(title)")
+        #endif
+        #if DEBUG
         print("  ✍️ Author: \(author)")
+        #endif
         
         try container.encode(id, forKey: .id)
+        #if DEBUG
         print("  📚 ID: \(id)")
+        #endif
         
         try container.encode(localId, forKey: .localId)
+        #if DEBUG
         print("  🆔 LocalID: \(localId)")
+        #endif
         
         try container.encode(title, forKey: .title)
         try container.encode(author, forKey: .author)
         
         try container.encodeIfPresent(publishedYear, forKey: .publishedYear)
+        #if DEBUG
         print("  📅 Published Year: \(publishedYear ?? "nil")")
+        #endif
         
         try container.encodeIfPresent(coverImageURL, forKey: .coverImageURL)
         if let url = coverImageURL {
+            #if DEBUG
             print("  🖼️ Cover URL: \(url)")
+            #endif
+            #if DEBUG
             print("  ✅ Cover URL being encoded successfully")
+            #endif
         } else {
+            #if DEBUG
             print("  ⚠️ Cover URL: nil")
+            #endif
+            #if DEBUG
             print("  ❌ WARNING: Encoding book '\(title)' with NO cover URL!")
+            #endif
         }
         
         try container.encodeIfPresent(isbn, forKey: .isbn)
+        #if DEBUG
         print("  📗 ISBN: \(isbn ?? "nil")")
+        #endif
         
         try container.encodeIfPresent(description, forKey: .description)
+        #if DEBUG
         print("  📝 Description: \(description != nil ? "Present" : "nil")")
+        #endif
         
         try container.encodeIfPresent(pageCount, forKey: .pageCount)
+        #if DEBUG
         print("  📄 Page Count: \(pageCount?.description ?? "nil")")
+        #endif
         
         try container.encode(isInLibrary, forKey: .isInLibrary)
+        #if DEBUG
         print("  📚 In Library: \(isInLibrary)")
+        #endif
         
         try container.encode(readingStatus, forKey: .readingStatus)
+        #if DEBUG
         print("  📊 Reading Status: \(readingStatus.rawValue)")
+        #endif
         
         try container.encode(currentPage, forKey: .currentPage)
+        #if DEBUG
         print("  📍 Current Page: \(currentPage)")
+        #endif
         
         try container.encodeIfPresent(userRating, forKey: .userRating)
+        #if DEBUG
         print("  ⭐ User Rating: \(userRating?.description ?? "nil")")
+        #endif
         
         try container.encodeIfPresent(userNotes, forKey: .userNotes)
+        #if DEBUG
         print("  📝 User Notes: \(userNotes != nil ? "Present" : "nil")")
+        #endif
         
         try container.encode(dateAdded, forKey: .dateAdded)
         if GOOGLE_API_VERBOSE {
+            #if DEBUG
             print("  📆 Date Added: \(dateAdded)")
+            #endif
+            #if DEBUG
             print("✅ Book encoded successfully: '\(title)' by \(author)")
+            #endif
+            #if DEBUG
             print("================================================")
+            #endif
         }
     }
 }
@@ -349,25 +449,32 @@ class GoogleBooksService: ObservableObject {
     @Published var errorMessage: String?
     
     func searchBookByISBN(_ isbn: String) async -> Book? {
+        #if DEBUG
         print("GoogleBooksAPI: Searching for ISBN: \(isbn)")
+        #endif
         
         // For ISBN search, we need to use the direct ISBN query without intitle
         // Build URL directly for ISBN search
         guard var components = URLComponents(string: baseURL) else { return nil }
         components.queryItems = [
             URLQueryItem(name: "q", value: "isbn:\(isbn)"),
-            URLQueryItem(name: "maxResults", value: "1")
+            URLQueryItem(name: "maxResults", value: "1"),
+            URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
         
         guard let url = components.url else { return nil }
+        #if DEBUG
         print("GoogleBooksAPI: ISBN search URL: \(url)")
+        #endif
         
         do {
             let (data, response) = try await session.data(from: url)
             
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
+                #if DEBUG
                 print("GoogleBooksAPI: ISBN search failed with status")
+                #endif
                 return nil
             }
             
@@ -376,11 +483,15 @@ class GoogleBooksService: ObservableObject {
             
             if let item = googleResponse.items?.first {
                 let book = item.book
+                #if DEBUG
                 print("GoogleBooksAPI: Found book via ISBN: \(book.title)")
+                #endif
                 return book
             }
         } catch {
+            #if DEBUG
             print("GoogleBooksAPI: ISBN search error: \(error)")
+            #endif
         }
         
         return nil
@@ -388,7 +499,9 @@ class GoogleBooksService: ObservableObject {
     
     func searchBooks(query: String) async {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { 
+            #if DEBUG
             print("GoogleBooksAPI: Empty query")
+            #endif
             return 
         }
         
@@ -481,7 +594,8 @@ class GoogleBooksService: ObservableObject {
             URLQueryItem(name: "maxResults", value: "40"), // Get more results to filter
             URLQueryItem(name: "orderBy", value: "relevance"),
             URLQueryItem(name: "printType", value: "books"),
-            URLQueryItem(name: "langRestrict", value: "en")  // English books
+            URLQueryItem(name: "langRestrict", value: "en"),  // English books
+            URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
         
         guard let url = components.url else {
@@ -491,7 +605,9 @@ class GoogleBooksService: ObservableObject {
         
         // Validate the URL for security
         guard URLValidator.isValidAPIURL(url) else {
+            #if DEBUG
             print("GoogleBooksAPI: URL validation failed")
+            #endif
             throw APIError.invalidURL
         }
         
@@ -580,7 +696,9 @@ class GoogleBooksService: ObservableObject {
                 // Query is looking for this classic
                 if titleLower.contains(classic.title) && authorLower.contains(classic.author) {
                     score += 800  // Massive boost for the actual classic
+                    #if DEBUG
                     print("📚 Classic match: '\(book.title)' by \(book.author) (+800)")
+                    #endif
                 }
             }
         }
@@ -671,7 +789,9 @@ class GoogleBooksService: ObservableObject {
         for keyword in unwantedKeywords {
             if titleLower.contains(keyword) {
                 score -= 300  // Increased penalty
+                #if DEBUG
                 print("📉 Penalizing '\(book.title)' for containing '\(keyword)' (-300)")
+                #endif
             }
         }
         
@@ -681,7 +801,9 @@ class GoogleBooksService: ObservableObject {
         for publisher in summaryPublishers {
             if authorLower.contains(publisher) {
                 score -= 500
+                #if DEBUG
                 print("📉 Heavily penalizing '\(book.title)' - summary publisher '\(publisher)' (-500)")
+                #endif
             }
         }
         
@@ -701,7 +823,9 @@ class GoogleBooksService: ObservableObject {
                (url.contains("zoom=5") || url.contains("zoom=4") || 
                 url.contains("extraLarge") || url.contains("large")) {
                 score += 20
+                #if DEBUG
                 print("📈 Boosting '\(book.title)' for high-quality cover (+20)")
+                #endif
             }
         }
         
@@ -713,7 +837,9 @@ class GoogleBooksService: ObservableObject {
         } else if titleLower.contains("first edition") || 
                   titleLower.contains("original") {
             score += 50  // Boost original editions
+            #if DEBUG
             print("📈 Boosting '\(book.title)' as original edition (+50)")
+            #endif
         }
         
         // Boost popular/classic books (those with more pages tend to be full novels)
@@ -834,14 +960,17 @@ class GoogleBooksService: ObservableObject {
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "maxResults", value: "40"),
             URLQueryItem(name: "orderBy", value: "relevance"),
-            URLQueryItem(name: "printType", value: "books")
+            URLQueryItem(name: "printType", value: "books"),
+            URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
         
         guard let url = components.url else {
             throw APIError.invalidURL
         }
         
+        #if DEBUG
         print("GoogleBooksAPI: Direct search URL: \(url)")
+        #endif
         
         let (data, response) = try await session.data(from: url)
         

@@ -16,7 +16,7 @@ struct ConversationCounter: View {
         HStack(spacing: 4) {
             // Dot indicators
             HStack(spacing: 4) {
-                ForEach(0..<2, id: \.self) { index in
+                ForEach(0..<8, id: \.self) { index in
                     Circle()
                         .fill(index < remainingCount ? DesignSystem.Colors.primaryAccent : Color.white.opacity(0.2))
                         .frame(width: 6, height: 6)
@@ -50,9 +50,9 @@ struct ConversationCounter: View {
     private var remainingCount: Int {
         if devShowCounter && storeKit.isPlus {
             // Show mock data in dev mode if user is Plus
-            return 1
+            return 3
         }
-        return storeKit.conversationsRemaining() ?? 2
+        return storeKit.conversationsRemaining() ?? 8
     }
 }
 

@@ -35,5 +35,7 @@
 	<string>Epilogue</string>
 	<key>SKStoreKitVersion</key>
 	<integer>2</integer>
+	<key>EpilogueProxyAuthToken</key>
+	<string>epilogue_testflight_2025_secret</string>
 </dict>
 </plist>

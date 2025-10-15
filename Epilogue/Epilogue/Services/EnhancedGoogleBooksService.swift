@@ -181,10 +181,15 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         )
         
         // Return top results, prioritizing books with covers
-        // Filter out books without cover images to prevent "image not available" placeholders
+        // Sort by confidence score (books with covers already get +40 bonus)
         return scoredResults
-            .filter { $0.hasCover }  // Only include books with cover images
-            .sorted { $0.confidenceScore > $1.confidenceScore }
+            .sorted { lhs, rhs in
+                // Prioritize books with covers, then by score
+                if lhs.hasCover != rhs.hasCover {
+                    return lhs.hasCover
+                }
+                return lhs.confidenceScore > rhs.confidenceScore
+            }
             .prefix(20)
             .map { $0.book }
     }
@@ -256,13 +261,14 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     ) async -> [GoogleBookItem]? {
         let apiBaseURL = "https://www.googleapis.com/books/v1/volumes"
         guard var components = URLComponents(string: apiBaseURL) else { return nil }
-        
+
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "maxResults", value: String(maxResults)),
             URLQueryItem(name: "orderBy", value: orderBy),
             URLQueryItem(name: "printType", value: "books"),
-            URLQueryItem(name: "langRestrict", value: "en")
+            URLQueryItem(name: "langRestrict", value: "en"),
+            URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
         
         guard let url = components.url else { return nil }
@@ -568,7 +574,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             )
         }
     }
-    
+
     // Special method for import that tries multiple strategies
     func findBestMatch(
         title: String,

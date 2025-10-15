@@ -58,10 +58,22 @@ class SimplifiedStoreKitManager: ObservableObject {
                 }
             }
 
-            print("✅ Loaded products: monthly=\(monthlyProduct != nil), annual=\(annualProduct != nil)")
+            // Validate that we loaded at least one product
+            if monthlyProduct == nil && annualProduct == nil {
+                purchaseError = "No subscriptions available. Please check your connection and try again."
+                #if DEBUG
+                print("⚠️ No products loaded from App Store")
+                #endif
+            } else {
+                #if DEBUG
+                print("✅ Loaded products: monthly=\(monthlyProduct != nil), annual=\(annualProduct != nil)")
+                #endif
+            }
         } catch {
+            #if DEBUG
             print("❌ Failed to load products: \(error)")
-            purchaseError = "Unable to load subscriptions. Please try again."
+            #endif
+            purchaseError = "Unable to load subscriptions. Please check your connection and try again."
         }
         isLoading = false
     }
@@ -76,43 +88,91 @@ class SimplifiedStoreKitManager: ObservableObject {
 
             switch result {
             case .success(let verification):
-                // Check verification
-                let transaction = try checkVerified(verification)
+                var transaction: StoreKit.Transaction?
 
-                // Update subscription status
-                await checkSubscriptionStatus()
+                do {
+                    // Check verification
+                    transaction = try checkVerified(verification)
 
-                // Finish transaction
-                await transaction.finish()
+                    // Update subscription status
+                    await checkSubscriptionStatus()
 
-                isLoading = false
-                print("✅ Purchase successful: \(product.id)")
-                return true
+                    // Always finish transaction to prevent it from being re-delivered
+                    await transaction?.finish()
+
+                    isLoading = false
+                    #if DEBUG
+                    print("✅ Purchase successful: \(product.id)")
+                    #endif
+                    return true
+                } catch {
+                    // Even if verification fails, finish the transaction
+                    await transaction?.finish()
+
+                    isLoading = false
+                    purchaseError = "Purchase verification failed. Please contact support if charged."
+                    #if DEBUG
+                    print("❌ Purchase verification failed but transaction finished")
+                    #endif
+                    return false
+                }
 
             case .userCancelled:
                 isLoading = false
+                purchaseError = nil  // Clear any previous errors
+                #if DEBUG
                 print("⚠️ Purchase cancelled by user")
+                #endif
                 return false
 
             case .pending:
                 isLoading = false
-                purchaseError = "Purchase is pending approval"
+                purchaseError = "Purchase is pending approval. You'll be notified when it's ready."
+                #if DEBUG
                 print("⏳ Purchase pending")
+                #endif
                 return false
 
             @unknown default:
                 isLoading = false
+                purchaseError = "Unknown purchase state. Please try again."
+                #if DEBUG
+                print("⚠️ Unknown purchase result")
+                #endif
                 return false
             }
         } catch StoreError.failedVerification {
             isLoading = false
-            purchaseError = "Purchase verification failed. Please try again."
+            purchaseError = "Purchase verification failed. Please contact support if charged."
+            #if DEBUG
             print("❌ Purchase verification failed")
+            #endif
+            return false
+        } catch let error as StoreKitError {
+            isLoading = false
+            // Handle specific StoreKit errors
+            switch error {
+            case .networkError:
+                purchaseError = "Network error. Please check your connection and try again."
+            case .userCancelled:
+                purchaseError = nil  // User intentionally cancelled
+            case .systemError:
+                purchaseError = "System error. Please try again later."
+            case .notAvailableInStorefront:
+                purchaseError = "This subscription is not available in your region."
+            default:
+                purchaseError = "Purchase failed: \(error.localizedDescription)"
+            }
+            #if DEBUG
+            print("❌ StoreKit error: \(error)")
+            #endif
             return false
         } catch {
             isLoading = false
-            purchaseError = error.localizedDescription
+            purchaseError = "Purchase failed: \(error.localizedDescription)"
+            #if DEBUG
             print("❌ Purchase failed: \(error)")
+            #endif
             return false
         }
     }
@@ -123,14 +183,37 @@ class SimplifiedStoreKitManager: ObservableObject {
         purchaseError = nil
 
         do {
+            // Sync with App Store to restore previous purchases
             try await AppStore.sync()
+
+            // Check if we now have an active subscription
+            let wasPlus = isPlus
             await checkSubscriptionStatus()
+
             isLoading = false
-            print("✅ Purchases restored")
+
+            if isPlus {
+                // Successfully restored an active subscription
+                #if DEBUG
+                print("✅ Purchases restored - user is now Plus")
+                #endif
+            } else if wasPlus == isPlus && !isPlus {
+                // No active subscription found
+                purchaseError = "No active subscriptions found. If you believe this is an error, please contact support."
+                #if DEBUG
+                print("⚠️ Restore complete but no active subscriptions found")
+                #endif
+            } else {
+                #if DEBUG
+                print("✅ Restore complete - subscription status unchanged")
+                #endif
+            }
         } catch {
             isLoading = false
-            purchaseError = "Unable to restore purchases. Please try again."
+            purchaseError = "Unable to restore purchases. Please check your connection and try again."
+            #if DEBUG
             print("❌ Restore failed: \(error)")
+            #endif
         }
     }
 
@@ -168,23 +251,37 @@ class SimplifiedStoreKitManager: ObservableObject {
         }
 
         isPlus = hasActiveSubscription
+        #if DEBUG
         print("📊 Subscription status: \(isPlus ? "PLUS" : "FREE")")
+        #endif
     }
 
     // MARK: - Listen for Transactions
     private func listenForTransactions() -> Task<Void, Error> {
         return Task.detached {
             for await result in StoreKit.Transaction.updates {
-                do {
-                    let transaction = try self.checkVerified(result)
+                var transaction: StoreKit.Transaction?
 
-                    // Update subscription status
+                do {
+                    // Verify transaction
+                    transaction = try self.checkVerified(result)
+
+                    // Update subscription status (handles expiration gracefully)
                     await self.checkSubscriptionStatus()
 
-                    // Finish transaction
-                    await transaction.finish()
+                    // Always finish transaction to acknowledge receipt
+                    await transaction?.finish()
+
+                    #if DEBUG
+                    print("✅ Transaction update processed and finished")
+                    #endif
                 } catch {
-                    print("❌ Transaction update failed: \(error)")
+                    // Even if verification fails, try to finish the transaction
+                    await transaction?.finish()
+
+                    #if DEBUG
+                    print("❌ Transaction update failed: \(error), but transaction finished")
+                    #endif
                 }
             }
         }
@@ -203,11 +300,11 @@ class SimplifiedStoreKitManager: ObservableObject {
     // MARK: - Conversation Counting
     func conversationsRemaining() -> Int? {
         guard !isPlus else { return nil }
-        return max(0, 2 - conversationsUsed)
+        return max(0, 8 - conversationsUsed)
     }
 
     func canStartConversation() -> Bool {
-        return isPlus || conversationsUsed < 2
+        return isPlus || conversationsUsed < 8
     }
 
     func recordConversation() {
@@ -217,14 +314,18 @@ class SimplifiedStoreKitManager: ObservableObject {
         UserDefaults.standard.set(conversationsUsed, forKey: "conversationsUsed")
         UserDefaults.standard.set(Date(), forKey: "lastConversationDate")
 
-        print("📝 Recorded conversation: \(conversationsUsed)/2 used")
+        #if DEBUG
+        print("📝 Recorded conversation: \(conversationsUsed)/8 used")
+        #endif
     }
 
     func resetMonthlyCount() {
         conversationsUsed = 0
         UserDefaults.standard.set(0, forKey: "conversationsUsed")
         UserDefaults.standard.set(Date(), forKey: "lastResetDate")
+        #if DEBUG
         print("🔄 Reset monthly conversation count")
+        #endif
     }
 
     // MARK: - Private Helpers
