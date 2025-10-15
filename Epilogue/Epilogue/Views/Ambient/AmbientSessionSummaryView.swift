@@ -725,7 +725,9 @@ struct AmbientSessionSummaryView: View {
         if let pageNumber = Int(pageText), pageNumber > 0 {
             session.currentPage = pageNumber
             try? modelContext.save()
+            #if DEBUG
             print("📖 Updated session page to: \(pageNumber)")
+            #endif
         } else if pageText.isEmpty {
             // Clear page if empty
             session.currentPage = nil
@@ -793,10 +795,16 @@ struct AmbientSessionSummaryView: View {
                     
                     do {
                         try modelContext.save()
+                        #if DEBUG
                         print("✅ Follow-up question saved to session: \(questionText.prefix(50))...")
+                        #endif
+                        #if DEBUG
                         print("   Session now has \((session.capturedQuestions ?? []).count) questions")
+                        #endif
                     } catch {
+                        #if DEBUG
                         print("❌ Failed to save follow-up question: \(error)")
+                        #endif
                     }
                     
                     isProcessingFollowUp = false
@@ -909,8 +917,9 @@ struct AmbientSessionSummaryView: View {
 
         Task {
             do {
-                // Skip AI generation if no questions available
-                guard !(session.capturedQuestions ?? []).isEmpty else {
+                // Skip AI generation if no questions were ANSWERED (meaning no AI interaction)
+                let questionsWithAnswers = (session.capturedQuestions ?? []).filter { $0.answer != nil }
+                guard !questionsWithAnswers.isEmpty else {
                     await MainActor.run {
                         self.generatedInsight = createInsightFromSession()
                         self.isGeneratingInsight = false
@@ -1018,7 +1027,9 @@ struct AmbientSessionSummaryView: View {
                     self.session.generatedInsight = insight  // Cache in session
                     self.isGeneratingInsight = false
                 }
+                #if DEBUG
                 print("Failed to generate AI insight: \(error)")
+                #endif
             }
         }
     }

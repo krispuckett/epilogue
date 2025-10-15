@@ -408,7 +408,9 @@ struct AmbientModeView: View {
                     colorPalette: colorPalette,
                     onDismiss: {
                         // Just dismiss the sheet - the onDismiss handler above will handle navigation
+                        #if DEBUG
                         print("✅ Done button tapped in session summary")
+                        #endif
                         showingSessionSummary = false
                     }
                 )
@@ -425,12 +427,16 @@ struct AmbientModeView: View {
             if let initialBook = EpilogueAmbientCoordinator.shared.initialBook {
                 currentBookContext = initialBook
                 lastDetectedBookId = initialBook.localId
+                #if DEBUG
                 print("📚 Starting ambient mode with book: \(initialBook.title)")
+                #endif
 
                 // Check cache synchronously first for instant load
                 Task { @MainActor in
                     if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: initialBook.localId.uuidString) {
+                        #if DEBUG
                         print("✅ Instant cache hit for: \(initialBook.title)")
+                        #endif
                         self.colorPalette = cachedPalette
                     }
                     // Then fetch if needed (this will also check cache)
@@ -508,7 +514,9 @@ struct AmbientModeView: View {
                         !msg.isUser && msg.content.contains("**\(item.text)**")
                     }
                     
+                    #if DEBUG
                     print("🔍 Checking for existing message for: \(item.text.prefix(30))... Found: \(hasMessage)")
+                    #endif
                     
                     if !hasMessage {
                         // Create the "Thinking..." message immediately
@@ -528,14 +536,20 @@ struct AmbientModeView: View {
                             SensoryFeedback.light()
                             
                             withAnimation(.interactiveSpring(response: 0.5, dampingFraction: 0.825, blendDuration: 0)) {
+                                #if DEBUG
                                 print("📊 Before expansion: expanded IDs = \(expandedMessageIds.count)")
+                                #endif
                                 expandedMessageIds.removeAll()
                                 expandedMessageIds.insert(messageId)
+                                #if DEBUG
                                 print("📊 After expansion: expanded IDs = \(expandedMessageIds.count), contains new message: \(expandedMessageIds.contains(messageId))")
+                                #endif
                             }
                         }
                         
+                        #if DEBUG
                         print("🔄 Created thinking message with ID: \(messageId) for: \(item.text.prefix(30))...")
+                        #endif
                     }
                 }
                 
@@ -583,11 +597,15 @@ struct AmbientModeView: View {
                                 
                                 // Make sure the message stays expanded during streaming
                                 if !expandedMessageIds.contains(messageId) {
+                                    #if DEBUG
                                     print("⚠️ Message lost expansion during streaming, re-expanding...")
+                                    #endif
                                     expandedMessageIds.insert(messageId)
                                 }
                                 
+                                #if DEBUG
                                 print("📝 Progressive update: \(response.count) chars (smooth), expanded: \(expandedMessageIds.contains(messageId))")
+                                #endif
                                 
                                 // Also update the saved question in SwiftData
                                 if let session = currentSession,
@@ -598,7 +616,9 @@ struct AmbientModeView: View {
                                 }
                             }
                         } else {
+                            #if DEBUG
                             print("⚠️ No message found to update for: \(item.text.prefix(30))...")
+                            #endif
                         }
                     }
                 }
@@ -709,7 +729,9 @@ struct AmbientModeView: View {
                 // Transcription visibility controlled by showLiveTranscriptionBubble setting
                 
                 // Debug log
+                #if DEBUG
                 print("📝 Live transcription received: \(cleanedText)")
+                #endif
             } else {
                 // Empty text means clear everything
                 liveTranscription = ""
@@ -1190,6 +1212,9 @@ struct AmbientModeView: View {
                                 .opacity(inputMode == .textInput || !isVoiceModeEnabled ? 0 : 1)
                                 .scaleEffect(inputMode == .textInput || !isVoiceModeEnabled ? 0.5 : 1)
                                 .allowsHitTesting(!inputMode.isTextInput && isVoiceModeEnabled)
+                                .accessibilityLabel(isRecording ? "Stop recording" : "Start voice recording")
+                                .accessibilityHint("Double tap to \(isRecording ? "stop" : "start") voice input for ambient reading mode")
+                                .accessibilityValue(isRecording ? "Recording" : "Ready")
                             
                             // Text input mode content - always present but with opacity control
                             Group {
@@ -1228,6 +1253,8 @@ struct AmbientModeView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
+                                    .accessibilityLabel("Capture book page")
+                                    .accessibilityHint("Double tap to open camera and capture a quote or page from your book")
                                     
                                     // Enhanced text field with ambient blur
                                     ZStack(alignment: .leading) {
@@ -1335,6 +1362,8 @@ struct AmbientModeView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .transition(.scale.combined(with: .opacity))
+                                .accessibilityLabel("Start voice input")
+                                .accessibilityHint("Double tap to switch to voice mode and start recording")
                             }
                             
                             // Submit arrow when text exists - with liquid glass
@@ -1362,6 +1391,8 @@ struct AmbientModeView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .transition(.scale.combined(with: .opacity))
+                                .accessibilityLabel("Send message")
+                                .accessibilityHint("Double tap to send your question to the AI")
                             }
                         }
                         .padding(.leading, 12)
@@ -1527,14 +1558,18 @@ struct AmbientModeView: View {
                 if !processedContentHashes.contains(responseKey) {
                     processedContentHashes.insert(responseKey)
                     
+                    #if DEBUG
                     print("✅ Response update detected for: \(item.text.prefix(30))...")
+                    #endif
                     
                     // Update the saved question in SwiftData with the answer
                     if let session = currentSession {
                         if let savedQuestion = (session.capturedQuestions ?? []).first(where: { $0.content == item.text }) {
                             savedQuestion.answer = response
                             try? modelContext.save()
+                            #if DEBUG
                             print("✅ Updated saved question with answer")
+                            #endif
                         }
                     }
                     
@@ -1560,9 +1595,15 @@ struct AmbientModeView: View {
                             expandedMessageIds.insert(updatedMessage.id)
                         }
                         
+                        #if DEBUG
                         print("✅ Updated thinking message with response and expanded it")
+                        #endif
+                        #if DEBUG
                         print("   Message content: \(updatedMessage.content.prefix(100))...")
+                        #endif
+                        #if DEBUG
                         print("   Total messages: \(messages.count)")
+                        #endif
                     } else {
                         // No thinking message found, add response as new message
                         let aiMessage = UnifiedChatMessage(
@@ -1578,7 +1619,9 @@ struct AmbientModeView: View {
                         // Automatically expand the new message to show the response
                         expandedMessageIds.insert(aiMessage.id)
                         
+                        #if DEBUG
                         print("✅ Added new message with response and expanded it")
+                        #endif
                     }
                 }
             }
@@ -1598,7 +1641,9 @@ struct AmbientModeView: View {
             
             // Skip if already processed (using hash to prevent duplicates)
             if processedContentHashes.contains(contentHash) {
+                #if DEBUG
                 print("⚠️ Skipping duplicate: \(item.text.prefix(30))...")
+                #endif
                 continue
             }
             
@@ -1668,13 +1713,17 @@ struct AmbientModeView: View {
                         expandedMessageIds.removeAll()
                     }
                     
+                    #if DEBUG
                     print("🎯 SAVE ANIMATION: Setting showSaveAnimation = true for Quote")
+                    #endif
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         showSaveAnimation = true
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                         withAnimation(.easeOut(duration: 0.3)) {
+                            #if DEBUG
                             print("🎯 SAVE ANIMATION: Hiding save animation for Quote")
+                            #endif
                             showSaveAnimation = false
                             savedItemType = nil
                         }
@@ -1756,16 +1805,22 @@ struct AmbientModeView: View {
                                 expandedMessageIds.insert(aiMessage.id)
                             }
                         }
+                        #if DEBUG
                         print("✅ Added AI response for question: \(item.text.prefix(30))...")
+                        #endif
                     } else {
+                        #if DEBUG
                         print("⚠️ Response already exists for question: \(item.text.prefix(30))...")
+                        #endif
                     }
                 } else {
                     // Question detected but no response yet
                     // The thinking message is already created in the onReceive listener
                     // Just trigger the AI response
                     pendingQuestion = item.text
+                    #if DEBUG
                     print("💭 Triggering AI response for: \(item.text.prefix(30))...")
+                    #endif
                     
                     // Trigger AI response
                     Task {
@@ -1851,7 +1906,9 @@ struct AmbientModeView: View {
         )
         
         if let existingQuotes = try? modelContext.fetch(fetchRequest), !existingQuotes.isEmpty {
+            #if DEBUG
             print("⚠️ Quote already exists: \(quoteText.prefix(30))...")
+            #endif
             
             // Show graceful reminder to user
             savedItemsCount += 1
@@ -1875,7 +1932,9 @@ struct AmbientModeView: View {
                         session.capturedQuotes = (session.capturedQuotes ?? []) + [existingQuote]
                     }
                     try? modelContext.save()
+                    #if DEBUG
                     print("✅ Linked existing quote to current session")
+                    #endif
                 }
             }
             return existingQuotes.first
@@ -1994,11 +2053,15 @@ struct AmbientModeView: View {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Quote saved to SwiftData with session: \(quoteText.prefix(50))...")
+            #endif
             SensoryFeedback.success()
             return capturedQuote
         } catch {
+            #if DEBUG
             print("❌ Failed to save quote: \(error)")
+            #endif
             return nil
         }
     }
@@ -2013,7 +2076,9 @@ struct AmbientModeView: View {
         )
         
         if let existingNotes = try? modelContext.fetch(fetchRequest), !existingNotes.isEmpty {
+            #if DEBUG
             print("⚠️ Note already exists, skipping save: \(noteText.prefix(30))...")
+            #endif
             return existingNotes.first
         }
         
@@ -2052,11 +2117,15 @@ struct AmbientModeView: View {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Note saved to SwiftData with session: \(content.text.prefix(50))...")
+            #endif
             SensoryFeedback.success()
             return capturedNote
         } catch {
+            #if DEBUG
             print("❌ Failed to save note: \(error)")
+            #endif
             return nil
         }
     }
@@ -2074,7 +2143,9 @@ struct AmbientModeView: View {
         }
         
         if isDuplicate {
+            #if DEBUG
             print("⚠️ DUPLICATE QUESTION DETECTED - NOT SAVING: \(questionText)")
+            #endif
             return // EXIT EARLY - DO NOT SAVE DUPLICATE
         }
         
@@ -2094,7 +2165,9 @@ struct AmbientModeView: View {
                     if !(session.capturedQuestions ?? []).contains(where: { $0.id == existingQuestion.id }) {
                         session.capturedQuestions = (session.capturedQuestions ?? []) + [existingQuestion]
                     }
+                    #if DEBUG
                     print("📎 Linked existing question to session: \(questionText.prefix(30))...")
+                    #endif
                 }
             }
             
@@ -2106,10 +2179,16 @@ struct AmbientModeView: View {
             
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Updated existing question: \(questionText.prefix(30))...")
+                #endif
+                #if DEBUG
                 print("   Session now has \((currentSession?.capturedQuestions ?? []).count) questions")
+                #endif
             } catch {
+                #if DEBUG
                 print("❌ Failed to update question: \(error)")
+                #endif
             }
             return
         }
@@ -2157,10 +2236,16 @@ struct AmbientModeView: View {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Question saved to SwiftData with session: \(questionText.prefix(50))...")
+            #endif
+            #if DEBUG
             print("   Session now has \((currentSession?.capturedQuestions ?? []).count) questions")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to save question: \(error)")
+            #endif
         }
     }
     
@@ -2217,9 +2302,13 @@ struct AmbientModeView: View {
             
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Initial session created (voice mode disabled)")
+                #endif
             } catch {
+                #if DEBUG
                 print("❌ Failed to save initial session: \(error)")
+                #endif
             }
             
             // Start book cover fade timer
@@ -2247,7 +2336,9 @@ struct AmbientModeView: View {
             
             guard finalMicAuthorized && speechStatus == .authorized else {
                 // Just log and return - no UI
+                #if DEBUG
                 print("❌ Permissions denied - Mic: \(finalMicAuthorized), Speech: \(speechStatus == .authorized)")
+                #endif
                 return
             }
             
@@ -2269,9 +2360,13 @@ struct AmbientModeView: View {
                 // Save the session immediately so relationships can be established
                 do {
                     try modelContext.save()
+                    #if DEBUG
                     print("✅ Initial session created and saved")
+                    #endif
                 } catch {
+                    #if DEBUG
                     print("❌ Failed to save initial session: \(error)")
+                    #endif
                 }
                 
                 // Start book cover fade timer - fade after 10 seconds
@@ -2322,7 +2417,9 @@ struct AmbientModeView: View {
         // Quick permission check before starting
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         guard micStatus == .authorized else {
+            #if DEBUG
             print("❌ Microphone permission not authorized")
+            #endif
             return
         }
         
@@ -2511,7 +2608,9 @@ struct AmbientModeView: View {
         // Smart content type detection
         let contentType = determineContentType(messageText)
         
+        #if DEBUG
         print("📝 Processing typed message: '\(messageText)' as \(contentType)")
+        #endif
 
         if contentType == .question {
             // Save the question immediately for the session
@@ -2587,7 +2686,9 @@ struct AmbientModeView: View {
                         try? modelContext.save()
                     }
                     
+                    #if DEBUG
                     print("✅ Quote saved to SwiftData: \(capturedQuote.text)")
+                    #endif
                 }
             } else {
                 // Save note and get the CapturedNote object
@@ -2608,7 +2709,9 @@ struct AmbientModeView: View {
                         try? modelContext.save()
                     }
                     
+                    #if DEBUG
                     print("✅ Note saved to SwiftData: \(capturedNote.content)")
+                    #endif
                 }
             }
             
@@ -2855,7 +2958,9 @@ struct AmbientModeView: View {
         do {
             try requestHandler.perform([request])
         } catch {
+            #if DEBUG
             print("Failed to perform OCR: \(error)")
+            #endif
         }
     }
     
@@ -2946,7 +3051,9 @@ struct AmbientModeView: View {
         
         do {
             try modelContext.save()
+            #if DEBUG
             print("💭 Quote auto-saved from camera: \(text.prefix(50))...")
+            #endif
             
             // Haptic feedback for saved quote
             SensoryFeedback.success()
@@ -2957,7 +3064,9 @@ struct AmbientModeView: View {
                 object: ["message": "Quote saved to \(currentBookContext?.title ?? "your collection")"]
             )
         } catch {
+            #if DEBUG
             print("Failed to save quote: \(error)")
+            #endif
         }
     }
     
@@ -3179,8 +3288,14 @@ struct AmbientModeView: View {
                         if let question = (session.capturedQuestions ?? []).first(where: { $0.content == pendingQ }) {
                             question.answer = response
                             question.isAnswered = true
+
+                            // Record conversation usage (only counts when AI actually answers)
+                            storeKit.recordConversation()
+
                             try? modelContext.save()
+                            #if DEBUG
                             print("✅ Updated SwiftData question with answer for summary view")
+                            #endif
                         }
                     }
                 }
@@ -3247,7 +3362,9 @@ struct AmbientModeView: View {
                     messages.append(errorMessage)
                 }
                 pendingQuestion = nil
+                #if DEBUG
                 print("❌ Failed to process message: \(error)")
+                #endif
             }
         }
     }
@@ -3275,7 +3392,9 @@ struct AmbientModeView: View {
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         guard aiService.isConfigured() else {
+            #if DEBUG
             print("🔑 AI Service configured: false")
+            #endif
             await MainActor.run {
                 // Update thinking message to show error with better formatting
                 if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") }) {
@@ -3331,7 +3450,9 @@ struct AmbientModeView: View {
                         bookTitle: currentBookContext?.title,
                         bookAuthor: currentBookContext?.author
                     )
+                    #if DEBUG
                     print("✅ Updated ambient question with AI response: \(text.prefix(30))...")
+                    #endif
                 }
                 
                 // CRITICAL: Update the saved question in SwiftData with the answer
@@ -3340,9 +3461,17 @@ struct AmbientModeView: View {
                     if let question = (session.capturedQuestions ?? []).first(where: { $0.content == text }) {
                         question.answer = response
                         question.isAnswered = true
+
+                        // Record conversation usage (only counts when AI actually answers)
+                        storeKit.recordConversation()
+
                         try? modelContext.save()
+                        #if DEBUG
                         print("✅ Updated SwiftData question with answer for summary view")
+                        #endif
+                        #if DEBUG
                         print("   Session has \((session.capturedQuestions ?? []).count) questions")
+                        #endif
                     }
                 }
                 
@@ -3384,7 +3513,7 @@ struct AmbientModeView: View {
 
                         **Monthly Conversation Limit Reached.**
 
-                        You've used both of your free ambient conversations this month. Your limit resets in \(resetTimeStr) (on the 1st of next month).
+                        You've used all 8 of your free ambient conversations this month. Your limit resets in \(resetTimeStr) (on the 1st of next month).
 
                         Your question has been saved and you can try again when your limit resets.
 
@@ -3426,7 +3555,9 @@ struct AmbientModeView: View {
                     messages[thinkingIndex] = updatedMessage
                 }
                 pendingQuestion = nil
+                #if DEBUG
                 print("❌ Failed to get AI response: \(error)")
+                #endif
             }
         }
     }
@@ -3436,17 +3567,23 @@ struct AmbientModeView: View {
         
         // CRITICAL: Prevent duplicate detections for the same book
         if lastDetectedBookId == book.localId {
+            #if DEBUG
             print("📚 Ignoring duplicate book detection: \(book.title)")
+            #endif
             return
         }
         
         // Also check if it's the same as current book context
         if currentBookContext?.localId == book.localId {
+            #if DEBUG
             print("📚 Book already set as current context: \(book.title)")
+            #endif
             return
         }
         
+        #if DEBUG
         print("📚 Book detected: \(book.title)")
+        #endif
         lastDetectedBookId = book.localId
         
         // Clear the transcription immediately to prevent double appearance
@@ -3478,9 +3615,13 @@ struct AmbientModeView: View {
                     session.bookModel = BookModel(from: book)
                     do {
                         try modelContext.save()
+                        #if DEBUG
                         print("📚 Updated session with first detected book: \(book.title)")
+                        #endif
                     } catch {
+                        #if DEBUG
                         print("❌ Failed to update session with detected book: \(error)")
+                        #endif
                     }
                 }
             }
@@ -3532,7 +3673,9 @@ struct AmbientModeView: View {
                         if let session = currentSession {
                             session.currentPage = pageNumber
                             try? modelContext.save()
+                            #if DEBUG
                             print("📖 Updated current page to: \(pageNumber)")
+                            #endif
                             
                             // Show subtle feedback
                             withAnimation(DesignSystem.Animation.easeStandard) {
@@ -3555,10 +3698,14 @@ struct AmbientModeView: View {
     
     private func extractColorsForBook(_ book: Book) async {
         let bookID = book.localId.uuidString
+        #if DEBUG
         print("🎨 Extracting colors for: \(book.title)")
+        #endif
         
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+            #if DEBUG
             print("✅ Found cached palette for: \(book.title)")
+            #endif
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     self.colorPalette = cachedPalette
@@ -3568,21 +3715,27 @@ struct AmbientModeView: View {
         }
         
         guard let coverURLString = book.coverImageURL else { 
+            #if DEBUG
             print("❌ No cover URL for: \(book.title)")
+            #endif
             return 
         }
         
         // Convert HTTP to HTTPS for ATS compliance
         let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
         guard let coverURL = URL(string: secureURLString) else {
+            #if DEBUG
             print("❌ Invalid URL: \(secureURLString)")
+            #endif
             return
         }
         
         do {
             let (imageData, _) = try await URLSession.shared.data(from: coverURL)
             guard let image = UIImage(data: imageData) else { 
+                #if DEBUG
                 print("❌ Failed to create image from data")
+                #endif
                 return 
             }
             
@@ -3593,15 +3746,23 @@ struct AmbientModeView: View {
                 withAnimation(.easeInOut(duration: 1.5)) {
                     self.colorPalette = palette
                     self.coverImage = image
+                    #if DEBUG
                     print("✅ Color palette extracted for: \(book.title)")
+                    #endif
+                    #if DEBUG
                     print("  Primary: \(palette.primary)")
+                    #endif
+                    #if DEBUG
                     print("  Secondary: \(palette.secondary)")
+                    #endif
                 }
             }
             
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
         } catch {
+            #if DEBUG
             print("❌ Failed to extract colors: \(error)")
+            #endif
         }
     }
     
@@ -3646,32 +3807,54 @@ struct AmbientModeView: View {
             session.endTime = Date()
             
             // Debug: Log the session's questions before saving
+            #if DEBUG
             print("📊 DEBUG: About to save session. Questions in session:")
+            #endif
             for (i, q) in (session.capturedQuestions ?? []).enumerated() {
+                #if DEBUG
                 print("   \(i+1). \(q.content?.prefix(50) ?? "nil") - Answer: \(q.answer != nil ? "Yes" : "No")")
+                #endif
             }
             
             // Force save to ensure all relationships are persisted
             do {
                 try modelContext.save()
+                #if DEBUG
                 print("✅ Session saved with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
+                #endif
             } catch {
+                #if DEBUG
                 print("❌ Failed to save session: \(error)")
+                #endif
             }
             
             // Debug: Log what we're saving
+            #if DEBUG
             print("📊 Session Summary Debug:")
+            #endif
+            #if DEBUG
             print("   Questions: \((session.capturedQuestions ?? []).count)")
+            #endif
             for (i, q) in (session.capturedQuestions ?? []).enumerated() {
+                #if DEBUG
                 print("     \(i+1). \((q.content ?? "").prefix(50))... Answer: \(q.isAnswered ?? false ? "Yes" : "No")")
+                #endif
             }
+            #if DEBUG
             print("   Quotes: \((session.capturedQuotes ?? []).count)")
+            #endif
             for (i, quote) in (session.capturedQuotes ?? []).enumerated() {
+                #if DEBUG
                 print("     \(i+1). \((quote.text ?? "").prefix(50))...")
+                #endif
             }
+            #if DEBUG
             print("   Notes: \((session.capturedNotes ?? []).count)")
+            #endif
             for (i, note) in (session.capturedNotes ?? []).enumerated() {
+                #if DEBUG
                 print("     \(i+1). \((note.content ?? "").prefix(50))...")
+                #endif
             }
             
             // Show summary if there's meaningful content
@@ -3696,7 +3879,9 @@ struct AmbientModeView: View {
     private func createSession() -> AmbientSession {
         // Use existing session - it was created at start and items were added during saving
         guard let session = currentSession else {
+            #if DEBUG
             print("❌ No current session found!")
+            #endif
             return AmbientSession(book: currentBookContext)
         }
         
@@ -3709,7 +3894,9 @@ struct AmbientModeView: View {
         let hasQuestions = (session.capturedQuestions ?? []).count > 0
         let hasContent = hasQuotes || hasNotes || hasQuestions
         
+        #if DEBUG
         print("📊 Finalizing session with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
+        #endif
         
         // Only save if there's actual content
         if hasContent {
@@ -3717,20 +3904,28 @@ struct AmbientModeView: View {
                 // Force save context to ensure all relationships are persisted
                 if modelContext.hasChanges {
                     try modelContext.save()
+                    #if DEBUG
                     print("✅ Session finalized in SwiftData with content")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("⚠️ No changes to save in model context")
+                    #endif
                     // Force a save anyway to ensure persistence
                     session.endTime = Date() // Touch the session
                     try modelContext.save()
                 }
             } catch {
+                #if DEBUG
                 print("❌ Failed to finalize session: \(error)")
+                #endif
                 // Try using safe save extension
                 modelContext.safeSave()
             }
         } else {
+            #if DEBUG
             print("⚠️ Session is empty, removing from context")
+            #endif
             modelContext.delete(session)
             try? modelContext.save()
         }
@@ -3780,16 +3975,22 @@ struct AmbientModeView: View {
         // Ensure all content is saved to the current book
         do {
             try modelContext.save()
+            #if DEBUG
             print("✅ Saved session for \(currentBookContext?.title ?? "unknown book") with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to save session before book switch: \(error)")
+            #endif
         }
     }
     
     private func loadExistingSessionIfAvailable() {
         // Check if we're continuing from an existing session
         if let existingSession = EpilogueAmbientCoordinator.shared.existingSession {
+            #if DEBUG
             print("📖 Loading existing session with \((existingSession.capturedQuestions ?? []).count) questions")
+            #endif
 
             // Load the book context
             if let bookModel = existingSession.bookModel {
@@ -3834,7 +4035,9 @@ struct AmbientModeView: View {
             currentSession = existingSession
             currentSession?.startTime = Date() // Update start time for this continuation
 
+            #if DEBUG
             print("✅ Loaded \(messages.count) messages from previous session")
+            #endif
         }
     }
 
@@ -3857,9 +4060,13 @@ struct AmbientModeView: View {
 
         do {
             try modelContext.save()
+            #if DEBUG
             print("📚 Started new session for book: \(book.title)")
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Failed to create new session: \(error)")
+            #endif
         }
     }
     
@@ -3929,9 +4136,13 @@ struct AmbientModeView: View {
                             
                             do {
                                 try modelContext.save()
+                                #if DEBUG
                                 print("📚 Started new session without book context")
+                                #endif
                             } catch {
+                                #if DEBUG
                                 print("❌ Failed to create new session: \(error)")
+                                #endif
                             }
                         }
                         SensoryFeedback.light()

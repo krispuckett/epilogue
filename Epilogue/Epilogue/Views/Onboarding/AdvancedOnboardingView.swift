@@ -267,43 +267,38 @@ struct AdvancedOnboardingView: View {
                let videoExt = page.videoExtension,
                let videoURL = Bundle.main.url(forResource: videoName, withExtension: videoExt) {
                     
-                    // Create player if needed
-                    let player: AVPlayer = {
-                        if let existingPlayer = players[index] {
-                            return existingPlayer
-                        } else {
-                            let newPlayer = AVPlayer(url: videoURL)
-                            newPlayer.isMuted = true
-                            newPlayer.actionAtItemEnd = .none
-                            
-                            // Loop video
-                            NotificationCenter.default.addObserver(
-                                forName: .AVPlayerItemDidPlayToEndTime,
-                                object: newPlayer.currentItem,
-                                queue: .main
-                            ) { _ in
-                                newPlayer.seek(to: .zero)
-                                newPlayer.play()
-                            }
-                            
-                            players[index] = newPlayer
-                            return newPlayer
-                        }
-                    }()
-                    
                     // Display video
-                    CleanVideoPlayer(player: player)
+                    CleanVideoPlayer(player: players[index] ?? AVPlayer())
                         .aspectRatio(9.0/16.0, contentMode: .fit)
                         .frame(height: UIScreen.main.bounds.height * 0.6)
                         .scaleEffect(currentPage == index ? 1 : 0.95)
                         .opacity(currentPage == index ? 1 : 0.8)
                         .offset(y: -48) // Move video up by 48px
                         .onAppear {
-                            player.seek(to: .zero)
-                            player.play()
+                            // Create player if needed
+                            if players[index] == nil {
+                                let newPlayer = AVPlayer(url: videoURL)
+                                newPlayer.isMuted = true
+                                newPlayer.actionAtItemEnd = .none
+
+                                // Loop video
+                                NotificationCenter.default.addObserver(
+                                    forName: .AVPlayerItemDidPlayToEndTime,
+                                    object: newPlayer.currentItem,
+                                    queue: .main
+                                ) { _ in
+                                    newPlayer.seek(to: .zero)
+                                    newPlayer.play()
+                                }
+
+                                players[index] = newPlayer
+                            }
+
+                            players[index]?.seek(to: .zero)
+                            players[index]?.play()
                         }
                         .onDisappear {
-                            player.pause()
+                            players[index]?.pause()
                         }
                         .animation(.spring(response: 0.6, dampingFraction: 0.85), value: currentPage)
                 } else {
@@ -457,7 +452,9 @@ struct CleanVideoPlayer: UIViewRepresentable {
 // MARK: - Preview
 #Preview {
     AdvancedOnboardingView {
+        #if DEBUG
         print("Onboarding completed")
+        #endif
     }
     .preferredColorScheme(.dark)
 }

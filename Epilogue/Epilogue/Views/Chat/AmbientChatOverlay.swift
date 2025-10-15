@@ -74,11 +74,15 @@ struct ClaudeInspiredGradient: View {
                     voiceRhythm: voiceRhythm
                 )
                 .onAppear {
+                    #if DEBUG
                     print("🎨 BookSpecificGradient appeared with voiceIntensity: \(voiceIntensity)")
+                    #endif
                 }
                 .onChange(of: voiceIntensity) { _, newIntensity in
                     if newIntensity > 0.01 {
+                        #if DEBUG
                         print("🎨 Gradient voiceIntensity changed to: \(newIntensity)")
+                        #endif
                     }
                 }
             } else {
@@ -695,7 +699,7 @@ struct AmbientChatOverlay: View {
             }
         }
         .onAppear {
-            if let book = selectedBook {
+            if isActive, let book = selectedBook {
                 startListening()
                 // Extract colors for initial book
                 Task {
@@ -703,8 +707,26 @@ struct AmbientChatOverlay: View {
                 }
             }
         }
+        .onDisappear {
+            // Stop listening when view disappears
+            voiceManager.stopListening()
+            autoStopManager.stopMonitoring()
+            #if DEBUG
+            print("[AmbientChat] View disappeared - stopped listening")
+            #endif
+        }
+        .onChange(of: isActive) { _, active in
+            if !active {
+                // Stop listening when ambient mode is deactivated
+                voiceManager.stopListening()
+                autoStopManager.stopMonitoring()
+                #if DEBUG
+                print("[AmbientChat] Ambient mode deactivated - stopped listening")
+                #endif
+            }
+        }
         .onChange(of: selectedBook) { _, newValue in
-            if let book = newValue {
+            if isActive, let book = newValue {
                 startListening()
                 // Extract colors for the selected book
                 Task {
@@ -717,7 +739,9 @@ struct AmbientChatOverlay: View {
         .onChange(of: voiceManager.transcribedText) { oldValue, newValue in
             // Store transcriptions in session
             if !newValue.isEmpty && newValue != oldValue {
+                #if DEBUG
                 print("[AmbientChat] New transcription: \(newValue)")
+                #endif
                 session?.rawTranscriptions.append(newValue)
                 
                 // Detect cognitive patterns in real-time
@@ -770,7 +794,9 @@ struct AmbientChatOverlay: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .autoStopTriggered)) { notification in
             if let reason = notification.object as? String {
+                #if DEBUG
                 print("[AmbientChat] Auto-stop triggered: \(reason)")
+                #endif
                 stopSession()
             }
         }
@@ -995,7 +1021,9 @@ struct AmbientChatOverlay: View {
                     */
                     
                 } catch {
+                    #if DEBUG
                     print("[AmbientChat] Failed to get AI response: \(error)")
+                    #endif
                     // TODO: Add error message if AI fails on main actor
                     // ChatThread and ThreadedChatMessage models have been removed
                     /*
@@ -1024,11 +1052,15 @@ struct AmbientChatOverlay: View {
     }
     
     private func processAmbientSession(_ session: LegacyAmbientSession) async -> ProcessedAmbientSession {
+        #if DEBUG
         print("[AmbientChat] Processing session with \(session.rawTranscriptions.count) transcriptions")
+        #endif
         
         // Combine all transcriptions into a single text for better context
         let fullTranscript = session.rawTranscriptions.joined(separator: " ")
+        #if DEBUG
         print("[AmbientChat] Full transcript captured [\(fullTranscript.count) characters]")
+        #endif
         
         // Extract quotes, notes, and questions from raw transcriptions
         var quotes: [ExtractedQuote] = []
@@ -1043,7 +1075,9 @@ struct AmbientChatOverlay: View {
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             
+            #if DEBUG
             print("[AmbientChat] Processing segment \(index): \(trimmed)")
+            #endif
             
             // Get cognitive patterns for this segment
             let patterns = CognitivePatternRecognizer.shared.recognizePatterns(in: trimmed)
@@ -1069,7 +1103,9 @@ struct AmbientChatOverlay: View {
                lowercased.contains("writes") ||
                lowercased.contains("wrote") ||
                lowercased.contains("according to") {
+                #if DEBUG
                 print("   Detected as QUOTE (by keyword)")
+                #endif
                 foundQuote = true
                 
                 // Extract the actual quote text
@@ -1096,7 +1132,9 @@ struct AmbientChatOverlay: View {
                 // Extract content between quotes
                 let quotedContent = extractQuotedContent(from: trimmed)
                 if !quotedContent.isEmpty && quotedContent.count > 10 { // At least 10 chars
+                    #if DEBUG
                     print("   Detected as QUOTE (by quotation marks)")
+                    #endif
                     foundQuote = true
                     quotes.append(ExtractedQuote(
                         text: quotedContent,
@@ -1134,7 +1172,9 @@ struct AmbientChatOverlay: View {
                 lowercased.contains("please explain") ||
                 lowercased.contains("tell me about") ||
                 lowercased.contains("tell me more")) {
+                #if DEBUG
                 print("   Detected as QUESTION")
+                #endif
                 foundQuestion = true
                 questions.append(ExtractedQuestion(
                     text: trimmed,
@@ -1159,36 +1199,50 @@ struct AmbientChatOverlay: View {
                    lowercased.contains("reminds me of") ||
                    lowercased.contains("this makes me think") {
                     noteType = .reflection
+                    #if DEBUG
                     print("   Detected as NOTE - reflection (by keyword)")
+                    #endif
                 } else if lowercased.contains("similar to") ||
                           lowercased.contains("connects to") ||
                           lowercased.contains("relates to") ||
                           lowercased.contains("like when") ||
                           lowercased.contains("reminds me") {
                     noteType = .connection
+                    #if DEBUG
                     print("   Detected as NOTE - connection (by keyword)")
+                    #endif
                 } else if lowercased.contains("i realize") ||
                           lowercased.contains("i understand") ||
                           lowercased.contains("this shows") ||
                           lowercased.contains("this means") ||
                           lowercased.contains("insight") {
                     noteType = .insight
+                    #if DEBUG
                     print("   Detected as NOTE - insight (by keyword)")
+                    #endif
                 } else {
                     // Fall back to cognitive pattern if available
                     switch primaryPattern {
                     case .connecting:
                         noteType = .connection
+                        #if DEBUG
                         print("   Detected as NOTE - connection (by pattern)")
+                        #endif
                     case .analyzing, .synthesizing, .evaluating:
                         noteType = .insight
+                        #if DEBUG
                         print("   Detected as NOTE - insight (by pattern)")
+                        #endif
                     case .reflecting, .creating, nil:
                         noteType = .reflection
+                        #if DEBUG
                         print("   Detected as NOTE - reflection (by pattern)")
+                        #endif
                     default:
                         noteType = .reflection
+                        #if DEBUG
                         print("   Detected as NOTE - reflection (default)")
+                        #endif
                     }
                 }
                 
@@ -1206,7 +1260,9 @@ struct AmbientChatOverlay: View {
             }
         }
         
+        #if DEBUG
         print("[AmbientChat] Extracted: \(quotes.count) quotes, \(notes.count) notes, \(questions.count) questions")
+        #endif
         
         // Generate summary with cognitive analysis
         let summary = generateSessionSummary(session: session, quotes: quotes, notes: notes, questions: questions, cognitiveAnalysis: cognitiveAnalysis)
@@ -1366,7 +1422,9 @@ struct AmbientChatOverlay: View {
             */
             
         } catch {
+            #if DEBUG
             print("[AmbientChat] Real-time question processing failed: \(error)")
+            #endif
         }
     }
     
@@ -1418,7 +1476,9 @@ struct AmbientChatOverlay: View {
                 }
             }
         } catch {
+            #if DEBUG
             print("Failed to extract colors for ambient chat: \(error)")
+            #endif
         }
     }
 }
