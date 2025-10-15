@@ -334,13 +334,33 @@ struct PremiumPaywallView: View {
 
             // Error message
             if let error = storeKit.purchaseError {
-                Text(error)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.red.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                    .padding(.vertical, 8)
-                    .transition(.opacity)
+                VStack(spacing: 12) {
+                    Text(error)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.red.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+
+                    // Retry button when products fail to load
+                    Button {
+                        Task {
+                            await storeKit.loadProducts()
+                        }
+                    } label: {
+                        Text("Retry Loading Products")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 8)
+                .transition(.opacity)
             }
 
             // Secondary links
