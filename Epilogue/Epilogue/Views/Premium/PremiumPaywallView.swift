@@ -60,6 +60,8 @@ struct PremiumPaywallView: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.8))
                     }
+                    .accessibilityLabel("Go back")
+                    .accessibilityHint("Returns to previous screen")
                 }
             }
             .onAppear {
@@ -147,21 +149,53 @@ struct PremiumPaywallView: View {
                         .kerning(1.4)
 
                     Spacer()
+                }
 
-                    VStack(alignment: .trailing, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text("$7.99")
-                                .font(.system(size: 30, weight: .bold, design: .monospaced))
-                                .tracking(-1.5)
-                                .foregroundStyle(.white.opacity(0.95))
-                            Text("/mo")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.5))
+                // Billing interval picker
+                HStack(spacing: 8) {
+                    ForEach(BillingInterval.allCases, id: \.self) { interval in
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedInterval = interval
+                            }
+                            SensoryFeedback.light()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                    Text(interval == .monthly ? "$7.99" : "$67")
+                                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                        .tracking(-1)
+                                        .foregroundStyle(selectedInterval == interval ? .white.opacity(0.95) : .white.opacity(0.5))
+                                    Text(interval == .monthly ? "/mo" : "/yr")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(selectedInterval == interval ? .white.opacity(0.5) : .white.opacity(0.3))
+                                }
+
+                                if interval == .annual {
+                                    Text("SAVE 30%")
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(selectedInterval == interval ? 0.9 : 0.5))
+                                        .kerning(0.8)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(selectedInterval == interval ? Color.white.opacity(0.08) : Color.white.opacity(0.02))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .strokeBorder(
+                                        selectedInterval == interval
+                                            ? Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.4)
+                                            : Color.white.opacity(0.1),
+                                        lineWidth: selectedInterval == interval ? 1.5 : 1
+                                    )
+                            )
                         }
-
-                        Text("or $67/yr  save 30%")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.9))
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -217,6 +251,9 @@ struct PremiumPaywallView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Free plan features")
+                .accessibilityHint("Double tap to \(isFreeCardExpanded ? "collapse" : "expand") free plan details")
+                .accessibilityValue(isFreeCardExpanded ? "Expanded" : "Collapsed")
 
                 if isFreeCardExpanded {
                     VStack(alignment: .leading, spacing: 14) {
@@ -291,6 +328,9 @@ struct PremiumPaywallView: View {
             .buttonStyle(.plain)
             .disabled(storeKit.isLoading)
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            .accessibilityLabel("Subscribe to Epilogue Plus")
+            .accessibilityHint("Double tap to start subscription purchase")
+            .accessibilityValue(storeKit.isLoading ? "Loading" : "Ready")
 
             // Error message
             if let error = storeKit.purchaseError {
@@ -314,6 +354,8 @@ struct PremiumPaywallView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(storeKit.isLoading)
+                .accessibilityLabel("Continue with free plan")
+                .accessibilityHint("Double tap to dismiss and use free plan with 2 conversations per month")
 
                 Button {
                     handleRestorePurchases()
@@ -324,6 +366,8 @@ struct PremiumPaywallView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(storeKit.isLoading)
+                .accessibilityLabel("Restore previous purchase")
+                .accessibilityHint("Double tap to restore previously purchased subscription")
             }
         }
         .opacity(ctaAppeared ? 1 : 0)
@@ -350,15 +394,21 @@ struct PremiumPaywallView: View {
             let product = selectedInterval == .annual ? storeKit.annualProduct : storeKit.monthlyProduct
 
             guard let product = product else {
+                #if DEBUG
                 print("❌ Product not available: \(selectedInterval.rawValue)")
+                #endif
                 return
             }
 
+            #if DEBUG
             print("🛒 Starting purchase for: \(product.id)")
+            #endif
             let success = await storeKit.purchase(product)
 
             if success {
+                #if DEBUG
                 print("✅ Purchase completed successfully")
+                #endif
                 dismiss()
             }
         }
@@ -368,14 +418,20 @@ struct PremiumPaywallView: View {
         SensoryFeedback.light()
 
         Task {
+            #if DEBUG
             print("🔄 Restoring purchases...")
+            #endif
             await storeKit.restorePurchases()
 
             if storeKit.isPlus {
+                #if DEBUG
                 print("✅ Purchases restored - user is now Plus")
+                #endif
                 dismiss()
             } else {
+                #if DEBUG
                 print("ℹ️ No active subscriptions found")
+                #endif
             }
         }
     }
