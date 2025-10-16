@@ -85,10 +85,10 @@ struct BookSessionHistoryCard: View {
             // Header with cleaner design
             Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { isExpanded.toggle() } }) {
                 HStack {
-                    Image(systemName: "clock.arrow.circlepath")
+                    Image(systemName: "text.book.closed")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Color(red: 1.0, green: 0.45, blue: 0.16))
-                    
+
                     Text("Reading Sessions")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)

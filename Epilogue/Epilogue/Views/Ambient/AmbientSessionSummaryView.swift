@@ -152,12 +152,12 @@ struct AmbientSessionSummaryView: View {
         ZStack {
             // Permanent ambient gradient background - EXACTLY LIKE LIBRARY VIEW
             AmbientChatGradientView()
-                .opacity(0.4)
+                .opacity(0.7)
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(false)
 
             // Subtle darkening overlay for better readability - EXACTLY LIKE LIBRARY VIEW
-            Color.black.opacity(0.15)
+            Color.black.opacity(0.05)
                 .ignoresSafeArea(.all)
                 .allowsHitTesting(false)
         }
