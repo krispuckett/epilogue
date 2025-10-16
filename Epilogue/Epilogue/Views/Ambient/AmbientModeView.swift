@@ -4452,6 +4452,7 @@ struct AmbientMessageThreadView: View {
                     Text(message.content)
                         .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
                         .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
+                        .lineLimit(2)  // Allow question to wrap to 2 lines if needed
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     // Use streaming text if available, otherwise use message content
@@ -4469,6 +4470,7 @@ struct AmbientMessageThreadView: View {
                         Text(content.question)
                             .font(.system(size: 16, weight: .regular, design: .default))  // Match note cards
                             .foregroundStyle(.white.opacity(0.95)) // Match note cards opacity
+                            .lineLimit(2)  // Allow question to wrap to 2 lines if needed
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
