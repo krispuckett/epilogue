@@ -264,13 +264,12 @@ struct SettingsView: View {
                                 .foregroundStyle(.orange)
                         }
 
-                        // TODO: Implement AmbientOrbExporter
-                        // NavigationLink {
-                        //     AmbientOrbExporter()
-                        // } label: {
-                        //     Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
-                        //         .foregroundStyle(.orange)
-                        // }
+                        NavigationLink {
+                            AmbientOrbExporter()
+                        } label: {
+                            Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
+                                .foregroundStyle(.orange)
+                        }
 
                         NavigationLink {
                             PremiumPaywallView()

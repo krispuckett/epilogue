@@ -12,10 +12,10 @@ struct ChatMessage: Identifiable {
     var isNew: Bool = true
 }
 
-// MARK: - Chat View (Actually shows Sessions history)
+// MARK: - Chat View
 struct ChatView: View {
     var body: some View {
-        MinimalSessionsView()
+        OptimizedPerplexitySessionsView()
     }
 }
 
