@@ -11,10 +11,15 @@ class AmbientBookDetector: ObservableObject {
     @Published var detectedBook: Book?
     @Published var confidence: Double = 0.0
     @Published var isDetecting: Bool = false
-    
+
     // Book library reference
     private var libraryBooks: [Book] = []
     private var cancellables = Set<AnyCancellable>()
+
+    // Session context - persists last detected book for follow-up questions
+    private var sessionBook: Book?
+    private var sessionBookTimestamp: Date?
+    private let sessionTimeout: TimeInterval = 600 // 10 minutes
     
     // Detection patterns
     private let bookTriggerPhrases = [
@@ -192,14 +197,41 @@ class AmbientBookDetector: ObservableObject {
         #if DEBUG
         print("📚 Checking against \(libraryBooks.count) known books")
         #endif
-        
+
         // Debug: Print first few book titles to verify library contents
         if libraryBooks.count > 0 {
             #if DEBUG
             print("📚 Books in library: \(libraryBooks.prefix(6).map { $0.title }.joined(separator: ", "))")
             #endif
         }
-        
+
+        // NEW: If no book title mentioned, use session context or currently reading book
+        let hasBookMention = libraryBooks.contains { lowercased.contains($0.title.lowercased()) }
+
+        if !hasBookMention {
+            // Check session book first (within 10 min timeout)
+            if let session = sessionBook,
+               let timestamp = sessionBookTimestamp,
+               Date().timeIntervalSince(timestamp) < sessionTimeout {
+                #if DEBUG
+                print("📚 Using session book (last detected): \(session.title)")
+                #endif
+                setDetectedBook(session, confidence: 0.7)
+                return
+            }
+
+            // Fall back to currently reading book
+            if let currentlyReading = libraryBooks.first(where: { $0.readingStatus == .currentlyReading }) {
+                #if DEBUG
+                print("📚 Using currently reading book: \(currentlyReading.title)")
+                #endif
+                setDetectedBook(currentlyReading, confidence: 0.6)
+                sessionBook = currentlyReading  // Set as session context
+                sessionBookTimestamp = Date()
+                return
+            }
+        }
+
         for book in libraryBooks {
             // Check title match
             let titleLower = book.title.lowercased()
@@ -310,7 +342,7 @@ class AmbientBookDetector: ObservableObject {
     private func setDetectedBook(_ book: Book, confidence: Double) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
+
             // CRITICAL: Only set if it's a different book to prevent duplicate triggers
             if self.detectedBook?.localId == book.localId {
                 #if DEBUG
@@ -318,9 +350,13 @@ class AmbientBookDetector: ObservableObject {
                 #endif
                 return
             }
-            
+
             self.detectedBook = book
             self.confidence = confidence
+
+            // Update session context for follow-up questions
+            self.sessionBook = book
+            self.sessionBookTimestamp = Date()
             
             #if DEBUG
             print("📖 Book detected: \(book.title) (confidence: \(Int(confidence * 100))%)")
