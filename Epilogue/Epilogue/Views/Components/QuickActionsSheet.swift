@@ -429,7 +429,8 @@ struct QuickActionsSheet: View {
             dismiss()
         case .ambientReading:
             // Start ambient reading with voice mode using simplified coordinator
-            SimplifiedAmbientCoordinator.shared.openAmbientReading()
+            // CRITICAL: Pass the current book context when launching from book detail!
+            SimplifiedAmbientCoordinator.shared.openAmbientReading(with: libraryViewModel.currentDetailBook)
             dismiss()
         }
     }
