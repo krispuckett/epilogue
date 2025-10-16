@@ -435,7 +435,8 @@ struct CleanVideoPlayer: UIViewRepresentable {
         }
         
         required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
+            // Not used - SwiftUI doesn't use NSCoder initialization
+            return nil
         }
         
         override func layoutSubviews() {

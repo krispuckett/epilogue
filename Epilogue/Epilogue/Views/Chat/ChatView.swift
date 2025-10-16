@@ -15,7 +15,7 @@ struct ChatMessage: Identifiable {
 // MARK: - Chat View
 struct ChatView: View {
     var body: some View {
-        OptimizedPerplexitySessionsView()
+        UnifiedChatView()
     }
 }
 

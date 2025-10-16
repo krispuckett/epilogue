@@ -13,7 +13,14 @@ final class SecureAPIManager {
     
     // MARK: - Proxy Configuration
     private let proxyBaseURL = "https://epilogue-proxy.kris-puckett.workers.dev"
-    private let appSecret = "epilogue_testflight_2025_secret"  // App identification only
+
+    // Basic client-side auth - NOTE: Can be extracted from binary
+    // TODO: Post-launch - Implement StoreKit receipt validation on CloudFlare worker
+    private var appSecret: String {
+        // Simple obfuscation (not cryptographically secure, just discourages casual extraction)
+        let encoded: [UInt8] = [101, 112, 105, 108, 111, 103, 117, 101, 95, 116, 101, 115, 116, 102, 108, 105, 103, 104, 116, 95, 50, 48, 50, 53, 95, 115, 101, 99, 114, 101, 116]
+        return String(bytes: encoded, encoding: .utf8) ?? ""
+    }
     
     private init() {}
     

@@ -4,6 +4,7 @@ import Vision
 import UIKit
 import CoreImage
 import Combine
+import OSLog
 
 struct BookScannerView: View {
     @StateObject private var scanner = BookScannerService.shared
@@ -504,13 +505,18 @@ struct CameraPreviewView: UIViewRepresentable {
     let cameraManager: BookCameraManager
     
     class PreviewView: UIView {
+        private static let logger = Logger(subsystem: "com.epilogue.app", category: "CameraPreview")
+
         override class var layerClass: AnyClass {
             AVCaptureVideoPreviewLayer.self
         }
-        
+
         var videoPreviewLayer: AVCaptureVideoPreviewLayer {
             guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
-                fatalError("Expected AVCaptureVideoPreviewLayer but got \(type(of: layer))")
+                Self.logger.error("Critical: Expected AVCaptureVideoPreviewLayer but got \(type(of: self.layer))")
+                // This should never happen since layerClass is set correctly
+                // Return a new instance as emergency fallback
+                return AVCaptureVideoPreviewLayer()
             }
             return previewLayer
         }

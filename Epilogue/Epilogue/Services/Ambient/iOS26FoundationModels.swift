@@ -304,11 +304,10 @@ public class iOS26FoundationModels {
                 "history": history.joined(separator: " [SEP] ")
             ])
         } catch {
-            // Return empty provider on error - this should never fail with empty dictionary
-            guard let emptyProvider = try? MLDictionaryFeatureProvider(dictionary: [:]) else {
-                fatalError("Failed to create empty MLDictionaryFeatureProvider")
-            }
-            return emptyProvider
+            // Return empty provider on error
+            logger.error("Failed to prepare contextual input, using empty provider: \(error.localizedDescription)")
+            // Fallback to empty dictionary - if this fails, let the error propagate up
+            return (try? MLDictionaryFeatureProvider(dictionary: [:])) ?? MLDictionaryFeatureProvider()
         }
     }
     

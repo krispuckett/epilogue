@@ -264,12 +264,13 @@ struct SettingsView: View {
                                 .foregroundStyle(.orange)
                         }
 
-                        NavigationLink {
-                            AmbientOrbExporter()
-                        } label: {
-                            Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
-                                .foregroundStyle(.orange)
-                        }
+                        // TODO: Implement AmbientOrbExporter
+                        // NavigationLink {
+                        //     AmbientOrbExporter()
+                        // } label: {
+                        //     Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
+                        //         .foregroundStyle(.orange)
+                        // }
 
                         NavigationLink {
                             PremiumPaywallView()
@@ -374,7 +375,7 @@ struct SettingsView: View {
                         handleVersionTap()
                     }
 
-                    Link(destination: URL(string: "https://readepilogue.com/privacy")!) {
+                    Link(destination: URL(string: "https://krispuckett.craft.me/BcGmXbnrNCvSGp")!) {
                         HStack {
                             Text(L10n.Settings.privacyPolicy)
                             Spacer()
@@ -384,7 +385,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Link(destination: URL(string: "https://readepilogue.com/terms")!) {
+                    Link(destination: URL(string: "https://krispuckett.craft.me/clvC7VnuiypGo1")!) {
                         HStack {
                             Text(L10n.Settings.termsOfService)
                             Spacer()

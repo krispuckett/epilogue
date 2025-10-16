@@ -140,20 +140,59 @@ struct PremiumPaywallView: View {
     // MARK: - Feature Comparison Section (Vertical Stack)
     private var featureComparisonSection: some View {
         VStack(spacing: 16) {
-            // EPILOGUE+ card (primary)
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .top) {
-                    Text("EPILOGUE+")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
-                        .kerning(1.4)
+            plusCard
+            freeCard
+        }
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        .opacity(featuresAppeared ? 1 : 0)
+        .offset(y: featuresAppeared ? 0 : -10)
+    }
 
-                    Spacer()
-                }
+    private var plusCard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .top) {
+                Text("EPILOGUE+")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                    .kerning(1.4)
 
-                // Billing interval picker
-                HStack(spacing: 8) {
-                    ForEach(BillingInterval.allCases, id: \.self) { interval in
+                Spacer()
+            }
+
+            billingIntervalPicker
+
+            VStack(alignment: .leading, spacing: 14) {
+                featureItem(icon: "checkmark", text: "Unlimited ambient mode conversations")
+                featureItem(icon: "checkmark", text: "Advanced AI models")
+                featureItem(icon: "checkmark", text: "All core features")
+                featureItem(icon: "checkmark", text: "On-device processing")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.4),
+                            Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+    }
+
+    private var billingIntervalPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(BillingInterval.allCases, id: \.self) { interval in
                         Button {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 selectedInterval = interval
@@ -196,39 +235,12 @@ struct PremiumPaywallView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 14) {
-                    featureItem(icon: "checkmark", text: "Unlimited ambient mode conversations")
-                    featureItem(icon: "checkmark", text: "Advanced AI models")
-                    featureItem(icon: "checkmark", text: "All core features")
-                    featureItem(icon: "checkmark", text: "On-device processing")
-                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.4),
-                                Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.5
-                    )
-            )
+        }
+    }
 
-            // FREE card (collapsible)
-            VStack(alignment: .leading, spacing: 0) {
+    private var freeCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         isFreeCardExpanded.toggle()
@@ -275,10 +287,6 @@ struct PremiumPaywallView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
             )
-        }
-        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-        .opacity(featuresAppeared ? 1 : 0)
-        .offset(y: featuresAppeared ? 0 : -10)
     }
 
     private func featureItem(icon: String, text: String, secondary: Bool = false) -> some View {

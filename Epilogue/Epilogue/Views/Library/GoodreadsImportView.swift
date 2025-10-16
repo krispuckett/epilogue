@@ -1860,15 +1860,23 @@ struct BookSearchRow: View {
             let fallbackContainer = try ModelContainer(for: BookModel.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
             context = ModelContext(fallbackContainer)
         } catch {
-            fatalError("Preview: Failed to create ModelContainer - \(error)")
+            // If preview setup fails, show error view
+            return AnyView(
+                VStack {
+                    Text("Preview Error")
+                    Text("Failed to create ModelContainer")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            )
         }
     }
 
-    return GoodreadsImportView(
+    return AnyView(GoodreadsImportView(
         modelContext: context,
         googleBooksService: GoogleBooksService(),
         libraryViewModel: LibraryViewModel()
-    )
+    ))
 }
 // MARK: - New Helper Views for Redesigned UI
 
