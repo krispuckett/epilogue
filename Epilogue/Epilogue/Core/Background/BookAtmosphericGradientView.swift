@@ -257,7 +257,7 @@ struct BookAtmosphericGradientView: View {
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
 
         // EXACT same enhancement as ambient chat
-        saturation = min(saturation * 1.4, 1.0)  // Boost vibrancy
+        saturation = min(saturation * 1.2, 1.0)  // Boost vibrancy
         brightness = max(brightness, 0.4)         // Minimum brightness
 
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
