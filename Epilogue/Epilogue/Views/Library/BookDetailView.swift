@@ -1059,27 +1059,65 @@ struct BookDetailView: View {
                     .font(.system(size: 16))
                     .foregroundColor(accentColor)
                     .frame(width: 28, height: 28)
-                
+
                 Text("Reading Timeline")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(textColor)
 
                 Spacer()
 
-                Text("Drag to adjust")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(textColor.opacity(0.5))
+                if let pageCount = book.pageCount, pageCount > 0 {
+                    Text("Drag to adjust")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(textColor.opacity(0.5))
+                }
             }
-            
-            // Ambient Reading Progress Timeline - Detailed View (now interactive!)
-            AmbientReadingProgressView(
-                book: book,
-                bookModel: bookModel,
-                width: 320,
-                showDetailed: true,
-                colorPalette: colorPalette
-            )
-            .environmentObject(libraryViewModel)
+
+            if let pageCount = book.pageCount, pageCount > 0 {
+                // Ambient Reading Progress Timeline - Detailed View (now interactive!)
+                AmbientReadingProgressView(
+                    book: book,
+                    bookModel: bookModel,
+                    width: 320,
+                    showDetailed: true,
+                    colorPalette: colorPalette,
+                    showCompletionSheet: $showingCompletionSheet
+                )
+                .environmentObject(libraryViewModel)
+            } else {
+                // Missing page count prompt
+                VStack(spacing: 12) {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 40))
+                        .foregroundColor(textColor.opacity(0.3))
+                        .padding(.top, 20)
+
+                    Text("Page count missing")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(textColor.opacity(0.7))
+
+                    Text("Add the total pages to track your reading progress")
+                        .font(.system(size: 14))
+                        .foregroundColor(textColor.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+
+                    Button {
+                        // TODO: Open edit sheet to add page count
+                    } label: {
+                        Text("Add Page Count")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(accentColor)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+            }
         }
     }
     
@@ -1209,14 +1247,14 @@ struct BookDetailView: View {
     private var readingInsightsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "sparkles")
+                Image(systemName: "book.pages")
                     .font(.system(size: 16))
                     .foregroundStyle(accentColor)
-                
+
                 Text("Reading Insights")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                
+
                 Spacer()
             }
             

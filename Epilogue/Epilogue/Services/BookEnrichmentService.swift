@@ -199,7 +199,8 @@ class BookEnrichmentService {
 
         // Check if response contains JSON block
         if let jsonStart = response.range(of: "{"),
-           let jsonEnd = response.range(of: "}", options: .backwards) {
+           let jsonEnd = response.range(of: "}", options: .backwards),
+           jsonStart.lowerBound < jsonEnd.upperBound {
             jsonString = String(response[jsonStart.lowerBound...jsonEnd.upperBound])
         } else {
             jsonString = response
@@ -295,5 +296,71 @@ class BookEnrichmentService {
 
     enum EnrichmentError: Error {
         case invalidResponse(String)
+    }
+
+    // MARK: - Page Count Fetching
+
+    func fetchMissingPageCount(for book: BookModel) async {
+        // Skip if book already has page count
+        guard book.pageCount == nil || book.pageCount == 0 else {
+            #if DEBUG
+            print("ℹ️ Book already has page count: \(book.title)")
+            #endif
+            return
+        }
+
+        #if DEBUG
+        print("📄 [PAGE COUNT] Fetching for '\(book.title)' by \(book.author)")
+        #endif
+
+        do {
+            let prompt = """
+            What is the total page count for the book "\(book.title)" by \(book.author)?
+
+            Respond with ONLY the number of pages (as an integer), nothing else.
+            Example response: 352
+
+            If you cannot find the exact page count, respond with your best estimate based on the standard edition.
+            """
+
+            let response = try await OptimizedPerplexityService.shared.chat(
+                message: prompt,
+                bookContext: nil
+            )
+
+            // Extract number from response
+            if let pageCount = extractPageCount(from: response) {
+                #if DEBUG
+                print("✅ [PAGE COUNT] Found: \(pageCount) pages")
+                #endif
+
+                // Update book model
+                book.pageCount = pageCount
+
+                #if DEBUG
+                print("💾 [PAGE COUNT] Updated book model")
+                #endif
+            } else {
+                #if DEBUG
+                print("⚠️ [PAGE COUNT] Could not parse page count from response: \(response)")
+                #endif
+            }
+        } catch {
+            #if DEBUG
+            print("❌ [PAGE COUNT] Failed: \(error)")
+            #endif
+        }
+    }
+
+    private func extractPageCount(from response: String) -> Int? {
+        // Try to find any number in the response
+        let pattern = #"\d+"#
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: response, range: NSRange(response.startIndex..., in: response)),
+           let range = Range(match.range, in: response) {
+            let numberString = String(response[range])
+            return Int(numberString)
+        }
+        return nil
     }
 }

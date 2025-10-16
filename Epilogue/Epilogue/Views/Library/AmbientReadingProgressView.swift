@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Ultra-polished scroll timeline reading progress with ambient effects
 struct AmbientReadingProgressView: View {
@@ -17,9 +18,15 @@ struct AmbientReadingProgressView: View {
     @State private var hasAppeared: Bool = false
     @State private var isDragging: Bool = false
     @State private var dragStartProgress: Double = 0
+    @State private var celebrationPulses: [CelebrationPulse] = []
+    @State private var hasTriggeredCompletion: Bool = false
 
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.modelContext) private var modelContext
+
+    // Binding to control completion sheet from parent
+    @Binding var showCompletionSheet: Bool
 
     // MARK: - Color Properties
     private var primaryColor: Color {
@@ -62,27 +69,36 @@ struct AmbientReadingProgressView: View {
             }
         }
         .onAppear {
+            // Reset completion flag if not at 100%
+            if progress < 1.0 {
+                hasTriggeredCompletion = false
+            }
+
             guard !hasAppeared else { return }
             hasAppeared = true
-            
+
             generateProgressDots()
-            
+
             if !reduceMotion {
                 withAnimation(.spring(response: 1.5, dampingFraction: 0.8).delay(0.3)) {
                     animatedProgress = progress
                     showMilestones = true
                 }
-                
+
                 withAnimation(.easeInOut(duration: 2.5).delay(0.6)) {
-                    glowIntensity = progress * 1.5 + 0.2  // More pronounced glow formula
+                    glowIntensity = progress * 1.5 + 0.2
                 }
             } else {
                 animatedProgress = progress
                 showMilestones = true
-                glowIntensity = progress * 1.5 + 0.2  // More pronounced glow formula
+                glowIntensity = progress * 1.5 + 0.2
             }
         }
-        .onChange(of: progress) { _, newProgress in
+        .onChange(of: progress) { oldProgress, newProgress in
+            // Reset if dragging back below 100%
+            if oldProgress >= 1.0 && newProgress < 1.0 {
+                hasTriggeredCompletion = false
+            }
             updateProgress(to: newProgress)
         }
     }
@@ -156,36 +172,77 @@ struct AmbientReadingProgressView: View {
                 Circle()
                     .stroke(Color.white.opacity(0.10), lineWidth: 3)
                     .frame(width: 120, height: 120)
-                
+
                 // Animated progress ring - more vibrant but fixed thickness
                 Circle()
                     .trim(from: 0, to: animatedProgress)
                     .stroke(
                         LinearGradient(
                             colors: [
-                                secondaryColor.opacity(0.6 + 0.4 * animatedProgress),  // More opaque with progress
+                                secondaryColor.opacity(0.6 + 0.4 * animatedProgress),
                                 primaryColor.opacity(0.8 + 0.2 * animatedProgress),
-                                accentColor.opacity(0.7 + 0.3 * animatedProgress)  // Brighter accent with progress
+                                accentColor.opacity(0.7 + 0.3 * animatedProgress)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)  // Fixed thickness
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
                     )
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
-                    .shadow(color: primaryColor.opacity(0.3 * animatedProgress), radius: 4, x: 0, y: 0)  // Add glow shadow instead
+                    .shadow(color: primaryColor.opacity(0.3 * animatedProgress), radius: 4, x: 0, y: 0)
                     .shadow(
                         color: primaryColor.opacity(0.6),
                         radius: 4,
                         y: 2
                     )
-                
+
                 // Center progress display - single line
                 Text("\(Int(animatedProgress * 100))%")
                     .font(.system(size: 24, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.white)
                     .contentTransition(.numericText())
+            }
+            .overlay {
+                // Celebration pulse rings - as overlay so they don't affect layout
+                ForEach(celebrationPulses) { pulse in
+                    ZStack {
+                        // Soft outer glow
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        primaryColor.opacity(pulse.opacity * 0.7),
+                                        secondaryColor.opacity(pulse.opacity * 0.5),
+                                        accentColor.opacity(pulse.opacity * 0.3)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 12
+                            )
+                            .frame(width: 120 * pulse.scale, height: 120 * pulse.scale)
+                            .blur(radius: 16)
+
+                        // Sharp inner ring
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        primaryColor.opacity(pulse.opacity * 1.0),
+                                        secondaryColor.opacity(pulse.opacity * 0.85),
+                                        accentColor.opacity(pulse.opacity * 0.7)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 5
+                            )
+                            .frame(width: 120 * pulse.scale, height: 120 * pulse.scale)
+                            .blur(radius: 2)
+                    }
+                    .allowsHitTesting(false)
+                }
             }
         }
     }
@@ -354,6 +411,9 @@ struct AmbientReadingProgressView: View {
                                         isDragging = false
                                     }
                                     SensoryFeedback.impact(.light)
+
+                                    // Check if book was just completed
+                                    checkForCompletion(newProgress: animatedProgress)
                                 }
                         )
                 }
@@ -371,6 +431,9 @@ struct AmbientReadingProgressView: View {
                     viewModel.updateCurrentPage(for: book, to: newPage)
 
                     SensoryFeedback.impact(.medium)
+
+                    // Check if book was just completed
+                    checkForCompletion(newProgress: tapProgress)
                 }
             }
             .frame(height: 24)
@@ -461,6 +524,73 @@ struct AmbientReadingProgressView: View {
             progressDots[index].isActive = progressDots[index].position <= animatedProgress
         }
     }
+
+    private func checkForCompletion(newProgress: Double) {
+        guard newProgress >= 1.0 && !hasTriggeredCompletion else { return }
+
+        hasTriggeredCompletion = true
+
+        // Update current page to total pages (but DON'T change status yet!)
+        if let bookModel = bookModel {
+            bookModel.currentPage = bookModel.pageCount ?? totalPages
+            try? modelContext.save()
+        }
+        viewModel.updateCurrentPage(for: book, to: totalPages)
+
+        // Success haptic feedback
+        SensoryFeedback.success()
+
+        // Trigger celebration animation
+        triggerCelebrationPulses()
+
+        // After animation completes: change status and show sheet
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            // Now change status to read
+            if let bookModel = bookModel {
+                bookModel.readingStatus = ReadingStatus.read.rawValue
+                try? modelContext.save()
+            }
+            viewModel.updateReadingStatus(for: book.id, status: .read)
+
+            // Show completion sheet (controlled by parent via binding)
+            showCompletionSheet = true
+        }
+    }
+
+    private func triggerCelebrationPulses() {
+        // Create 5 expanding pulse rings with realistic water-ripple physics
+        for i in 0..<5 {
+            let delay = Double(i) * 0.15  // Faster succession like real water ripples
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                let pulse = CelebrationPulse(id: UUID())
+                celebrationPulses.append(pulse)
+
+                // Realistic water physics - each ring loses energy as it travels outward
+                let waveNumber = Double(i)
+                let baseResponse = 1.8
+                let variableResponse = baseResponse + (waveNumber * 0.18)  // Later waves slower
+                let variableDamping = 0.38 + (waveNumber * 0.04)           // Progressive energy loss
+                let variableScale = 5.0 - (waveNumber * 0.15)              // Later waves don't travel as far
+
+                // Add slight randomness for organic feel
+                let randomOffset = Double.random(in: -0.05...0.05)
+                let finalResponse = variableResponse + randomOffset
+
+                // Animate with water-like spring physics
+                withAnimation(.spring(response: finalResponse, dampingFraction: variableDamping)) {
+                    if let index = celebrationPulses.firstIndex(where: { $0.id == pulse.id }) {
+                        celebrationPulses[index].scale = variableScale
+                        celebrationPulses[index].opacity = 0.0
+                    }
+                }
+
+                // Remove pulse after animation completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+                    celebrationPulses.removeAll(where: { $0.id == pulse.id })
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Supporting Types
@@ -470,6 +600,12 @@ private struct ProgressDot {
     var isActive: Bool
     let isMilestone: Bool
     let size: CGFloat
+}
+
+private struct CelebrationPulse: Identifiable {
+    let id: UUID
+    var scale: CGFloat = 1.0
+    var opacity: Double = 1.0
 }
 
 // MARK: - Preview
@@ -490,6 +626,7 @@ struct AmbientReadingProgressDemo: View {
         book.currentPage = 127  // Set some progress for preview
         return book
     }()
+    @State private var showCompletionSheet = false
     
     var body: some View {
         ZStack {
@@ -520,7 +657,8 @@ struct AmbientReadingProgressDemo: View {
                 book: sampleBook,
                 width: 300,
                 showDetailed: false,
-                colorPalette: nil
+                colorPalette: nil,
+                showCompletionSheet: $showCompletionSheet
             )
             .padding(DesignSystem.Spacing.listItemPadding)
             .background(Color.white.opacity(0.05))
@@ -538,7 +676,8 @@ struct AmbientReadingProgressDemo: View {
                 book: sampleBook,
                 width: 320,
                 showDetailed: true,
-                colorPalette: nil
+                colorPalette: nil,
+                showCompletionSheet: $showCompletionSheet
             )
             .padding(30)
             .background(Color.white.opacity(0.05))

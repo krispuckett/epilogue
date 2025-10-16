@@ -224,6 +224,17 @@ struct LibraryView: View {
                         #if DEBUG
                         print("      smartSynopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
                         #endif
+
+                        // Fetch page count if missing
+                        if bookModel.pageCount == nil || bookModel.pageCount == 0 {
+                            #if DEBUG
+                            print("   📄 Page count missing, fetching...")
+                            #endif
+                            await BookEnrichmentService.shared.fetchMissingPageCount(for: bookModel)
+                            #if DEBUG
+                            print("   📄 Page count: \(bookModel.pageCount ?? 0)")
+                            #endif
+                        }
                     } catch {
                         #if DEBUG
                         print("   ❌ FAILED to save BookModel: \(error)")

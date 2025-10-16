@@ -5,7 +5,7 @@ struct EditBookSheet: View {
     let currentBook: Book
     let initialSearchTerm: String
     let onBookReplaced: (Book) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
     @StateObject private var booksService = GoogleBooksService()
     @State private var searchTerm: String
@@ -14,6 +14,7 @@ struct EditBookSheet: View {
     @State private var searchError: String?
     @State private var hasSearched = false
     @FocusState private var isSearchFieldFocused: Bool
+    @State private var showCompletionSheet = false
     
     init(currentBook: Book, initialSearchTerm: String, onBookReplaced: @escaping (Book) -> Void) {
         self.currentBook = currentBook
@@ -79,7 +80,8 @@ struct EditBookSheet: View {
                         book: currentBook,
                         width: geometry.size.width - 32,
                         showDetailed: false,
-                        colorPalette: nil // EditBookSheet doesn't have color palette context
+                        colorPalette: nil, // EditBookSheet doesn't have color palette context
+                        showCompletionSheet: $showCompletionSheet
                     )
                 }
                 .frame(height: 60) // Set explicit height for GeometryReader
