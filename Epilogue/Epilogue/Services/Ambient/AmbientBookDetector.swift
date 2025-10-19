@@ -20,6 +20,10 @@ class AmbientBookDetector: ObservableObject {
     private var sessionBook: Book?
     private var sessionBookTimestamp: Date?
     private let sessionTimeout: TimeInterval = 600 // 10 minutes
+
+    // Lock flag - when true, prevents auto-switching to other books
+    // Set to true when user explicitly starts a session from a book
+    private var isSessionLocked: Bool = false
     
     // Detection patterns
     private let bookTriggerPhrases = [
@@ -70,8 +74,11 @@ class AmbientBookDetector: ObservableObject {
     func resetDetection() {
         detectedBook = nil
         confidence = 0.0
+        sessionBook = nil
+        sessionBookTimestamp = nil
+        isSessionLocked = false
         #if DEBUG
-        print("📚 Book detection reset")
+        print("📚 Book detection reset and unlocked")
         #endif
     }
     
@@ -205,31 +212,62 @@ class AmbientBookDetector: ObservableObject {
             #endif
         }
 
-        // NEW: If no book title mentioned, use session context or currently reading book
+        // CRITICAL: If session is locked (user started from a specific book),
+        // ONLY switch if a DIFFERENT book is explicitly mentioned
+        if isSessionLocked {
+            #if DEBUG
+            print("🔒 Session is locked to: \(sessionBook?.title ?? "none")")
+            #endif
+
+            // Check if a different book is explicitly mentioned
+            let differentBookMentioned = libraryBooks.contains { book in
+                book.localId != sessionBook?.localId &&
+                lowercased.contains(book.title.lowercased())
+            }
+
+            if !differentBookMentioned {
+                #if DEBUG
+                print("🔒 No different book mentioned - keeping locked book")
+                #endif
+                return  // Keep current locked book
+            }
+
+            #if DEBUG
+            print("🔓 Different book explicitly mentioned - allowing switch")
+            #endif
+            // If we get here, user mentioned a different book - allow detection to continue
+        }
+
+        // Check if any book is mentioned in the text
         let hasBookMention = libraryBooks.contains { lowercased.contains($0.title.lowercased()) }
 
         if !hasBookMention {
-            // Check session book first (within 10 min timeout)
+            // CRITICAL FIX: If we have a session book, keep using it (don't auto-switch)
+            // This prevents the detector from changing books mid-conversation
             if let session = sessionBook,
                let timestamp = sessionBookTimestamp,
                Date().timeIntervalSince(timestamp) < sessionTimeout {
                 #if DEBUG
-                print("📚 Using session book (last detected): \(session.title)")
+                print("📚 Keeping session book (no new book mentioned): \(session.title)")
                 #endif
-                setDetectedBook(session, confidence: 0.7)
+                // Don't call setDetectedBook - just return to keep current context
                 return
             }
 
-            // Fall back to currently reading book
+            // ONLY fall back to currently reading if NO session book is set
+            // This only happens on first question with no book context
             if let currentlyReading = libraryBooks.first(where: { $0.readingStatus == .currentlyReading }) {
                 #if DEBUG
-                print("📚 Using currently reading book: \(currentlyReading.title)")
+                print("📚 No session book - using currently reading book: \(currentlyReading.title)")
                 #endif
                 setDetectedBook(currentlyReading, confidence: 0.6)
-                sessionBook = currentlyReading  // Set as session context
+                sessionBook = currentlyReading
                 sessionBookTimestamp = Date()
                 return
             }
+
+            // If still no book found, don't change anything
+            return
         }
 
         for book in libraryBooks {
@@ -327,16 +365,31 @@ class AmbientBookDetector: ObservableObject {
     }
     
     // Public method to manually set the book context
+    // Called when user explicitly starts a session from a book
     func setCurrentBook(_ book: Book) {
         // Set synchronously for immediate use
         self.detectedBook = book
         self.confidence = 1.0
+        self.sessionBook = book
+        self.sessionBookTimestamp = Date()
+
+        // LOCK the session to this book to prevent auto-switching
+        self.isSessionLocked = true
+
         #if DEBUG
-        print("📖 Book context set immediately: \(book.title)")
+        print("📖 Book context set and LOCKED: \(book.title)")
         #endif
-        
+
         // Also trigger the async update for UI
         setDetectedBook(book, confidence: 1.0)
+    }
+
+    // Unlock session (called when user manually clears book or ends session)
+    func unlockSession() {
+        isSessionLocked = false
+        #if DEBUG
+        print("🔓 Session unlocked - auto-detection enabled")
+        #endif
     }
     
     private func setDetectedBook(_ book: Book, confidence: Double) {

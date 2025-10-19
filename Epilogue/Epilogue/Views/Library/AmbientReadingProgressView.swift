@@ -205,6 +205,7 @@ struct AmbientReadingProgressView: View {
             }
             .overlay {
                 // Celebration pulse rings - as overlay so they don't affect layout
+                // Clean expanding rings with subtle organic wobble via Metal shader
                 ForEach(celebrationPulses) { pulse in
                     ZStack {
                         // Soft outer glow
@@ -223,6 +224,7 @@ struct AmbientReadingProgressView: View {
                             )
                             .frame(width: 120 * pulse.scale, height: 120 * pulse.scale)
                             .blur(radius: 16)
+                            .modifier(WaterWobbleModifier(wobblePhase: pulse.scale * 10.0))
 
                         // Sharp inner ring
                         Circle()
@@ -240,6 +242,7 @@ struct AmbientReadingProgressView: View {
                             )
                             .frame(width: 120 * pulse.scale, height: 120 * pulse.scale)
                             .blur(radius: 2)
+                            .modifier(WaterWobbleModifier(wobblePhase: pulse.scale * 12.0))
                     }
                     .allowsHitTesting(false)
                 }
@@ -602,7 +605,7 @@ private struct ProgressDot {
     let size: CGFloat
 }
 
-private struct CelebrationPulse: Identifiable {
+struct CelebrationPulse: Identifiable {
     let id: UUID
     var scale: CGFloat = 1.0
     var opacity: Double = 1.0
