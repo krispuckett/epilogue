@@ -44,37 +44,67 @@ class SimplifiedStoreKitManager: ObservableObject {
         isLoading = true
         purchaseError = nil
 
-        do {
-            let products = try await Product.products(for: [monthlyID, annualID])
+        // Retry logic for App Review - products may not be immediately available
+        var retryCount = 0
+        let maxRetries = 3
 
-            for product in products {
-                switch product.id {
-                case monthlyID:
-                    monthlyProduct = product
-                case annualID:
-                    annualProduct = product
-                default:
-                    break
+        while retryCount < maxRetries {
+            do {
+                let products = try await Product.products(for: [monthlyID, annualID])
+
+                for product in products {
+                    switch product.id {
+                    case monthlyID:
+                        monthlyProduct = product
+                    case annualID:
+                        annualProduct = product
+                    default:
+                        break
+                    }
+                }
+
+                // If we got at least one product, success!
+                if monthlyProduct != nil || annualProduct != nil {
+                    #if DEBUG
+                    print("✅ Loaded products: monthly=\(monthlyProduct != nil), annual=\(annualProduct != nil)")
+                    #endif
+                    isLoading = false
+                    return
+                }
+
+                // No products loaded - retry
+                #if DEBUG
+                print("⚠️ No products loaded (attempt \(retryCount + 1)/\(maxRetries))")
+                #endif
+
+                retryCount += 1
+                if retryCount < maxRetries {
+                    // Wait 2 seconds before retry
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+
+            } catch {
+                #if DEBUG
+                print("❌ Failed to load products (attempt \(retryCount + 1)/\(maxRetries)): \(error)")
+                #endif
+
+                retryCount += 1
+                if retryCount < maxRetries {
+                    // Wait 2 seconds before retry
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
                 }
             }
-
-            // Validate that we loaded at least one product
-            if monthlyProduct == nil && annualProduct == nil {
-                purchaseError = "No subscriptions available. Please check your connection and try again."
-                #if DEBUG
-                print("⚠️ No products loaded from App Store")
-                #endif
-            } else {
-                #if DEBUG
-                print("✅ Loaded products: monthly=\(monthlyProduct != nil), annual=\(annualProduct != nil)")
-                #endif
-            }
-        } catch {
-            #if DEBUG
-            print("❌ Failed to load products: \(error)")
-            #endif
-            purchaseError = "Unable to load subscriptions. Please check your connection and try again."
         }
+
+        // If we get here, all retries failed
+        // Don't show error - just log it and allow app to function without subscriptions
+        #if DEBUG
+        print("⚠️ Unable to load subscription products after \(maxRetries) attempts")
+        print("⚠️ App will continue to function with free tier")
+        #endif
+
+        // Set error message but don't block the app
+        purchaseError = "Subscriptions temporarily unavailable. Try again later."
         isLoading = false
     }
 
