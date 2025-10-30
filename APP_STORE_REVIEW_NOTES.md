@@ -27,8 +27,8 @@ This update includes **519 commits** since the September 18th submission, focusi
 - **Annual subscription**: $67/year (30% savings)
 - **7-day free trial** for new users
 - **8 free conversations/month** for non-subscribers (up from 2)
-- **Privacy Policy**: https://krispuckett.craft.me/BcGmXbnrNCvSGp
-- **Terms of Service**: https://krispuckett.craft.me/clvC7VnuiypGo1
+- **Privacy Policy**: https://readepilogue.com/privacy
+- **Terms of Use**: https://readepilogue.com/terms
 
 **Premium Features**:
 - Unlimited AI conversations and book enrichment
@@ -341,8 +341,8 @@ Four premium themes:
 - **Developer**: Kris Puckett
 - **Email**: support@readepilogue.com
 - **Website**: https://readepilogue.com
-- **Privacy Policy**: https://krispuckett.craft.me/BcGmXbnrNCvSGp
-- **Terms of Service**: https://krispuckett.craft.me/clvC7VnuiypGo1
+- **Privacy Policy**: https://readepilogue.com/privacy
+- **Terms of Use**: https://readepilogue.com/terms
 
 ---
 

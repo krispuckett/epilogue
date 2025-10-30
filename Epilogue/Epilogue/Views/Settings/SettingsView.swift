@@ -44,6 +44,15 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            ZStack {
+                // Atmospheric gradient background
+                AmbientChatGradientView()
+                    .opacity(0.4)
+                    .ignoresSafeArea(.all)
+
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea(.all)
+
             Form {
                 // MARK: - Epilogue+ Upsell Card
                 if !SimplifiedStoreKitManager.shared.isPlus {
@@ -423,8 +432,18 @@ struct SettingsView: View {
                     Text(L10n.Settings.Section.about)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .onAppear {
+                // Style list row backgrounds with glass effect
+                UITableView.appearance().backgroundColor = .clear
+                UITableViewCell.appearance().backgroundColor = UIColor(white: 1, alpha: 0.05)
+            }
             .navigationTitle(L10n.Settings.title)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(L10n.Action.done) {
