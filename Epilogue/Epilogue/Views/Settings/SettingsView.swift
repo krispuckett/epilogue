@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("realTimeQuestions") private var realTimeQuestions = true
     @AppStorage("audioFeedback") private var audioFeedback = false
     @AppStorage("alwaysShowInput") private var alwaysShowInput = false
+    @AppStorage("experimentalCustomCamera") private var experimentalCustomCamera = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -244,7 +245,30 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundColor(.orange)
                         }
-                        
+
+                        // Experimental Custom Camera Toggle
+                        Toggle(isOn: $experimentalCustomCamera) {
+                            HStack {
+                                Image(systemName: "camera.fill")
+                                    .foregroundColor(.orange)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Custom Camera")
+                                    Text("Experimental AVFoundation camera for text capture")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .onChange(of: experimentalCustomCamera) { _, newValue in
+                            #if DEBUG
+                            print("🎥 [EXPERIMENT] Custom camera \(newValue ? "enabled" : "disabled")")
+                            #endif
+
+                            if newValue {
+                                SensoryFeedback.impact(.medium)
+                            }
+                        }
+
                         Button {
                             Task { @MainActor in
                                 // Safety check before migration
@@ -540,7 +564,7 @@ struct SettingsView: View {
             let author: String
             let currentPage: Int
             let readingStatus: String
-            let userRating: Int?
+            let userRating: Double?  // Supports half-star ratings
             let dateAdded: Date
         }
 

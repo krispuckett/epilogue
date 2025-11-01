@@ -119,7 +119,7 @@ struct GoodreadsImportView: View {
                                     
                                     // CRITICAL FIX: Preserve Goodreads data that might be lost in conversion
                                     if let goodreadsRating = Int(processedBook.goodreadsBook.myRating), goodreadsRating > 0 {
-                                        book.userRating = goodreadsRating
+                                        book.userRating = Double(goodreadsRating)  // Convert Int to Double
                                     }
                                     if !processedBook.goodreadsBook.privateNotes.isEmpty {
                                         book.userNotes = processedBook.goodreadsBook.privateNotes
@@ -1638,7 +1638,7 @@ struct ManualMatchView: View {
         
         // Apply Goodreads metadata
         if let rating = Int(unmatchedBook.goodreadsBook.myRating), rating > 0 {
-            bookModel.userRating = rating
+            bookModel.userRating = Double(rating)  // Convert Int to Double
         }
         
         if !unmatchedBook.goodreadsBook.privateNotes.isEmpty {

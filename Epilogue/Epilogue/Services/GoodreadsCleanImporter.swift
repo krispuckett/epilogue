@@ -107,7 +107,7 @@ class GoodreadsCleanImporter: ObservableObject {
                     enrichedBook.coverImageURL = resolved
                 }
                 
-                enrichedBook.userRating = csvBook.myRating > 0 ? csvBook.myRating : nil
+                enrichedBook.userRating = csvBook.myRating > 0 ? Double(csvBook.myRating) : nil  // Convert Int to Double
                 enrichedBook.userNotes = csvBook.privateNotes.isEmpty ? nil : csvBook.privateNotes
                 enrichedBook.readingStatus = csvBook.readingStatus
                 

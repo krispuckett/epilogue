@@ -184,7 +184,7 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
     var isInLibrary: Bool = false
     var readingStatus: ReadingStatus = .wantToRead
     var currentPage: Int = 0
-    var userRating: Int?
+    var userRating: Double?  // Supports half-star ratings (0.5 increments: 1.0, 1.5, 2.0, etc.)
     var userNotes: String?
     var dateAdded: Date = Date()
     
@@ -314,8 +314,13 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         
         currentPage = try container.decodeIfPresent(Int.self, forKey: .currentPage) ?? 0
         if GOOGLE_API_VERBOSE { print("  📍 Current Page: \(currentPage)") }
-        
-        userRating = try container.decodeIfPresent(Int.self, forKey: .userRating)
+
+        // Support both Int (legacy) and Double (half-star ratings) during migration
+        if let intRating = try? container.decodeIfPresent(Int.self, forKey: .userRating) {
+            userRating = Double(intRating)
+        } else {
+            userRating = try container.decodeIfPresent(Double.self, forKey: .userRating)
+        }
         if GOOGLE_API_VERBOSE { print("  ⭐ User Rating: \(userRating?.description ?? "nil")") }
         
         userNotes = try container.decodeIfPresent(String.self, forKey: .userNotes)

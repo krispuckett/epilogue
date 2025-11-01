@@ -261,7 +261,7 @@ final class DataMigrationService {
         // Map reading status
         newBook.readingStatus = mapReadingStatus(from: oldBook)
         newBook.currentPage = oldBook.currentPage ?? 0
-        newBook.userRating = oldBook.rating
+        newBook.userRating = oldBook.rating.map { Double($0) }  // Convert Int to Double
         newBook.userNotes = nil // Old model doesn't have this
         newBook.dateAdded = oldBook.dateAdded
         newBook.isInLibrary = true // All old books are in library

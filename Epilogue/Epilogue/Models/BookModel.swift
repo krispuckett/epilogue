@@ -40,7 +40,7 @@ final class BookModel {
     var isInLibrary: Bool = false  // Default for CloudKit
     var readingStatus: String = ReadingStatus.wantToRead.rawValue // Store as string for SwiftData
     var currentPage: Int = 0  // Default for CloudKit
-    var userRating: Int?
+    var userRating: Double?  // Supports half-star ratings (0.5 increments: 1.0, 1.5, 2.0, etc.)
     var userNotes: String?
     var dateAdded: Date = Date()  // Default for CloudKit
     

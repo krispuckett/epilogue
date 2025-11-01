@@ -6,11 +6,13 @@ struct BookCompletionSheet: View {
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     
     // State for the form
-    @State private var rating: Int = 0
+    @State private var rating: Double = 0.0  // Supports half-star ratings (0.5 increments)
     @State private var reviewText: String = ""
     @State private var selectedTags: Set<String> = []
     @State private var isFavorite: Bool = false
     @State private var animateStars = false
+    @State private var isDragging = false
+    @State private var lastHapticRating: Double = 0.0
     @FocusState private var isReviewFocused: Bool
     
     // Available emotional tags - curated selection
@@ -132,32 +134,156 @@ struct BookCompletionSheet: View {
             Text("How would you rate this book?")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white.opacity(0.9))
-            
-            HStack(spacing: 12) {
-                ForEach(1...5, id: \.self) { star in
-                    Button {
-                        withAnimation(DesignSystem.Animation.springStandard) {
-                            rating = star
-                            SensoryFeedback.light()
+
+            GeometryReader { geometry in
+                let totalWidth = geometry.size.width
+                let starWidth: CGFloat = 44
+                let spacing: CGFloat = 12
+                let totalStarsWidth = (starWidth * 5) + (spacing * 4)
+                let xOffset = (totalWidth - totalStarsWidth) / 2  // Center the stars
+
+                ZStack(alignment: .leading) {
+                    // Star icons - clean and precise
+                    HStack(spacing: spacing) {
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: starIcon(for: star))
+                                .font(.system(size: 36))
+                                .foregroundStyle(starColor(for: star))
+                                .frame(width: starWidth, height: starWidth)
+                                .scaleEffect(starScale(for: star))
+                                .animation(
+                                    isDragging ? .none : .spring(response: 0.3, dampingFraction: 0.7),
+                                    value: rating
+                                )
                         }
-                    } label: {
-                        Image(systemName: star <= rating ? "star.fill" : "star")
-                            .font(.system(size: 36))
-                            .foregroundStyle(
-                                star <= rating ? 
-                                DesignSystem.Colors.primaryAccent : 
-                                DesignSystem.Colors.textQuaternary
-                            )
-                            .scaleEffect(animateStars && star <= rating ? 1.0 : 0.8)
-                            .animation(
-                                .spring(response: 0.4, dampingFraction: 0.6)
-                                .delay(Double(star) * 0.05),
-                                value: rating
-                            )
                     }
+                    .offset(x: xOffset)
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            if !isDragging {
+                                isDragging = true
+                            }
+
+                            let newRating = calculateRatingFromDrag(
+                                xPosition: value.location.x,
+                                containerWidth: totalWidth,
+                                starWidth: starWidth,
+                                spacing: spacing
+                            )
+
+                            if newRating != rating {
+                                rating = newRating
+
+                                // Refined haptic: only on half-star boundaries
+                                if newRating != lastHapticRating {
+                                    SensoryFeedback.selection()
+                                    lastHapticRating = newRating
+                                }
+                            }
+                        }
+                        .onEnded { _ in
+                            isDragging = false
+                            SensoryFeedback.light()  // Final confirmation
+                        }
+                )
+            }
+            .frame(height: 44)
+            .padding(.vertical, 8)
+        }
+    }
+
+    // MARK: - Star Visual Helpers
+
+    private func starScale(for star: Int) -> CGFloat {
+        let starValue = Double(star)
+
+        // Initial appearance animation
+        if !animateStars {
+            return 0.8
+        }
+
+        // During drag: no scaling variance
+        if isDragging {
+            return 1.0
+        }
+
+        // At rest: subtle scale for filled stars
+        if rating >= starValue - 0.5 {
+            return 1.0
+        } else {
+            return 0.95
+        }
+    }
+
+    // MARK: - Rating Calculation
+
+    private func calculateRatingFromDrag(xPosition: CGFloat, containerWidth: CGFloat, starWidth: CGFloat, spacing: CGFloat) -> Double {
+        let totalStarsWidth = (starWidth * 5) + (spacing * 4)
+        let xOffset = (containerWidth - totalStarsWidth) / 2
+
+        // Adjust position relative to first star
+        let relativeX = xPosition - xOffset
+
+        // Below minimum: no rating
+        if relativeX <= 0 { return 0.0 }
+
+        // Above maximum: 5 stars
+        if relativeX >= totalStarsWidth { return 5.0 }
+
+        // Calculate which star we're in
+        for starIndex in 0..<5 {
+            let starStart = CGFloat(starIndex) * (starWidth + spacing)
+            let starEnd = starStart + starWidth
+
+            // Check if we're within this star's bounds
+            if relativeX >= starStart && relativeX < starEnd {
+                let positionInStar = relativeX - starStart
+                let halfWidth = starWidth / 2
+                let baseRating = Double(starIndex + 1)
+
+                // Left half = X.5, Right half = X.0
+                if positionInStar < halfWidth {
+                    return baseRating - 0.5
+                } else {
+                    return baseRating
                 }
             }
-            .padding(.vertical, 8)
+
+            // If we're in the spacing after this star (before next star)
+            if relativeX >= starEnd && starIndex < 4 {
+                let nextStarStart = CGFloat(starIndex + 1) * (starWidth + spacing)
+                if relativeX < nextStarStart {
+                    // In the gap: use the full rating of the star we just left
+                    return Double(starIndex + 1)
+                }
+            }
+        }
+
+        return 5.0
+    }
+
+    // MARK: - Star Helper Methods
+
+    private func starIcon(for star: Int) -> String {
+        let starValue = Double(star)
+        if rating >= starValue {
+            return "star.fill"
+        } else if rating >= starValue - 0.5 {
+            return "star.leadinghalf.filled"
+        } else {
+            return "star"
+        }
+    }
+
+    private func starColor(for star: Int) -> Color {
+        let starValue = Double(star)
+        if rating >= starValue - 0.5 {
+            return DesignSystem.Colors.primaryAccent
+        } else {
+            return DesignSystem.Colors.textQuaternary
         }
     }
     

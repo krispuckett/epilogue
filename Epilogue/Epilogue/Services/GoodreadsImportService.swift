@@ -1425,7 +1425,7 @@ class GoodreadsImportService: ObservableObject {
         
         // Parse Goodreads-specific data
         if let rating = Int(goodreadsBook.myRating), rating > 0 {
-            book.userRating = rating
+            book.userRating = Double(rating)  // Convert Int to Double
         }
         
         // Notes: prefer Private Notes, otherwise use My Review; if both exist, merge

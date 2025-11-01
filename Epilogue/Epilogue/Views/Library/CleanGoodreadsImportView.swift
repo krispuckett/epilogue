@@ -325,10 +325,8 @@ struct CleanGoodreadsImportView: View {
                                     
                                     if let rating = book.userRating, rating > 0 {
                                         HStack(spacing: 2) {
-                                            ForEach(0..<rating, id: \.self) { _ in
-                                                Image(systemName: "star.fill")
-                                                    .font(.system(size: 8))
-                                                    .foregroundStyle(.yellow)
+                                            ForEach(Array(1...5), id: \.self) { star in
+                                                starIcon(for: star, rating: rating)
                                             }
                                         }
                                         .padding(.top, 8)
@@ -530,6 +528,26 @@ struct CleanGoodreadsImportView: View {
             #endif
         }
     }
+
+    // MARK: - Rating Helper
+
+    /// Returns the appropriate star icon for displaying half-star ratings
+    private func starIcon(for star: Int, rating: Double) -> some View {
+        let starValue = Double(star)
+        let icon: String
+
+        if rating >= starValue {
+            icon = "star.fill"
+        } else if rating >= starValue - 0.5 {
+            icon = "star.leadinghalf.filled"
+        } else {
+            icon = "star"
+        }
+
+        return Image(systemName: icon)
+            .font(.system(size: 8))
+            .foregroundStyle(rating >= starValue - 0.5 ? .yellow : .gray.opacity(0.3))
+    }
 }
 
 // MARK: - Import Book Cover View
@@ -599,4 +617,5 @@ struct ImportBookCoverView: View {
             }
         }
     }
+
 }

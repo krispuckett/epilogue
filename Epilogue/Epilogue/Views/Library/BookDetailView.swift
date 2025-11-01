@@ -775,8 +775,8 @@ struct BookDetailView: View {
             
             // Rating only (status pill moved to toolbar)
             if let rating = book.userRating {
-                StatusPill(text: "★ \(rating)", color: accentColor, interactive: false)
-                    .accessibilityLabel("Rating: \(rating) stars")
+                StatusPill(text: "★ \(formatRating(rating))", color: accentColor, interactive: false)
+                    .accessibilityLabel("Rating: \(formatRating(rating)) stars")
                     .padding(.top, 8)
                     .blur(radius: metadataBlur)
                     .opacity(metadataOpacity)
@@ -1465,9 +1465,9 @@ struct BookDetailView: View {
             if let rating = book.userRating {
                 HStack(spacing: 4) {
                     ForEach(1...5, id: \.self) { star in
-                    Image(systemName: star <= rating ? "star.fill" : "star")
-                        .font(.system(size: 20))
-                        .foregroundStyle(accentColor)
+                        Image(systemName: starIconForRating(star: star, rating: rating))
+                            .font(.system(size: 20))
+                            .foregroundStyle(accentColor)
                     }
                 }
                 .padding(.bottom, 8)
@@ -1604,7 +1604,32 @@ struct BookDetailView: View {
         .padding(DesignSystem.Spacing.listItemPadding)
         .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
-    
+
+    // MARK: - Rating Helper Methods
+
+    /// Format rating for display (removes unnecessary decimals for whole numbers)
+    private func formatRating(_ rating: Double) -> String {
+        if rating.truncatingRemainder(dividingBy: 1) == 0 {
+            // Whole number: show as "5" not "5.0"
+            return String(format: "%.0f", rating)
+        } else {
+            // Half star: show as "4.5"
+            return String(format: "%.1f", rating)
+        }
+    }
+
+    /// Determine which star icon to show based on rating
+    private func starIconForRating(star: Int, rating: Double) -> String {
+        let starValue = Double(star)
+        if rating >= starValue {
+            return "star.fill"
+        } else if rating >= starValue - 0.5 {
+            return "star.leadinghalf.filled"
+        } else {
+            return "star"
+        }
+    }
+
     // MARK: - Always Available Sections
     
     @ViewBuilder
