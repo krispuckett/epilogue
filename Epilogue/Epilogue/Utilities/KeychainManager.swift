@@ -105,6 +105,20 @@ class KeychainManager {
 // MARK: - API Key Storage Extension
 
 extension KeychainManager {
+    enum APIKeyType {
+        case perplexity
+        case readwise
+        
+        var identifier: String {
+            switch self {
+            case .perplexity:
+                return "perplexity_api_key"
+            case .readwise:
+                return "readwise_api_key"
+            }
+        }
+    }
+    
     private static let perplexityAPIKeyIdentifier = "perplexity_api_key"
     
     func savePerplexityAPIKey(_ apiKey: String) throws {
@@ -171,5 +185,23 @@ extension KeychainManager {
         #if DEBUG
         print("✅ Legacy API key storage check complete")
         #endif
+    }
+    
+    // MARK: - Generic API Key Management
+    
+    func setAPIKey(_ apiKey: String, for keyType: APIKeyType) {
+        try? save(key: keyType.identifier, value: apiKey)
+    }
+    
+    func getAPIKey(for keyType: APIKeyType) -> String? {
+        try? retrieve(key: keyType.identifier)
+    }
+    
+    func removeAPIKey(for keyType: APIKeyType) {
+        try? delete(key: keyType.identifier)
+    }
+    
+    func hasAPIKey(for keyType: APIKeyType) -> Bool {
+        exists(key: keyType.identifier)
     }
 }

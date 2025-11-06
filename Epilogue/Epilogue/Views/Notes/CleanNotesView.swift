@@ -40,25 +40,45 @@ struct CleanNotesView: View {
     // Toast notification state
     @State private var toastMessage = ""
     @State private var showingToast = false
-    
+
+    // Export state
+    enum ExportContent: Identifiable {
+        case singleNote(CapturedNote)
+        case singleQuote(CapturedQuote)
+        case batch(notes: [CapturedNote], quotes: [CapturedQuote])
+
+        var id: String {
+            switch self {
+            case .singleNote(let note): return note.id?.uuidString ?? UUID().uuidString
+            case .singleQuote(let quote): return quote.id?.uuidString ?? UUID().uuidString
+            case .batch: return "batch_\(UUID().uuidString)"
+            }
+        }
+    }
+
+    @State private var exportContent: ExportContent?
+
     enum FilterType: String, CaseIterable {
         case all = "All"
+        case favorites = "Favorites"
         case notes = "Notes"
         case quotes = "Quotes"
         case byBook = "By Book"
-        
+
         var icon: String {
             switch self {
             case .all: return "square.grid.2x2"
+            case .favorites: return "star.fill"
             case .notes: return "note.text"
             case .quotes: return "quote.opening"
             case .byBook: return "books.vertical"
             }
         }
-        
+
         var description: String {
             switch self {
             case .all: return "All Items"
+            case .favorites: return "Favorites"
             case .notes: return "Notes Only"
             case .quotes: return "Quotes Only"
             case .byBook: return "Group by Book"
@@ -87,9 +107,19 @@ struct CleanNotesView: View {
     // Filtered items with search and filter
     private var filteredItems: [(date: Date, note: Note?, quote: CapturedQuote?)] {
         var items = allItems
-        
+
         // Apply type filter
         switch selectedFilter {
+        case .favorites:
+            items = items.filter { item in
+                if let note = item.note {
+                    // Find the captured note and check if it's favorited
+                    return capturedNotes.first(where: { $0.id == note.id })?.isFavorite == true
+                } else if let quote = item.quote {
+                    return quote.isFavorite == true
+                }
+                return false
+            }
         case .notes:
             items = items.filter { $0.note != nil }
         case .quotes:
@@ -447,8 +477,15 @@ struct CleanNotesView: View {
                                 )
                             }
 
-                            // Delete selected button (only show when items are selected)
+                            // Actions for selected items (only show when items are selected)
                             if isSelectionMode && !selectedItems.isEmpty {
+                                Button {
+                                    exportSelectedItems()
+                                } label: {
+                                    Label("Export \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")",
+                                          systemImage: "doc.text")
+                                }
+
                                 Button(role: .destructive) {
                                     deleteSelectedItems()
                                 } label: {
@@ -514,6 +551,16 @@ struct CleanNotesView: View {
                 author: data.author,
                 bookTitle: data.bookTitle
             )
+        }
+        .sheet(item: $exportContent) { content in
+            switch content {
+            case .singleNote(let note):
+                MarkdownExportSheet(note: note, quote: nil, notes: [], quotes: [])
+            case .singleQuote(let quote):
+                MarkdownExportSheet(note: nil, quote: quote, notes: [], quotes: [])
+            case .batch(let notes, let quotes):
+                MarkdownExportSheet(note: nil, quote: nil, notes: notes, quotes: quotes)
+            }
         }
     }
 
@@ -651,15 +698,44 @@ struct CleanNotesView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    
+
+                    Divider()
+
                     Button {
                         shareNote(note)
                     } label: {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
-                    
+
                     Divider()
-                    
+
+                    Button {
+                        if let captured = capturedNote {
+                            toggleNoteFavorite(captured)
+                        }
+                    } label: {
+                        Label(
+                            capturedNote?.isFavorite == true ? "Remove from Favorites" : "Add to Favorites",
+                            systemImage: capturedNote?.isFavorite == true ? "star.slash.fill" : "star.fill"
+                        )
+                    }
+
+                    Divider()
+
+                    Button {
+                        if let captured = capturedNote {
+                            print("📤 Exporting single note: \(captured.content?.prefix(50) ?? "")")
+                            exportContent = .singleNote(captured)
+                            print("📤 Export content set")
+                        } else {
+                            print("❌ No captured note found!")
+                        }
+                    } label: {
+                        Label("Export Notes", systemImage: "doc.text")
+                    }
+
+                    Divider()
+
                     Button(role: .destructive) {
                         if let captured = capturedNote {
                             deleteNote(captured)
@@ -761,15 +837,38 @@ struct CleanNotesView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    
+
+                    Divider()
+
                     Button {
                         shareQuote(quote)
                     } label: {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
-                    
+
                     Divider()
-                    
+
+                    Button {
+                        toggleQuoteFavorite(quote)
+                    } label: {
+                        Label(
+                            quote.isFavorite == true ? "Remove from Favorites" : "Add to Favorites",
+                            systemImage: quote.isFavorite == true ? "star.slash.fill" : "star.fill"
+                        )
+                    }
+
+                    Divider()
+
+                    Button {
+                        print("📤 Exporting single quote: \(quote.text?.prefix(50) ?? "")")
+                        exportContent = .singleQuote(quote)
+                        print("📤 Export content set")
+                    } label: {
+                        Label("Export Notes", systemImage: "doc.text")
+                    }
+
+                    Divider()
+
                     Button(role: .destructive) {
                         deleteQuote(quote)
                     } label: {
@@ -993,6 +1092,24 @@ struct CleanNotesView: View {
         SensoryFeedback.success()
     }
     
+    private func exportSelectedItems() {
+        var selectedNotes: [CapturedNote] = []
+        var selectedQuotes: [CapturedQuote] = []
+
+        for id in selectedItems {
+            if let note = capturedNotes.first(where: { $0.id == id }) {
+                selectedNotes.append(note)
+            } else if let quote = capturedQuotes.first(where: { $0.id == id }) {
+                selectedQuotes.append(quote)
+            }
+        }
+
+        print("📤 Exporting batch: \(selectedNotes.count) notes, \(selectedQuotes.count) quotes")
+        exportContent = .batch(notes: selectedNotes, quotes: selectedQuotes)
+
+        SensoryFeedback.success()
+    }
+
     private func deleteSelectedItems() {
         for id in selectedItems {
             if let note = capturedNotes.first(where: { $0.id == id }) {
@@ -1098,8 +1215,26 @@ struct CleanNotesView: View {
         */
     }
     
+    // MARK: - Favorite Actions
+
+    private func toggleNoteFavorite(_ note: CapturedNote) {
+        withAnimation(DesignSystem.Animation.springStandard) {
+            note.isFavorite = !(note.isFavorite ?? false)
+        }
+        try? modelContext.save()
+        SensoryFeedback.success()
+    }
+
+    private func toggleQuoteFavorite(_ quote: CapturedQuote) {
+        withAnimation(DesignSystem.Animation.springStandard) {
+            quote.isFavorite = !(quote.isFavorite ?? false)
+        }
+        try? modelContext.save()
+        SensoryFeedback.success()
+    }
+
     // MARK: - Note/Quote Creation
-    
+
     private func createNote(content: String, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
         // Find or create BookModel if we have book context
         var bookModel: BookModel? = nil
@@ -1455,7 +1590,18 @@ private struct NoteCardView: View {
                     lineWidth: 0.5
                 )
         )
+        .overlay(alignment: .leading) {
+            // Golden favorite indicator on left edge
+            if capturedNote?.isFavorite == true {
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                    .fill(Color.yellow.opacity(0.6))
+                    .frame(width: 2)
+                    .padding(.vertical, 1)
+                    .padding(.leading, 1)
+            }
+        }
         .animation(DesignSystem.Animation.springStandard, value: showDate)
+        .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
         .onTapGesture {
             withAnimation(DesignSystem.Animation.springStandard) {
                 showDate.toggle()

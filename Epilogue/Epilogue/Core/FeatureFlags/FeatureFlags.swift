@@ -39,6 +39,7 @@ enum FeatureFlag: String, CaseIterable {
     case advancedBookSearch = "feature.library.advanced_search"
     case batchBookImport = "feature.library.batch_import"
     case bookCollections = "feature.library.collections"
+    case readwiseIntegration = "feature.library.readwise_integration"
 
     // Performance Features
     case aggressiveCaching = "feature.performance.aggressive_caching"
@@ -48,6 +49,7 @@ enum FeatureFlag: String, CaseIterable {
     // Experimental Features
     case experimentalGestures = "feature.experimental.gestures"
     case experimentalAnimations = "feature.experimental.animations"
+    case experimentalCustomCamera = "feature.experimental.custom_camera"
     case debugMode = "feature.experimental.debug_mode"
 
     var defaultValue: Bool {
@@ -62,11 +64,13 @@ enum FeatureFlag: String, CaseIterable {
         case .advancedBookSearch: return true
         case .batchBookImport: return true
         case .bookCollections: return false
+        case .readwiseIntegration: return false
         case .aggressiveCaching: return true
         case .imagePreloading: return true
         case .backgroundSync: return false
         case .experimentalGestures: return false
         case .experimentalAnimations: return false
+        case .experimentalCustomCamera: return false
         case .debugMode: return false
         }
     }
@@ -83,11 +87,13 @@ enum FeatureFlag: String, CaseIterable {
         case .advancedBookSearch: return "Advanced Book Search"
         case .batchBookImport: return "Batch Book Import"
         case .bookCollections: return "Book Collections"
+        case .readwiseIntegration: return "Readwise Integration"
         case .aggressiveCaching: return "Aggressive Caching"
         case .imagePreloading: return "Image Preloading"
         case .backgroundSync: return "Background Sync"
         case .experimentalGestures: return "Experimental Gestures"
         case .experimentalAnimations: return "Experimental Animations"
+        case .experimentalCustomCamera: return "Custom Camera (Text Capture)"
         case .debugMode: return "Debug Mode"
         }
     }
@@ -330,6 +336,10 @@ final class FeatureFlags {
         #else
         return isEnabled(.debugMode)
         #endif
+    }
+
+    var isCustomCameraEnabled: Bool {
+        isEnabled(.experimentalCustomCamera)
     }
 }
 

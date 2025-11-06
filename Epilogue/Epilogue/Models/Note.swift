@@ -12,7 +12,8 @@ final class CapturedNote {
     var bookLocalId: String?
     var source: String? = CaptureSource.manual.rawValue  // Store as String for CloudKit
     var tags: [String]? = []
-    
+    var isFavorite: Bool? = false
+
     // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
@@ -56,7 +57,10 @@ final class CapturedQuote {
     var bookLocalId: String?
     var source: String? = CaptureSource.manual.rawValue  // Store as String for CloudKit
     var notes: String? // User's notes about the quote
-    
+    var isFavorite: Bool? = false
+    var exportedToReadwise: Bool = false  // Track if synced to Readwise
+    var additionalNotes: String? // Additional notes for the quote
+
     // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
@@ -87,6 +91,8 @@ final class CapturedQuote {
         self.timestamp = timestamp
         self.source = source.rawValue  // Store as String
         self.notes = notes
+        self.exportedToReadwise = false
+        self.additionalNotes = nil
     }
 }
 

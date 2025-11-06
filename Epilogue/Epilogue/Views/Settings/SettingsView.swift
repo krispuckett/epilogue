@@ -1,8 +1,6 @@
 import SwiftUI
 import AVKit
 import SwiftData
-
-// Import models and utilities
 import Foundation
 
 struct SettingsView: View {
@@ -96,6 +94,28 @@ struct SettingsView: View {
                     .accessibilityLabel("Import from Goodreads")
                     .accessibilityHint("Double tap to import your books from Goodreads")
                     .accessibilityIdentifier("settings.goodreadsImport")
+                    
+                    FeatureFlagView(.readwiseIntegration) {
+                        NavigationLink {
+                            ReadwiseSyncView()
+                        } label: {
+                            HStack {
+                                Label("Sync with Readwise", systemImage: "arrow.triangle.2.circlepath")
+                                    .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                                
+                                Spacer()
+                                
+                                if ReadwiseService.shared.isAuthenticated {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                        }
+                        .accessibilityLabel("Sync with Readwise")
+                        .accessibilityHint("Double tap to sync your highlights with Readwise")
+                        .accessibilityIdentifier("settings.readwiseSync")
+                    }
                 } header: {
                     Text(L10n.Settings.Section.library)
                 }

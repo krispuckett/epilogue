@@ -249,7 +249,10 @@ class GoodreadsImportService: ObservableObject {
     private var startTime: Date?
     private var processedCount = 0
     private var averageProcessingTime: TimeInterval = 0
-    
+
+    // OPTIMIZATION: Track large imports to enable light mode (reduces API calls)
+    private var isLargeImport = false
+
     // Caching
     private var isbnCache: [String: GoogleBookItem] = [:]
     private var titleAuthorCache: [String: GoogleBookItem] = [:]
@@ -302,7 +305,10 @@ class GoodreadsImportService: ObservableObject {
             // Parse CSV
             let goodreadsBooks = try await parseCSV(from: url)
             let totalBooks = goodreadsBooks.count
-            
+
+            // OPTIMIZATION: Enable light mode for large imports to reduce API calls
+            isLargeImport = totalBooks > 200
+
             // Optimize for large libraries
             let optimizedSpeed = totalBooks > 500 ? .fast : speed
             let totalBatches = (totalBooks + optimizedSpeed.batchSize - 1) / optimizedSpeed.batchSize
@@ -1076,17 +1082,33 @@ class GoodreadsImportService: ObservableObject {
                 publishedYear: String(goodreadsBook.yearPublished),
                 preferredPublisher: goodreadsBook.publisher
             ) {
-                // Color gate: if initial pick is grayscale, try alternates via ranked search
+                // Color gate: if initial pick is grayscale, try to find a better COVER (not a different book)
                 let book: Book
                 if await isBookCoverGrayscale(initialBook) {
                     coverStats.grayscaleGoogleSkipped += 1
+                    #if DEBUG
+                    print("🎨 ISBN-matched book has grayscale cover, searching for better cover for SAME book...")
+                    #endif
+
                     let alternates = await enhancedService.searchBooksWithRanking(
                         query: "\(goodreadsBook.title) by \(goodreadsBook.author)",
                         preferISBN: isbn
                     )
-                    if let nonGray = await pickBestNonGrayscale(from: alternates) {
+
+                    // CRITICAL: Only use alternates that pass strict isSameBook() validation
+                    if let validatedAlternate = await pickBestNonGrayscaleValidated(
+                        from: alternates,
+                        goodreadsBook: goodreadsBook,
+                        maxCheck: 5
+                    ) {
+                        // Keep the ISBN-matched book, but use the better cover URL
+                        var bookWithBetterCover = initialBook
+                        bookWithBetterCover.coverImageURL = validatedAlternate.coverImageURL
                         coverStats.selectedGoogleColorful += 1
-                        book = nonGray
+                        book = bookWithBetterCover
+                        #if DEBUG
+                        print("✅ Found validated alternate with better cover for same book")
+                        #endif
                     } else {
                         // Try Open Library cover fallback before giving up
                         if let fallbackURL = await BookCoverFallbackService.shared.getFallbackCoverURL(for: initialBook) {
@@ -1094,8 +1116,14 @@ class GoodreadsImportService: ObservableObject {
                             patched.coverImageURL = fallbackURL
                             coverStats.openLibraryFallback += 1
                             book = patched
+                            #if DEBUG
+                            print("✅ Using Open Library fallback cover")
+                            #endif
                         } else {
                             book = initialBook
+                            #if DEBUG
+                            print("⚠️ No validated alternate or fallback found, keeping original grayscale cover")
+                            #endif
                         }
                     }
                 } else {
@@ -1149,19 +1177,62 @@ class GoodreadsImportService: ObservableObject {
         let searchQuery = "\(goodreadsBook.title) by \(goodreadsBook.author)"
         #if DEBUG
         print("🔍 Searching Google Books for: \(searchQuery)")
+        if isLargeImport {
+            print("   (Light mode enabled for large import)")
+        }
         #endif
-        let results = await enhancedService.searchBooksWithRanking(query: searchQuery, preferISBN: nil, publisherHint: goodreadsBook.publisher)
+        let results = await enhancedService.searchBooksWithRanking(
+            query: searchQuery,
+            preferISBN: nil,
+            publisherHint: goodreadsBook.publisher,
+            lightMode: isLargeImport  // Enable light mode for imports >200 books
+        )
         #if DEBUG
         print("   Found \(results.count) results")
         #endif
-        
-        // Pick the first non-grayscale cover among top results
-        if let book = await pickBestNonGrayscale(from: results) ?? results.first {
+
+        // CRITICAL FIX: Validate ALL results FIRST, then pick best cover from validated ones
+        // This prevents selecting wrong books just because they have colorful covers
+
+        // Step 1: Filter to only validated books
+        var validatedBooks: [Book] = []
+        for book in results {
+            let bookItem = GoogleBookItem(
+                id: book.id,
+                volumeInfo: VolumeInfo(
+                    title: book.title,
+                    authors: book.authors,
+                    publishedDate: book.publishedYear,
+                    description: book.description,
+                    pageCount: book.pageCount,
+                    imageLinks: book.coverImageURL != nil ? ImageLinks(
+                        thumbnail: book.coverImageURL,
+                        small: nil,
+                        medium: nil,
+                        large: nil,
+                        extraLarge: nil
+                    ) : nil,
+                    industryIdentifiers: book.isbn.flatMap { isbn in [IndustryIdentifier(type: "ISBN", identifier: isbn)] }
+                )
+            )
+
+            if isGoodMatch(googleBook: bookItem, goodreadsBook: goodreadsBook) {
+                validatedBooks.append(book)
+            }
+        }
+
+        #if DEBUG
+        print("   ✅ Validated \(validatedBooks.count) of \(results.count) results")
+        #endif
+
+        // Step 2: Pick the best cover from VALIDATED books only
+        if let book = await pickBestNonGrayscale(from: validatedBooks) ?? validatedBooks.first {
             if await isBookCoverGrayscale(book) {
-                // If first is grayscale but pickBestNonGrayscale returned nil, count skip implicitly later
+                // Validated but grayscale
             } else {
                 coverStats.selectedGoogleColorful += 1
             }
+
             // Convert Book to GoogleBookItem
             let bookItem = GoogleBookItem(
                 id: book.id,
@@ -1181,59 +1252,25 @@ class GoodreadsImportService: ObservableObject {
                     industryIdentifiers: book.isbn.flatMap { isbn in [IndustryIdentifier(type: "ISBN", identifier: isbn)] }
                 )
             )
-            
-            // Verify it's a good match
-            if isGoodMatch(googleBook: bookItem, goodreadsBook: goodreadsBook) {
-                titleAuthorCache[searchKey] = bookItem
-                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
-                return ProcessedBook(
-                    goodreadsBook: goodreadsBook,
-                    bookModel: bookModel,
-                    matchMethod: .titleAuthor
-                )
-            }
+
+            // Book is already validated, cache and return
+            titleAuthorCache[searchKey] = bookItem
+            let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
+            return ProcessedBook(
+                goodreadsBook: goodreadsBook,
+                bookModel: bookModel,
+                matchMethod: .titleAuthor
+            )
         }
-        
-        // As a last resort, try Open Library for a cover if we have at least a basic Book
-        if let isbn = goodreadsBook.primaryISBN {
-            // Use minimal book stub for fallback cover
-            let stub = Book(id: UUID().uuidString,
-                            title: goodreadsBook.title,
-                            author: goodreadsBook.author,
-                            publishedYear: goodreadsBook.yearPublished.isEmpty ? nil : goodreadsBook.yearPublished,
-                            coverImageURL: nil,
-                            isbn: isbn,
-                            description: nil,
-                            pageCount: nil)
-            if let fallbackURL = await BookCoverFallbackService.shared.getFallbackCoverURL(for: stub) {
-                coverStats.openLibraryFallback += 1
-                let bookItem = GoogleBookItem(
-                    id: stub.id,
-                    volumeInfo: VolumeInfo(
-                        title: stub.title,
-                        authors: [stub.author],
-                        publishedDate: stub.publishedYear,
-                        description: nil,
-                        pageCount: nil,
-                        imageLinks: ImageLinks(
-                            thumbnail: fallbackURL,
-                            small: nil,
-                            medium: nil,
-                            large: nil,
-                            extraLarge: nil
-                        ),
-                        industryIdentifiers: [IndustryIdentifier(type: "ISBN", identifier: isbn)]
-                    )
-                )
-                let bookModel = await createBookModel(from: bookItem, goodreadsBook: goodreadsBook)
-                return ProcessedBook(
-                    goodreadsBook: goodreadsBook,
-                    bookModel: bookModel,
-                    matchMethod: .titleAuthor
-                )
-            }
-        }
-        
+
+        #if DEBUG
+        print("   ❌ No validated matches found for: \(goodreadsBook.title)")
+        #endif
+
+        // CRITICAL FIX: Removed Open Library fallback that created unvalidated stub books
+        // Books that can't be validated will go to needsMatching[] for manual review
+        // This prevents importing wrong books that Google Books couldn't validate
+
         return nil
     }
 
@@ -1265,19 +1302,229 @@ class GoodreadsImportService: ObservableObject {
         }
         return nil
     }
+
+    /// Pick the best non-grayscale book that also passes strict isSameBook() validation
+    /// This prevents replacing an ISBN-matched book with a different book just because it has a better cover
+    private func pickBestNonGrayscaleValidated(
+        from books: [Book],
+        goodreadsBook: GoodreadsBook,
+        maxCheck: Int = 5
+    ) async -> Book? {
+        for (idx, candidate) in books.prefix(maxCheck).enumerated() {
+            // Must have a cover URL
+            guard let coverURL = candidate.coverImageURL, !coverURL.isEmpty else {
+                #if DEBUG
+                print("   ⚠️ Candidate #\(idx + 1) has no cover URL, skipping")
+                #endif
+                continue
+            }
+
+            // Must pass strict isSameBook() validation
+            guard isSameBook(candidate: candidate, goodreadsBook: goodreadsBook) else {
+                #if DEBUG
+                print("   ❌ Candidate #\(idx + 1) failed isSameBook() validation")
+                #endif
+                continue
+            }
+
+            // Check if cover is non-grayscale
+            if let image = await SharedBookCoverManager.shared.loadThumbnail(from: coverURL) {
+                if !ImageQualityEvaluator.isLikelyGrayscale(image) {
+                    #if DEBUG
+                    print("   ✅ Candidate #\(idx + 1) passed validation AND has colorful cover")
+                    #endif
+                    return candidate
+                } else {
+                    #if DEBUG
+                    print("   ⚠️ Candidate #\(idx + 1) passed validation but cover is grayscale, trying next")
+                    #endif
+                }
+            }
+        }
+
+        #if DEBUG
+        print("   ❌ No validated non-grayscale alternates found in top \(maxCheck) results")
+        #endif
+        return nil
+    }
     
     private func isGoodMatch(googleBook: GoogleBookItem, goodreadsBook: GoodreadsBook) -> Bool {
         let titleSimilarity = calculateSimilarity(
             googleBook.volumeInfo.title.lowercased(),
             goodreadsBook.title.lowercased()
         )
-        
-        let authorMatch = googleBook.volumeInfo.authors?.contains { author in
-            author.lowercased().contains(goodreadsBook.author.lowercased()) ||
-            goodreadsBook.author.lowercased().contains(author.lowercased())
+
+        // CRITICAL FIX: Tightened author matching to prevent false matches
+        // Old logic: loose .contains() could match "King" to "Stephen King" AND "Larry King"
+        // New logic: exact match, last name match, or word-boundary match only
+        let authorMatch = googleBook.volumeInfo.authors?.contains { googleAuthor in
+            let googleLower = googleAuthor.lowercased()
+            let goodreadsLower = goodreadsBook.author.lowercased()
+
+            // Exact match
+            if googleLower == goodreadsLower { return true }
+
+            // Last name match (handles "Stephen King" vs "King, Stephen")
+            let googleLastName = googleLower.split(separator: " ").last.map(String.init) ?? ""
+            let goodreadsLastName = goodreadsLower.split(separator: " ").last.map(String.init) ?? ""
+            if !googleLastName.isEmpty && googleLastName == goodreadsLastName {
+                // Also check first initial if available to avoid "Stephen King" matching "Larry King"
+                let googleFirstInitial = googleLower.first
+                let goodreadsFirstInitial = goodreadsLower.first
+                if let gf = googleFirstInitial, let gr = goodreadsFirstInitial, gf == gr {
+                    return true
+                }
+                // If no first initial check possible but last names match, still accept
+                if googleLastName.count > 4 { // Only for non-common last names
+                    return true
+                }
+            }
+
+            // One fully contains the other at word boundaries
+            // "J.R.R. Tolkien" contains "Tolkien" ✓
+            // "Stephen King" contains "King" only if >4 chars ✓
+            if googleLower.contains(" \(goodreadsLower)") || googleLower.contains("\(goodreadsLower) ") ||
+               goodreadsLower.contains(" \(googleLower)") || goodreadsLower.contains("\(googleLower) ") {
+                return true
+            }
+
+            return false
         } ?? false
-        
-        return titleSimilarity > 0.8 && authorMatch
+
+        // CRITICAL FIX: Raised from 0.8 to 0.95 to prevent wrong book matches
+        // 95% allows minor differences (punctuation, subtitles) but blocks wrong books
+        guard titleSimilarity > 0.95 else {
+            #if DEBUG
+            print("   ❌ isGoodMatch: Title similarity too low: \(String(format: "%.1f%%", titleSimilarity * 100))")
+            print("      Google: \(googleBook.volumeInfo.title)")
+            print("      Goodreads: \(goodreadsBook.title)")
+            #endif
+            return false
+        }
+
+        guard authorMatch else {
+            #if DEBUG
+            print("   ❌ isGoodMatch: Author mismatch")
+            #endif
+            return false
+        }
+
+        // NEW: If Goodreads has ISBN, verify it matches Google result
+        if let goodreadsISBN = goodreadsBook.primaryISBN,
+           !goodreadsISBN.isEmpty {
+            // Check if Google book has ISBN
+            if let googleISBNs = googleBook.volumeInfo.industryIdentifiers {
+                let googleISBN = googleISBNs.first(where: {
+                    $0.type.contains("ISBN")
+                })?.identifier
+
+                if let googleISBN = googleISBN {
+                    // Clean both ISBNs for comparison
+                    let cleanGoodreads = cleanISBNForComparison(goodreadsISBN)
+                    let cleanGoogle = cleanISBNForComparison(googleISBN)
+
+                    // ISBNs must match (allow for ISBN-10 vs ISBN-13 variants)
+                    if cleanGoodreads != cleanGoogle &&
+                       !areISBNVariants(cleanGoodreads, cleanGoogle) {
+                        #if DEBUG
+                        print("   ❌ isGoodMatch: ISBN mismatch")
+                        print("      Goodreads ISBN: \(cleanGoodreads)")
+                        print("      Google ISBN: \(cleanGoogle)")
+                        #endif
+                        return false
+                    }
+                }
+            }
+        }
+
+        #if DEBUG
+        print("   ✅ isGoodMatch: Validated (title: \(String(format: "%.1f%%", titleSimilarity * 100)))")
+        #endif
+
+        return true
+    }
+
+    // Helper to clean ISBN for comparison
+    private func cleanISBNForComparison(_ isbn: String) -> String {
+        isbn.replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "=", with: "")
+            .replacingOccurrences(of: "\"", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // Check if two ISBNs are variants (ISBN-10 vs ISBN-13)
+    private func areISBNVariants(_ isbn1: String, _ isbn2: String) -> Bool {
+        // ISBN-13 is ISBN-10 with 978 prefix
+        if isbn1.count == 13 && isbn2.count == 10 {
+            return isbn1.hasPrefix("978") && isbn1.hasSuffix(isbn2.suffix(9))
+        }
+        if isbn2.count == 13 && isbn1.count == 10 {
+            return isbn2.hasPrefix("978") && isbn2.hasSuffix(isbn1.suffix(9))
+        }
+        return false
+    }
+
+    /// Strict validation to ensure two books are actually the same book (not just similar)
+    /// Used when replacing an ISBN-matched book with an alternate to verify accuracy
+    private func isSameBook(candidate: Book, goodreadsBook: GoodreadsBook) -> Bool {
+        // 1. Title must be 95%+ similar (very high threshold)
+        let titleSimilarity = calculateSimilarity(
+            candidate.title.lowercased(),
+            goodreadsBook.title.lowercased()
+        )
+
+        guard titleSimilarity >= 0.95 else {
+            #if DEBUG
+            print("   ❌ isSameBook: Title similarity too low: \(String(format: "%.1f%%", titleSimilarity * 100))")
+            print("      Candidate: \(candidate.title)")
+            print("      Goodreads: \(goodreadsBook.title)")
+            #endif
+            return false
+        }
+
+        // 2. Author must match exactly (one of the authors must contain or be contained by Goodreads author)
+        let authorMatch = candidate.authors.contains { author in
+            let authorLower = author.lowercased()
+            let goodreadsAuthorLower = goodreadsBook.author.lowercased()
+            return authorLower.contains(goodreadsAuthorLower) || goodreadsAuthorLower.contains(authorLower)
+        }
+
+        guard authorMatch else {
+            #if DEBUG
+            print("   ❌ isSameBook: Author mismatch")
+            print("      Candidate: \(candidate.authors.joined(separator: ", "))")
+            print("      Goodreads: \(goodreadsBook.author)")
+            #endif
+            return false
+        }
+
+        // 3. Publisher matching skipped - Book type doesn't have publisher field
+        // (Google Books API doesn't always provide publisher data)
+
+        // 4. If we have page count, it should be within 10% (different editions may vary slightly)
+        if let candidatePages = candidate.pageCount,
+           candidatePages > 0,
+           let goodreadsPages = Int(goodreadsBook.numberOfPages),
+           goodreadsPages > 0 {
+            let pageRatio = Double(candidatePages) / Double(goodreadsPages)
+            if pageRatio < 0.9 || pageRatio > 1.1 {
+                #if DEBUG
+                print("   ❌ isSameBook: Page count difference too large")
+                print("      Candidate: \(candidatePages) pages")
+                print("      Goodreads: \(goodreadsPages) pages")
+                print("      Ratio: \(String(format: "%.1f%%", pageRatio * 100))")
+                #endif
+                return false
+            }
+        }
+
+        #if DEBUG
+        print("   ✅ isSameBook: Validated as same book")
+        print("      Title match: \(String(format: "%.1f%%", titleSimilarity * 100))")
+        #endif
+
+        return true
     }
     
     private func calculateSimilarity(_ str1: String, _ str2: String) -> Double {
@@ -2176,7 +2423,7 @@ class GoodreadsImportService: ObservableObject {
 
 // MARK: - Array Extension
 
-extension Array {
+private extension Array {
     func chunked(into size: Int) -> [[Element]] {
         guard size > 0 else { return [] }
         return stride(from: 0, to: count, by: size).map { startIndex in
