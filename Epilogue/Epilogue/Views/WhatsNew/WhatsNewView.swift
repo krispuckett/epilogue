@@ -92,7 +92,7 @@ struct WhatsNewView: View {
                 Spacer()
             }
 
-            Text("New Quick Reading Session - start reading without ambient intelligence, track progress, all with a single tap.")
+            Text("Export your notes and quotes as beautiful markdown - compatible with Notion, Obsidian, and more. Powered by intelligent title generation.")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.95))
                 .multilineTextAlignment(.leading)
@@ -120,30 +120,30 @@ struct WhatsNewView: View {
             VStack(spacing: 1) {
                 FeatureRow(
                     number: 1,
-                    title: "AI with Memory",
-                    description: "Ambient mode can now answer questions about past discussions, find mentions of characters, and search your saved quotes. Powered by iOS 26 tool calling.",
-                    detail: "Ask 'What did I say about Gandalf?' or 'Show my quotes about power'"
+                    title: "Markdown Export",
+                    description: "Export notes and quotes as beautiful markdown with intelligent titles. Choose from Standard, Obsidian, or Notion formats. Customize what metadata to include.",
+                    detail: "Long-press any note or quote and select 'Export Notes'"
                 )
 
                 FeatureRow(
                     number: 2,
-                    title: "Better Book Context",
-                    description: "Books get AI-generated summaries that capture their essence without spoilers. Automatically enriched when you view them.",
-                    detail: "Works for fiction and non-fiction"
+                    title: "Half-Star Ratings",
+                    description: "Rate books with precision using half-star increments. Drag to set your exact rating, from 0.5 to 5 stars.",
+                    detail: "Swipe down to reveal rating on book cards"
                 )
 
                 FeatureRow(
                     number: 3,
-                    title: "Personal Recommendations",
-                    description: "After 5 books, get recommendations based on your library's themes and authors. Analyzed privately on-device.",
-                    detail: "Available in Search"
+                    title: "Better Goodreads Import",
+                    description: "Improved book matching and edition selection. Smarter ranking prevents popular wrong books from outranking correct obscure ones.",
+                    detail: "Import in Settings > Library"
                 )
 
                 FeatureRow(
                     number: 4,
-                    title: "Smarter Ambient Mode",
-                    description: "Detects when you're refining questions, prevents duplicates, and classifies captures automatically.",
-                    detail: "Understands corrections and context"
+                    title: "Favorites System",
+                    description: "Mark your most meaningful quotes and notes as favorites with a golden indicator. Filter to see only your favorites.",
+                    detail: "Add via context menu"
                 )
             }
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
@@ -160,11 +160,11 @@ struct WhatsNewView: View {
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
 
             VStack(spacing: 12) {
-                ImprovementItem(text: "Offline cover caching")
-                ImprovementItem(text: "Question queue with retry logic")
-                ImprovementItem(text: "Reading sessions persist your progress")
-                ImprovementItem(text: "Context-aware AI responses")
-                ImprovementItem(text: "Better edition selection from Google Books")
+                ImprovementItem(text: "Intelligent title generation using NaturalLanguage")
+                ImprovementItem(text: "Batch export with chronological sorting")
+                ImprovementItem(text: "Reduced Goodreads import popularity bias")
+                ImprovementItem(text: "Session summaries with water ripple animations")
+                ImprovementItem(text: "Book completion celebrations")
             }
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }

@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var showingExportSuccess = false
     @State private var showingCacheClearedToast = false
     @State private var toastMessage = ""
+    @State private var showingWhatsNew = false
 
     // Batch enrichment state
     @State private var isEnriching = false
@@ -331,6 +332,14 @@ struct SettingsView: View {
                                 .foregroundStyle(.yellow)
                         }
 
+                        Button {
+                            showingWhatsNew = true
+                            SensoryFeedback.light()
+                        } label: {
+                            Label("Preview What's New", systemImage: "sparkles")
+                                .foregroundStyle(.cyan)
+                        }
+
                         Toggle(isOn: Binding(
                             get: { UserDefaults.standard.bool(forKey: "devShowConversationCounter") },
                             set: { UserDefaults.standard.set($0, forKey: "devShowConversationCounter") }
@@ -509,6 +518,9 @@ struct SettingsView: View {
                 Text("alert.export_complete.message".localized())
             }
             .modifier(GlassToastModifier(isShowing: $showingCacheClearedToast, message: toastMessage))
+            .sheet(isPresented: $showingWhatsNew) {
+                WhatsNewView()
+            }
         }
     }
 
