@@ -67,6 +67,11 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var pendingTranscription: String = ""
     private var thoughtTimer: Timer?
     private var audioSession: AVAudioSession?
+
+    // ADAPTIVE TIMER: Learn user's speaking patterns
+    private var userPauseHistory: [TimeInterval] = [] // Track typical pause lengths
+    private var recentConfidenceScores: [Double] = [] // Track confidence trends
+    private var lastVADSignal: Bool = false // Track if VAD detecting activity
     
     // Voice Activity Detection
     private var silenceTimer: Timer?
@@ -507,10 +512,13 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 
                 // Always append to recognition request (Apple needs continuous audio)
                 self.recognitionRequest?.append(buffer)
-                
+
                 // Voice Activity Detection
                 let hasVoice = self.detectVoiceActivity(from: buffer)
-                
+
+                // Track VAD signal for adaptive timer
+                self.lastVADSignal = hasVoice
+
                 if hasVoice {
                     self.handleVoiceDetected()
                 } else {
@@ -849,17 +857,32 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                     }
                 } else {
                     // For incomplete sentences, wait for silence
-                    // Start or restart thought timer (1.5 seconds of silence = complete thought)
-                    // Reduced to 1.5 seconds for more responsive processing
+                    // Use ADAPTIVE TIMER that learns from user's speaking patterns
+                    // This accommodates slow/thoughtful speakers while staying responsive for fast speakers
                     thoughtTimer?.invalidate()
-                    thoughtTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { _ in
+
+                    // Track confidence scores for trend analysis
+                    recentConfidenceScores.append(Double(self.confidenceScore))
+                    if recentConfidenceScores.count > 10 {
+                        recentConfidenceScores.removeFirst()
+                    }
+
+                    // Calculate adaptive duration based on multiple factors
+                    let adaptiveDuration = calculateAdaptiveTimerDuration()
+                    let pauseStartTime = Date()
+
+                    thoughtTimer = Timer.scheduledTimer(withTimeInterval: adaptiveDuration, repeats: false) { _ in
+                        // Track how long user actually paused (for pattern learning)
+                        let actualPauseDuration = Date().timeIntervalSince(pauseStartTime)
+                        self.trackUserPause(duration: actualPauseDuration)
+
                         // User has been silent - process the complete thought
                         if !self.pendingTranscription.isEmpty {
                             let completeThought = self.pendingTranscription
                             self.pendingTranscription = ""
-                            
+
                             Task {
-                                logger.info("💭 Processing complete thought after silence: \(completeThought)")
+                                logger.info("💭 Processing complete thought after \(String(format: "%.1f", actualPauseDuration))s silence: \(completeThought)")
                                 await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
                             }
                         }
@@ -1280,43 +1303,38 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     
     private func detectBookFromSpeech(_ text: String) {
         let lowercased = text.lowercased()
-        
-        // Natural patterns people use
+
+        // ONLY detect explicit book-switching intent, NOT general questions
+        // Removed generic patterns like "reading ", "in ", "from " that trigger on everything
+        // This was causing "Who is Gandalf?" to auto-switch from Odyssey to Lord of the Rings
         let patterns = [
             "i'm reading ",
             "i am reading ",
-            "reading ",
-            "in the book ",
-            "from ",
-            "in ",
-            "the book ",
-            "this book ",
-            "my current book ",
             "currently reading ",
             "just finished reading ",
-            "started reading "
+            "started reading ",
+            "switch to ",
+            "change to "
         ]
-        
-        // Check for book mentions
+
+        // Check for book mentions with explicit intent
         for pattern in patterns {
             if let range = lowercased.range(of: pattern) {
                 let afterPattern = String(text[range.upperBound...])
-                
+
                 // Try to match against library books
                 if let matchedBook = fuzzyMatchBook(afterPattern) {
                     // Update coordinator
                     SimplifiedAmbientCoordinator.shared.setBookContext(matchedBook)
-                    logger.info("Book detected from speech: \(matchedBook.title)")
+                    logger.info("📖 Book detected from explicit intent '\(pattern)': \(matchedBook.title)")
                     return
                 }
             }
         }
-        
-        // Also check for direct title mentions
-        if let matchedBook = fuzzyMatchBookTitle(in: text) {
-            SimplifiedAmbientCoordinator.shared.setBookContext(matchedBook)
-            logger.info("Book title detected: \(matchedBook.title)")
-        }
+
+        // REMOVED: Fuzzy title matching on every input
+        // This was causing character names and topics to switch books inappropriately
+        // Users should explicitly say "switch to [book]" or "I'm reading [book]" to change context
     }
     
     private func fuzzyMatchBook(_ text: String) -> Book? {
@@ -1427,9 +1445,75 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = 0.5
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        
+
         let synthesizer = AVSpeechSynthesizer()
         synthesizer.speak(utterance)
+    }
+
+    /// Calculates optimal pause duration based on user's speaking patterns and current context
+    /// This makes the system work for slow/thoughtful speakers while staying responsive
+    private func calculateAdaptiveTimerDuration() -> TimeInterval {
+        // Base duration: 2.0 seconds (our new baseline)
+        var duration: TimeInterval = 2.0
+
+        // FACTOR 1: User's historical pause patterns
+        // If user typically pauses 3-4 seconds between thoughts, adapt to that
+        if userPauseHistory.count >= 3 {
+            let averagePause = userPauseHistory.reduce(0, +) / Double(userPauseHistory.count)
+            let maxRecentPause = userPauseHistory.suffix(5).max() ?? 2.0
+
+            // Use the larger of average or recent max, but cap at 4 seconds
+            duration = max(duration, min(averagePause, 4.0))
+            duration = max(duration, min(maxRecentPause, 4.0))
+
+            logger.debug("📊 Adaptive timer: User avg pause = \(String(format: "%.1f", averagePause))s, using \(String(format: "%.1f", duration))s")
+        }
+
+        // FACTOR 2: Confidence score trends
+        // If confidence is dropping, user might be mid-word - extend timer
+        if recentConfidenceScores.count >= 3 {
+            let recentScores = Array(recentConfidenceScores.suffix(3))
+            let isDecreasing = recentScores[2] < recentScores[1] && recentScores[1] < recentScores[0]
+
+            if isDecreasing {
+                duration += 0.5 // Add 500ms if confidence dropping (speech likely continuing)
+                logger.debug("📉 Confidence dropping, extending timer to \(String(format: "%.1f", duration))s")
+            }
+        }
+
+        // FACTOR 3: Voice Activity Detection
+        // If VAD still detecting potential speech, extend timer
+        if lastVADSignal {
+            duration += 0.5 // Add 500ms if voice activity detected
+            logger.debug("🎤 VAD signal active, extending timer to \(String(format: "%.1f", duration))s")
+        }
+
+        // FACTOR 4: Question detection
+        // If current text looks like start of question, be more patient
+        let lowerText = pendingTranscription.lowercased()
+        let questionStarters = ["who", "what", "where", "when", "why", "how", "is", "are", "can", "could", "should", "would"]
+        let startsWithQuestion = questionStarters.contains(where: { lowerText.hasPrefix($0 + " ") })
+
+        if startsWithQuestion && lowerText.split(separator: " ").count < 3 {
+            // User just started a question with 1-2 words, give them more time
+            duration += 1.0
+            logger.debug("❓ Question detected with few words, extending timer to \(String(format: "%.1f", duration))s")
+        }
+
+        // Cap at 5 seconds max to avoid waiting forever
+        duration = min(duration, 5.0)
+
+        return duration
+    }
+
+    /// Track user's pause after completing a thought (for learning patterns)
+    private func trackUserPause(duration: TimeInterval) {
+        userPauseHistory.append(duration)
+
+        // Keep only last 20 pauses for rolling average
+        if userPauseHistory.count > 20 {
+            userPauseHistory.removeFirst()
+        }
     }
 }
 
@@ -1452,7 +1536,7 @@ extension VoiceRecognitionManager {
     private func setupSpeechAnalyzerIfAvailable() async {
         // Try to use iOS 26 SpeechAnalyzer if available
         // This would be the preferred approach once we find the correct import
-        
+
         // Example usage (when available):
         // let configuration = SpeechAnalyzer.Configuration(
         //     requiresOnDeviceRecognition: true

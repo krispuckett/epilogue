@@ -8,7 +8,7 @@ struct SimpleQuoteCard: View {
     @State private var isPressed = false
     @State private var showDate = false
     @State private var showingSessionSummary = false
-    
+
     // Convenience initializer for backward compatibility
     init(note: Note, capturedQuote: CapturedQuote? = nil) {
         self.note = note
@@ -150,7 +150,18 @@ struct SimpleQuoteCard: View {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                 .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
         )
+        .overlay(alignment: .leading) {
+            // Golden favorite indicator on left edge
+            if capturedQuote?.isFavorite == true {
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                    .fill(Color.yellow.opacity(0.6))
+                    .frame(width: 2)
+                    .padding(.vertical, 1)
+                    .padding(.leading, 1)
+            }
+        }
         .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(DesignSystem.Animation.springStandard, value: capturedQuote?.isFavorite)
         .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .animation(DesignSystem.Animation.springStandard, value: showDate)
         .onTapGesture {

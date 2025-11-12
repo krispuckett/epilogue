@@ -2,6 +2,7 @@ import SwiftUI
 import Vision
 import VisionKit
 import UIKit
+import AVFoundation
 
 // MARK: - Ambient Intelligence - Delegate Fix with iOS 26 Context Menu
 struct AmbientTextCapture: View {
@@ -19,6 +20,7 @@ struct AmbientTextCapture: View {
     @State private var isInitialized = false
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("experimentalCustomCamera") private var experimentalCustomCamera = false
 
     var body: some View {
         ZStack {
@@ -53,12 +55,23 @@ struct AmbientTextCapture: View {
             }
         }
         .sheet(isPresented: $showingCamera) {
-            CameraCapture { image in
-                if let image = image {
-                    capturedImage = image
-                    extractPageNumber(from: image)
+            // Feature flag: Use experimental custom camera or fallback to system camera
+            if experimentalCustomCamera {
+                SmoothCameraCapture { image in
+                    if let image = image {
+                        capturedImage = image
+                        extractPageNumber(from: image)
+                    }
+                    showingCamera = false
                 }
-                showingCamera = false
+            } else {
+                CameraCapture { image in
+                    if let image = image {
+                        capturedImage = image
+                        extractPageNumber(from: image)
+                    }
+                    showingCamera = false
+                }
             }
         }
         .task {
@@ -684,3 +697,331 @@ struct SensoryFeedbackHelper {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }
+
+// MARK: - Smooth Custom Camera (Experimental)
+// Replaces UIImagePickerController with custom AVFoundation camera for better UX
+
+struct SmoothCameraCapture: View {
+    let completion: (UIImage?) -> Void
+
+    @StateObject private var cameraManager = SharedCameraManager()
+    @Environment(\.dismiss) private var dismiss
+    @State private var showCaptureButton = false
+    @State private var isCapturing = false
+
+    var body: some View {
+        ZStack {
+            // Camera preview
+            if cameraManager.isSessionRunning {
+                CameraPreviewRepresentable(session: cameraManager.session)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            } else {
+                // Loading state
+                Color.black
+                    .ignoresSafeArea()
+                    .overlay {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+
+                            Text("Initializing camera...")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                    }
+            }
+
+            // Page frame guide overlay
+            PageFrameGuide()
+
+            // Controls
+            VStack {
+                // Top bar
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .glassEffect(in: .circle)
+                    }
+
+                    Spacer()
+
+                    // Debug indicator
+                    #if DEBUG
+                    Text("EXPERIMENTAL")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.orange.opacity(0.2))
+                        .clipShape(Capsule())
+                    #endif
+                }
+                .padding(.horizontal)
+                .padding(.top, 16)
+
+                Spacer()
+
+                // Instructions
+                if !isCapturing {
+                    Text("Position page within frame")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .glassEffect(in: .capsule)
+                        .opacity(showCaptureButton ? 1 : 0)
+                        .padding(.bottom, 20)
+                }
+
+                // Capture button
+                if !isCapturing {
+                    Button {
+                        capturePhoto()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .strokeBorder(.white.opacity(0.5), lineWidth: 4)
+                                .frame(width: 80, height: 80)
+
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 66, height: 66)
+                        }
+                    }
+                    .disabled(!cameraManager.isSessionRunning)
+                    .opacity(showCaptureButton && cameraManager.isSessionRunning ? 1 : 0.5)
+                    .scaleEffect(showCaptureButton ? 1 : 0.8)
+                    .padding(.bottom, 40)
+                } else {
+                    // Capturing state
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.3)
+
+                        Text("Capturing...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .padding(.bottom, 60)
+                }
+            }
+        }
+        .onAppear {
+            #if DEBUG
+            print("🎥 [EXPERIMENT] SmoothCameraCapture appeared")
+            #endif
+
+            cameraManager.startSession()
+
+            // Wait for camera to fully initialize before enabling capture
+            // This prevents AVFoundation exceptions from premature capture attempts
+            Task {
+                // Give the session time to stabilize
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+                // Double-check session is actually running
+                guard cameraManager.isSessionRunning else {
+                    #if DEBUG
+                    print("❌ [EXPERIMENT] Session failed to start")
+                    #endif
+                    return
+                }
+
+                // Fade in capture button
+                await MainActor.run {
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        showCaptureButton = true
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            #if DEBUG
+            print("🎥 [EXPERIMENT] SmoothCameraCapture disappeared")
+            #endif
+
+            cameraManager.stopSession()
+        }
+    }
+
+    private func capturePhoto() {
+        // Safety check - ensure session is running
+        guard cameraManager.isSessionRunning else {
+            #if DEBUG
+            print("❌ [EXPERIMENT] Capture blocked - session not running")
+            #endif
+            return
+        }
+
+        SensoryFeedbackHelper.impact(.medium)
+
+        // Visual feedback
+        withAnimation(.spring(response: 0.2)) {
+            showCaptureButton = false
+            isCapturing = true
+        }
+
+        #if DEBUG
+        print("🎥 [EXPERIMENT] User tapped capture button")
+        #endif
+
+        cameraManager.capturePhoto { image in
+            #if DEBUG
+            print("🎥 [EXPERIMENT] Photo capture completed: \(image != nil)")
+            #endif
+
+            // Small delay for smoother UX
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                completion(image)
+                dismiss()
+            }
+        }
+    }
+}
+
+// MARK: - Camera Preview Representable
+struct CameraPreviewRepresentable: UIViewRepresentable {
+    let session: AVCaptureSession
+
+    func makeUIView(context: Context) -> CameraPreviewUIView {
+        let view = CameraPreviewUIView()
+        view.session = session
+        return view
+    }
+
+    func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {}
+}
+
+// Custom UIView for camera preview to ensure proper layer handling
+class CameraPreviewUIView: UIView {
+    var session: AVCaptureSession? {
+        didSet {
+            if let session = session {
+                previewLayer.session = session
+            }
+        }
+    }
+
+    private lazy var previewLayer: AVCaptureVideoPreviewLayer = {
+        let layer = AVCaptureVideoPreviewLayer()
+        layer.videoGravity = .resizeAspectFill
+        return layer
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        layer.addSublayer(previewLayer)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        previewLayer.frame = bounds
+    }
+}
+
+// MARK: - Page Frame Guide
+struct PageFrameGuide: View {
+    @State private var pulseAnimation = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Darkened edges
+                Color.black.opacity(0.5)
+                    .reverseMask {
+                        RoundedRectangle(cornerRadius: 20)
+                            .frame(
+                                width: geometry.size.width * 0.85,
+                                height: geometry.size.height * 0.6
+                            )
+                    }
+
+                // Frame outline with subtle pulse
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(.white.opacity(0.8), lineWidth: 2)
+                    .frame(
+                        width: geometry.size.width * 0.85,
+                        height: geometry.size.height * 0.6
+                    )
+                    .scaleEffect(pulseAnimation ? 1.01 : 1.0)
+                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: pulseAnimation)
+
+                // Corner guides
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(.white, lineWidth: 3)
+                    .frame(
+                        width: geometry.size.width * 0.85,
+                        height: geometry.size.height * 0.6
+                    )
+                    .mask {
+                        CornerGuideMask()
+                    }
+            }
+        }
+        .allowsHitTesting(false)
+        .onAppear {
+            pulseAnimation = true
+        }
+    }
+}
+
+// Corner guide mask for professional look
+struct CornerGuideMask: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let cornerLength: CGFloat = 30
+
+            ZStack {
+                // Top-left
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: cornerLength))
+                    path.addLine(to: CGPoint(x: 0, y: 0))
+                    path.addLine(to: CGPoint(x: cornerLength, y: 0))
+                }
+                .stroke(lineWidth: 3)
+                .position(x: cornerLength / 2, y: cornerLength / 2)
+
+                // Top-right
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: 0))
+                    path.addLine(to: CGPoint(x: cornerLength, y: 0))
+                    path.addLine(to: CGPoint(x: cornerLength, y: cornerLength))
+                }
+                .stroke(lineWidth: 3)
+                .position(x: geometry.size.width - cornerLength / 2, y: cornerLength / 2)
+
+                // Bottom-left
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: 0))
+                    path.addLine(to: CGPoint(x: 0, y: cornerLength))
+                    path.addLine(to: CGPoint(x: cornerLength, y: cornerLength))
+                }
+                .stroke(lineWidth: 3)
+                .position(x: cornerLength / 2, y: geometry.size.height - cornerLength / 2)
+
+                // Bottom-right
+                Path { path in
+                    path.move(to: CGPoint(x: cornerLength, y: 0))
+                    path.addLine(to: CGPoint(x: cornerLength, y: cornerLength))
+                    path.addLine(to: CGPoint(x: 0, y: cornerLength))
+                }
+                .stroke(lineWidth: 3)
+                .position(x: geometry.size.width - cornerLength / 2, y: geometry.size.height - cornerLength / 2)
+            }
+        }
+    }
+}
+
+// Note: reverseMask extension already defined in BookScannerView.swift

@@ -12,7 +12,7 @@ struct WhatsNewView: View {
                 minimalGradientBackground
 
                 ScrollView {
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0, pinnedViews: []) {
                         // Header
                         headerSection
                             .padding(.top, 40)
@@ -29,16 +29,13 @@ struct WhatsNewView: View {
 
                         // Improvements
                         improvementsSection
-                            .padding(.bottom, 32)
-
-                        // Metrics
-                        metricsSection
-                            .padding(.bottom, 32)
+                            .padding(.bottom, 60)
 
                         Spacer(minLength: 60)
                     }
                 }
                 .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
             }
             .navigationTitle("What's New")
             .navigationBarTitleDisplayMode(.large)
@@ -111,7 +108,7 @@ struct WhatsNewView: View {
     // MARK: - New Capabilities Section
     private var newCapabilitiesSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("NEW CAPABILITIES")
+            Text("NEW")
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.2)
@@ -170,58 +167,6 @@ struct WhatsNewView: View {
         }
     }
 
-    // MARK: - Metrics Section
-    private var metricsSection: some View {
-        VStack(spacing: 24) {
-            HStack(spacing: 32) {
-                metricItem(value: "5", label: "AI\nTOOLS")
-                metricItem(value: "3", label: "INTELLIGENCE\nLAYERS")
-                metricItem(value: "100%", label: "OFFLINE\nSUPPORT")
-            }
-            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-
-            // Start Reading button - PROPER GLASS PATTERN
-            Button {
-                dismiss()
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
-                        .glassEffect(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(
-                                    Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3),
-                                    lineWidth: 1
-                                )
-                        }
-
-                    Text("Start Reading")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .frame(height: 52)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 60)
-        }
-    }
-
-    private func metricItem(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 24, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.95))
-
-            Text(label)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
-                .tracking(1.5)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity)
-    }
 }
 
 // MARK: - Feature Row

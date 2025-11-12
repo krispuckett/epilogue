@@ -59,6 +59,10 @@ struct ContentView: View {
                     showQuickActionCard = true
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenAmbientModeFromIntent"))) { notification in
+                // Handle Siri "Continue Reading" intent
+                handleAmbientModeIntent(notification)
+            }
             .sheet(isPresented: $whatsNewManager.shouldShow) {
                 whatsNewManager.markAsShown()
             } content: {
@@ -168,5 +172,26 @@ struct ContentView: View {
         @unknown default:
             break
         }
+    }
+
+    // MARK: - App Intents Handling
+    private func handleAmbientModeIntent(_ notification: Notification) {
+        logger.info("🎙️ Siri triggered: Continue Reading intent")
+
+        guard let bookId = notification.userInfo?["bookId"] as? String else {
+            logger.error("No book ID provided in intent notification")
+            return
+        }
+
+        // Find the book in the library
+        guard let book = libraryViewModel.books.first(where: { $0.id == bookId }) else {
+            logger.error("Could not find book with ID: \(bookId)")
+            return
+        }
+
+        logger.info("📚 Opening Ambient Mode with: \(book.title)")
+
+        // Launch ambient mode with the selected book
+        ambientCoordinator.launch(from: .general, book: book)
     }
 }

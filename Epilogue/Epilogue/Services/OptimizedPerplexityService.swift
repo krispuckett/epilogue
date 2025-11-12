@@ -583,13 +583,32 @@ class OptimizedPerplexityService: ObservableObject {
                 currentPage: currentPage
             )
         } ?? "Be concise and helpful."
-        
+
+        // CRITICAL FIX: Enhance query with book context so web search finds relevant results
+        // Without this, "Who is Gandalf?" searches general web and finds Star Wars/chefs
+        // With this, "Who is Gandalf in Lord of the Rings?" finds correct book-specific results
+        let enhancedQuery: String
+        if let book = bookContext {
+            // Only enhance if query doesn't already mention the book
+            let lowerQuery = query.lowercased()
+            let lowerTitle = book.title.lowercased()
+
+            if !lowerQuery.contains(lowerTitle) && !lowerQuery.contains(book.author.lowercased()) {
+                enhancedQuery = "\(query) in \(book.title) by \(book.author)"
+                logger.info("📚 Enhanced query for web search: '\(query)' → '\(enhancedQuery)'")
+            } else {
+                enhancedQuery = query
+            }
+        } else {
+            enhancedQuery = query
+        }
+
         // Back to sonar - it was working fine before
         let body: [String: Any] = [
             "model": "sonar",  // Always use sonar for proxy
             "messages": [
                 ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": query]
+                ["role": "user", "content": enhancedQuery]
             ],
             "stream": stream,
             "search_recency": "month",
@@ -797,12 +816,31 @@ class OptimizedPerplexityService: ObservableObject {
             context += "You can reference previous sessions naturally, e.g., 'Building on what we discussed before...'\n"
         }
 
-        // Add user's current page for context
+        // Add user's current page for context with STRICT spoiler protection
         if let currentPage = currentPage, let pageCount = book.pageCount, pageCount > 0 {
             let percentage = Int((Double(currentPage) / Double(pageCount)) * 100)
             context += "\n\n"
             context += "READING PROGRESS:\n"
             context += "The user is currently on page \(currentPage) of \(pageCount) (\(percentage)% through the book).\n"
+            context += """
+
+            CRITICAL SPOILER PREVENTION:
+            The user has ONLY read up to page \(currentPage). You MUST strictly follow these rules:
+
+            ✅ ALLOWED: Discuss events, characters, plot points, and revelations from pages 1-\(currentPage)
+            ❌ FORBIDDEN: Reveal, hint at, or reference ANY events, character developments, plot twists, or information that occurs AFTER page \(currentPage)
+
+            If a question asks about something that happens later in the book:
+            - Respond with: "That's discussed later in the book! I'll avoid spoiling it - ask me again when you've read further."
+            - Optionally add: "You might find the answer around page [X]" (where X > \(currentPage))
+            - NEVER reveal what actually happens
+
+            If uncertain whether something is a spoiler:
+            - Err on the side of caution
+            - Provide only information clearly established by page \(currentPage)
+            - Do not make forward-looking statements about character fates or plot developments
+
+            """
         }
 
         // Add user's notes - shows what they're thinking and noticing

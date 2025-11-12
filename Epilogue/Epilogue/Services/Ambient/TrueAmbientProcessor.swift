@@ -363,15 +363,19 @@ public class TrueAmbientProcessor: ObservableObject {
                     // This distinguishes "Who is home" from "Who is Homer"
                     let baseLastWord = baseWords.last?.lowercased() ?? ""
                     let newLastWord = newWords.last?.lowercased() ?? ""
-                    
-                    // Calculate Levenshtein distance for last words
-                    let lastWordSimilar = areWordsSimilar(baseLastWord, newLastWord)
-                    
+
+                    // Calculate similarity metrics for last words
+                    let lastWordDistance = baseLastWord.isEmpty || newLastWord.isEmpty ? 999 :
+                                          levenshteinDistance(baseLastWord, newLastWord)
+                    let maxLastWordLength = max(baseLastWord.count, newLastWord.count)
+                    let lastWordSimilarity = maxLastWordLength == 0 ? 0.0 :
+                                            1.0 - (Double(lastWordDistance) / Double(maxLastWordLength))
+
                     let similarity = Double(matchingWords.count) / Double(max(baseWords.count, newWords.count))
-                    
-                    // More strict evolution detection:
-                    // 1. Must have high overall similarity (70%+)
-                    // 2. Last words must be similar (not completely different)
+
+                    // STRICTER evolution detection to prevent false positives:
+                    // 1. Must have high overall similarity (75%+, increased from 70%)
+                    // 2. Last words must be VERY similar (80%+, not just "similar")
                     // 3. Must start with same question word
                     let sameQuestionStart = (evolving.base.hasPrefix("who is") && normalizedText.hasPrefix("who is")) ||
                                            (evolving.base.hasPrefix("what is") && normalizedText.hasPrefix("what is")) ||
@@ -379,8 +383,8 @@ public class TrueAmbientProcessor: ObservableObject {
                                            (evolving.base.hasPrefix("when is") && normalizedText.hasPrefix("when is")) ||
                                            (evolving.base.hasPrefix("why is") && normalizedText.hasPrefix("why is")) ||
                                            (evolving.base.hasPrefix("how is") && normalizedText.hasPrefix("how is"))
-                    
-                    if similarity > 0.7 && lastWordSimilar && sameQuestionStart {
+
+                    if similarity > 0.75 && lastWordSimilarity > 0.8 && sameQuestionStart {
 
                         // IMPORTANT: Only treat as evolution if the new text is MORE complete (longer)
                         // This prevents "Who is Bilbo Baggins?" from being replaced by "Who is Bilbo Ba?"
@@ -1819,7 +1823,90 @@ public class TrueAmbientProcessor: ObservableObject {
     private var currentBookContext: BookContext?
     
     // MARK: - Helper Methods
-    
+
+    /// Validates if a response actually relates to the specified book context
+    /// Returns relevance score (0.0 = completely off-topic, 1.0 = highly relevant)
+    private func validateResponseRelevance(_ response: String, bookContext: Book?, enrichment: (synopsis: String, characters: [String], themes: [String], setting: String)?) -> (isRelevant: Bool, score: Double, reason: String) {
+
+        guard let book = bookContext else {
+            // No book context, can't validate
+            return (true, 1.0, "No book context to validate against")
+        }
+
+        let lowerResponse = response.lowercased()
+        let bookTitle = book.title.lowercased()
+        let authorName = book.author.lowercased()
+
+        var relevanceScore: Double = 0.0
+        var reasons: [String] = []
+
+        // FACTOR 1: Does response mention the book title? (30 points)
+        if lowerResponse.contains(bookTitle) {
+            relevanceScore += 0.3
+            reasons.append("mentions book title")
+        }
+
+        // FACTOR 2: Does response mention the author? (20 points)
+        let authorLastName = authorName.split(separator: " ").last.map(String.init) ?? authorName
+        if lowerResponse.contains(authorName) || lowerResponse.contains(authorLastName) {
+            relevanceScore += 0.2
+            reasons.append("mentions author")
+        }
+
+        // FACTOR 3: Does response mention main characters from enrichment? (30 points)
+        if let enrichment = enrichment, !enrichment.characters.isEmpty {
+            let mentionedCharacters = enrichment.characters.filter { character in
+                lowerResponse.contains(character.lowercased())
+            }
+
+            if !mentionedCharacters.isEmpty {
+                // Score based on how many characters mentioned
+                let characterScore = min(Double(mentionedCharacters.count) / Double(enrichment.characters.count), 1.0) * 0.3
+                relevanceScore += characterScore
+                reasons.append("mentions \(mentionedCharacters.count) character(s)")
+            }
+        }
+
+        // FACTOR 4: Does response mention themes? (10 points)
+        if let enrichment = enrichment, !enrichment.themes.isEmpty {
+            let mentionedThemes = enrichment.themes.filter { theme in
+                lowerResponse.contains(theme.lowercased())
+            }
+
+            if !mentionedThemes.isEmpty {
+                relevanceScore += 0.1
+                reasons.append("mentions themes")
+            }
+        }
+
+        // FACTOR 5: Check for WRONG book/franchise mentions (major red flags)
+        let wrongContextIndicators = [
+            // Common book/franchise names that might appear
+            "star wars", "star trek", "harry potter", "game of thrones",
+            "marvel", "dc comics", "star trek", "doctor who",
+            // Generic non-book contexts
+            "chef", "restaurant", "cookbook", "cooking show", "food network",
+            "species", "biology", "zoology" // For "Gand species" type results
+        ]
+
+        let hasWrongContext = wrongContextIndicators.contains { indicator in
+            lowerResponse.contains(indicator)
+        }
+
+        if hasWrongContext {
+            relevanceScore -= 0.5 // Penalize heavily
+            reasons.append("⚠️ contains wrong context indicators")
+        }
+
+        // Threshold: 0.4+ is considered relevant
+        let isRelevant = relevanceScore >= 0.4 && !hasWrongContext
+
+        let reasonString = reasons.isEmpty ? "no specific markers found" : reasons.joined(separator: ", ")
+        logger.info("🔍 Response relevance for '\(book.title)': \(String(format: "%.2f", relevanceScore)) - \(reasonString)")
+
+        return (isRelevant, relevanceScore, reasonString)
+    }
+
     private func updateReadingContext(_ captures: [AmbientProcessedContent]) async {
         if let book = currentBook {
             await ReadingContextManager.shared.updateContext(from: captures, book: book)
@@ -2255,11 +2342,19 @@ extension TrueAmbientProcessor {
         logger.info("🚀 SMART ROUTING: Using IntelligentQueryRouter for optimal response")
         
         // Find the question index for updating - it should exist since we added it earlier
-        let questionIndexToUpdate = await MainActor.run {
-            self.detectedContent.firstIndex(where: { 
-                $0.type == .question && 
-                $0.text.lowercased() == question.lowercased() 
-            }) ?? 0
+        let questionIndex = await MainActor.run {
+            self.detectedContent.firstIndex(where: {
+                $0.type == .question &&
+                $0.text.lowercased() == question.lowercased()
+            })
+        }
+
+        // CRITICAL: If question not found, log error and bail out
+        // Don't default to 0 as that could update the wrong question
+        guard let questionIndex = questionIndex else {
+            logger.error("❌ CRITICAL: Question not found in detectedContent: '\(question)'")
+            logger.error("   This should not happen - question should have been added before fetching answer")
+            return
         }
         
         // Use simple router to decide which AI service to use
@@ -2324,22 +2419,20 @@ extension TrueAmbientProcessor {
                 currentPage: currentPage
             ) {
                 streamedResponse = chunk.text
-                
-                // Wait at least 2 seconds before showing first response (keep thinking animation)
-                let elapsed = Date().timeIntervalSince(startTime)
-                if elapsed < 2.0 {
-                    continue // Keep collecting but don't update UI yet
-                }
-                
+
+                // REMOVED: Artificial 2-second delay that made system feel sluggish
+                // Progressive loading and "thinking" indicator provide sufficient feedback
+                // Users expect instant responsiveness in voice mode
+
                 // Update UI at thresholds for smooth progressive loading
                 if thresholdIndex < updateThresholds.count && 
                    streamedResponse.count >= updateThresholds[thresholdIndex] {
                     
                     await MainActor.run {
-                        if questionIndexToUpdate < self.detectedContent.count && 
-                           self.detectedContent[questionIndexToUpdate].type == .question {
-                            let oldContent = self.detectedContent[questionIndexToUpdate]
-                            self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                        if questionIndex < self.detectedContent.count &&
+                           self.detectedContent[questionIndex].type == .question {
+                            let oldContent = self.detectedContent[questionIndex]
+                            self.detectedContent[questionIndex] = AmbientProcessedContent(
                                 text: oldContent.text,
                                 type: oldContent.type,
                                 timestamp: oldContent.timestamp,
@@ -2362,19 +2455,43 @@ extension TrueAmbientProcessor {
                     break
                 }
             }
-            
-            // Final update if we have more content (but respect 2-second minimum)
-            let finalElapsed = Date().timeIntervalSince(startTime)
-            if finalElapsed < 2.0 {
-                try? await Task.sleep(nanoseconds: UInt64((2.0 - finalElapsed) * 1_000_000_000))
+
+            // Final update if we have more content
+            // REMOVED: 2-second minimum delay - users expect instant responses
+
+            // CRITICAL: Validate response relevance to catch off-topic answers
+            // This prevents "Who is Gandalf?" from returning chef/Star Wars results
+            if !streamedResponse.isEmpty {
+                let validation = validateResponseRelevance(streamedResponse, bookContext: bookContext, enrichment: enrichment)
+
+                if !validation.isRelevant {
+                    logger.warning("⚠️ Response failed relevance check (score: \(String(format: "%.2f", validation.score)))")
+                    logger.warning("   Reason: \(validation.reason)")
+                    logger.warning("   Falling back to local AI for book-specific answer...")
+
+                    // Trigger SmartEpilogueAI fallback for book-specific answer
+                    if let book = bookContext {
+                        SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
+                        if let fallbackResponse = try? await SmartEpilogueAI.shared.smartQuery(question),
+                           !fallbackResponse.isEmpty {
+                            streamedResponse = fallbackResponse
+                            logger.info("✅ SmartEpilogueAI provided book-specific answer")
+                        } else {
+                            // If even local AI fails, add context note to web response
+                            streamedResponse = "Based on web search:\n\n\(streamedResponse)\n\n⚠️ Note: This answer may not be specifically about \"\(book.title)\". Ask me to clarify if needed."
+                        }
+                    }
+                } else {
+                    logger.info("✅ Response validated as relevant (score: \(String(format: "%.2f", validation.score)) - \(validation.reason))")
+                }
             }
-            
+
             if streamedResponse.count > lastUpdateLength {
                 await MainActor.run {
-                    if questionIndexToUpdate < self.detectedContent.count && 
-                       self.detectedContent[questionIndexToUpdate].type == .question {
-                        let oldContent = self.detectedContent[questionIndexToUpdate]
-                        self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                    if questionIndex < self.detectedContent.count && 
+                       self.detectedContent[questionIndex].type == .question {
+                        let oldContent = self.detectedContent[questionIndex]
+                        self.detectedContent[questionIndex] = AmbientProcessedContent(
                             text: oldContent.text,
                             type: oldContent.type,
                             timestamp: oldContent.timestamp,
@@ -2420,10 +2537,10 @@ extension TrueAmbientProcessor {
 
             // Update UI with fallback response or error
             await MainActor.run {
-                if questionIndexToUpdate < self.detectedContent.count &&
-                   self.detectedContent[questionIndexToUpdate].type == .question {
-                    let oldContent = self.detectedContent[questionIndexToUpdate]
-                    self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                if questionIndex < self.detectedContent.count &&
+                   self.detectedContent[questionIndex].type == .question {
+                    let oldContent = self.detectedContent[questionIndex]
+                    self.detectedContent[questionIndex] = AmbientProcessedContent(
                         text: oldContent.text,
                         type: oldContent.type,
                         timestamp: oldContent.timestamp,
@@ -2493,10 +2610,10 @@ extension TrueAmbientProcessor {
                 if !streamedResponse.isEmpty {
                     await MainActor.run {
                         // Use the index we saved when adding the question
-                        if questionIndexToUpdate < self.detectedContent.count && 
-                           self.detectedContent[questionIndexToUpdate].type == .question {
-                            let oldContent = self.detectedContent[questionIndexToUpdate]
-                            self.detectedContent[questionIndexToUpdate] = AmbientProcessedContent(
+                        if questionIndex < self.detectedContent.count && 
+                           self.detectedContent[questionIndex].type == .question {
+                            let oldContent = self.detectedContent[questionIndex]
+                            self.detectedContent[questionIndex] = AmbientProcessedContent(
                                 text: oldContent.text,
                                 type: oldContent.type,
                                 timestamp: oldContent.timestamp,
@@ -2509,10 +2626,10 @@ extension TrueAmbientProcessor {
                             self.objectWillChange.send()
                             // Log progress
                             if streamedResponse.count % 100 < 10 {
-                                logger.info("🔄 Updated question #\(questionIndexToUpdate) with \(streamedResponse.count) chars")
+                                logger.info("🔄 Updated question #\(questionIndex) with \(streamedResponse.count) chars")
                             }
                         } else {
-                            logger.error("❌ Invalid question index \(questionIndexToUpdate) or question not found")
+                            logger.error("❌ Invalid question index \(questionIndex) or question not found")
                             // Fallback: try to find it
                             if let index = self.detectedContent.firstIndex(where: { 
                                 $0.type == .question && 

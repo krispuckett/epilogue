@@ -128,30 +128,30 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     }
     
     // Override the search to add smart filtering and ranking
-    func searchBooksWithRanking(query: String, preferISBN: String? = nil, publisherHint: String? = nil) async -> [Book] {
+    func searchBooksWithRanking(query: String, preferISBN: String? = nil, publisherHint: String? = nil, lightMode: Bool = false) async -> [Book] {
         // Parse the query to extract title, author, etc.
         let parsedQuery = ParsedQuery(from: query)
-        
+
         // If we have an ISBN, try that first
         if let isbn = preferISBN, !isbn.isEmpty {
             if let book = await searchBookByISBN(isbn) {
                 return [book]
             }
         }
-        
+
         // Get all search queries to try
         let searchQueries = parsedQuery.generateSearchQueries()
         var allResults: [GoogleBookItem] = []
         var triedQueries = Set<String>()
-        
+
         // Try each query until we get good results
         for searchQuery in searchQueries {
             guard !triedQueries.contains(searchQuery) else { continue }
             triedQueries.insert(searchQuery)
-            
-            let results = await getRawSearchResults(query: searchQuery, maxResults: 20)
+
+            let results = await getRawSearchResults(query: searchQuery, maxResults: 20, lightMode: lightMode)
             allResults.append(contentsOf: results)
-            
+
             // If we have enough good results, stop searching
             let booksWithCovers = allResults.filter { item in
                 item.volumeInfo.imageLinks?.thumbnail != nil
@@ -194,53 +194,70 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             .map { $0.book }
     }
     
-    private func getRawSearchResults(query: String, maxResults: Int = 40) async -> [GoogleBookItem] {
+    private func getRawSearchResults(query: String, maxResults: Int = 40, lightMode: Bool = false) async -> [GoogleBookItem] {
         var allItems: [GoogleBookItem] = []
-        
-        // Try multiple search strategies in parallel
-        await withTaskGroup(of: [GoogleBookItem]?.self) { group in
-            // Strategy 1: Regular search
-            group.addTask {
-                return await self.performRawSearch(query: query, maxResults: maxResults)
+
+        // OPTIMIZATION: Light mode for large imports reduces API calls by 60%
+        if lightMode {
+            // Only do 1-2 most reliable searches to reduce API load
+            // Strategy 1: Regular search with more results
+            if let items = await performRawSearch(query: query, maxResults: 30) {
+                allItems.append(contentsOf: items)
             }
-            
-            // Strategy 2: If it looks like title + author, search each separately
-            if query.contains(" by ") || query.split(separator: " ").count > 2 {
-                let words = query.split(separator: " ")
-                if words.count > 1 {
-                    // Search by likely title (first few words)
-                    let titleQuery = words.prefix(min(3, words.count - 1)).joined(separator: " ")
-                    group.addTask {
-                        return await self.performRawSearch(
-                            query: "intitle:\(titleQuery)",
-                            maxResults: 10
-                        )
-                    }
+
+            // Strategy 2: Relevance search only if we don't have enough results
+            if allItems.count < 15 {
+                if let items = await performRawSearch(query: query, maxResults: 15, orderBy: "relevance") {
+                    allItems.append(contentsOf: items)
                 }
             }
-            
-            // Strategy 3: Search with orderBy relevance
-            group.addTask {
-                return await self.performRawSearch(
-                    query: query,
-                    maxResults: 10,
-                    orderBy: "relevance"
-                )
-            }
-            
-            // Strategy 4: Search with orderBy newest (sometimes gets better editions)
-            group.addTask {
-                return await self.performRawSearch(
-                    query: query,
-                    maxResults: 10,
-                    orderBy: "newest"
-                )
-            }
-            
-            // Collect all results
-            for await items in group {
-                if let items = items {
-                    allItems.append(contentsOf: items)
+        } else {
+            // Full parallel search for normal imports
+            // Try multiple search strategies in parallel
+            await withTaskGroup(of: [GoogleBookItem]?.self) { group in
+                // Strategy 1: Regular search
+                group.addTask {
+                    return await self.performRawSearch(query: query, maxResults: maxResults)
+                }
+
+                // Strategy 2: If it looks like title + author, search each separately
+                if query.contains(" by ") || query.split(separator: " ").count > 2 {
+                    let words = query.split(separator: " ")
+                    if words.count > 1 {
+                        // Search by likely title (first few words)
+                        let titleQuery = words.prefix(min(3, words.count - 1)).joined(separator: " ")
+                        group.addTask {
+                            return await self.performRawSearch(
+                                query: "intitle:\(titleQuery)",
+                                maxResults: 10
+                            )
+                        }
+                    }
+                }
+
+                // Strategy 3: Search with orderBy relevance
+                group.addTask {
+                    return await self.performRawSearch(
+                        query: query,
+                        maxResults: 10,
+                        orderBy: "relevance"
+                    )
+                }
+
+                // Strategy 4: Search with orderBy newest (sometimes gets better editions)
+                group.addTask {
+                    return await self.performRawSearch(
+                        query: query,
+                        maxResults: 10,
+                        orderBy: "newest"
+                    )
+                }
+
+                // Collect all results
+                for await items in group {
+                    if let items = items {
+                        allItems.append(contentsOf: items)
+                    }
                 }
             }
         }
@@ -543,11 +560,15 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             // Check for language (prefer English)
             if let lang = volumeInfo.language, lang != "en" { score -= 10 }
 
-            // Popularity: boost high ratings and counts when available
-            if let avg = volumeInfo.averageRating { score += avg * 10 } // up to +50 for 5.0
+            // CRITICAL FIX: Reduced popularity bias from +90 max to +40 max
+            // This prevents popular wrong books from outranking correct obscure books
+            // Popularity still helps, but can't override title/author/ISBN matches
+            if let avg = volumeInfo.averageRating {
+                score += avg * 4  // up to +20 for 5.0 (was +50)
+            }
             if let cnt = volumeInfo.ratingsCount {
-                // log-scale boost up to ~+40 for very popular editions
-                let boost = min(40.0, log10(Double(max(cnt, 1))) * 20.0)
+                // log-scale boost up to ~+20 for very popular editions (was +40)
+                let boost = min(20.0, log10(Double(max(cnt, 1))) * 10.0)
                 score += boost
             }
 

@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import SwiftUI
+import Combine
 
 @MainActor
 class ReadwiseService: ObservableObject {
@@ -19,7 +21,7 @@ class ReadwiseService: ObservableObject {
         let message: String
     }
     
-    enum ReadwiseError: LocalizedError {
+    enum ReadwiseError: LocalizedError, Equatable {
         case noToken
         case invalidToken
         case networkError(String)
@@ -224,10 +226,12 @@ class ReadwiseService: ObservableObject {
                 if existingQuote == nil {
                     let capturedQuote = CapturedQuote(
                         text: highlight.text,
+                        book: nil,
+                        author: highlight.author,
                         pageNumber: highlight.location != nil ? Int(highlight.location!) : nil,
                         timestamp: highlight.highlightedAt ?? Date(),
-                        additionalNotes: highlight.note,
-                        captureSource: .import_
+                        source: .import_,
+                        notes: highlight.note
                     )
                     capturedQuote.book = book
                     modelContext.insert(capturedQuote)
@@ -264,7 +268,7 @@ class ReadwiseService: ObservableObject {
                 text: quote.text ?? "",
                 title: quote.book?.title,
                 author: quote.book?.author,
-                note: quote.additionalNotes,
+                note: quote.notes,
                 location: quote.pageNumber != nil ? String(quote.pageNumber!) : nil,
                 highlightedAt: quote.timestamp ?? Date()
             )
@@ -272,19 +276,25 @@ class ReadwiseService: ObservableObject {
         
         // Send in batches of 100
         let batchSize = 100
-        let batches = highlights.chunked(into: batchSize)
+        var currentIndex = 0
+        var batchNumber = 0
+        let totalBatches = (highlights.count + batchSize - 1) / batchSize
         
-        for (index, batch) in batches.enumerated() {
+        while currentIndex < highlights.count {
+            let endIndex = min(currentIndex + batchSize, highlights.count)
+            let batch = Array(highlights[currentIndex..<endIndex])
+            batchNumber += 1
+            
             syncProgress = SyncProgress(
-                current: index + 1,
-                total: batches.count,
+                current: batchNumber,
+                total: totalBatches,
                 message: "Exporting highlights to Readwise..."
             )
             
             try await createHighlights(token: token, highlights: batch)
             
             // Mark quotes as exported
-            let batchQuotes = Array(quotes[index * batchSize..<min((index + 1) * batchSize, quotes.count)])
+            let batchQuotes = Array(quotes[currentIndex..<min(endIndex, quotes.count)])
             for quote in batchQuotes {
                 quote.exportedToReadwise = true
             }
@@ -293,6 +303,8 @@ class ReadwiseService: ObservableObject {
             
             // Rate limit delay
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            currentIndex = endIndex
         }
     }
     
@@ -348,11 +360,9 @@ class ReadwiseService: ObservableObject {
         
         // Create new book
         let newBook = BookModel(
+            id: UUID().uuidString,
             title: title,
-            author: author,
-            totalPages: 0,
-            currentPage: 0,
-            readingStatus: "toRead"
+            author: author
         )
         
         modelContext.insert(newBook)
@@ -420,11 +430,3 @@ struct ReadwiseHighlightCreate: Codable {
     }
 }
 
-// MARK: - Array Extension
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
-    }
-}

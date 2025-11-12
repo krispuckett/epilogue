@@ -3,6 +3,20 @@ import AppIntents
 /// App Shortcuts provider for Siri suggestions
 struct EpilogueShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        // PRIORITY 1: Continue Reading (most common action)
+        AppShortcut(
+            intent: ContinueReadingIntent(),
+            phrases: [
+                "Continue reading in \(.applicationName)",
+                "Resume my book in \(.applicationName)",
+                "Continue reading \(\.$book) in \(.applicationName)",
+                "Resume \(\.$book) in \(.applicationName)",
+                "Open \(\.$book) in \(.applicationName)"
+            ],
+            shortTitle: "Continue Reading",
+            systemImageName: "book.fill"
+        )
+
         AppShortcut(
             intent: AddNoteIntent(),
             phrases: [
@@ -47,4 +61,6 @@ struct EpilogueShortcuts: AppShortcutsProvider {
             systemImageName: "chart.line.uptrend.xyaxis"
         )
     }
+
+    static var shortcutTileColor: ShortcutTileColor = .orange
 }

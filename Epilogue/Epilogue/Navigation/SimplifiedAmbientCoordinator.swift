@@ -94,6 +94,9 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
         // Set initial book context if provided
         if let book = book {
             currentBook = book
+            // CRITICAL: Also set in AmbientBookDetector to establish session lock
+            // This prevents unwanted book switching during the session
+            AmbientBookDetector.shared.setCurrentBook(book)
             logger.info("📚 Starting ambient mode with book: \(book.title)")
         }
 

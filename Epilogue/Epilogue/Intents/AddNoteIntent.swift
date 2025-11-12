@@ -81,11 +81,7 @@ extension BookEntity {
             return nil
         }
 
-        return BookEntity(
-            id: currentBook.id,
-            title: currentBook.title,
-            author: currentBook.author
-        )
+        return BookEntity(from: currentBook)
     }
 }
 
