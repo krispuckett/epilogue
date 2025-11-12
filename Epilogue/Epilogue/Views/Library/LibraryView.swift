@@ -1678,6 +1678,11 @@ class LibraryViewModel: ObservableObject {
         Task {
             await BookContextCache.shared.generateContextForAllBooks(books)
         }
+
+        // Index all books for Spotlight on app launch
+        Task { @MainActor in
+            SpotlightIndexingService.shared.indexBooks(books)
+        }
         
         // Listen for library refresh notification
         NotificationCenter.default.addObserver(
@@ -1828,6 +1833,11 @@ class LibraryViewModel: ObservableObject {
             #if DEBUG
             print("  ✅ Successfully saved \(books.count) books")
             #endif
+
+            // Index books for Spotlight search
+            Task { @MainActor in
+                SpotlightIndexingService.shared.indexBooks(books)
+            }
         } catch {
             #if DEBUG
             print("  ❌ Failed to save books: \(error)")

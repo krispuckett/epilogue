@@ -64,8 +64,8 @@ class SpotlightIndexingService {
         attributeSet.contentCreationDate = book.dateAdded
         attributeSet.contentModificationDate = book.dateAdded
 
-        // Deep link URL
-        let deepLinkURL = "epilogue://book/\(book.id)"
+        // Deep link URL (with query parameter for DeepLinkHandler compatibility)
+        let deepLinkURL = "epilogue://book?id=\(book.id)"
         attributeSet.contentURL = URL(string: deepLinkURL)
 
         // Create searchable item
@@ -125,7 +125,7 @@ class SpotlightIndexingService {
             attributeSet.contentCreationDate = book.dateAdded
             attributeSet.contentModificationDate = book.dateAdded
 
-            let deepLinkURL = "epilogue://book/\(book.id)"
+            let deepLinkURL = "epilogue://book?id=\(book.id)"
             attributeSet.contentURL = URL(string: deepLinkURL)
 
             return CSSearchableItem(
