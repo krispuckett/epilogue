@@ -48,6 +48,8 @@ final class DeepLinkHandler: ObservableObject {
             handleQuoteDeepLink(components)
         case "chat":
             handleChatDeepLink(components)
+        case "continueReading":
+            handleContinueReading()
         default:
             logger.warning("Unknown deep link host: \(components.host ?? "nil")")
         }
@@ -162,5 +164,29 @@ final class DeepLinkHandler: ObservableObject {
         case 2: navigationCoordinator?.selectedTab = .chat
         default: logger.warning("Invalid tab index: \(index)")
         }
+    }
+
+    private func handleContinueReading() {
+        logger.info("🎯 Widget tapped: Continue Reading")
+
+        // Load currently reading book from UserDefaults
+        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
+              let books = try? JSONDecoder().decode([Book].self, from: data),
+              let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
+            logger.warning("No currently reading book found")
+            return
+        }
+
+        logger.info("📚 Opening Ambient Mode with: \(currentBook.title)")
+
+        // Post notification to trigger ambient mode (same as Siri intent)
+        NotificationCenter.default.post(
+            name: Notification.Name("OpenAmbientModeFromIntent"),
+            object: currentBook.id,
+            userInfo: [
+                "bookId": currentBook.id,
+                "bookTitle": currentBook.title
+            ]
+        )
     }
 }

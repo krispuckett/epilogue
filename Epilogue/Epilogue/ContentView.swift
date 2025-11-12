@@ -63,6 +63,10 @@ struct ContentView: View {
                 // Handle Siri "Continue Reading" intent
                 handleAmbientModeIntent(notification)
             }
+            .onOpenURL { url in
+                // Handle deep links from widgets and external sources
+                deepLinkHandler.handle(url: url)
+            }
             .sheet(isPresented: $whatsNewManager.shouldShow) {
                 whatsNewManager.markAsShown()
             } content: {

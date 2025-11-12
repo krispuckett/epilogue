@@ -115,6 +115,7 @@ struct CurrentReadingWidgetView: View {
             }
             .ignoresSafeArea()
         }
+        .widgetURL(URL(string: "epilogue://continueReading"))  // Fallback for iOS 16
     }
 
     // MARK: - Small Widget
@@ -201,6 +202,32 @@ struct CurrentReadingWidgetView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
                             .padding(.leading, 2)
+                    }
+
+                    Spacer()
+
+                    // Interactive button - tappable link
+                    Link(destination: URL(string: "epilogue://continueReading")!) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Continue Reading")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(LinearGradient(
+                                    colors: [
+                                        CurrentReadingWidgetView.enhanceColor(entry.colors[0]),
+                                        CurrentReadingWidgetView.enhanceColor(entry.colors[1])
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ))
+                        )
                     }
                 }
                 .frame(height: 112)
@@ -293,7 +320,39 @@ struct CurrentReadingWidgetView: View {
                     }
                 }
 
-                Spacer().frame(height: 28)
+                Spacer().frame(height: 20)
+
+                // Interactive button - tappable link
+                Link(destination: URL(string: "epilogue://continueReading")!) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Continue Reading")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(
+                        Capsule()
+                            .fill(LinearGradient(
+                                colors: [
+                                    CurrentReadingWidgetView.enhanceColor(entry.colors[0]),
+                                    CurrentReadingWidgetView.enhanceColor(entry.colors[1])
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                            .shadow(
+                                color: CurrentReadingWidgetView.enhanceColor(entry.colors[0]).opacity(0.4),
+                                radius: 8,
+                                x: 0,
+                                y: 4
+                            )
+                    )
+                }
+
+                Spacer().frame(height: 24)
             }
         }
     }
