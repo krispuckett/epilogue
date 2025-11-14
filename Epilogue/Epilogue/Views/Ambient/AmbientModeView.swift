@@ -4658,55 +4658,19 @@ struct AmbientMessageThreadView: View {
     }
     
     private func formatResponseText(_ text: String) -> AttributedString {
-        // Clean and format text with refined typography
-        var cleanText = text
+        // CRITICAL FIX: Preserve original formatting, only clean markdown
+        // DO NOT destroy line breaks, lists, or spacing
+        let cleanText = text
             .replacingOccurrences(of: "**", with: "") // Remove markdown bold
             .replacingOccurrences(of: "##", with: "") // Remove markdown headers
-            .replacingOccurrences(of: "  ", with: " ") // Clean double spaces
-            .replacingOccurrences(of: "..", with: ".") // Fix double periods
-        
-        // Split into natural paragraphs
-        let sentences = cleanText.components(separatedBy: ". ")
-        var paragraphs: [String] = []
-        var currentParagraph = ""
-        
-        for (index, sentence) in sentences.enumerated() {
-            let cleanSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !cleanSentence.isEmpty {
-                currentParagraph += cleanSentence
-                if !cleanSentence.hasSuffix(".") && !cleanSentence.hasSuffix("?") && !cleanSentence.hasSuffix("!") {
-                    currentParagraph += "."
-                }
-                
-                // Create paragraph breaks at natural transition points
-                let isNaturalBreak = cleanSentence.contains(where: { phrase in
-                    ["However", "Additionally", "Furthermore", "Moreover", 
-                     "In conclusion", "First", "Second", "Finally", "Therefore",
-                     "As a result", "In summary", "Notably"].contains { cleanSentence.contains($0) }
-                })
-                
-                if (index + 1) % 3 == 0 || isNaturalBreak {
-                    paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
-                    currentParagraph = ""
-                } else if index < sentences.count - 1 {
-                    currentParagraph += " "
-                }
-            }
-        }
-        
-        // Add any remaining text as final paragraph
-        if !currentParagraph.trimmingCharacters(in: .whitespaces).isEmpty {
-            paragraphs.append(currentParagraph.trimmingCharacters(in: .whitespaces))
-        }
-        
-        // Join paragraphs with double newlines for spacing
-        let formattedText = paragraphs.joined(separator: "\n\n")
-        
+
         // Convert to AttributedString with markdown support
+        // This preserves ALL original formatting including line breaks, lists, etc.
         do {
-            return try AttributedString(markdown: formattedText)
+            return try AttributedString(markdown: cleanText)
         } catch {
-            return AttributedString(formattedText)
+            // Fallback if markdown parsing fails
+            return AttributedString(cleanText)
         }
     }
 }

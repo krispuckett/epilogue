@@ -2472,19 +2472,30 @@ extension TrueAmbientProcessor {
         
         logger.info("🚀 Using Perplexity for book knowledge question")
         
-        // Enhance the question with explicit book context
+        // Enhance the question with explicit book context AND fix incomplete questions
         let enhancedQuestion: String
         if let book = bookContext {
+            // CRITICAL: Auto-complete incomplete questions like "What are the main themes of the?"
+            var questionToAsk = question
+            let lowerQuestion = question.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Pattern matching for incomplete questions
+            if lowerQuestion.hasSuffix(" of the?") || lowerQuestion.hasSuffix(" of the book?") {
+                questionToAsk = question.replacingOccurrences(of: " of the?", with: " of '\(book.title)'?", options: .caseInsensitive)
+                questionToAsk = questionToAsk.replacingOccurrences(of: " of the book?", with: " of '\(book.title)'?", options: .caseInsensitive)
+                logger.info("🔧 Auto-completed question: '\(question)' → '\(questionToAsk)'")
+            }
+
             // Check for cached context first
             if let cachedContext = BookContextCache.shared.getContext(for: book) {
                 logger.info("📚 Using cached context for \(book.title)")
                 // Include rich context in the question
-                enhancedQuestion = "\(cachedContext.contextString). Question: \(question)"
+                enhancedQuestion = "\(cachedContext.contextString). Question: \(questionToAsk)"
             } else {
                 // Fallback to basic enhancement
-                enhancedQuestion = "In the book '\(book.title)' by \(book.author), \(question)"
+                enhancedQuestion = "In the book '\(book.title)' by \(book.author), \(questionToAsk)"
             }
-            logger.info("📚 Asking about \(book.title): \(question)")
+            logger.info("📚 Asking about \(book.title): \(questionToAsk)")
         } else {
             enhancedQuestion = question
         }
