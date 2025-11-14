@@ -2344,7 +2344,11 @@ struct AmbientModeView: View {
             
             // Whisper will be loaded when needed by VoiceRecognitionManager
             // The voice manager handles model loading internally
-            
+
+            // CRITICAL: Load enrichment BEFORE creating session
+            // This must happen FIRST so contextualStrings are ready when speech starts
+            await voiceManager.loadEnrichmentForCurrentBook(modelContext: modelContext)
+
             // NOW we can create the session
             await MainActor.run {
                 // Record when the session actually starts
@@ -2356,7 +2360,7 @@ struct AmbientModeView: View {
                 session.startTime = startTime // Use the actual start time
                 currentSession = session
                 modelContext.insert(session)
-                
+
                 // Save the session immediately so relationships can be established
                 do {
                     try modelContext.save()
@@ -2368,17 +2372,13 @@ struct AmbientModeView: View {
                     print("❌ Failed to save initial session: \(error)")
                     #endif
                 }
-                
+
                 // Start book cover fade timer - fade after 10 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
                     withAnimation(.easeOut(duration: 2.0)) {
                         showBookCover = false
                     }
                 }
-                
-                // CRITICAL: Load enrichment BEFORE starting session
-                // This must happen FIRST so contextualStrings are ready
-                await voiceRecognition.loadEnrichmentForCurrentBook(modelContext: modelContext)
 
                 processor.startSession()
 
