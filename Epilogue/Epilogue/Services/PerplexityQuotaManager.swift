@@ -49,6 +49,12 @@ class PerplexityQuotaManager: ObservableObject {
 
     // Load remaining questions
     private func loadRemainingQuestions() {
+        // In Gandalf mode, always show unlimited (999)
+        if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            remainingQuestions = 999
+            return
+        }
+
         let questionsUsed = UserDefaults.standard.integer(forKey: questionsUsedKey)
         remainingQuestions = max(0, dailyQuotaLimit - questionsUsed)
     }
@@ -69,8 +75,11 @@ class PerplexityQuotaManager: ObservableObject {
 
     // Track a question usage
     func trackQuestionUsage() -> Bool {
-        // Skip tracking in Gandalf mode
+        // CRITICAL: Skip tracking AND don't show quota sheet in Gandalf mode
         if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            #if DEBUG
+            print("🧙‍♂️ Gandalf mode: Skipping quota tracking, unlimited questions")
+            #endif
             return true
         }
 
@@ -85,20 +94,26 @@ class PerplexityQuotaManager: ObservableObject {
             print("📊 Perplexity question tracked. Remaining: \(remainingQuestions)/\(dailyQuotaLimit)")
             #endif
 
-            // Show sheet if quota exhausted
+            // Show sheet if quota exhausted (but NOT in Gandalf mode)
             if remainingQuestions == 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.showQuotaExceededSheet = true
+                    // Double-check Gandalf mode before showing sheet
+                    if !UserDefaults.standard.bool(forKey: "gandalfMode") {
+                        self?.showQuotaExceededSheet = true
+                    }
                 }
             }
 
             return true
         } else {
-            // Quota exceeded
+            // Quota exceeded (but NOT in Gandalf mode)
             #if DEBUG
             print("⚠️ Daily Perplexity quota exceeded")
             #endif
-            showQuotaExceededSheet = true
+            // Only show sheet if NOT in Gandalf mode
+            if !UserDefaults.standard.bool(forKey: "gandalfMode") {
+                showQuotaExceededSheet = true
+            }
             return false
         }
     }
@@ -124,6 +139,17 @@ class PerplexityQuotaManager: ObservableObject {
 
     // Get percentage of quota used
     var quotaUsedPercentage: Double {
-        Double(dailyQuotaLimit - remainingQuestions) / Double(dailyQuotaLimit)
+        // In Gandalf mode, show 0% used
+        if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            return 0.0
+        }
+        return Double(dailyQuotaLimit - remainingQuestions) / Double(dailyQuotaLimit)
+    }
+
+    // MARK: - Gandalf Mode Helper
+
+    /// Check if Gandalf mode is active (for debugging and UI)
+    var isGandalfModeActive: Bool {
+        UserDefaults.standard.bool(forKey: "gandalfMode")
     }
 }
