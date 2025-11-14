@@ -329,15 +329,34 @@ class SimplifiedStoreKitManager: ObservableObject {
 
     // MARK: - Conversation Counting
     func conversationsRemaining() -> Int? {
+        // CRITICAL: Gandalf mode = unlimited conversations
+        if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            return nil
+        }
         guard !isPlus else { return nil }
         return max(0, 8 - conversationsUsed)
     }
 
     func canStartConversation() -> Bool {
+        // CRITICAL: Gandalf mode bypasses conversation limits
+        if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            #if DEBUG
+            print("🧙‍♂️ Gandalf mode: Bypassing conversation limit check")
+            #endif
+            return true
+        }
         return isPlus || conversationsUsed < 8
     }
 
     func recordConversation() {
+        // CRITICAL: Don't record conversations in Gandalf mode
+        if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            #if DEBUG
+            print("🧙‍♂️ Gandalf mode: Skipping conversation recording")
+            #endif
+            return
+        }
+
         guard !isPlus else { return }
 
         conversationsUsed += 1
@@ -360,6 +379,15 @@ class SimplifiedStoreKitManager: ObservableObject {
 
     // MARK: - Private Helpers
     private func loadConversationCount() {
+        // CRITICAL: In Gandalf mode, always show 0 conversations used (unlimited)
+        if UserDefaults.standard.bool(forKey: "gandalfMode") {
+            conversationsUsed = 0
+            #if DEBUG
+            print("🧙‍♂️ Gandalf mode: Setting conversations to 0 (unlimited)")
+            #endif
+            return
+        }
+
         conversationsUsed = UserDefaults.standard.integer(forKey: "conversationsUsed")
 
         // Check if we need to reset (new month)
