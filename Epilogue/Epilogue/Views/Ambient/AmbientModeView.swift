@@ -2600,6 +2600,7 @@ struct AmbientModeView: View {
         // Normal message processing (not editing)
 
         // Check conversation limit BEFORE processing new messages
+        // CRITICAL: Gandalf mode bypasses this check (already handled in canStartConversation)
         if !storeKit.canStartConversation() {
             SensoryFeedback.warning()
             showPaywall = true
