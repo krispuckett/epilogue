@@ -185,6 +185,13 @@ struct LibraryView: View {
                         #if DEBUG
                         print("   ✅ Enrichment completed")
                         #endif
+
+                        // CRITICAL: Alert if enrichment failed
+                        if !existingModel.isEnriched {
+                            print("⚠️⚠️⚠️ ENRICHMENT FAILED for '\(book.title)' ⚠️⚠️⚠️")
+                            print("   Speech recognition won't have character names!")
+                            print("   Check Perplexity API key in Settings")
+                        }
                     } else {
                         #if DEBUG
                         print("   ⏭️ Already enriched, skipping")
@@ -224,6 +231,19 @@ struct LibraryView: View {
                         #if DEBUG
                         print("      smartSynopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
                         #endif
+
+                        // CRITICAL: Alert user if enrichment failed
+                        if !bookModel.isEnriched {
+                            print("⚠️⚠️⚠️ ENRICHMENT FAILED for '\(book.title)' ⚠️⚠️⚠️")
+                            print("   This means character names like 'Odysseus' won't be in speech recognition!")
+                            print("   Ambient mode will hear 'Otis' instead of 'Odysseus'!")
+                            print("   Check Perplexity API key and quota in Settings")
+                        } else {
+                            print("✅✅✅ ENRICHMENT SUCCESS for '\(book.title)'")
+                            if let characters = bookModel.majorCharacters {
+                                print("   Characters: \(characters.joined(separator: ", "))")
+                            }
+                        }
 
                         // Fetch page count if missing
                         if bookModel.pageCount == nil || bookModel.pageCount == 0 {
