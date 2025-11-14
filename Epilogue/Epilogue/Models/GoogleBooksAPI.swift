@@ -448,10 +448,16 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
 class GoogleBooksService: ObservableObject {
     private let baseURL = "https://www.googleapis.com/books/v1/volumes"
     private let session = URLSession.shared
-    
+
     @Published var searchResults: [Book] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+
+    // Pagination support
+    private var currentQuery: String = ""
+    private var startIndex: Int = 0
+    private var hasMoreResults: Bool = true
+    private let resultsPerPage: Int = 40
     
     func searchBookByISBN(_ isbn: String) async -> Book? {
         #if DEBUG
@@ -503,32 +509,39 @@ class GoogleBooksService: ObservableObject {
     }
     
     func searchBooks(query: String) async {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { 
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
             #if DEBUG
             print("GoogleBooksAPI: Empty query")
             #endif
-            return 
+            return
         }
-        
+
         if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Starting search for: '\(query)'") }
-        
+
+        // Reset pagination for new search
+        currentQuery = query
+        startIndex = 0
+        hasMoreResults = true
+
         await MainActor.run {
             isLoading = true
             errorMessage = nil
             searchResults = []
         }
-        
+
         do {
-            let books = try await performSearch(query: query)
+            let books = try await performSearch(query: query, startIndex: 0)
             if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Found \(books.count) books") }
-            
+
             await MainActor.run {
                 searchResults = books
+                startIndex = books.count
+                hasMoreResults = books.count >= resultsPerPage
                 isLoading = false
             }
         } catch {
             if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Search failed with error: \(error)") }
-            
+
             await MainActor.run {
                 errorMessage = error.localizedDescription
                 searchResults = []
@@ -536,18 +549,52 @@ class GoogleBooksService: ObservableObject {
             }
         }
     }
+
+    func loadMoreResults() async {
+        guard hasMoreResults, !isLoading, !currentQuery.isEmpty else {
+            #if DEBUG
+            print("GoogleBooksAPI: Cannot load more - hasMore: \(hasMoreResults), loading: \(isLoading), query: '\(currentQuery)'")
+            #endif
+            return
+        }
+
+        if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Loading more results from index \(startIndex)") }
+
+        await MainActor.run {
+            isLoading = true
+        }
+
+        do {
+            let books = try await performSearch(query: currentQuery, startIndex: startIndex)
+            if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Loaded \(books.count) more books") }
+
+            await MainActor.run {
+                searchResults.append(contentsOf: books)
+                startIndex += books.count
+                hasMoreResults = books.count >= resultsPerPage
+                isLoading = false
+            }
+        } catch {
+            if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Load more failed with error: \(error)") }
+
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
+        }
+    }
     
-    private func performSearch(query: String) async throws -> [Book] {
+    private func performSearch(query: String, startIndex: Int = 0) async throws -> [Book] {
         // Clean and encode the query
         let cleanQuery = query.trimmingCharacters(in: .whitespaces)
         guard cleanQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) != nil else {
             throw APIError.invalidQuery
         }
-        
+
         // Check if this is an ISBN search
         if cleanQuery.lowercased().hasPrefix("isbn:") {
             // Direct ISBN search - use as-is
-            return try await performDirectSearch(query: cleanQuery)
+            return try await performDirectSearch(query: cleanQuery, startIndex: startIndex)
         }
         
         // Enhanced search query building with smart interpretation
@@ -596,7 +643,8 @@ class GoogleBooksService: ObservableObject {
         }
         components.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
-            URLQueryItem(name: "maxResults", value: "40"), // Get more results to filter
+            URLQueryItem(name: "maxResults", value: String(resultsPerPage)),
+            URLQueryItem(name: "startIndex", value: String(startIndex)), // Pagination support
             URLQueryItem(name: "orderBy", value: "relevance"),
             URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "langRestrict", value: "en"),  // English books
@@ -667,9 +715,9 @@ class GoogleBooksService: ObservableObject {
             let score2 = scoreBook(book2, query: queryLower, queryWords: queryWords)
             return score1 > score2
         }
-        
-        // Take top 20 results after scoring
-        return Array(books.prefix(20))
+
+        // Return all results (pagination handles limiting)
+        return books
     }
     
     private func scoreBook(_ book: Book, query: String, queryWords: [String]) -> Int {
@@ -834,12 +882,21 @@ class GoogleBooksService: ObservableObject {
             }
         }
         
-        // Boost original editions and penalize special editions
-        if titleLower.contains("anniversary edition") || 
-           titleLower.contains("special edition") ||
-           titleLower.contains("collector's edition") {
-            score -= 50  // Slight penalty for special editions (often different covers)
-        } else if titleLower.contains("first edition") || 
+        // Boost special and anniversary editions - these often have the best covers!
+        if titleLower.contains("anniversary edition") {
+            score += 100  // Anniversary editions often have beautiful commemorative covers
+            #if DEBUG
+            print("📈 Boosting '\(book.title)' as anniversary edition (+100)")
+            #endif
+        } else if titleLower.contains("special edition") ||
+                  titleLower.contains("collector's edition") ||
+                  titleLower.contains("deluxe edition") ||
+                  titleLower.contains("illustrated edition") {
+            score += 75  // Special editions usually have premium covers
+            #if DEBUG
+            print("📈 Boosting '\(book.title)' as special edition (+75)")
+            #endif
+        } else if titleLower.contains("first edition") ||
                   titleLower.contains("original") {
             score += 50  // Boost original editions
             #if DEBUG
@@ -956,14 +1013,15 @@ class GoogleBooksService: ObservableObject {
     }
     
     // New helper function for direct search
-    private func performDirectSearch(query: String) async throws -> [Book] {
+    private func performDirectSearch(query: String, startIndex: Int = 0) async throws -> [Book] {
         guard var components = URLComponents(string: baseURL) else {
             throw URLError(.badURL)
         }
-        
+
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "maxResults", value: "40"),
+            URLQueryItem(name: "maxResults", value: String(resultsPerPage)),
+            URLQueryItem(name: "startIndex", value: String(startIndex)), // Pagination support
             URLQueryItem(name: "orderBy", value: "relevance"),
             URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
@@ -986,9 +1044,9 @@ class GoogleBooksService: ObservableObject {
         
         let decoder = JSONDecoder()
         let googleResponse = try decoder.decode(GoogleBooksResponse.self, from: data)
-        
+
         let books = googleResponse.items?.compactMap { $0.book } ?? []
-        return Array(books.prefix(20))
+        return books
     }
     
     // Extract key terms from long/noisy text

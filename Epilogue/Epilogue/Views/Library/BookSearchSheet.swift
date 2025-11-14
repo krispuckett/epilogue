@@ -515,7 +515,7 @@ struct BookSearchSheet: View {
     // MARK: - Results View
     private var resultsView: some View {
         LazyVStack(spacing: 0) {
-            ForEach(searchResults) { book in
+            ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, book in
                 BookSearchResultRow(book: book, onAdd: {
                     #if DEBUG
                     print("🔍 DEBUG: Book selected from search results:")
@@ -535,6 +535,26 @@ struct BookSearchSheet: View {
                     onBookSelected(book)
                     dismiss()
                 })
+                .onAppear {
+                    // Load more when approaching the end (5 items from bottom)
+                    if index == searchResults.count - 5 {
+                        Task {
+                            await loadMoreSearchResults()
+                        }
+                    }
+                }
+            }
+
+            // Loading indicator at bottom when loading more
+            if booksService.isLoading && !searchResults.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(DesignSystem.Colors.primaryAccent)
+                    Text("Loading more...")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .padding(.vertical, 20)
             }
         }
         .padding(.vertical, 12)
@@ -560,14 +580,14 @@ struct BookSearchSheet: View {
         #endif
         isLoading = true
         searchError = nil
-        
-        // Use enhanced service ranking for better results
-        // Use the enhanced searchBooksWithRanking method for better results
+
+        // Use enhanced search with smart ranking and filtering
         searchResults = await booksService.searchBooksWithRanking(query: query)
+
         #if DEBUG
-        print("📖 Found \(searchResults.count) ranked results for: '\(query)'")
+        print("📖 Found \(searchResults.count) enhanced results for: '\(query)'")
         #endif
-        
+
         // Re-rank by visual similarity if we have a captured feature print
         if BookScannerService.shared.capturedFeaturePrint != nil {
             #if DEBUG
@@ -575,7 +595,7 @@ struct BookSearchSheet: View {
             #endif
             searchResults = await BookScannerService.shared.reRankBooksWithFeaturePrint(searchResults)
         }
-        
+
         if searchResults.isEmpty {
             // Try spell correction
             if let correctedQuery = spellCorrect(query), correctedQuery != query {
@@ -588,7 +608,7 @@ struct BookSearchSheet: View {
                 #endif
             }
         }
-        
+
         // Check for errors
         if let error = booksService.errorMessage {
             searchError = error
@@ -596,8 +616,29 @@ struct BookSearchSheet: View {
             print("❌ Search error:  (error)")
             #endif
         }
-        
+
         isLoading = false
+    }
+
+    @MainActor
+    private func loadMoreSearchResults() async {
+        #if DEBUG
+        print("📚 Loading more search results...")
+        #endif
+
+        let newResults = await booksService.loadMoreEnhancedResults()
+
+        // Only update if we got new results (don't clear existing results)
+        if !newResults.isEmpty {
+            searchResults = newResults
+            #if DEBUG
+            print("📖 Total results now: \(searchResults.count)")
+            #endif
+        } else {
+            #if DEBUG
+            print("📖 No more results available")
+            #endif
+        }
     }
     
     // MARK: - Spell Correction

@@ -3,7 +3,13 @@ import os.log
 
 // Enhanced Google Books Service with smart ranking and filtering
 class EnhancedGoogleBooksService: GoogleBooksService {
-    
+
+    // Pagination state for enhanced search
+    private var enhancedSearchResults: [Book] = []
+    private var currentEnhancedQuery: String = ""
+    private var enhancedStartIndex: Int = 0
+    private var hasMoreEnhancedResults: Bool = true
+
     struct ScoredBook {
         let book: Book
         let googleItem: GoogleBookItem
@@ -87,6 +93,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 // Special case for known popular books
                 if cleanTitle.lowercased().contains("hobbit") && cleanAuthor.lowercased().contains("tolkien") {
                     queries.insert("intitle:\"The Hobbit\" inauthor:\"J.R.R. Tolkien\"", at: 0)
+                    // Also search for anniversary editions explicitly
+                    queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\" anniversary", at: 1)
+                    queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\" 75th", at: 2)
                 }
                 
                 // Try with just first word of title and full author (handles subtitle variations)
@@ -104,11 +113,18 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             
             // Fallback to just title
             queries.append("intitle:\"\(cleanTitle)\"")
-            
-            // Special handling for popular books without author
+
+            // Special handling for The Hobbit - search for specific editions AND ISBNs
+            // IMPORTANT: Insert in REVERSE order so ISBN stays at position 0!
             if cleanTitle.lowercased() == "the hobbit" || cleanTitle.lowercased() == "hobbit" {
+                queries.insert("intitle:\"The Hobbit\" illustrated", at: 0)
+                queries.insert("intitle:\"The Hobbit\" anniversary edition", at: 0)
+                queries.insert("intitle:\"The Hobbit\" 75th anniversary", at: 0)
                 queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\"", at: 0)
                 queries.insert("intitle:\"The Hobbit\" inauthor:\"J.R.R. Tolkien\"", at: 0)
+                // ISBN query MUST be first - this is the 75th Anniversary Edition with Tolkien's mountain/red sun cover!
+                // Google Books ID: pD6arNyKyi8C (2012 HarperCollins edition)
+                queries.insert("isbn:0547951973", at: 0)
             }
             
             queries.append(cleanTitle)
@@ -127,29 +143,128 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }
     }
     
-    // Override the search to add smart filtering and ranking
+    // Override the search to add smart filtering and ranking (with pagination)
     func searchBooksWithRanking(query: String, preferISBN: String? = nil, publisherHint: String? = nil, lightMode: Bool = false) async -> [Book] {
+        // Reset pagination for new search
+        currentEnhancedQuery = query
+        enhancedStartIndex = 0
+        hasMoreEnhancedResults = true
+        enhancedSearchResults = []
+
         // Parse the query to extract title, author, etc.
         let parsedQuery = ParsedQuery(from: query)
 
         // If we have an ISBN, try that first
         if let isbn = preferISBN, !isbn.isEmpty {
             if let book = await searchBookByISBN(isbn) {
+                enhancedSearchResults = [book]
+                hasMoreEnhancedResults = false
                 return [book]
             }
         }
 
+        // Get initial batch of results
+        let results = await fetchEnhancedBatch(
+            query: query,
+            parsedQuery: parsedQuery,
+            preferISBN: preferISBN,
+            publisherHint: publisherHint,
+            lightMode: lightMode
+        )
+
+        enhancedSearchResults = results
+        enhancedStartIndex = results.count
+        // Keep trying to load more as long as we got at least some results
+        hasMoreEnhancedResults = results.count > 0
+
+        return results
+    }
+
+    // Load more paginated results
+    func loadMoreEnhancedResults() async -> [Book] {
+        guard hasMoreEnhancedResults, !currentEnhancedQuery.isEmpty else {
+            return []
+        }
+
+        let parsedQuery = ParsedQuery(from: currentEnhancedQuery)
+
+        // Fetch next batch
+        let newResults = await fetchEnhancedBatch(
+            query: currentEnhancedQuery,
+            parsedQuery: parsedQuery,
+            preferISBN: nil,
+            publisherHint: nil,
+            lightMode: false,
+            startIndex: enhancedStartIndex
+        )
+
+        // Deduplicate: Only add books we don't already have
+        var existingIDs = Set(enhancedSearchResults.map { $0.id })
+        let uniqueNewResults = newResults.filter { !existingIDs.contains($0.id) }
+
+        enhancedSearchResults.append(contentsOf: uniqueNewResults)
+        enhancedStartIndex += newResults.count
+        // Stop pagination only when we get zero new unique results
+        hasMoreEnhancedResults = uniqueNewResults.count > 0
+
+        return enhancedSearchResults
+    }
+
+    // Fetch a batch of enhanced results
+    private func fetchEnhancedBatch(
+        query: String,
+        parsedQuery: ParsedQuery,
+        preferISBN: String?,
+        publisherHint: String?,
+        lightMode: Bool,
+        startIndex: Int = 0
+    ) async -> [Book] {
         // Get all search queries to try
         let searchQueries = parsedQuery.generateSearchQueries()
+
+        #if DEBUG
+        print("🔍 === SEARCH DEBUG ===")
+        print("🔍 Original query: '\(query)'")
+        print("🔍 Generated \(searchQueries.count) search queries:")
+        for (index, q) in searchQueries.enumerated() {
+            print("🔍   [\(index)]: \(q)")
+        }
+        print("🔍 ==================")
+        #endif
+
         var allResults: [GoogleBookItem] = []
         var triedQueries = Set<String>()
+        var isbnResultIDs = Set<String>()  // Track IDs from ISBN queries
 
         // Try each query until we get good results
         for searchQuery in searchQueries {
             guard !triedQueries.contains(searchQuery) else { continue }
             triedQueries.insert(searchQuery)
 
-            let results = await getRawSearchResults(query: searchQuery, maxResults: 20, lightMode: lightMode)
+            #if DEBUG
+            print("🔍 Executing query: '\(searchQuery)'")
+            #endif
+
+            let results = await getRawSearchResults(
+                query: searchQuery,
+                maxResults: 40,
+                lightMode: lightMode,
+                startIndex: startIndex
+            )
+
+            #if DEBUG
+            print("🔍 Query '\(searchQuery)' returned \(results.count) results")
+            if searchQuery.contains("isbn:") {
+                print("🎯 ISBN QUERY EXECUTED! Results: \(results.count)")
+                for result in results {
+                    print("🎯   - \(result.volumeInfo.title)")
+                    print("🎯     ID: \(result.id)")
+                    print("🎯     Has cover: \(result.volumeInfo.imageLinks?.thumbnail != nil)")
+                    isbnResultIDs.insert(result.id)  // Track this ID
+                }
+            }
+            #endif
+
             allResults.append(contentsOf: results)
 
             // If we have enough good results, stop searching
@@ -157,12 +272,12 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 item.volumeInfo.imageLinks?.thumbnail != nil
             }
 
-            // Increased threshold to account for placeholder images
-            if booksWithCovers.count >= 15 {
+            // Get at least 40 books with covers for a full page of high-quality results
+            if booksWithCovers.count >= 40 {
                 break
             }
         }
-        
+
         // Remove duplicates
         var seen = Set<String>()
         let uniqueResults = allResults.filter { item in
@@ -170,7 +285,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             seen.insert(item.id)
             return true
         }
-        
+
         // Score and rank the results
         let scoredResults = rankBooks(
             uniqueResults,
@@ -179,35 +294,102 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             parsedQuery: parsedQuery,
             publisherHint: publisherHint
         )
-        
-        // Return top results, prioritizing books with covers
-        // Sort by confidence score (books with covers already get +40 bonus)
-        return scoredResults
-            .sorted { lhs, rhs in
-                // Prioritize books with covers, then by score
-                if lhs.hasCover != rhs.hasCover {
-                    return lhs.hasCover
-                }
-                return lhs.confidenceScore > rhs.confidenceScore
+
+        // Sort by priority: covers first, then by confidence score
+        let sorted = scoredResults.sorted { lhs, rhs in
+            // Prioritize books with covers, then by score
+            if lhs.hasCover != rhs.hasCover {
+                return lhs.hasCover
             }
-            .prefix(20)
-            .map { $0.book }
+            return lhs.confidenceScore > rhs.confidenceScore
+        }
+
+        // MINIMAL FILTER: Only require a valid cover URL
+        // Anniversary/Special editions ALWAYS pass if they have a cover
+        // Regular books need at least some quality indicators
+        let filteredBooks = sorted.filter { scoredBook in
+            // Must have a cover URL
+            guard scoredBook.hasCover,
+                  let coverURL = scoredBook.book.coverImageURL,
+                  !coverURL.isEmpty else {
+                #if DEBUG
+                print("❌ Filtered out '\(scoredBook.book.title)' - No cover URL")
+                #endif
+                return false
+            }
+
+            // CRITICAL: Books found via ISBN query ALWAYS pass (this is the 75th Anniversary!)
+            if isbnResultIDs.contains(scoredBook.googleItem.id) {
+                #if DEBUG
+                print("✅ ISBN RESULT always passes: '\(scoredBook.book.title)' (ID: \(scoredBook.googleItem.id))")
+                #endif
+                return true
+            }
+
+            let volumeInfo = scoredBook.googleItem.volumeInfo
+            let titleLower = scoredBook.book.title.lowercased()
+
+            // SPECIAL CASE: Anniversary/Special/Illustrated editions ALWAYS pass if they have a cover
+            let isSpecialEdition = titleLower.contains("anniversary") ||
+                                   titleLower.contains("illustrated by") ||
+                                   titleLower.contains("special edition") ||
+                                   titleLower.contains("collector") ||
+                                   titleLower.contains("deluxe") ||
+                                   titleLower.contains("75th") ||
+                                   titleLower.contains("50th") ||
+                                   titleLower.contains("100th")
+
+            if isSpecialEdition {
+                #if DEBUG
+                print("✅ SPECIAL EDITION always passes: '\(scoredBook.book.title)'")
+                #endif
+                return true  // NO quality filter for special editions!
+            }
+
+            // For regular books, require at least some quality indicators
+            let hasPageCount = volumeInfo.pageCount != nil && volumeInfo.pageCount! > 0
+            let hasISBN = scoredBook.hasISBN
+            let hasRatings = (volumeInfo.ratingsCount ?? 0) > 0
+            let hasMultipleImageSizes = (volumeInfo.imageLinks?.small != nil ||
+                                         volumeInfo.imageLinks?.medium != nil ||
+                                         volumeInfo.imageLinks?.large != nil)
+
+            let qualityScore = (hasPageCount ? 1 : 0) +
+                              (hasISBN ? 1 : 0) +
+                              (hasRatings ? 1 : 0) +
+                              (hasMultipleImageSizes ? 1 : 0)
+
+            // Regular books need at least 2 indicators
+            let passes = qualityScore >= 2
+            #if DEBUG
+            if !passes {
+                print("❌ Filtered out '\(scoredBook.book.title)' - Quality score: \(qualityScore) (need 2+)")
+            }
+            #endif
+            return passes
+        }.map { $0.book }
+
+        #if DEBUG
+        print("📚 Returning \(filteredBooks.count) books after filtering")
+        #endif
+
+        return filteredBooks
     }
     
-    private func getRawSearchResults(query: String, maxResults: Int = 40, lightMode: Bool = false) async -> [GoogleBookItem] {
+    private func getRawSearchResults(query: String, maxResults: Int = 40, lightMode: Bool = false, startIndex: Int = 0) async -> [GoogleBookItem] {
         var allItems: [GoogleBookItem] = []
 
         // OPTIMIZATION: Light mode for large imports reduces API calls by 60%
         if lightMode {
             // Only do 1-2 most reliable searches to reduce API load
             // Strategy 1: Regular search with more results
-            if let items = await performRawSearch(query: query, maxResults: 30) {
+            if let items = await performRawSearch(query: query, maxResults: 30, startIndex: startIndex) {
                 allItems.append(contentsOf: items)
             }
 
             // Strategy 2: Relevance search only if we don't have enough results
             if allItems.count < 15 {
-                if let items = await performRawSearch(query: query, maxResults: 15, orderBy: "relevance") {
+                if let items = await performRawSearch(query: query, maxResults: 15, orderBy: "relevance", startIndex: startIndex) {
                     allItems.append(contentsOf: items)
                 }
             }
@@ -217,7 +399,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             await withTaskGroup(of: [GoogleBookItem]?.self) { group in
                 // Strategy 1: Regular search
                 group.addTask {
-                    return await self.performRawSearch(query: query, maxResults: maxResults)
+                    return await self.performRawSearch(query: query, maxResults: maxResults, startIndex: startIndex)
                 }
 
                 // Strategy 2: If it looks like title + author, search each separately
@@ -229,7 +411,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                         group.addTask {
                             return await self.performRawSearch(
                                 query: "intitle:\(titleQuery)",
-                                maxResults: 10
+                                maxResults: 10,
+                                startIndex: startIndex
                             )
                         }
                     }
@@ -240,7 +423,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     return await self.performRawSearch(
                         query: query,
                         maxResults: 10,
-                        orderBy: "relevance"
+                        orderBy: "relevance",
+                        startIndex: startIndex
                     )
                 }
 
@@ -249,7 +433,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     return await self.performRawSearch(
                         query: query,
                         maxResults: 10,
-                        orderBy: "newest"
+                        orderBy: "newest",
+                        startIndex: startIndex
                     )
                 }
 
@@ -274,7 +459,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     private func performRawSearch(
         query: String,
         maxResults: Int,
-        orderBy: String = "relevance"
+        orderBy: String = "relevance",
+        startIndex: Int = 0
     ) async -> [GoogleBookItem]? {
         let apiBaseURL = "https://www.googleapis.com/books/v1/volumes"
         guard var components = URLComponents(string: apiBaseURL) else { return nil }
@@ -282,6 +468,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "maxResults", value: String(maxResults)),
+            URLQueryItem(name: "startIndex", value: String(startIndex)),
             URLQueryItem(name: "orderBy", value: orderBy),
             URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "langRestrict", value: "en"),
