@@ -470,10 +470,10 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                     // Add pendingEnrichedContext loaded from BookModel
                     // This contains character names like "Odysseus", "Telemachus", "Penelope"
                     // preventing "Otis" when user says "Odysseus"
-                    if !pendingEnrichedContext.isEmpty {
-                        contextualStrings.append(contentsOf: pendingEnrichedContext)
-                        logger.info("✅ Added \(pendingEnrichedContext.count) enriched terms from BookModel")
-                        logger.info("   Enriched context: \(pendingEnrichedContext.joined(separator: ", "))")
+                    if !self.pendingEnrichedContext.isEmpty {
+                        contextualStrings.append(contentsOf: self.pendingEnrichedContext)
+                        logger.info("✅ Added \(self.pendingEnrichedContext.count) enriched terms from BookModel")
+                        logger.info("   Enriched context: \(self.pendingEnrichedContext.joined(separator: ", "))")
                     } else {
                         logger.warning("⚠️ No enriched context available for '\(detectedBook.title)'")
                         logger.warning("   Call loadEnrichmentForCurrentBook() first or run BookEnrichmentService")
