@@ -258,13 +258,23 @@ struct SettingsView: View {
                             if enabled {
                                 // Haptic feedback for activation
                                 SensoryFeedback.success()
+                                // Reset quota sheet state to prevent showing old quota exceeded sheets
+                                PerplexityQuotaManager.shared.showQuotaExceededSheet = false
+                                // Force reload quota count
+                                PerplexityQuotaManager.shared.objectWillChange.send()
                             }
                         }
 
                         if gandalfMode {
-                            Label("Testing mode active - quotas disabled", systemImage: "info.circle")
-                                .font(.caption)
-                                .foregroundColor(.orange)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("🧙‍♂️ UNLIMITED MODE ACTIVE", systemImage: "infinity")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.purple)
+                                Label("Quotas disabled - ask as many questions as you want", systemImage: "info.circle")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
                         }
 
                         // Experimental Custom Camera Toggle
