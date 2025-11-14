@@ -1340,7 +1340,9 @@ struct AmbientModeView: View {
                         ZStack {
                             // Ambient orb when no text
                             if keyboardText.isEmpty {
-                                Button {
+                                // FIXED: Don't wrap AmbientOrbButton in another Button (nested button problem)
+                                // AmbientOrbButton is already a Button internally - just pass action directly
+                                AmbientOrbButton(size: 48) {
                                     // If voice mode is disabled, enable it first
                                     if !isVoiceModeEnabled {
                                         isVoiceModeEnabled = true
@@ -1355,12 +1357,7 @@ struct AmbientModeView: View {
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                                         startRecording()
                                     }
-                                } label: {
-                                    AmbientOrbButton(size: 48) {
-                                        // Action handled by parent button
-                                    }
                                 }
-                                .buttonStyle(.plain)
                                 .transition(.scale.combined(with: .opacity))
                                 .accessibilityLabel("Start voice input")
                                 .accessibilityHint("Double tap to switch to voice mode and start recording")
