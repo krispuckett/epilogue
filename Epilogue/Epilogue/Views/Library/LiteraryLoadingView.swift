@@ -7,6 +7,7 @@ struct LiteraryLoadingView: View {
     @State private var quoteOpacity: Double = 0
     @State private var bookScale: CGFloat = 0.8
     @State private var bookOpacity: Double = 0
+    @State private var quoteTimer: Timer? // PERFORMANCE FIX: Store timer to invalidate on disappear
     
     init(message: String? = nil) {
         self.message = message
@@ -115,12 +116,13 @@ struct LiteraryLoadingView: View {
         .padding(.horizontal, 50)
         .frame(maxWidth: 400) // Limit width for better readability
         .onAppear {
+            // PERFORMANCE FIX: Store timer reference so we can invalidate it
             // Rotate quotes every 4 seconds
-            Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
+            quoteTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
                 withAnimation(.easeInOut(duration: 0.5)) {
                     quoteOpacity = 0
                 }
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     currentQuote = LiteraryQuotes.randomQuote()
                     withAnimation(.easeInOut(duration: 0.5)) {
@@ -128,6 +130,12 @@ struct LiteraryLoadingView: View {
                     }
                 }
             }
+        }
+        .onDisappear {
+            // PERFORMANCE FIX: Invalidate timer to prevent memory leak
+            // Without this, timer keeps running even after view disappears
+            quoteTimer?.invalidate()
+            quoteTimer = nil
         }
     }
 }

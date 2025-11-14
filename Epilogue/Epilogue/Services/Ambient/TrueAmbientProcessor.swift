@@ -120,10 +120,10 @@ public class TrueAmbientProcessor: ObservableObject {
         public let requiresAction: Bool
     }
     
-    // WhisperKit integration
+    // WhisperKit integration (PRIMARY transcription engine)
     private var whisperModel: WhisperKit?
     private var audioBuffer: AVAudioPCMBuffer?
-    private let confidenceThreshold: Float = 0.99
+    private let confidenceThreshold: Float = 0.75  // WhisperKit is more accurate than Apple Speech
     
     // Session management
     private var sessionContent: [AmbientProcessedContent] = []
@@ -264,7 +264,9 @@ public class TrueAmbientProcessor: ObservableObject {
                         lowerTextCheck.starts(with: "why") ||
                         lowerTextCheck.starts(with: "how")
         
-        if isQuestion && confidence < 0.5 {
+        // INCREASED: Require 0.75 confidence for questions (was 0.5)
+        // This prevents "Who is Otis?" from being processed when user said "Who is Odysseus?"
+        if isQuestion && confidence < 0.75 {
             logger.warning("⚠️ Ignoring low-confidence question (conf: \(confidence)): \(text)")
             return // Wait for higher confidence version
         }
@@ -371,11 +373,17 @@ public class TrueAmbientProcessor: ObservableObject {
                     let lastWordSimilarity = maxLastWordLength == 0 ? 0.0 :
                                             1.0 - (Double(lastWordDistance) / Double(maxLastWordLength))
 
+                    // ADDED: Use phonetic similarity to catch "Otis" vs "Odysseus"
+                    let lastWordPhoneticSim = phoneticSimilarity(baseLastWord, newLastWord)
+
+                    // Use the higher of string similarity or phonetic similarity
+                    let finalLastWordSimilarity = max(lastWordSimilarity, lastWordPhoneticSim)
+
                     let similarity = Double(matchingWords.count) / Double(max(baseWords.count, newWords.count))
 
                     // STRICTER evolution detection to prevent false positives:
                     // 1. Must have high overall similarity (75%+, increased from 70%)
-                    // 2. Last words must be VERY similar (80%+, not just "similar")
+                    // 2. Last words must be VERY similar (70%+, LOWERED from 80% to catch phonetic matches)
                     // 3. Must start with same question word
                     let sameQuestionStart = (evolving.base.hasPrefix("who is") && normalizedText.hasPrefix("who is")) ||
                                            (evolving.base.hasPrefix("what is") && normalizedText.hasPrefix("what is")) ||
@@ -384,7 +392,9 @@ public class TrueAmbientProcessor: ObservableObject {
                                            (evolving.base.hasPrefix("why is") && normalizedText.hasPrefix("why is")) ||
                                            (evolving.base.hasPrefix("how is") && normalizedText.hasPrefix("how is"))
 
-                    if similarity > 0.75 && lastWordSimilarity > 0.8 && sameQuestionStart {
+                    // Use finalLastWordSimilarity (max of string and phonetic)
+                    // This catches "Who is Otis?" → "Who is Odysseus?" (phonetic match)
+                    if similarity > 0.75 && finalLastWordSimilarity > 0.7 && sameQuestionStart {
 
                         // IMPORTANT: Only treat as evolution if the new text is MORE complete (longer)
                         // This prevents "Who is Bilbo Baggins?" from being replaced by "Who is Bilbo Ba?"
@@ -692,19 +702,22 @@ public class TrueAmbientProcessor: ObservableObject {
                 
                 // Process the question
                 Task {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay - balanced for natural speech
-                    
+                    // INCREASED: 2.5 second delay for questions (was 1 second)
+                    // This gives transcription time to stabilize and correct mistakes
+                    // Prevents "Who is Otis?" → "Who is Odysseus?" duplicates
+                    try? await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 seconds - allows for corrections
+
                     // Double-check we're not already fetching this
                     let normalizedForCheck = correctedText.lowercased()
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-                    
+
                     if !self.questionsBeingFetched.contains(normalizedForCheck) {
                         await self.processQuestionWithEnhancedContext(correctedText, confidence: confidence, enhancedIntent: enhancedIntent)
                     } else {
                         logger.info("⏭️ Question already being fetched, avoiding duplicate API call")
                     }
-                    
+
                     // Remove from active questions
                     let normalizedText = text.lowercased()
                         .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1074,18 +1087,18 @@ public class TrueAmbientProcessor: ObservableObject {
     private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
         let m = s1.count
         let n = s2.count
-        
+
         if m == 0 { return n }
         if n == 0 { return m }
-        
+
         var matrix = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
-        
+
         for i in 0...m { matrix[i][0] = i }
         for j in 0...n { matrix[0][j] = j }
-        
+
         let s1Array = Array(s1)
         let s2Array = Array(s2)
-        
+
         for i in 1...m {
             for j in 1...n {
                 let cost = s1Array[i-1] == s2Array[j-1] ? 0 : 1
@@ -1096,8 +1109,96 @@ public class TrueAmbientProcessor: ObservableObject {
                 )
             }
         }
-        
+
         return matrix[m][n]
+    }
+
+    // MARK: - Phonetic Similarity (Catches "Otis" vs "Odysseus")
+
+    /// Calculate phonetic similarity between two strings
+    /// Returns 0.0-1.0 where 1.0 = identical sound, 0.0 = completely different
+    /// Used to detect transcription errors like "Otis" when user said "Odysseus"
+    private func phoneticSimilarity(_ str1: String, _ str2: String) -> Double {
+        let s1 = str1.lowercased()
+        let s2 = str2.lowercased()
+
+        // Quick exact match
+        if s1 == s2 { return 1.0 }
+
+        // If one string is completely contained in the other, high similarity
+        if s1.contains(s2) || s2.contains(s1) {
+            return 0.9
+        }
+
+        // Calculate Soundex codes for phonetic matching
+        let soundex1 = soundex(s1)
+        let soundex2 = soundex(s2)
+
+        // Soundex match = they sound the same (e.g., "Otis" and "Odysseus" might match)
+        if soundex1 == soundex2 && soundex1 != "0000" {
+            return 0.85
+        }
+
+        // Check first few letters (often preserved in misheard names)
+        let prefixLength = min(3, s1.count, s2.count)
+        if prefixLength > 0 {
+            let prefix1 = String(s1.prefix(prefixLength))
+            let prefix2 = String(s2.prefix(prefixLength))
+            if prefix1 == prefix2 {
+                return 0.7
+            }
+        }
+
+        // Check vowel patterns (similar sound)
+        let vowels1 = s1.filter { "aeiou".contains($0) }
+        let vowels2 = s2.filter { "aeiou".contains($0) }
+
+        if !vowels1.isEmpty && vowels1 == vowels2 {
+            return 0.6
+        }
+
+        return 0.0
+    }
+
+    /// Simple Soundex algorithm for phonetic matching
+    /// "Otis" → "O320", "Odysseus" → "O322" (similar!)
+    private func soundex(_ str: String) -> String {
+        let input = str.uppercased().filter { $0.isLetter }
+        guard !input.isEmpty else { return "0000" }
+
+        let firstLetter = String(input.first!)
+        var code = firstLetter
+
+        let soundexMap: [Character: Character] = [
+            "B": "1", "F": "1", "P": "1", "V": "1",
+            "C": "2", "G": "2", "J": "2", "K": "2", "Q": "2", "S": "2", "X": "2", "Z": "2",
+            "D": "3", "T": "3",
+            "L": "4",
+            "M": "5", "N": "5",
+            "R": "6"
+        ]
+
+        var previousCode: Character? = nil
+
+        for char in input.dropFirst() {
+            if let soundCode = soundexMap[char] {
+                if soundCode != previousCode {
+                    code.append(soundCode)
+                    previousCode = soundCode
+                }
+            } else {
+                previousCode = nil
+            }
+
+            if code.count >= 4 { break }
+        }
+
+        // Pad with zeros
+        while code.count < 4 {
+            code.append("0")
+        }
+
+        return String(code.prefix(4))
     }
     
     // MARK: - Session Management

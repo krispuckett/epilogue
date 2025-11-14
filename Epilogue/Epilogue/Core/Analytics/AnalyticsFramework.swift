@@ -543,8 +543,18 @@ final class Analytics: AnalyticsService {
     // MARK: - Private Helpers
 
     private func startFlushTimer() {
-        flushTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-            self.flush()
+        // PERFORMANCE: Increased from 30 to 60 seconds to reduce CPU usage
+        // Also skip flush if no events to send
+        flushTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            // Only flush if we have events
+            queueLock.lock()
+            let hasEvents = !eventQueue.isEmpty
+            queueLock.unlock()
+
+            if hasEvents {
+                self.flush()
+            }
         }
     }
 

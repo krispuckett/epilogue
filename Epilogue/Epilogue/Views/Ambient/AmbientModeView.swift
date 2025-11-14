@@ -2376,13 +2376,17 @@ struct AmbientModeView: View {
                     }
                 }
                 
+                // CRITICAL: Load enrichment BEFORE starting session
+                // This must happen FIRST so contextualStrings are ready
+                await voiceRecognition.loadEnrichmentForCurrentBook(modelContext: modelContext)
+
                 processor.startSession()
-                
+
                 // Fade in onboarding text
                 if showOnboarding {
                     onboardingOpacity = 1.0
-                    
-                    // Start timer to fade out after 4 seconds  
+
+                    // Start timer to fade out after 4 seconds
                     onboardingTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
                         fadeOutOnboarding()
                     }
@@ -3121,6 +3125,27 @@ struct AmbientModeView: View {
                 currentSession?.capturedQuotes = []
             }
             currentSession?.capturedQuotes?.append(capturedQuote)
+        }
+
+        // CRITICAL FIX: Insert into SwiftData so quote persists and appears in Notes view
+        modelContext.insert(capturedQuote)
+
+        // CRITICAL FIX: Save to SwiftData database
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ Quote saved from Visual Intelligence to SwiftData: \(text.prefix(50))...")
+            #endif
+        } catch {
+            #if DEBUG
+            print("❌ Failed to save quote from Visual Intelligence: \(error)")
+            #endif
+            // Show error notification to user instead of false success
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToastMessage"),
+                object: ["message": "Failed to save quote. Please try again."]
+            )
+            return  // Don't show success animation if save failed
         }
 
         // Add to messages

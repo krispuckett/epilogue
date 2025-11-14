@@ -4,6 +4,7 @@ import Combine
 import OSLog
 import Accelerate.vecLib.vDSP
 import UIKit
+import SwiftData
 // Potential iOS 26 imports - uncomment if available
 // import SpeechAnalysis
 // import FoundationModels
@@ -460,11 +461,23 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                     "Love Wins", "Rob Bell"
                 ]
                 
-                // Add book titles from detected book if available
+                // CRITICAL: Add enriched book data (characters, themes from Perplexity)
+                // This is the bridge from BookEnrichmentService → Speech Recognition
                 if let detectedBook = AmbientBookDetector.shared.detectedBook {
                     contextualStrings.append(detectedBook.title)
-                    // Author is not optional in Book struct
                     contextualStrings.append(detectedBook.author)
+
+                    // Add pendingEnrichedContext loaded from BookModel
+                    // This contains character names like "Odysseus", "Telemachus", "Penelope"
+                    // preventing "Otis" when user says "Odysseus"
+                    if !pendingEnrichedContext.isEmpty {
+                        contextualStrings.append(contentsOf: pendingEnrichedContext)
+                        logger.info("✅ Added \(pendingEnrichedContext.count) enriched terms from BookModel")
+                        logger.info("   Enriched context: \(pendingEnrichedContext.joined(separator: ", "))")
+                    } else {
+                        logger.warning("⚠️ No enriched context available for '\(detectedBook.title)'")
+                        logger.warning("   Call loadEnrichmentForCurrentBook() first or run BookEnrichmentService")
+                    }
                 }
                 
                 recognitionRequest.contextualStrings = contextualStrings
@@ -497,41 +510,46 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             // Install tap for audio analysis
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                 guard let self = self else { return }
-                
-                // Log every 100th buffer to avoid spam
+
+                // PERFORMANCE OPTIMIZATION: Throttle expensive operations
+                // Keep buffer size at 1024 for smooth gradient response
+                // But only run expensive analysis every 3rd buffer (saves ~60% CPU on analysis)
                 self.audioBufferCount += 1
+                let shouldRunExpensiveAnalysis = (self.audioBufferCount % 3 == 0)
+
                 if self.audioBufferCount % 100 == 0 {
                     logger.debug("🎤 Audio buffer #\(self.audioBufferCount), amplitude: \(self.currentAmplitude)")
                 }
-                
-                // Update amplitude for visualization
+
+                // ALWAYS update amplitude for gradient visualization (keeps gradient smooth!)
                 self.updateAmplitude(from: buffer)
-                
-                // NEW: Analyze voice characteristics for ambient mode
-                self.analyzeVoiceCharacteristics(buffer)
-                
-                // Always append to recognition request (Apple needs continuous audio)
+
+                // THROTTLED: Voice characteristics analysis (expensive FFT-like operations)
+                // Only run every 3rd buffer - gradient doesn't need this, it uses amplitude
+                if shouldRunExpensiveAnalysis {
+                    self.analyzeVoiceCharacteristics(buffer)
+                }
+
+                // ALWAYS append to recognition request (Apple needs continuous audio)
                 self.recognitionRequest?.append(buffer)
 
-                // Voice Activity Detection
-                let hasVoice = self.detectVoiceActivity(from: buffer)
+                // THROTTLED: Voice Activity Detection (expensive zero-crossing & frequency analysis)
+                // Only run every 3rd buffer - saves CPU, still responsive enough
+                if shouldRunExpensiveAnalysis {
+                    let hasVoice = self.detectVoiceActivity(from: buffer)
+                    self.lastVADSignal = hasVoice
 
-                // Track VAD signal for adaptive timer
-                self.lastVADSignal = hasVoice
-
-                if hasVoice {
-                    self.handleVoiceDetected()
-                } else {
-                    self.handleSilence()
+                    if hasVoice {
+                        self.handleVoiceDetected()
+                    } else {
+                        self.handleSilence()
+                    }
                 }
-                
-                // Advanced pipeline processing removed - using TrueAmbientProcessor
-                
-                // Buffer for Whisper whenever we're actively listening (not just when voice detected)
-                // This ensures we capture all audio that Apple is transcribing
+
+                // Buffer for Whisper whenever we're actively listening
                 if self.recognitionState == .listening || !self.transcribedText.isEmpty {
                     self.bufferAudioForWhisper(buffer)
-                    
+
                     // Log periodically
                     self.voiceBufferLogCounter += 1
                     if self.voiceBufferLogCounter % 100 == 0 {
@@ -818,75 +836,47 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     @MainActor
     private func processTranscriptionResult(_ result: SFSpeechRecognitionResult) async {
         let text = result.bestTranscription.formattedString
-        self.transcribedText = text
-        
+        self.transcribedText = text  // Used for LIVE UI FEEDBACK ONLY
+
         // Update words per minute tracking
         updateWordsPerMinute(from: text)
-        
+
         // Update confidence score for debugging
         if let segment = result.bestTranscription.segments.last {
             self.confidenceScore = segment.confidence
-            logger.debug("Transcription confidence: \(segment.confidence) - '\(segment.substring)'")
+            logger.debug("Apple Speech confidence: \(segment.confidence) - '\(segment.substring)'")
         }
-        
-        // CRITICAL: Route ONLY to SingleSourceProcessor - eliminates competing systems
+
+        // IMPORTANT: Apple Speech is now ONLY for real-time UI feedback
+        // WhisperKit handles actual processing (more accurate, especially with names)
+        // This prevents "Otis" when user says "Odysseus"
         if isListeningInAmbientMode {
-            // Still detect book mentions for context
+            // Detect book mentions for context
             detectBookFromSpeech(text)
-            
-            // Route to TrueAmbientProcessor - THE ONLY PROCESSOR
-            let processor = TrueAmbientProcessor.shared
-            
-            logger.info("🎯 SingleSourceProcessor: Processing '\(text.prefix(50))...' (final: \(result.isFinal))")
-            
-            // Capture the most recent complete transcription
+
+            logger.info("📱 Apple Speech (UI only): '\(text.prefix(50))...' (final: \(result.isFinal))")
+
+            // Capture for potential fallback only
             if !text.isEmpty {
                 pendingTranscription = text
                 lastSpeechTime = Date()
                 
                 // Check if we have a complete sentence (ends with punctuation) and process immediately
-                if result.isFinal || (self.confidenceScore > 0.7 && (text.hasSuffix(".") || text.hasSuffix("?") || text.hasSuffix("!"))) {
-                    // Process immediately for complete sentences
-                    let completeThought = self.pendingTranscription
-                    self.pendingTranscription = ""
-                    thoughtTimer?.invalidate() // Cancel any pending timer
-                    
-                    Task {
-                        logger.info("💭 Processing complete sentence immediately: \(completeThought)")
-                        await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
-                    }
-                } else {
-                    // For incomplete sentences, wait for silence
-                    // Use ADAPTIVE TIMER that learns from user's speaking patterns
-                    // This accommodates slow/thoughtful speakers while staying responsive for fast speakers
-                    thoughtTimer?.invalidate()
+                // BUT: For questions, always wait for stabilization to avoid "Otis" vs "Odysseus" mistakes
+                let isQuestionText = text.lowercased().hasPrefix("who ") || text.lowercased().hasPrefix("what ") ||
+                                    text.lowercased().hasPrefix("where ") || text.lowercased().hasPrefix("when ") ||
+                                    text.lowercased().hasPrefix("why ") || text.lowercased().hasPrefix("how ") ||
+                                    text.hasSuffix("?")
 
-                    // Track confidence scores for trend analysis
-                    recentConfidenceScores.append(Double(self.confidenceScore))
-                    if recentConfidenceScores.count > 10 {
-                        recentConfidenceScores.removeFirst()
-                    }
+                // NO LONGER PROCESSING Apple Speech results directly
+                // WhisperKit will handle all processing for better accuracy
+                // Just update the pending transcription for fallback scenarios
+                thoughtTimer?.invalidate()
 
-                    // Calculate adaptive duration based on multiple factors
-                    let adaptiveDuration = calculateAdaptiveTimerDuration()
-                    let pauseStartTime = Date()
-
-                    thoughtTimer = Timer.scheduledTimer(withTimeInterval: adaptiveDuration, repeats: false) { _ in
-                        // Track how long user actually paused (for pattern learning)
-                        let actualPauseDuration = Date().timeIntervalSince(pauseStartTime)
-                        self.trackUserPause(duration: actualPauseDuration)
-
-                        // User has been silent - process the complete thought
-                        if !self.pendingTranscription.isEmpty {
-                            let completeThought = self.pendingTranscription
-                            self.pendingTranscription = ""
-
-                            Task {
-                                logger.info("💭 Processing complete thought after \(String(format: "%.1f", actualPauseDuration))s silence: \(completeThought)")
-                                await processor.processDetectedText(completeThought, confidence: Float(self.confidenceScore))
-                            }
-                        }
-                    }
+                // Track confidence scores for adaptive timing
+                recentConfidenceScores.append(Double(self.confidenceScore))
+                if recentConfidenceScores.count > 10 {
+                    recentConfidenceScores.removeFirst()
                 }
             }
         }
@@ -1099,8 +1089,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         // Start the processing timer only if it's not already running
         if whisperProcessingTimer == nil {
-            logger.info("Starting Whisper processing timer (2 seconds)")
-            whisperProcessingTimer = Timer.scheduledTimer(withTimeInterval: whisperBufferDuration, repeats: true) { [weak self] _ in
+            logger.info("Starting Whisper processing timer (\(Int(self.whisperBufferDuration)) seconds)")
+            whisperProcessingTimer = Timer.scheduledTimer(withTimeInterval: self.whisperBufferDuration, repeats: true) { [weak self] _ in
                 logger.info("Whisper processing timer fired")
                 Task {
                     await self?.processWithWhisper()
@@ -1161,14 +1151,16 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 logger.warning("Whisper returned blank audio, using Apple transcription as fallback")
                 
                 // Use Apple's transcription as fallback if available
-                if !transcribedText.isEmpty {
+                if !transcribedText.isEmpty && isListeningInAmbientMode {
                     whisperTranscribedText = "[Fallback] \(transcribedText)"
                     whisperConfidence = confidenceScore
-                    
-                    NotificationCenter.default.post(
-                        name: Notification.Name("WhisperTranscriptionReady"),
-                        object: transcribedText as NSString
-                    )
+
+                    logger.warning("⚠️ WhisperKit returned blank, falling back to Apple Speech (less accurate)")
+
+                    // Process with Apple Speech as fallback
+                    Task {
+                        await TrueAmbientProcessor.shared.processDetectedText(transcribedText, confidence: confidenceScore)
+                    }
                 } else {
                     whisperTranscribedText = ""
                     whisperConfidence = 0.0
@@ -1189,9 +1181,20 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 whisperConfidence = avgConfidence
                 detectedLanguage = result.language ?? "en"
                 
-                logger.info("Whisper transcription: \(result.text) (confidence: \(avgConfidence), language: \(result.language ?? "unknown"))")
-                
-                // Post notification with Whisper's transcription
+                logger.info("✅ Whisper transcription: \(result.text) (confidence: \(avgConfidence), language: \(result.language ?? "unknown"))")
+
+                // CRITICAL: Use WhisperKit as PRIMARY transcription engine
+                // Apple Speech is only for real-time UI feedback
+                // WhisperKit is more accurate, especially with names like "Odysseus" (not "Otis")
+                if isListeningInAmbientMode && !result.text.isEmpty {
+                    // Process with TrueAmbientProcessor using WhisperKit's ACCURATE transcription
+                    Task {
+                        logger.info("🎯 Using WhisperKit transcription for processing: \(result.text)")
+                        await TrueAmbientProcessor.shared.processDetectedText(result.text, confidence: avgConfidence)
+                    }
+                }
+
+                // Also post notification for any other listeners
                 NotificationCenter.default.post(
                     name: Notification.Name("WhisperTranscriptionReady"),
                     object: result.text as NSString
@@ -1199,11 +1202,18 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             }
         } catch {
             logger.error("Whisper transcription failed: \(error.localizedDescription)")
-            
+
             // Use Apple transcription as fallback on error
-            if !transcribedText.isEmpty {
+            if !transcribedText.isEmpty && isListeningInAmbientMode {
                 whisperTranscribedText = "[Error fallback] \(transcribedText)"
                 whisperConfidence = confidenceScore * 0.8 // Reduce confidence for fallback
+
+                logger.warning("⚠️ WhisperKit error, falling back to Apple Speech")
+
+                // Process with Apple Speech as fallback
+                Task {
+                    await TrueAmbientProcessor.shared.processDetectedText(transcribedText, confidence: confidenceScore * 0.8)
+                }
             }
         }
         
@@ -1299,6 +1309,71 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     func updateLibraryBooks(_ books: [Book]) {
         self.libraryBooks = books
         logger.info("Updated library books for voice detection: \(books.count) books")
+    }
+
+    // MARK: - Book Enrichment Integration
+
+    // Store enriched context to apply on next recognition session
+    private var pendingEnrichedContext: [String] = []
+
+    /// Load enriched data for the current book
+    /// Call this when starting ambient mode to warm up character names
+    @MainActor
+    func loadEnrichmentForCurrentBook(modelContext: ModelContext?) async {
+        guard let book = AmbientBookDetector.shared.detectedBook else {
+            logger.info("No book detected yet for enrichment")
+            return
+        }
+
+        guard let modelContext = modelContext else {
+            logger.warning("No model context available for enrichment lookup")
+            return
+        }
+
+        logger.info("📚 Loading enrichment data for '\(book.title)'...")
+
+        do {
+            // Fetch the BookModel for this Book
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { bookModel in
+                    bookModel.id == book.id || bookModel.localId == book.localId.uuidString
+                }
+            )
+
+            let results = try modelContext.fetch(descriptor)
+
+            if let bookModel = results.first {
+                pendingEnrichedContext.removeAll()
+
+                // Add enriched character names (THE WHOLE POINT!)
+                if let characters = bookModel.majorCharacters, !characters.isEmpty {
+                    pendingEnrichedContext.append(contentsOf: characters)
+                    logger.info("✅ Loaded \(characters.count) enriched characters: \(characters.joined(separator: ", "))")
+                } else {
+                    logger.warning("⚠️ No enriched characters for '\(book.title)' - book may need enrichment")
+                }
+
+                // Add key themes
+                if let themes = bookModel.keyThemes, !themes.isEmpty {
+                    pendingEnrichedContext.append(contentsOf: themes)
+                    logger.info("✅ Loaded \(themes.count) themes: \(themes.joined(separator: ", "))")
+                }
+
+                // Add series name if available
+                if let seriesName = bookModel.seriesName {
+                    pendingEnrichedContext.append(seriesName)
+                }
+
+                if pendingEnrichedContext.isEmpty {
+                    logger.warning("⚠️ '\(book.title)' has NO enrichment data - needs to run BookEnrichmentService")
+                    logger.warning("   Without enrichment, 'Odysseus' might be heard as 'Otis'")
+                }
+            } else {
+                logger.warning("⚠️ No BookModel found for '\(book.title)' - enrichment not available")
+            }
+        } catch {
+            logger.error("Failed to fetch enriched data: \(error)")
+        }
     }
     
     private func detectBookFromSpeech(_ text: String) {
@@ -1489,15 +1564,17 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         }
 
         // FACTOR 4: Question detection
-        // If current text looks like start of question, be more patient
+        // If current text looks like start of question, be MORE patient (increased delay)
         let lowerText = pendingTranscription.lowercased()
         let questionStarters = ["who", "what", "where", "when", "why", "how", "is", "are", "can", "could", "should", "would"]
         let startsWithQuestion = questionStarters.contains(where: { lowerText.hasPrefix($0 + " ") })
+        let hasQuestionMark = pendingTranscription.contains("?")
 
-        if startsWithQuestion && lowerText.split(separator: " ").count < 3 {
-            // User just started a question with 1-2 words, give them more time
-            duration += 1.0
-            logger.debug("❓ Question detected with few words, extending timer to \(String(format: "%.1f", duration))s")
+        // INCREASED: Give questions 2 seconds extra (was 1 second) to stabilize
+        // This prevents "Who is Otis?" when user said "Who is Odysseus?"
+        if startsWithQuestion || hasQuestionMark {
+            duration += 2.0  // Increased from 1.0
+            logger.debug("❓ Question detected, extending timer to \(String(format: "%.1f", duration))s for transcription stability")
         }
 
         // Cap at 5 seconds max to avoid waiting forever
