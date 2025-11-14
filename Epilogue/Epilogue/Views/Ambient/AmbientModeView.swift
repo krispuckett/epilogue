@@ -1345,9 +1345,9 @@ struct AmbientModeView: View {
                                     if !isVoiceModeEnabled {
                                         isVoiceModeEnabled = true
                                     }
-                                    // Return to voice mode
-                                    isKeyboardFocused = false
+                                    // Return to voice mode - ALL state changes in animation block for proper synchronization
                                     withAnimation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0)) {
+                                        isKeyboardFocused = false
                                         keyboardText = ""
                                         textFieldHeight = 44  // Reset to compact height
                                         inputMode = .listening
