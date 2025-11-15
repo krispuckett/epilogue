@@ -60,6 +60,46 @@ struct EpilogueShortcuts: AppShortcutsProvider {
             shortTitle: "Reading Progress",
             systemImageName: "chart.line.uptrend.xyaxis"
         )
+
+        AppShortcut(
+            intent: UpdateBookStatusIntent(),
+            phrases: [
+                "Update book status in \(.applicationName)",
+                "Change reading status in \(.applicationName)"
+            ],
+            shortTitle: "Update Status",
+            systemImageName: "checkmark.circle"
+        )
+
+        AppShortcut(
+            intent: OpenBookIntent(),
+            phrases: [
+                "Open \(\.$book) in \(.applicationName)",
+                "Show me \(\.$book) in \(.applicationName)"
+            ],
+            shortTitle: "Open Book",
+            systemImageName: "book.circle"
+        )
+
+        AppShortcut(
+            intent: SearchLibraryIntent(),
+            phrases: [
+                "Search my library in \(.applicationName)",
+                "Find a book in \(.applicationName)"
+            ],
+            shortTitle: "Search Library",
+            systemImageName: "magnifyingglass"
+        )
+
+        AppShortcut(
+            intent: ExportNotesIntent(),
+            phrases: [
+                "Export notes from \(\.$book) in \(.applicationName)",
+                "Get markdown for \(\.$book) in \(.applicationName)"
+            ],
+            shortTitle: "Export Notes",
+            systemImageName: "square.and.arrow.up"
+        )
     }
 
     static var shortcutTileColor: ShortcutTileColor = .orange

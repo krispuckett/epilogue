@@ -373,6 +373,13 @@ struct SettingsView: View {
                             Label("Shader Playground", systemImage: "wand.and.rays")
                                 .foregroundStyle(.purple)
                         }
+
+                        NavigationLink {
+                            SpecularLensExperiment()
+                        } label: {
+                            Label("Specular Lens Experiment", systemImage: "sparkles.rectangle.stack")
+                                .foregroundStyle(.orange)
+                        }
                     } header: {
                         Text("Developer Options")
                     } footer: {
