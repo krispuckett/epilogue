@@ -1649,7 +1649,6 @@ private struct NoteCardView: View {
                     Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 }
                 .clipShape(Capsule())
-                .transition(.opacity)
                 .accessibilityLabel("Show more of this note")
                 .accessibilityHint("Double tap to expand this note")
 
@@ -1670,7 +1669,6 @@ private struct NoteCardView: View {
                     Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 }
                 .clipShape(Capsule())
-                .transition(.opacity)
                 .accessibilityLabel("Show full note")
                 .accessibilityHint("Double tap to expand this note")
 
@@ -1706,22 +1704,22 @@ private struct NoteCardView: View {
     @ViewBuilder
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header - shows when expanded OR when date is tapped
+            // Header - shows when expanded with smooth fade
             if isExpanded {
                 dateHeader
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // Content
+            // Content with smooth height animation
             contentText
-                .frame(maxHeight: isExpanded ? .infinity : nil)
-                .clipped()
 
-            // Expansion indicator - positioned naturally
+            // Expansion indicator - fades out smoothly
             if !isExpanded && contentTier.needsExpansionUI {
                 HStack {
                     Spacer()
                     expansionIndicator
                         .padding(.top, 4)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     Spacer()
                 }
             }
@@ -1763,7 +1761,7 @@ private struct NoteCardView: View {
                     .padding(.leading, 1)
             }
         }
-        .animation(DesignSystem.Animation.springStandard, value: isExpanded)
+        .animation(.smooth(duration: 0.4, extraBounce: 0.0), value: isExpanded)
         .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(makeAccessibilityLabel())
@@ -1771,7 +1769,7 @@ private struct NoteCardView: View {
         .accessibilityAddTraits(.isButton)
         // Tap to expand inline (all tiers)
         .onTapGesture {
-            withAnimation(DesignSystem.Animation.springStandard) {
+            withAnimation(.smooth(duration: 0.4, extraBounce: 0.0)) {
                 isExpanded.toggle()
             }
             SensoryFeedback.light()
