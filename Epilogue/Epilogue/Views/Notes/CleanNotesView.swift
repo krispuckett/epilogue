@@ -1510,6 +1510,13 @@ private struct NoteCardView: View {
         }
     }
 
+    private var isMediumTier: Bool {
+        if case .medium = contentTier {
+            return true
+        }
+        return false
+    }
+
     private enum ContentTier {
         case short
         case medium(additionalLines: Int)
@@ -1747,7 +1754,7 @@ private struct NoteCardView: View {
                 HStack {
                     Spacer()
                     expansionIndicator
-                        .padding(.top, contentTier == .medium ? -4 : 8)
+                        .padding(.top, isMediumTier ? -4 : 8)
                     Spacer()
                 }
             }
