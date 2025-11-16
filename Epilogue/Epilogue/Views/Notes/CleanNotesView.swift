@@ -1629,22 +1629,39 @@ private struct NoteCardView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    // MARK: - Gradient Fade Overlay (Medium Tier)
+    // MARK: - Blur Fade Overlay (Medium Tier)
     @ViewBuilder
-    private var gradientFade: some View {
+    private var blurFade: some View {
         if case .medium = contentTier, !isExpanded {
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    Color.clear,
-                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.3),
-                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6),
-                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.85)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
+            VStack(spacing: 0) {
+                // Gradient mask for the blur to create fade effect
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 60)
+
+                // Solid mask area
+                Color.black
+                    .frame(height: 30)
+            }
+            .background(.ultraThinMaterial)
+            .mask(
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.3),
+                        Color.black.opacity(0.7),
+                        Color.black
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             )
-            .frame(height: 90)
             .allowsHitTesting(false)
             .transition(.opacity)
         }
@@ -1739,14 +1756,14 @@ private struct NoteCardView: View {
                 dateHeader
             }
 
-            // Content with overlay for gradient
+            // Content with overlay for blur
             ZStack(alignment: .bottom) {
                 contentText
                     .frame(maxHeight: isExpanded ? .infinity : nil)
                     .clipped()
 
-                // Gradient fade for medium-length notes
-                gradientFade
+                // Blur fade for medium-length notes
+                blurFade
             }
 
             // Expansion indicator - positioned naturally
