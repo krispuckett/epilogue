@@ -1476,26 +1476,95 @@ private struct NoteScrollOffsetPreferenceKey: PreferenceKey {
 
 
 // MARK: - Note Card View with Date Toggle
+// MARK: - Enhanced Note Card with Smart Expansion
 private struct NoteCardView: View {
     let note: Note
     let capturedNote: CapturedNote?
-    @State private var showDate = false
+
+    // MARK: - State Management
+    @State private var isExpanded = false
+    @State private var showingDetailView = false
     @State private var showingSessionSummary = false
-    
+    @State private var contentHeight: CGFloat = 0
+    @State private var indicatorGlow = false
+
+    // MARK: - Constants (Steve would approve these numbers)
+    private let lineHeight: CGFloat = 27  // 16pt font + 6pt line spacing + 5pt padding
+    private let previewLineLimit = 5
+    private let mediumThreshold: CGFloat = 12  // lines
+    private let longThreshold: CGFloat = 20    // lines
+
+    // MARK: - Content Tier Detection
+    private var approximateLineCount: Int {
+        Int(ceil(contentHeight / lineHeight))
+    }
+
+    private var contentTier: ContentTier {
+        let lines = approximateLineCount
+        if lines <= previewLineLimit {
+            return .short
+        } else if lines <= Int(mediumThreshold) {
+            return .medium(additionalLines: lines - previewLineLimit)
+        } else {
+            return .long(totalLines: lines)
+        }
+    }
+
+    private enum ContentTier {
+        case short
+        case medium(additionalLines: Int)
+        case long(totalLines: Int)
+
+        var needsExpansionUI: Bool {
+            switch self {
+            case .short: return false
+            case .medium, .long: return true
+            }
+        }
+    }
+
+    // MARK: - Header with Smart "Show Less" Button
     private var dateHeader: some View {
         HStack {
             Text(formatDate(note.dateCreated).uppercased())
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .kerning(1.2)
                 .foregroundStyle(
-                    (capturedNote?.source as? String) == "ambient" 
+                    (capturedNote?.source as? String) == "ambient"
                         ? DesignSystem.Colors.primaryAccent.opacity(0.6)
                         : .white.opacity(0.4)
                 )
-            
+
             Spacer()
-            
-            // Session pill for ambient notes - shows with date on tap
+
+            // Show "Show Less" pill when expanded
+            if isExpanded && contentTier.needsExpansionUI {
+                Button {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                        isExpanded = false
+                    }
+                    SensoryFeedback.light()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Show Less")
+                            .font(.system(size: 10, weight: .medium))
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 8, weight: .semibold))
+                    }
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.05))
+                    .overlay {
+                        Capsule().stroke(DesignSystem.Colors.primaryAccent.opacity(0.3), lineWidth: 0.5)
+                    }
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            }
+
+            // Session pill for ambient notes
             if let session = capturedNote?.ambientSession, (capturedNote?.source as? String) == "ambient" {
                 Button {
                     showingSessionSummary = true
@@ -1504,7 +1573,6 @@ private struct NoteCardView: View {
                         Text("SESSION")
                             .font(.system(size: 10, weight: .semibold, design: .default))
                             .kerning(1.0)
-
                         Image(systemName: "arrow.right")
                             .font(.system(size: 9, weight: .bold))
                     }
@@ -1520,7 +1588,7 @@ private struct NoteCardView: View {
                             .stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 1)
                     )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(.plain)
             }
         }
         .transition(.asymmetric(
@@ -1528,16 +1596,112 @@ private struct NoteCardView: View {
             removal: .move(edge: .top).combined(with: .opacity)
         ))
     }
-    
+
+    // MARK: - Content Text with Measurement
     private var contentText: some View {
         Text(note.content)
             .font(.system(size: 16, weight: .regular, design: .default))
             .foregroundStyle(.white.opacity(0.95))
             .multilineTextAlignment(.leading)
-            .lineLimit(5)  // Limit to 5 lines max, expandable on tap
+            .lineLimit(isExpanded ? nil : previewLineLimit)
             .lineSpacing(6)
+            .background(
+                // Hidden measurement view - Steve would appreciate this efficiency
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear {
+                            // Measure full content height on first render
+                            DispatchQueue.main.async {
+                                contentHeight = geo.size.height
+                            }
+                        }
+                        .onChange(of: note.content) { _, _ in
+                            contentHeight = geo.size.height
+                        }
+                }
+            )
+            .fixedSize(horizontal: false, vertical: true)
     }
-    
+
+    // MARK: - Gradient Fade Overlay (Medium Tier)
+    @ViewBuilder
+    private var gradientFade: some View {
+        if case .medium = contentTier, !isExpanded {
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.85),
+                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.98)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 70)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
+    // MARK: - Expansion Indicator Pills
+    @ViewBuilder
+    private var expansionIndicator: some View {
+        if contentTier.needsExpansionUI && !isExpanded {
+            switch contentTier {
+            case .medium(let additionalLines):
+                // Glass pill for medium notes
+                HStack(spacing: 4) {
+                    Text("\(additionalLines) more line\(additionalLines == 1 ? "" : "s")")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.05))
+                .overlay {
+                    Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                }
+                .clipShape(Capsule())
+                .shadow(color: indicatorGlow ? DesignSystem.Colors.primaryAccent.opacity(0.3) : .clear, radius: 8)
+                .transition(.scale.combined(with: .opacity))
+                .accessibilityLabel("Expand to show \(additionalLines) more lines")
+                .accessibilityHint("Double tap to expand this note")
+
+            case .long:
+                // Prominent button for long notes
+                Button {
+                    showingDetailView = true
+                    SensoryFeedback.impact(.light)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("View Full Note")
+                            .font(.caption.weight(.medium))
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(DesignSystem.Colors.primaryAccent.opacity(0.12))
+                    .overlay {
+                        Capsule().stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 0.5)
+                    }
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+                .accessibilityLabel("View full note in reading mode")
+                .accessibilityHint("Double tap to open note in full-screen reading view")
+
+            case .short:
+                EmptyView()
+            }
+        }
+    }
+
+    // MARK: - Book Context
     private var bookContext: some View {
         Group {
             if let bookTitle = note.bookTitle {
@@ -1546,7 +1710,7 @@ private struct NoteCardView: View {
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .kerning(0.8)
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
-                    
+
                     if let author = note.author {
                         Text(author.uppercased())
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
@@ -1558,16 +1722,35 @@ private struct NoteCardView: View {
             }
         }
     }
-    
+
+    // MARK: - Main Body
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Show header when date is toggled on
-            if showDate {
+            // Header - shows when expanded OR when date is tapped
+            if isExpanded {
                 dateHeader
             }
-            
-            contentText
-            
+
+            // Content with overlay for gradient
+            ZStack(alignment: .bottom) {
+                contentText
+                    .frame(maxHeight: isExpanded ? .infinity : nil)
+                    .clipped()
+
+                // Gradient fade for medium-length notes
+                gradientFade
+            }
+
+            // Expansion indicator
+            if !isExpanded {
+                HStack {
+                    Spacer()
+                    expansionIndicator
+                        .padding(.top, contentTier == .medium ? -4 : 8)
+                    Spacer()
+                }
+            }
+
             bookContext
         }
         .padding(DesignSystem.Spacing.cardPadding)
@@ -1591,7 +1774,7 @@ private struct NoteCardView: View {
                 )
         )
         .overlay(alignment: .leading) {
-            // Golden favorite indicator on left edge
+            // Golden favorite indicator
             if capturedNote?.isFavorite == true {
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
                     .fill(Color.yellow.opacity(0.6))
@@ -1600,14 +1783,52 @@ private struct NoteCardView: View {
                     .padding(.leading, 1)
             }
         }
-        .animation(DesignSystem.Animation.springStandard, value: showDate)
-        .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
+        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: isExpanded)
+        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: capturedNote?.isFavorite)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(makeAccessibilityLabel())
+        .accessibilityHint(makeAccessibilityHint())
+        .accessibilityAddTraits(.isButton)
+        // Tap to expand (for short/medium notes)
         .onTapGesture {
-            withAnimation(DesignSystem.Animation.springStandard) {
-                showDate.toggle()
+            if case .long = contentTier {
+                // Long notes open detail view
+                showingDetailView = true
+            } else if contentTier.needsExpansionUI {
+                // Medium notes expand inline
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                    isExpanded.toggle()
+                }
+                SensoryFeedback.light()
+            } else {
+                // Short notes just show date
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                    isExpanded.toggle()
+                }
+                SensoryFeedback.light()
             }
-            SensoryFeedback.light()
         }
+        // Long press for detail view (all tiers)
+        .onLongPressGesture(minimumDuration: 0.5) {
+            showingDetailView = true
+            SensoryFeedback.impact(.medium)
+        }
+        // Glow effect on first appearance
+        .onAppear {
+            if contentTier.needsExpansionUI {
+                withAnimation(.easeInOut(duration: 1.5).repeatCount(2, autoreverses: true)) {
+                    indicatorGlow = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    indicatorGlow = false
+                }
+            }
+        }
+        // Detail view sheet for long notes
+        .sheet(isPresented: $showingDetailView) {
+            NoteDetailView(note: note, capturedNote: capturedNote)
+        }
+        // Session summary sheet
         .sheet(isPresented: $showingSessionSummary) {
             if let session = capturedNote?.ambientSession {
                 NavigationStack {
@@ -1616,10 +1837,40 @@ private struct NoteCardView: View {
             }
         }
     }
-    
+
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
         return formatter.string(from: date)
+    }
+
+    // MARK: - Accessibility Helpers
+    private func makeAccessibilityLabel() -> String {
+        var label = "Note"
+
+        if let bookTitle = note.bookTitle {
+            label += " from \(bookTitle)"
+        }
+
+        if isExpanded {
+            label += ". Expanded"
+        }
+
+        return label
+    }
+
+    private func makeAccessibilityHint() -> String {
+        switch contentTier {
+        case .short:
+            return "Double tap to show date and details"
+        case .medium(let lines):
+            if isExpanded {
+                return "Double tap to collapse note"
+            } else {
+                return "Double tap to expand and show \(lines) more lines. Long press to view in full screen"
+            }
+        case .long:
+            return "Double tap to view full note in reading mode. Long press for full screen view"
+        }
     }
 }

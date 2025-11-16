@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Simple Quote Card for Award Winning Notes View
+// MARK: - Enhanced Quote Card with Reader Mode for Long Quotes
 struct SimpleQuoteCard: View {
     let note: Note
     let capturedQuote: CapturedQuote?
@@ -8,19 +8,32 @@ struct SimpleQuoteCard: View {
     @State private var isPressed = false
     @State private var showDate = false
     @State private var showingSessionSummary = false
+    @State private var showingReaderMode = false
 
     // Convenience initializer for backward compatibility
     init(note: Note, capturedQuote: CapturedQuote? = nil) {
         self.note = note
         self.capturedQuote = capturedQuote
     }
-    
-    var firstLetter: String {
-        String(note.content.prefix(1)).uppercased()
+
+    // MARK: - Content Detection
+    private var isVeryLongQuote: Bool {
+        note.content.count > 500  // ~3+ paragraphs
     }
-    
+
+    private var previewContent: String {
+        guard isVeryLongQuote else { return note.content }
+        // Show first ~400 characters
+        let index = note.content.index(note.content.startIndex, offsetBy: min(400, note.content.count))
+        return String(note.content[..<index])
+    }
+
+    var firstLetter: String {
+        String((isVeryLongQuote ? previewContent : note.content).prefix(1)).uppercased()
+    }
+
     var restOfContent: String {
-        String(note.content.dropFirst())
+        String((isVeryLongQuote ? previewContent : note.content).dropFirst())
     }
     
     var body: some View {
@@ -99,7 +112,37 @@ struct SimpleQuoteCard: View {
                     .padding(.top, 8)
             }
             .padding(.top, 20)
-            
+
+            // "Continue Reading" button for very long quotes
+            if isVeryLongQuote {
+                HStack {
+                    Spacer()
+                    Button {
+                        showingReaderMode = true
+                        SensoryFeedback.light()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Continue Reading")
+                                .font(.system(size: 13, weight: .medium, design: .default))
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(DesignSystem.Colors.primaryAccent.opacity(0.12))
+                        .overlay {
+                            Capsule().stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 0.5)
+                        }
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding(.top, 24)
+                .transition(.scale.combined(with: .opacity))
+            }
+
             // Attribution section
             VStack(alignment: .leading, spacing: 16) {
                 // Thin horizontal rule with gradient
@@ -185,6 +228,10 @@ struct SimpleQuoteCard: View {
                     AmbientSessionSummaryView(session: session, colorPalette: nil)
                 }
             }
+        }
+        // Quote reader mode for very long quotes
+        .sheet(isPresented: $showingReaderMode) {
+            QuoteReaderView(note: note, capturedQuote: capturedQuote)
         }
     }
     
