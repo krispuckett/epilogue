@@ -1602,7 +1602,7 @@ private struct NoteCardView: View {
         ))
     }
 
-    // MARK: - Content Text with Measurement
+    // MARK: - Content Text with Character-Based Measurement
     private var contentText: some View {
         Text(note.content)
             .font(.system(size: 16, weight: .regular, design: .default))
@@ -1610,28 +1610,20 @@ private struct NoteCardView: View {
             .multilineTextAlignment(.leading)
             .lineLimit(isExpanded ? nil : previewLineLimit)
             .lineSpacing(6)
-            .background(
-                // Hidden full-height measurement view
-                Text(note.content)
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .lineSpacing(6)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .hidden()
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .onAppear {
-                                    // Measure full content height on first render
-                                    DispatchQueue.main.async {
-                                        contentHeight = geo.size.height
-                                    }
-                                }
-                                .onChange(of: note.content) { _, _ in
-                                    contentHeight = geo.size.height
-                                }
-                        }
-                    )
-            )
+            .onAppear {
+                // Estimate line count based on character count
+                estimateContentHeight()
+            }
+            .onChange(of: note.content) { _, _ in
+                estimateContentHeight()
+            }
+    }
+
+    private func estimateContentHeight() {
+        // Average characters per line at 16pt font ~50-60 chars
+        let avgCharsPerLine: CGFloat = 55
+        let estimatedLines = CGFloat(note.content.count) / avgCharsPerLine
+        contentHeight = estimatedLines * lineHeight
     }
 
     // MARK: - Text Blur Fade Overlay (Medium Tier)
