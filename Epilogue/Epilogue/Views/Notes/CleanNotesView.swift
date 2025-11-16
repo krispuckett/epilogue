@@ -1629,41 +1629,33 @@ private struct NoteCardView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    // MARK: - Blur Fade Overlay (Medium Tier)
+    // MARK: - Text Blur Fade Overlay (Medium Tier)
     @ViewBuilder
-    private var blurFade: some View {
+    private var textBlurFade: some View {
         if case .medium = contentTier, !isExpanded {
-            VStack(spacing: 0) {
-                // Gradient mask for the blur to create fade effect
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        Color.black
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
+            // Duplicate the text with blur and gradient mask for smooth fade
+            Text(note.content)
+                .font(.system(size: 16, weight: .regular, design: .default))
+                .foregroundStyle(.white.opacity(0.95))
+                .multilineTextAlignment(.leading)
+                .lineLimit(previewLineLimit)
+                .lineSpacing(6)
+                .blur(radius: 3)
+                .mask(
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.black.opacity(0.4),
+                            Color.black.opacity(0.8),
+                            Color.black
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 90)
                 )
-                .frame(height: 60)
-
-                // Solid mask area
-                Color.black
-                    .frame(height: 30)
-            }
-            .background(.ultraThinMaterial)
-            .mask(
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        Color.black.opacity(0.3),
-                        Color.black.opacity(0.7),
-                        Color.black
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .allowsHitTesting(false)
-            .transition(.opacity)
+                .allowsHitTesting(false)
+                .transition(.opacity)
         }
     }
 
@@ -1756,14 +1748,14 @@ private struct NoteCardView: View {
                 dateHeader
             }
 
-            // Content with overlay for blur
+            // Content with overlay for text blur
             ZStack(alignment: .bottom) {
                 contentText
                     .frame(maxHeight: isExpanded ? .infinity : nil)
                     .clipped()
 
-                // Blur fade for medium-length notes
-                blurFade
+                // Text blur fade for medium-length notes
+                textBlurFade
             }
 
             // Expansion indicator - positioned naturally
