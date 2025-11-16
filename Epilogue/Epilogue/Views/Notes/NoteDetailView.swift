@@ -129,9 +129,6 @@ struct NoteDetailView: View {
                 }
             }
         }
-        .presentationDragIndicator(.visible)
-        .presentationDetents([.large])
-        .presentationCornerRadius(DesignSystem.CornerRadius.large)
         .alert("Delete Note?", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
