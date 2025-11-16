@@ -1626,38 +1626,6 @@ private struct NoteCardView: View {
         contentHeight = estimatedLines * lineHeight
     }
 
-    // MARK: - Text Blur Fade Overlay (Medium Tier)
-    @ViewBuilder
-    private var textBlurFade: some View {
-        if case .medium = contentTier, !isExpanded {
-            VStack(spacing: 0) {
-                Spacer()
-
-                // Duplicate the text with blur and gradient mask for smooth fade
-                Text(note.content)
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(previewLineLimit)
-                    .lineSpacing(6)
-                    .blur(radius: 4)
-                    .mask(
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color.black.opacity(0.5),
-                                Color.black
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            }
-            .frame(height: 80)
-            .allowsHitTesting(false)
-            .transition(.opacity)
-        }
-    }
 
     // MARK: - Expansion Indicator Pills
     @ViewBuilder
@@ -1665,41 +1633,43 @@ private struct NoteCardView: View {
         if contentTier.needsExpansionUI && !isExpanded {
             switch contentTier {
             case .medium:
-                // Liquid glass pill for medium notes
-                HStack(spacing: 6) {
+                // Small subtle pill for medium notes
+                HStack(spacing: 4) {
                     Text("Show More")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .glassEffect(in: Capsule())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.05))
                 .overlay {
-                    Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 }
+                .clipShape(Capsule())
                 .transition(.opacity)
                 .accessibilityLabel("Show more of this note")
                 .accessibilityHint("Double tap to expand this note")
 
             case .long:
-                // Same liquid glass pill for long notes
-                HStack(spacing: 6) {
+                // Small subtle pill for long notes
+                HStack(spacing: 4) {
                     Text("Show More")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .glassEffect(in: Capsule())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.05))
                 .overlay {
-                    Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 }
+                .clipShape(Capsule())
                 .transition(.opacity)
                 .accessibilityLabel("Show full note")
                 .accessibilityHint("Double tap to expand this note")
@@ -1741,15 +1711,10 @@ private struct NoteCardView: View {
                 dateHeader
             }
 
-            // Content with overlay for text blur
-            ZStack(alignment: .bottom) {
-                contentText
-                    .frame(maxHeight: isExpanded ? .infinity : nil)
-                    .clipped()
-
-                // Text blur fade for medium-length notes
-                textBlurFade
-            }
+            // Content
+            contentText
+                .frame(maxHeight: isExpanded ? .infinity : nil)
+                .clipped()
 
             // Expansion indicator - positioned naturally
             if !isExpanded && contentTier.needsExpansionUI {
