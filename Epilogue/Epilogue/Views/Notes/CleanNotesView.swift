@@ -1483,7 +1483,6 @@ private struct NoteCardView: View {
 
     // MARK: - State Management
     @State private var isExpanded = false
-    @State private var showingDetailView = false
     @State private var showingSessionSummary = false
     @State private var contentHeight: CGFloat = 0
 
@@ -1694,30 +1693,24 @@ private struct NoteCardView: View {
                 .accessibilityHint("Double tap to expand this note")
 
             case .long:
-                // Prominent button for long notes
-                Button {
-                    showingDetailView = true
-                    SensoryFeedback.impact(.light)
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("View Full Note")
-                            .font(.caption.weight(.medium))
-                        Image(systemName: "arrow.up.right")
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(DesignSystem.Colors.primaryAccent.opacity(0.12))
-                    .overlay {
-                        Capsule().stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 0.5)
-                    }
-                    .clipShape(Capsule())
+                // Same liquid glass pill for long notes
+                HStack(spacing: 6) {
+                    Text("Show More")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .glassEffect(in: Capsule())
+                .overlay {
+                    Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                }
                 .transition(.opacity)
-                .accessibilityLabel("View full note in reading mode")
-                .accessibilityHint("Double tap to open note in full-screen reading view")
+                .accessibilityLabel("Show full note")
+                .accessibilityHint("Double tap to expand this note")
 
             case .short:
                 EmptyView()
@@ -1819,33 +1812,12 @@ private struct NoteCardView: View {
         .accessibilityLabel(makeAccessibilityLabel())
         .accessibilityHint(makeAccessibilityHint())
         .accessibilityAddTraits(.isButton)
-        // Tap to expand (for short/medium notes)
+        // Tap to expand inline (all tiers)
         .onTapGesture {
-            if case .long = contentTier {
-                // Long notes open detail view
-                showingDetailView = true
-            } else if contentTier.needsExpansionUI {
-                // Medium notes expand inline
-                withAnimation(DesignSystem.Animation.springStandard) {
-                    isExpanded.toggle()
-                }
-                SensoryFeedback.light()
-            } else {
-                // Short notes just show date
-                withAnimation(DesignSystem.Animation.springStandard) {
-                    isExpanded.toggle()
-                }
-                SensoryFeedback.light()
+            withAnimation(DesignSystem.Animation.springStandard) {
+                isExpanded.toggle()
             }
-        }
-        // Long press for detail view (all tiers)
-        .onLongPressGesture(minimumDuration: 0.5) {
-            showingDetailView = true
-            SensoryFeedback.impact(.medium)
-        }
-        // Detail view sheet for long notes
-        .sheet(isPresented: $showingDetailView) {
-            NoteDetailView(note: note, capturedNote: capturedNote)
+            SensoryFeedback.light()
         }
         // Session summary sheet
         .sheet(isPresented: $showingSessionSummary) {
