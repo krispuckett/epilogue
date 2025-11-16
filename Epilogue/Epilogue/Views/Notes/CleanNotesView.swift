@@ -1612,21 +1612,27 @@ private struct NoteCardView: View {
             .lineLimit(isExpanded ? nil : previewLineLimit)
             .lineSpacing(6)
             .background(
-                // Hidden measurement view - Steve would appreciate this efficiency
-                GeometryReader { geo in
-                    Color.clear
-                        .onAppear {
-                            // Measure full content height on first render
-                            DispatchQueue.main.async {
-                                contentHeight = geo.size.height
-                            }
+                // Hidden full-height measurement view
+                Text(note.content)
+                    .font(.system(size: 16, weight: .regular, design: .default))
+                    .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .hidden()
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .onAppear {
+                                    // Measure full content height on first render
+                                    DispatchQueue.main.async {
+                                        contentHeight = geo.size.height
+                                    }
+                                }
+                                .onChange(of: note.content) { _, _ in
+                                    contentHeight = geo.size.height
+                                }
                         }
-                        .onChange(of: note.content) { _, _ in
-                            contentHeight = geo.size.height
-                        }
-                }
+                    )
             )
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Text Blur Fade Overlay (Medium Tier)
@@ -1667,25 +1673,24 @@ private struct NoteCardView: View {
     private var expansionIndicator: some View {
         if contentTier.needsExpansionUI && !isExpanded {
             switch contentTier {
-            case .medium(let additionalLines):
-                // Glass pill for medium notes
-                HStack(spacing: 4) {
-                    Text("\(additionalLines) more line\(additionalLines == 1 ? "" : "s")")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.7))
+            case .medium:
+                // Liquid glass pill for medium notes
+                HStack(spacing: 6) {
+                    Text("Show More")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
                     Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(DesignSystem.Colors.primaryAccent)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.05))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .glassEffect(in: Capsule())
                 .overlay {
-                    Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                    Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5)
                 }
-                .clipShape(Capsule())
                 .transition(.opacity)
-                .accessibilityLabel("Expand to show \(additionalLines) more lines")
+                .accessibilityLabel("Show more of this note")
                 .accessibilityHint("Double tap to expand this note")
 
             case .long:
