@@ -1723,8 +1723,9 @@ private struct NoteCardView: View {
         }
     }
 
-    // MARK: - Main Body
-    var body: some View {
+    // MARK: - Card Content Layout
+    @ViewBuilder
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header - shows when expanded OR when date is tapped
             if isExpanded {
@@ -1753,6 +1754,11 @@ private struct NoteCardView: View {
 
             bookContext
         }
+    }
+
+    // MARK: - Main Body
+    var body: some View {
+        cardContent
         .padding(DesignSystem.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
