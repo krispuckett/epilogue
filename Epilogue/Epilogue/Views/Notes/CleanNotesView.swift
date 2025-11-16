@@ -1486,7 +1486,6 @@ private struct NoteCardView: View {
     @State private var showingDetailView = false
     @State private var showingSessionSummary = false
     @State private var contentHeight: CGFloat = 0
-    @State private var indicatorGlow = false
 
     // MARK: - Constants (Steve would approve these numbers)
     private let lineHeight: CGFloat = 27  // 16pt font + 6pt line spacing + 5pt padding
@@ -1547,7 +1546,7 @@ private struct NoteCardView: View {
             // Show "Show Less" pill when expanded
             if isExpanded && contentTier.needsExpansionUI {
                 Button {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                    withAnimation(DesignSystem.Animation.springStandard) {
                         isExpanded = false
                     }
                     SensoryFeedback.light()
@@ -1637,13 +1636,15 @@ private struct NoteCardView: View {
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.85),
-                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.98)
+                    Color.clear,
+                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.3),
+                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.6),
+                    Color(red: 0.15, green: 0.145, blue: 0.14).opacity(0.85)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 70)
+            .frame(height: 90)
             .allowsHitTesting(false)
             .transition(.opacity)
         }
@@ -1671,8 +1672,7 @@ private struct NoteCardView: View {
                     Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                 }
                 .clipShape(Capsule())
-                .shadow(color: indicatorGlow ? DesignSystem.Colors.primaryAccent.opacity(0.3) : .clear, radius: 8)
-                .transition(.scale.combined(with: .opacity))
+                .transition(.opacity)
                 .accessibilityLabel("Expand to show \(additionalLines) more lines")
                 .accessibilityHint("Double tap to expand this note")
 
@@ -1698,7 +1698,7 @@ private struct NoteCardView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .transition(.scale.combined(with: .opacity))
+                .transition(.opacity)
                 .accessibilityLabel("View full note in reading mode")
                 .accessibilityHint("Double tap to open note in full-screen reading view")
 
@@ -1749,12 +1749,12 @@ private struct NoteCardView: View {
                 gradientFade
             }
 
-            // Expansion indicator
-            if !isExpanded {
+            // Expansion indicator - positioned naturally
+            if !isExpanded && contentTier.needsExpansionUI {
                 HStack {
                     Spacer()
                     expansionIndicator
-                        .padding(.top, isMediumTier ? -4 : 8)
+                        .padding(.top, 4)
                     Spacer()
                 }
             }
@@ -1796,8 +1796,8 @@ private struct NoteCardView: View {
                     .padding(.leading, 1)
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: isExpanded)
-        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: capturedNote?.isFavorite)
+        .animation(DesignSystem.Animation.springStandard, value: isExpanded)
+        .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(makeAccessibilityLabel())
         .accessibilityHint(makeAccessibilityHint())
@@ -1809,13 +1809,13 @@ private struct NoteCardView: View {
                 showingDetailView = true
             } else if contentTier.needsExpansionUI {
                 // Medium notes expand inline
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
                 SensoryFeedback.light()
             } else {
                 // Short notes just show date
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                withAnimation(DesignSystem.Animation.springStandard) {
                     isExpanded.toggle()
                 }
                 SensoryFeedback.light()
@@ -1825,17 +1825,6 @@ private struct NoteCardView: View {
         .onLongPressGesture(minimumDuration: 0.5) {
             showingDetailView = true
             SensoryFeedback.impact(.medium)
-        }
-        // Glow effect on first appearance
-        .onAppear {
-            if contentTier.needsExpansionUI {
-                withAnimation(.easeInOut(duration: 1.5).repeatCount(2, autoreverses: true)) {
-                    indicatorGlow = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    indicatorGlow = false
-                }
-            }
         }
         // Detail view sheet for long notes
         .sheet(isPresented: $showingDetailView) {
