@@ -72,16 +72,6 @@ struct EpilogueShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
-            intent: OpenBookIntent(),
-            phrases: [
-                "Open \(\.$book) in \(.applicationName)",
-                "Show me \(\.$book) in \(.applicationName)"
-            ],
-            shortTitle: "Open Book",
-            systemImageName: "book.circle"
-        )
-
-        AppShortcut(
             intent: SearchLibraryIntent(),
             phrases: [
                 "Search my library in \(.applicationName)",
@@ -89,6 +79,17 @@ struct EpilogueShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Search Library",
             systemImageName: "magnifyingglass"
+        )
+
+        AppShortcut(
+            intent: SearchNotesIntent(),
+            phrases: [
+                "Search my notes in \(.applicationName)",
+                "Find quotes in \(.applicationName)",
+                "Search notes and quotes in \(.applicationName)"
+            ],
+            shortTitle: "Search Notes",
+            systemImageName: "doc.text.magnifyingglass"
         )
 
         AppShortcut(

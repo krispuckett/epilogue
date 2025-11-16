@@ -20,37 +20,18 @@ struct RateBookIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        // Validate rating
-        let clampedRating = min(max(rating, 0.0), 5.0)
+        // Use LibraryService for atomic update across all storage layers
+        do {
+            try await LibraryService.shared.updateBookRating(book.id, rating: rating)
 
-        // Load books from UserDefaults
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              var books = try? JSONDecoder().decode([Book].self, from: data) else {
-            throw IntentError.message("Could not load library")
-        }
+            let stars = String(format: "%.1f", min(max(rating, 0.0), 5.0))
+            let message = "Rated '\(book.title)' \(stars) stars"
+            return .result(dialog: IntentDialog(stringLiteral: message))
 
-        // Find and update book
-        guard let index = books.firstIndex(where: { $0.id == book.id }) else {
+        } catch LibraryError.bookNotFound {
             throw IntentError.message("Could not find '\(book.title)' in your library")
+        } catch {
+            throw IntentError.message("Failed to update rating: \(error.localizedDescription)")
         }
-
-        books[index].userRating = clampedRating
-
-        // Save back
-        if let encoded = try? JSONEncoder().encode(books) {
-            UserDefaults.standard.set(encoded, forKey: "com.epilogue.savedBooks")
-        }
-
-        // Refresh library
-        NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
-
-        // Index for Spotlight
-        Task {
-            await SpotlightIndexingService.shared.indexBook(books[index])
-        }
-
-        let stars = String(format: "%.1f", clampedRating)
-        let message = "Rated '\(book.title)' \(stars) stars"
-        return .result(dialog: IntentDialog(stringLiteral: message))
     }
 }

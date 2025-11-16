@@ -17,18 +17,8 @@ struct SearchLibraryIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<[BookEntity]> & ProvidesDialog {
-        // Load books from UserDefaults
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            throw IntentError.message("Could not load library")
-        }
-
-        // Search by title or author
-        let lowercaseQuery = query.lowercased()
-        let results = books.filter { book in
-            book.title.lowercased().contains(lowercaseQuery) ||
-            book.author.lowercased().contains(lowercaseQuery)
-        }
+        // Use LibraryService intelligent search with fuzzy matching and ranking
+        let results = LibraryService.shared.searchBooks(query: query, limit: 10)
 
         if results.isEmpty {
             return .result(

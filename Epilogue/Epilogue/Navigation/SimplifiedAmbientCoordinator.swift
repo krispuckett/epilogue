@@ -17,24 +17,29 @@ public class EpilogueAmbientCoordinator: ObservableObject {
     
     func launch(from context: LaunchContext = .general, book: Book? = nil) {
         preSelectedBook = book
-        
+        initialBook = book  // Set initialBook so AmbientModeView can pick it up
+
         Task {
             await prepareServices()
         }
-        
+
         isActive = true
-        
+
         // Use voiceModeStart instead of ambientModeStart
         HapticManager.shared.voiceModeStart()
-        
+
         #if DEBUG
         print("🚀 Launching ambient mode from: \(context)")
+        if let book = book {
+            print("📚 With book: \(book.title)")
+        }
         #endif
     }
     
     func dismiss() {
         isActive = false
         preSelectedBook = nil
+        initialBook = nil
     }
     
     private func prepareServices() async {

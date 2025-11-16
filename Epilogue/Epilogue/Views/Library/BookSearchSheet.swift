@@ -581,8 +581,21 @@ struct BookSearchSheet: View {
         isLoading = true
         searchError = nil
 
+        // Detect if the query is an ISBN
+        let detectedISBN = detectISBN(from: query)
+
+        #if DEBUG
+        if let isbn = detectedISBN {
+            print("📚 Detected ISBN: \(isbn) - using direct ISBN search")
+        }
+        #endif
+
         // Use enhanced search with smart ranking and filtering
-        searchResults = await booksService.searchBooksWithRanking(query: query)
+        // If ISBN detected, pass it as preferISBN for direct lookup
+        searchResults = await booksService.searchBooksWithRanking(
+            query: query,
+            preferISBN: detectedISBN
+        )
 
         #if DEBUG
         print("📖 Found \(searchResults.count) enhanced results for: '\(query)'")
@@ -731,6 +744,39 @@ struct BookSearchSheet: View {
         }
         
         return matrix[m][n]
+    }
+
+    // MARK: - ISBN Detection
+    /// Detects if a search query is an ISBN (10 or 13 digits) and returns cleaned ISBN
+    private func detectISBN(from query: String) -> String? {
+        // Remove common separators (hyphens, spaces)
+        let cleanedQuery = query.replacingOccurrences(of: "-", with: "")
+                                .replacingOccurrences(of: " ", with: "")
+                                .trimmingCharacters(in: .whitespaces)
+
+        // Check if it's all digits (ISBN-10 or ISBN-13)
+        let digitsOnly = cleanedQuery.filter { $0.isNumber }
+
+        // ISBN-10: 10 digits
+        // ISBN-13: 13 digits (usually starts with 978 or 979)
+        if digitsOnly.count == 10 || digitsOnly.count == 13 {
+            // Make sure the cleaned query is mostly digits (allow for X in ISBN-10)
+            let allowedChars = CharacterSet.decimalDigits.union(CharacterSet(charactersIn: "Xx"))
+            if cleanedQuery.rangeOfCharacter(from: allowedChars.inverted) == nil {
+                #if DEBUG
+                print("📚 ISBN detected: \(digitsOnly) (length: \(digitsOnly.count))")
+                #endif
+                return digitsOnly
+            }
+        }
+
+        // Also check if query contains "ISBN:" prefix
+        if query.lowercased().hasPrefix("isbn:") || query.lowercased().hasPrefix("isbn ") {
+            let isbnPart = String(query.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            return detectISBN(from: isbnPart)  // Recursive call to clean it
+        }
+
+        return nil
     }
 
     // MARK: - Mode Toggle (Trending | For You)

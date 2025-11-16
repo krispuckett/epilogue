@@ -10,27 +10,27 @@ struct QuoteReaderView: View {
 
     @State private var showingDeleteAlert = false
 
-    // Literary ambient background
-    private var atmosphericGradient: some View {
-        // Warm sepia-toned gradient for quotes
+    // Minimal gradient background (like AmbientSessionSummaryView)
+    private var minimalGradientBackground: some View {
         LinearGradient(
             colors: [
-                Color(red: 0.18, green: 0.14, blue: 0.10),
-                Color(red: 0.12, green: 0.10, blue: 0.08)
+                Color(red: 0.05, green: 0.05, blue: 0.05),
+                Color.black
             ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+            startPoint: .top,
+            endPoint: .bottom
         )
         .ignoresSafeArea()
     }
 
     var body: some View {
-        ZStack {
-            // Atmospheric background
-            atmosphericGradient
+        NavigationStack {
+            ZStack {
+                // Minimal background
+                minimalGradientBackground
 
-            // Content - centered like a book page
-            ScrollView {
+                // Content - centered like a book page
+                ScrollView {
                 VStack(spacing: 0) {
                     Spacer(minLength: 60)
 
@@ -98,64 +98,38 @@ struct QuoteReaderView: View {
             }
             .scrollIndicators(.hidden)
 
-            // Floating controls
-            VStack {
-                HStack {
-                    // Close button
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .frame(width: 36, height: 36)
-                            .background(Color.white.opacity(0.08))
-                            .clipShape(Circle())
-                            .overlay {
-                                Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                            }
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
                     }
-                    .buttonStyle(.plain)
+                }
 
-                    Spacer()
-
-                    // Action buttons
-                    HStack(spacing: 12) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 16) {
                         // Share quote
                         ShareLink(item: formatShareText()) {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.8))
-                                .frame(width: 36, height: 36)
-                                .background(Color.white.opacity(0.08))
-                                .clipShape(Circle())
-                                .overlay {
-                                    Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                                }
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(DesignSystem.Colors.textSecondary)
                         }
-                        .buttonStyle(.plain)
 
                         // Delete quote
                         Button {
                             showingDeleteAlert = true
                         } label: {
                             Image(systemName: "trash")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.red.opacity(0.8))
-                                .frame(width: 36, height: 36)
-                                .background(Color.red.opacity(0.10))
-                                .clipShape(Circle())
-                                .overlay {
-                                    Circle().stroke(Color.red.opacity(0.2), lineWidth: 0.5)
-                                }
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.red.opacity(0.7))
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-
-                Spacer()
             }
         }
         .presentationDragIndicator(.visible)

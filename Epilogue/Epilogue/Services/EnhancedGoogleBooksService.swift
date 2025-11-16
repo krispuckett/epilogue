@@ -144,6 +144,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     }
     
     // Override the search to add smart filtering and ranking (with pagination)
+    @MainActor
     func searchBooksWithRanking(query: String, preferISBN: String? = nil, publisherHint: String? = nil, lightMode: Bool = false) async -> [Book] {
         // Reset pagination for new search
         currentEnhancedQuery = query
@@ -181,6 +182,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     }
 
     // Load more paginated results
+    @MainActor
     func loadMoreEnhancedResults() async -> [Book] {
         guard hasMoreEnhancedResults, !currentEnhancedQuery.isEmpty else {
             return []
@@ -211,6 +213,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     }
 
     // Fetch a batch of enhanced results
+    @MainActor
     private func fetchEnhancedBatch(
         query: String,
         parsedQuery: ParsedQuery,
@@ -370,10 +373,44 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }.map { $0.book }
 
         #if DEBUG
-        print("📚 Returning \(filteredBooks.count) books after filtering")
+        print("📚 Validating cover URLs for \(filteredBooks.count) books (same validation as Goodreads)")
         #endif
 
-        return filteredBooks
+        // CRITICAL FIX: Validate and resolve cover URLs (same as Goodreads import does)
+        // This prevents blank covers from broken/placeholder URLs
+        var validatedBooks: [Book] = []
+        for book in filteredBooks {
+            var validated = book
+
+            // Use DisplayCoverURLResolver to find the best working cover URL
+            // This tries: publisher fife URLs, content API URLs, thumbnail, and Open Library fallback
+            if let resolvedURL = await DisplayCoverURLResolver.resolveDisplayURL(
+                googleID: book.id,
+                isbn: book.isbn,
+                thumbnailURL: book.coverImageURL
+            ) {
+                validated.coverImageURL = resolvedURL
+                #if DEBUG
+                if resolvedURL != book.coverImageURL {
+                    print("✅ Resolved better URL for '\(book.title)'")
+                    print("   Old: \(book.coverImageURL ?? "nil")")
+                    print("   New: \(resolvedURL)")
+                }
+                #endif
+                validatedBooks.append(validated)
+            } else {
+                // No valid cover URL found - skip this book to avoid blank covers
+                #if DEBUG
+                print("❌ No valid cover URL found for '\(book.title)' - excluding from results")
+                #endif
+            }
+        }
+
+        #if DEBUG
+        print("📚 Returning \(validatedBooks.count) books with validated covers (filtered \(filteredBooks.count - validatedBooks.count) blanks)")
+        #endif
+
+        return validatedBooks
     }
     
     private func getRawSearchResults(query: String, maxResults: Int = 40, lightMode: Bool = false, startIndex: Int = 0) async -> [GoogleBookItem] {

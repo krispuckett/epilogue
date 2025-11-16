@@ -21,75 +21,33 @@ struct ExportNotesIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        // Get model container
-        guard let container = try? ModelContainer(
-            for: BookModel.self, CapturedQuote.self, CapturedNote.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: false)
-        ) else {
-            throw IntentError.message("Could not access database")
+        // Convert ExportFormatEnum to ExportFormat
+        let exportFormat: ExportFormat
+        switch format {
+        case .standard:
+            exportFormat = .standard
+        case .obsidian:
+            exportFormat = .obsidian
+        case .notion:
+            exportFormat = .notion
         }
 
-        let context = ModelContext(container)
+        // Use LibraryService for consistent export with all 3 formats
+        do {
+            let markdown = try await LibraryService.shared.exportNotes(bookId: book.id, format: exportFormat)
 
-        // Find BookModel
-        let entityId = book.id
-        let descriptor = FetchDescriptor<BookModel>(
-            predicate: #Predicate { $0.id == entityId }
-        )
+            let formatName = format.rawValue
+            let message = "Exported notes from '\(book.title)' in \(formatName) format"
+            return .result(
+                value: markdown,
+                dialog: IntentDialog(stringLiteral: message)
+            )
 
-        guard let bookModel = try? context.fetch(descriptor).first else {
-            throw IntentError.message("Could not find '\(book.title)' in database")
+        } catch LibraryError.bookNotFound {
+            throw IntentError.message("Could not find '\(book.title)' in your library")
+        } catch {
+            throw IntentError.message("Failed to export notes: \(error.localizedDescription)")
         }
-
-        // Fetch quotes
-        let quotesDescriptor = FetchDescriptor<CapturedQuote>(
-            predicate: #Predicate { $0.book?.id == entityId },
-            sortBy: [SortDescriptor(\CapturedQuote.pageNumber)]
-        )
-        let quotes = (try? context.fetch(quotesDescriptor)) ?? []
-
-        // Fetch notes
-        let notesDescriptor = FetchDescriptor<CapturedNote>(
-            predicate: #Predicate { $0.book?.id == entityId },
-            sortBy: [SortDescriptor(\CapturedNote.timestamp, order: .reverse)]
-        )
-        let notes = (try? context.fetch(notesDescriptor)) ?? []
-
-        // Generate markdown
-        var markdown = "# \(book.title)\n\n"
-        markdown += "**by \(book.author)**\n\n"
-        markdown += "---\n\n"
-
-        if !quotes.isEmpty {
-            markdown += "## Quotes (\(quotes.count))\n\n"
-            for quote in quotes {
-                if let text = quote.text {
-                    markdown += "> \"\(text)\"\n\n"
-                    if let page = quote.pageNumber {
-                        markdown += "Page \(page)\n\n"
-                    }
-                }
-            }
-        }
-
-        if !notes.isEmpty {
-            markdown += "## Notes (\(notes.count))\n\n"
-            for note in notes {
-                if let content = note.content {
-                    markdown += "- \(content)\n"
-                }
-            }
-            markdown += "\n"
-        }
-
-        markdown += "---\n"
-        markdown += "*Exported from Epilogue*\n"
-
-        let message = "Exported \(quotes.count) quotes and \(notes.count) notes from '\(book.title)'"
-        return .result(
-            value: markdown,
-            dialog: IntentDialog(stringLiteral: message)
-        )
     }
 }
 

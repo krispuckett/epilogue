@@ -1633,29 +1633,32 @@ private struct NoteCardView: View {
     @ViewBuilder
     private var textBlurFade: some View {
         if case .medium = contentTier, !isExpanded {
-            // Duplicate the text with blur and gradient mask for smooth fade
-            Text(note.content)
-                .font(.system(size: 16, weight: .regular, design: .default))
-                .foregroundStyle(.white.opacity(0.95))
-                .multilineTextAlignment(.leading)
-                .lineLimit(previewLineLimit)
-                .lineSpacing(6)
-                .blur(radius: 3)
-                .mask(
-                    LinearGradient(
-                        colors: [
-                            Color.clear,
-                            Color.black.opacity(0.4),
-                            Color.black.opacity(0.8),
-                            Color.black
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+            VStack(spacing: 0) {
+                Spacer()
+
+                // Duplicate the text with blur and gradient mask for smooth fade
+                Text(note.content)
+                    .font(.system(size: 16, weight: .regular, design: .default))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(previewLineLimit)
+                    .lineSpacing(6)
+                    .blur(radius: 4)
+                    .mask(
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color.black.opacity(0.5),
+                                Color.black
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                    .frame(height: 90)
-                )
-                .allowsHitTesting(false)
-                .transition(.opacity)
+            }
+            .frame(height: 80)
+            .allowsHitTesting(false)
+            .transition(.opacity)
         }
     }
 

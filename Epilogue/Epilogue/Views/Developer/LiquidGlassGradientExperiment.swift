@@ -2,28 +2,28 @@ import SwiftUI
 import SwiftData
 import Combine
 
-/// Experimental shader effect for book covers
-/// Applies a specular lens shader on top of atmospheric gradients
+/// Experimental liquid glass lens shader applied to atmospheric gradients
+/// Pill-shaped element with auto-animated shader effect
 /// Access from Settings > Developer Options
-struct SpecularLensExperiment: View {
+struct LiquidGlassGradientExperiment: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var books: [BookModel]
 
-    // Shader animation state
+    // Touch interaction state
     @State private var dragPosition: CGPoint = .zero
-    @State private var isTouching: Bool = false
-    @State private var rippleScale: CGFloat = 0
+    @State private var phase: CGFloat = 0
 
-    // Adjustable parameters
+    // Shader parameters
     @State private var intensity: CGFloat = 3.0
+    @State private var radius: CGFloat = 20.0
     @State private var shaderEnabled: Bool = true
     @State private var showControls: Bool = true
     @State private var showBookPicker: Bool = false
     @State private var selectedBook: BookModel?
 
-    // Toggle between auto-animate and touch modes
-    @State private var touchMode: Bool = true
+    // Auto-animation timer
+    let timer = Timer.publish(every: 1/60, on: .main, in: .common).autoconnect()
 
     // Books with covers only
     private var booksWithCovers: [BookModel] {
@@ -51,8 +51,8 @@ struct SpecularLensExperiment: View {
                     .ignoresSafeArea()
 
                 if let book = targetBook {
-                    // Book cover with atmospheric gradient and shader
-                    bookCoverWithShader(book: book)
+                    // Atmospheric gradient with shader effect
+                    gradientWithShader(book: book)
                 } else {
                     // No books found
                     Text("No books found in library")
@@ -105,7 +105,7 @@ struct SpecularLensExperiment: View {
                 }
             }
             .sheet(isPresented: $showBookPicker) {
-                ExperimentBookPickerSheet(
+                ExperimentalBookPickerSheet(
                     books: booksWithCovers,
                     selectedBook: $selectedBook
                 )
@@ -113,191 +113,99 @@ struct SpecularLensExperiment: View {
         }
     }
 
-    // MARK: - Book Cover with Shader
+    // MARK: - Gradient with Shader
     @ViewBuilder
-    private func bookCoverWithShader(book: BookModel) -> some View {
-        GeometryReader { geometry in
+    private func gradientWithShader(book: BookModel) -> some View {
+        VStack(spacing: 20) {
+            // Pill-shaped gradient with shader - exactly like the button code
             ZStack {
-                // Atmospheric gradient background with shader effect
-                ZStack {
-                    if let image = bookCoverImage {
-                        BookAtmosphericGradientWithImage(image: image)
-                            .ignoresSafeArea()
-                    } else {
-                        // Fallback gradient if no cover image - BRIGHT and VISIBLE
-                        LinearGradient(
-                            stops: [
-                                .init(color: Color.red.opacity(0.6), location: 0.0),
-                                .init(color: Color.orange.opacity(0.5), location: 0.3),
-                                .init(color: Color.purple.opacity(0.4), location: 0.6),
-                                .init(color: Color.black, location: 1.0)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .ignoresSafeArea()
-                    }
-                }
-                .modifier(
-                    ConditionalShaderModifier(
-                        enabled: shaderEnabled && (!touchMode || isTouching),
-                        dragPosition: dragPosition,
-                        intensity: intensity
-                    )
-                )
-                .overlay {
-                    // Touch ripple effect
-                    if isTouching && touchMode {
-                        Circle()
-                            .stroke(Color.white.opacity(0.6), lineWidth: 2)
-                            .frame(width: 60, height: 60)
-                            .scaleEffect(rippleScale)
-                            .opacity(1.0 - rippleScale)
-                            .position(dragPosition)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if !isTouching {
-                                // First touch - trigger ripple
-                                isTouching = true
-                                rippleScale = 0
-                                withAnimation(.easeOut(duration: 0.6)) {
-                                    rippleScale = 3.0
-                                }
-                            }
-                            dragPosition = value.location
-                        }
-                        .onEnded { _ in
-                            isTouching = false
-                            rippleScale = 0
-                        }
-                )
-
-                // Book cover in center - NO SHADER, just the cover
                 if let image = bookCoverImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 240, height: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 20)
-                        .allowsHitTesting(false)
+                    // Blurred atmospheric gradient
+                    BookAtmosphericGradientWithImage(image: image)
+                        .blur(radius: radius)
+                        .frame(width: 320, height: 320)
+                        .layerEffect(
+                            ShaderLibrary.specular_position_lens(
+                                .boundingRect,
+                                .float2(dragPosition),
+                                .float(intensity)
+                            ),
+                            maxSampleOffset: CGSize(width: 400, height: 400)
+                        )
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    dragPosition = value.location
+                                }
+                        )
                 } else {
-                    // Placeholder when no cover image - BRIGHT and VISIBLE
-                    ZStack {
-                        // Bright placeholder card
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.2),
-                                        Color.white.opacity(0.05)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 240, height: 360)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 2)
+                    // Fallback gradient
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.red.opacity(0.6), location: 0.0),
+                            .init(color: Color.orange.opacity(0.5), location: 0.3),
+                            .init(color: Color.purple.opacity(0.4), location: 0.6),
+                            .init(color: Color.black, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .blur(radius: radius)
+                    .frame(width: 320, height: 320)
+                    .layerEffect(
+                        ShaderLibrary.specular_position_lens(
+                            .boundingRect,
+                            .float2(dragPosition),
+                            .float(intensity)
+                        ),
+                        maxSampleOffset: CGSize(width: 400, height: 400)
+                    )
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                dragPosition = value.location
                             }
-
-                        // Icon and text
-                        VStack(spacing: 16) {
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 80))
-                                .foregroundStyle(.white.opacity(0.6))
-
-                            Text("No Cover Image")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.8))
-
-                            Text("Touch gradient to see shader")
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.5))
-                        }
-                    }
-                    .frame(width: 240, height: 360)
-                    .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 20)
-                    .allowsHitTesting(false)
-                }
-
-                // Debug info overlay (top center)
-                VStack {
-                    Text(bookCoverImage == nil ? "⚠️ No cover image data" : "✅ Cover loaded")
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(bookCoverImage == nil ? .red : .green)
-                        .padding(8)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(.top, 100)
-
-                    Spacer()
-                }
-
-                // Book info overlay
-                VStack {
-                    Spacer()
-
-                    VStack(spacing: 8) {
-                        Text(book.title)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.95))
-
-                        Text(book.author)
-                            .font(.system(size: 17, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .padding(.top, 480)
+                    )
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: 160, height: 40)
+            .cornerRadius(20)
+            .onReceive(timer) { _ in
+                phase += 0.01
+                dragPosition.x = 160 + sin(phase) * 240
+                dragPosition.y = 160 + cos(phase) * 240
+            }
+            .padding(.top, 100)
+
+            // Phase debug
+            Text("phase: \(tan(phase), specifier: "%.2f")")
+                .font(.system(size: 12))
+                .foregroundStyle(.white)
+                .monospaced()
+                .bold()
+                .padding()
+                .frame(width: 160)
+                .glassEffect(.clear.tint(.black.opacity(0.1)))
+
+            // Book info
+            VStack(spacing: 8) {
+                Text(book.title)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
+
+                Text(book.author)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            .padding(.top, 20)
+
+            Spacer()
         }
     }
 
     // MARK: - Controls Panel
     private var controlsPanel: some View {
         VStack(spacing: 16) {
-            // Touch mode toggle
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Touch Mode")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-
-                    Text(touchMode ? "Tap & drag to reveal" : "Always visible")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-
-                Spacer()
-
-                Toggle("", isOn: $touchMode)
-                    .labelsHidden()
-            }
-
-            Divider()
-                .background(Color.white.opacity(0.2))
-
-            // Enable/Disable shader
-            HStack {
-                Text("Shader Effect")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-
-                Spacer()
-
-                Toggle("", isOn: $shaderEnabled)
-                    .labelsHidden()
-            }
-
-            Divider()
-                .background(Color.white.opacity(0.2))
-
             // Intensity slider
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -314,25 +222,23 @@ struct SpecularLensExperiment: View {
                     .tint(.white.opacity(0.8))
             }
 
-            // Touch status
-            if touchMode {
+            Divider()
+                .background(Color.white.opacity(0.2))
+
+            // Blur radius slider
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: isTouching ? "hand.point.up.left.fill" : "hand.point.up.left")
-                        .font(.system(size: 14))
-                        .foregroundStyle(isTouching ? .green : .white.opacity(0.5))
-
-                    Text(isTouching ? "Touching" : "Not touching")
+                    Text("Blur Radius")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(isTouching ? .green : .white.opacity(0.7))
-
+                        .foregroundStyle(.white.opacity(0.7))
                     Spacer()
-
-                    if isTouching {
-                        Text("(\(Int(dragPosition.x)), \(Int(dragPosition.y)))")
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
+                    Text(String(format: "%.1f", radius))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
+
+                Slider(value: $radius, in: 0...40)
+                    .tint(.white.opacity(0.8))
             }
         }
         .padding(20)
@@ -346,29 +252,6 @@ struct SpecularLensExperiment: View {
                 .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal, 20)
-    }
-}
-
-// MARK: - Conditional Shader Modifier
-struct ConditionalShaderModifier: ViewModifier {
-    let enabled: Bool
-    let dragPosition: CGPoint
-    let intensity: CGFloat
-
-    func body(content: Content) -> some View {
-        if enabled {
-            content
-                .layerEffect(
-                    ShaderLibrary.specular_position_lens(
-                        .boundingRect,
-                        .float2(dragPosition),
-                        .float(intensity)
-                    ),
-                    maxSampleOffset: CGSize(width: 400, height: 400)
-                )
-        } else {
-            content
-        }
     }
 }
 
@@ -399,8 +282,8 @@ struct BookAtmosphericGradientWithImage: View {
     }
 }
 
-// MARK: - Experiment Book Picker Sheet
-struct ExperimentBookPickerSheet: View {
+// MARK: - Experimental Book Picker Sheet
+struct ExperimentalBookPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let books: [BookModel]
     @Binding var selectedBook: BookModel?
@@ -512,6 +395,6 @@ struct ExperimentBookPickerSheet: View {
 }
 
 #Preview {
-    SpecularLensExperiment()
+    LiquidGlassGradientExperiment()
         .modelContainer(for: BookModel.self)
 }

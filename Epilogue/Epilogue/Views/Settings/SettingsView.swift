@@ -375,10 +375,10 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
-                            SpecularLensExperiment()
+                            LiquidGlassGradientExperiment()
                         } label: {
-                            Label("Specular Lens Experiment", systemImage: "sparkles.rectangle.stack")
-                                .foregroundStyle(.orange)
+                            Label("Liquid Glass Gradient", systemImage: "sparkles")
+                                .foregroundStyle(.cyan)
                         }
                     } header: {
                         Text("Developer Options")
