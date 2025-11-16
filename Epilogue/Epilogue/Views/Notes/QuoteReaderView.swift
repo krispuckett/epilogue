@@ -10,17 +10,20 @@ struct QuoteReaderView: View {
 
     @State private var showingDeleteAlert = false
 
-    // Minimal gradient background (like AmbientSessionSummaryView)
+    // EXACTLY LIKE AMBIENT SESSION SUMMARY
     private var minimalGradientBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.05, green: 0.05, blue: 0.05),
-                Color.black
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        ZStack {
+            // Permanent ambient gradient background
+            AmbientChatGradientView()
+                .opacity(0.7)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+
+            // Subtle darkening overlay for better readability
+            Color.black.opacity(0.05)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+        }
     }
 
     var body: some View {
