@@ -375,6 +375,13 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
+                            TextAnimationExperiments()
+                        } label: {
+                            Label("Text Animation Lab", systemImage: "text.alignleft")
+                                .foregroundStyle(.orange)
+                        }
+
+                        NavigationLink {
                             LiquidGlassGradientExperiment()
                         } label: {
                             Label("Liquid Glass Gradient", systemImage: "sparkles")
