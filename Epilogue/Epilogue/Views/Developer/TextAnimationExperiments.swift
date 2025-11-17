@@ -202,15 +202,31 @@ So you can see that I'm talking and it's pulling up real time and this is using 
     }
 
     private var scaleBlurEffect: some View {
-        Text(sampleText)
-            .font(.system(size: 16, weight: .regular, design: .default))
-            .foregroundStyle(.white.opacity(0.95))
-            .multilineTextAlignment(.leading)
-            .lineLimit(isExpanded ? nil : 5)
-            .lineSpacing(6)
-            .scaleEffect(isExpanded ? 1.0 : scaleStart)
-            .blur(radius: isExpanded ? 0 : blurRadius)
-            .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+        ZStack(alignment: .topLeading) {
+            // Main visible text - NO blur
+            Text(sampleText)
+                .font(.system(size: 16, weight: .regular, design: .default))
+                .foregroundStyle(.white.opacity(0.95))
+                .multilineTextAlignment(.leading)
+                .lineLimit(isExpanded ? nil : 5)
+                .lineSpacing(6)
+                .scaleEffect(isExpanded ? 1.0 : scaleStart)
+                .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+
+            // Blur layer below truncation - only when collapsed
+            if !isExpanded {
+                Text(sampleText)
+                    .font(.system(size: 16, weight: .regular, design: .default))
+                    .foregroundStyle(.white.opacity(opacityStart))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(5)
+                    .lineSpacing(6)
+                    .blur(radius: blurRadius)
+                    .offset(y: offsetY)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+            }
+        }
     }
 
     private var offsetBlurEffect: some View {
