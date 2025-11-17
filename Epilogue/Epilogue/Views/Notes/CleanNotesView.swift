@@ -1602,36 +1602,21 @@ private struct NoteCardView: View {
         ))
     }
 
-    // MARK: - Content Text with Character-Based Measurement and Smooth Fade
+    // MARK: - Content Text with Character-Based Measurement
     private var contentText: some View {
-        ZStack(alignment: .topLeading) {
-            // Collapsed state
-            if !isExpanded {
-                Text(note.content)
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(previewLineLimit)
-                    .lineSpacing(6)
-                    .transition(.opacity)
+        Text(note.content)
+            .font(.system(size: 16, weight: .regular, design: .default))
+            .foregroundStyle(.white.opacity(0.95))
+            .multilineTextAlignment(.leading)
+            .lineLimit(isExpanded ? nil : previewLineLimit)
+            .lineSpacing(6)
+            .fixedSize(horizontal: false, vertical: true)
+            .onAppear {
+                estimateContentHeight()
             }
-
-            // Expanded state
-            if isExpanded {
-                Text(note.content)
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(6)
-                    .transition(.opacity)
+            .onChange(of: note.content) { _, _ in
+                estimateContentHeight()
             }
-        }
-        .onAppear {
-            estimateContentHeight()
-        }
-        .onChange(of: note.content) { _, _ in
-            estimateContentHeight()
-        }
     }
 
     private func estimateContentHeight() {
@@ -1776,7 +1761,7 @@ private struct NoteCardView: View {
                     .padding(.leading, 1)
             }
         }
-        .animation(.smooth(duration: 0.4, extraBounce: 0.0), value: isExpanded)
+        .animation(.spring(response: 0.5, dampingFraction: 0.9, blendDuration: 0), value: isExpanded)
         .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(makeAccessibilityLabel())
@@ -1784,7 +1769,7 @@ private struct NoteCardView: View {
         .accessibilityAddTraits(.isButton)
         // Tap to expand inline (all tiers)
         .onTapGesture {
-            withAnimation(.smooth(duration: 0.4, extraBounce: 0.0)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.9, blendDuration: 0)) {
                 isExpanded.toggle()
             }
             SensoryFeedback.light()
