@@ -1608,8 +1608,8 @@ private struct NoteCardView: View {
             .font(.system(size: 16, weight: .regular, design: .default))
             .foregroundStyle(.white.opacity(0.95))
             .multilineTextAlignment(.leading)
+            .lineLimit(isExpanded ? nil : previewLineLimit)
             .lineSpacing(6)
-            .fixedSize(horizontal: false, vertical: true)
             .onAppear {
                 estimateContentHeight()
             }
@@ -1709,10 +1709,8 @@ private struct NoteCardView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // Content with frame-based smooth reveal
+            // Content - simple lineLimit change
             contentText
-                .frame(maxHeight: isExpanded ? .infinity : CGFloat(previewLineLimit) * lineHeight)
-                .clipped()
 
             // Expansion indicator - fades out smoothly
             if !isExpanded && contentTier.needsExpansionUI {
@@ -1762,7 +1760,7 @@ private struct NoteCardView: View {
                     .padding(.leading, 1)
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.9, blendDuration: 0), value: isExpanded)
+        .animation(.easeInOut(duration: 0.3), value: isExpanded)
         .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(makeAccessibilityLabel())
@@ -1770,7 +1768,7 @@ private struct NoteCardView: View {
         .accessibilityAddTraits(.isButton)
         // Tap to expand inline (all tiers)
         .onTapGesture {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.9, blendDuration: 0)) {
+            withAnimation(.easeInOut(duration: 0.3)) {
                 isExpanded.toggle()
             }
             SensoryFeedback.light()
