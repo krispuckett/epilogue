@@ -1608,7 +1608,6 @@ private struct NoteCardView: View {
             .font(.system(size: 16, weight: .regular, design: .default))
             .foregroundStyle(.white.opacity(0.95))
             .multilineTextAlignment(.leading)
-            .lineLimit(isExpanded ? nil : previewLineLimit)
             .lineSpacing(6)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear {
@@ -1710,8 +1709,10 @@ private struct NoteCardView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // Content with smooth height animation
+            // Content with frame-based smooth reveal
             contentText
+                .frame(maxHeight: isExpanded ? .infinity : CGFloat(previewLineLimit) * lineHeight)
+                .clipped()
 
             // Expansion indicator - fades out smoothly
             if !isExpanded && contentTier.needsExpansionUI {
