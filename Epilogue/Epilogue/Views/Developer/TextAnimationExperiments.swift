@@ -1,192 +1,267 @@
 import SwiftUI
 
-// MARK: - Text Animation Experiments for Note Card Expansion
-// Testing different text rendering animations inspired by custom TextRenderer effects
-
+// MARK: - Text Animation Experiments - Exact Note Card Replica
 struct TextAnimationExperiments: View {
     @State private var isExpanded = false
-    @State private var selectedEffect = TextEffect.fadeIn
+
+    // Animation parameters
+    @State private var animationDuration: Double = 0.3
+    @State private var offsetY: Double = 20
+    @State private var blurRadius: Double = 4
+    @State private var opacityCollapsed: Double = 0.85
+    @State private var scaleCollapsed: Double = 0.98
 
     private let sampleText = """
-In my younger and more vulnerable years my father gave me some advice that I've been turning over in my mind ever since.
-
-"Whenever you feel like criticizing any one," he told me, "just remember that all the people in this world haven't had the advantages that you've had." He didn't say any more but we've always been unusually communicative in a reserved way, and I understood that he meant a great deal more than that.
+So you can see that I'm talking and it's pulling up real time and this is using the Apple speech for the real time transcription a piece to it but the actual questions I would ask would pull up using whisper kit so I've got this dual routed transcription service in order to accomplish the speed visually as well as the accuracy from whisper kit. The other piece of this is that the gradient are responding to my voice, so I wanted it to be kind of ambient and polished and atmospheric, but not necessarily super new it.
 """
-
-    enum TextEffect: String, CaseIterable {
-        case fadeIn = "Fade In"
-        case slideUp = "Slide Up"
-        case slideUpFade = "Slide Up + Fade"
-        case scaleBlur = "Scale + Blur"
-        case offsetBlur = "Offset + Blur (Custom)"
-        case staggeredFade = "Staggered Fade"
-        case wave = "Wave Effect"
-    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
+                // Background - exact match
                 AmbientChatGradientView()
                     .opacity(0.4)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.all)
+                    .allowsHitTesting(false)
+
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea(.all)
+                    .allowsHitTesting(false)
 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Effect picker
-                        Picker("Animation Effect", selection: $selectedEffect) {
-                            ForEach(TextEffect.allCases, id: \.self) { effect in
-                                Text(effect.rawValue).tag(effect)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .padding()
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(12)
+                        // Exact note card replica
+                        noteCard
 
-                        // Demo card
-                        demoCard
-
-                        // Toggle button
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.5)) {
-                                isExpanded.toggle()
-                            }
-                        } label: {
-                            Text(isExpanded ? "Collapse" : "Expand")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 32)
-                                .padding(.vertical, 16)
-                                .background(DesignSystem.Colors.primaryAccent)
-                                .cornerRadius(12)
-                        }
+                        // Parameter controls
+                        parameterControls
                     }
                     .padding()
                 }
             }
-            .navigationTitle("Text Animation Tests")
+            .navigationTitle("Text Animation Lab")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
+    // MARK: - Exact Note Card Replica
     @ViewBuilder
-    private var demoCard: some View {
+    private var noteCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Render text based on selected effect
-            switch selectedEffect {
-            case .fadeIn:
-                fadeInText
-            case .slideUp:
-                slideUpText
-            case .slideUpFade:
-                slideUpFadeText
-            case .scaleBlur:
-                scaleBlurText
-            case .offsetBlur:
-                offsetBlurText
-            case .staggeredFade:
-                staggeredFadeText
-            case .wave:
-                waveText
-            }
-        }
-        .padding(24)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Effect 1: Simple Fade In
-    private var fadeInText: some View {
-        Text(isExpanded ? sampleText : String(sampleText.prefix(200)))
-            .font(.system(size: 16))
-            .foregroundStyle(.white.opacity(0.95))
-            .lineSpacing(6)
-            .opacity(isExpanded ? 1.0 : 0.9)
-    }
-
-    // MARK: - Effect 2: Slide Up
-    private var slideUpText: some View {
-        Text(isExpanded ? sampleText : String(sampleText.prefix(200)))
-            .font(.system(size: 16))
-            .foregroundStyle(.white.opacity(0.95))
-            .lineSpacing(6)
-            .offset(y: isExpanded ? 0 : 10)
-    }
-
-    // MARK: - Effect 3: Slide Up + Fade
-    private var slideUpFadeText: some View {
-        Text(isExpanded ? sampleText : String(sampleText.prefix(200)))
-            .font(.system(size: 16))
-            .foregroundStyle(.white.opacity(0.95))
-            .lineSpacing(6)
-            .offset(y: isExpanded ? 0 : 20)
-            .opacity(isExpanded ? 1.0 : 0.85)
-    }
-
-    // MARK: - Effect 4: Scale + Blur
-    private var scaleBlurText: some View {
-        Text(isExpanded ? sampleText : String(sampleText.prefix(200)))
-            .font(.system(size: 16))
-            .foregroundStyle(.white.opacity(0.95))
-            .lineSpacing(6)
-            .scaleEffect(isExpanded ? 1.0 : 0.98)
-            .blur(radius: isExpanded ? 0 : 2)
-    }
-
-    // MARK: - Effect 5: Offset + Blur (Custom - Like Video)
-    private var offsetBlurText: some View {
-        ZStack(alignment: .topLeading) {
-            // Base text
-            Text(isExpanded ? sampleText : String(sampleText.prefix(200)))
-                .font(.system(size: 16))
+            // Content text
+            Text(sampleText)
+                .font(.system(size: 16, weight: .regular, design: .default))
                 .foregroundStyle(.white.opacity(0.95))
+                .multilineTextAlignment(.leading)
+                .lineLimit(isExpanded ? nil : 5)
                 .lineSpacing(6)
+                .offset(y: isExpanded ? 0 : offsetY)
+                .opacity(isExpanded ? 1.0 : opacityCollapsed)
+                .scaleEffect(isExpanded ? 1.0 : scaleCollapsed)
+                .blur(radius: isExpanded ? 0 : blurRadius)
 
-            // Blur overlay when collapsed
+            // Show More pill - exact replica
             if !isExpanded {
-                Text(String(sampleText.prefix(200)))
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .lineSpacing(6)
-                    .blur(radius: 4)
-                    .offset(y: 11)
-                    .transition(.opacity)
+                HStack {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("Show More")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.05))
+                    .overlay {
+                        Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                    }
+                    .clipShape(Capsule())
+                    .padding(.top, 4)
+                    Spacer()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
+
+            // Book context
+            VStack(alignment: .leading, spacing: 2) {
+                Text("THE ODYSSEY".uppercased())
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .kerning(0.8)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+
+                Text("HOMER".uppercased())
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .kerning(0.6)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+            .padding(.top, 12)
+        }
+        .padding(DesignSystem.Spacing.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.10),
+                            Color.white.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
+        .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: animationDuration)) {
+                isExpanded.toggle()
+            }
+            SensoryFeedback.light()
         }
     }
 
-    // MARK: - Effect 6: Staggered Fade (Per Line)
-    private var staggeredFadeText: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            let lines = (isExpanded ? sampleText : String(sampleText.prefix(200))).split(separator: "\n")
-            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                Text(String(line))
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .opacity(isExpanded ? 1.0 : (index < 3 ? 1.0 : 0.0))
-                    .animation(.easeInOut(duration: 0.3).delay(Double(index) * 0.05), value: isExpanded)
+    // MARK: - Parameter Controls
+    @ViewBuilder
+    private var parameterControls: some View {
+        VStack(spacing: 20) {
+            Text("ANIMATION PARAMETERS")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .kerning(1.4)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 16) {
+                // Duration
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Duration")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                        Spacer()
+                        Text(String(format: "%.2fs", animationDuration))
+                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    Slider(value: $animationDuration, in: 0.1...1.0, step: 0.05)
+                        .tint(DesignSystem.Colors.primaryAccent)
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.1))
+
+                // Offset Y
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Offset Y")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                        Spacer()
+                        Text(String(format: "%.0f", offsetY))
+                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    Slider(value: $offsetY, in: 0...50, step: 1)
+                        .tint(DesignSystem.Colors.primaryAccent)
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.1))
+
+                // Blur Radius
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Blur Radius")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                        Spacer()
+                        Text(String(format: "%.1f", blurRadius))
+                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    Slider(value: $blurRadius, in: 0...10, step: 0.5)
+                        .tint(DesignSystem.Colors.primaryAccent)
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.1))
+
+                // Opacity (Collapsed)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Opacity (Collapsed)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                        Spacer()
+                        Text(String(format: "%.2f", opacityCollapsed))
+                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    Slider(value: $opacityCollapsed, in: 0.5...1.0, step: 0.05)
+                        .tint(DesignSystem.Colors.primaryAccent)
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.1))
+
+                // Scale (Collapsed)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Scale (Collapsed)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                        Spacer()
+                        Text(String(format: "%.2f", scaleCollapsed))
+                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    Slider(value: $scaleCollapsed, in: 0.9...1.0, step: 0.01)
+                        .tint(DesignSystem.Colors.primaryAccent)
+                }
+
+                // Reset button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        resetToDefaults()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Reset to Defaults")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(DesignSystem.Colors.primaryAccent.opacity(0.12))
+                    .cornerRadius(10)
+                }
+                .padding(.top, 8)
             }
+            .padding(20)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
         }
     }
 
-    // MARK: - Effect 7: Wave Effect
-    private var waveText: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            let lines = (isExpanded ? sampleText : String(sampleText.prefix(200))).split(separator: "\n")
-            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                Text(String(line))
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .offset(y: isExpanded ? 0 : CGFloat(index) * 5)
-                    .opacity(isExpanded ? 1.0 : (index < 3 ? 1.0 : 0.3))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8).delay(Double(index) * 0.03), value: isExpanded)
-            }
-        }
+    private func resetToDefaults() {
+        animationDuration = 0.3
+        offsetY = 20
+        blurRadius = 4
+        opacityCollapsed = 0.85
+        scaleCollapsed = 0.98
     }
 }
 
