@@ -18,6 +18,8 @@ struct PerfectBookScanner: View {
     @StateObject private var coordinator = ScannerCoordinator()
     @State private var showingManualSearch = false
     @State private var manualSearchQuery = ""
+    @State private var showingISBNInput = false
+    @State private var isbnInput = ""
 
     var body: some View {
         ZStack {
@@ -86,6 +88,27 @@ struct PerfectBookScanner: View {
                     manualSearchQuery = ""
                 }
             )
+        }
+        .alert("Enter ISBN", isPresented: $showingISBNInput) {
+            TextField("ISBN (10 or 13 digits)", text: $isbnInput)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+
+            Button("Cancel", role: .cancel) {
+                isbnInput = ""
+            }
+
+            Button("Search") {
+                let cleanedISBN = isbnInput.filter { $0.isNumber }
+                if !cleanedISBN.isEmpty {
+                    Task {
+                        await searchISBN(cleanedISBN)
+                    }
+                }
+                isbnInput = ""
+            }
+        } message: {
+            Text("Enter the ISBN number from the back of the book (works without barcode)")
         }
         .onAppear {
             #if DEBUG
@@ -309,6 +332,17 @@ struct PerfectBookScanner: View {
 
                             Spacer()
 
+                            // ISBN input button
+                            Button {
+                                showingISBNInput = true
+                            } label: {
+                                Image(systemName: "barcode.viewfinder")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 44, height: 44)
+                                    .glassEffect(in: Circle())
+                            }
+
                             // Manual search
                             Button {
                                 showingManualSearch = true
@@ -325,6 +359,41 @@ struct PerfectBookScanner: View {
                 .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                 .padding(.bottom, 24)
 
+        }
+    }
+
+    // MARK: - ISBN Search
+
+    private func searchISBN(_ isbn: String) async {
+        coordinator.isProcessing = true
+        coordinator.statusMessage = "Searching ISBN..."
+
+        #if DEBUG
+        print("📚 Searching for ISBN: \(isbn)")
+        #endif
+
+        // Use the Google Books API to search by ISBN
+        let booksService = GoogleBooksService()
+        if let book = await booksService.searchBookByISBN(isbn) {
+            #if DEBUG
+            print("✅ Found book via ISBN: \(book.title)")
+            #endif
+            coordinator.stageBook(book)
+            SensoryFeedback.success()
+            coordinator.statusMessage = "Added \(book.title)"
+        } else {
+            #if DEBUG
+            print("❌ No book found for ISBN: \(isbn)")
+            #endif
+            SensoryFeedback.error()
+            coordinator.statusMessage = "ISBN not found"
+        }
+
+        coordinator.isProcessing = false
+
+        // Reset status message after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            coordinator.statusMessage = "Scan any book - barcode, cover, or spine"
         }
     }
 
