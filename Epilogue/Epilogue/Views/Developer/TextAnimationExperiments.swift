@@ -202,31 +202,39 @@ So you can see that I'm talking and it's pulling up real time and this is using 
     }
 
     private var scaleBlurEffect: some View {
-        ZStack(alignment: .topLeading) {
-            // Main visible text - NO blur
-            Text(sampleText)
-                .font(.system(size: 16, weight: .regular, design: .default))
-                .foregroundStyle(.white.opacity(0.95))
-                .multilineTextAlignment(.leading)
-                .lineLimit(isExpanded ? nil : 5)
-                .lineSpacing(6)
-                .scaleEffect(isExpanded ? 1.0 : scaleStart)
-                .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+        VStack(alignment: .leading, spacing: 6) {
+            let lines = sampleText.split(separator: "\n")
+            let previewLines = 5
 
-            // Blur layer below truncation - only when collapsed
-            if !isExpanded {
-                Text(sampleText)
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .foregroundStyle(.white.opacity(opacityStart))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(5)
-                    .lineSpacing(6)
-                    .blur(radius: blurRadius)
-                    .offset(y: offsetY)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+            if isExpanded {
+                // Show all lines when expanded
+                ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                    Text(String(line))
+                        .font(.system(size: 16, weight: .regular, design: .default))
+                        .foregroundStyle(.white.opacity(0.95))
+                }
+            } else {
+                // Show first 5 lines with progressive blur
+                ForEach(Array(lines.prefix(previewLines).enumerated()), id: \.offset) { index, line in
+                    Text(String(line))
+                        .font(.system(size: 16, weight: .regular, design: .default))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .blur(radius: index < 4 ? 0 : (index == 4 ? blurRadius * 0.3 : 0))
+                        .scaleEffect(scaleStart)
+                }
+
+                // Blurred preview of line 6+ below
+                if lines.count > previewLines {
+                    Text(lines[previewLines...].joined(separator: "\n"))
+                        .font(.system(size: 16, weight: .regular, design: .default))
+                        .foregroundStyle(.white.opacity(opacityStart * 0.5))
+                        .blur(radius: blurRadius)
+                        .scaleEffect(scaleStart * 0.95)
+                        .offset(y: -6)
+                }
             }
         }
+        .animation(.easeInOut(duration: animationDuration), value: isExpanded)
     }
 
     private var offsetBlurEffect: some View {
@@ -258,14 +266,16 @@ So you can see that I'm talking and it's pulling up real time and this is using 
     private var staggeredFadeEffect: some View {
         VStack(alignment: .leading, spacing: 6) {
             let lines = sampleText.split(separator: "\n")
-            let displayLines = isExpanded ? lines : Array(lines.prefix(3))
+            let previewLines = 5
 
-            ForEach(Array(displayLines.enumerated()), id: \.offset) { index, line in
-                Text(String(line))
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .opacity(isExpanded ? 1.0 : (index < 3 ? 1.0 : opacityStart))
-                    .animation(.easeInOut(duration: animationDuration).delay(Double(index) * staggerDelay), value: isExpanded)
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                if isExpanded || index < previewLines {
+                    Text(String(line))
+                        .font(.system(size: 16, weight: .regular, design: .default))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .opacity(isExpanded ? 1.0 : (index < previewLines ? 1.0 : 0.0))
+                        .animation(.easeInOut(duration: animationDuration).delay(Double(index) * staggerDelay), value: isExpanded)
+                }
             }
         }
     }
