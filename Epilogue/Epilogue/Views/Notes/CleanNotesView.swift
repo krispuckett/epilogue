@@ -1602,21 +1602,36 @@ private struct NoteCardView: View {
         ))
     }
 
-    // MARK: - Content Text with Character-Based Measurement
+    // MARK: - Content Text with Character-Based Measurement and Smooth Fade
     private var contentText: some View {
-        Text(note.content)
-            .font(.system(size: 16, weight: .regular, design: .default))
-            .foregroundStyle(.white.opacity(0.95))
-            .multilineTextAlignment(.leading)
-            .lineLimit(isExpanded ? nil : previewLineLimit)
-            .lineSpacing(6)
-            .onAppear {
-                // Estimate line count based on character count
-                estimateContentHeight()
+        ZStack(alignment: .topLeading) {
+            // Collapsed state
+            if !isExpanded {
+                Text(note.content)
+                    .font(.system(size: 16, weight: .regular, design: .default))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(previewLineLimit)
+                    .lineSpacing(6)
+                    .transition(.opacity)
             }
-            .onChange(of: note.content) { _, _ in
-                estimateContentHeight()
+
+            // Expanded state
+            if isExpanded {
+                Text(note.content)
+                    .font(.system(size: 16, weight: .regular, design: .default))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(6)
+                    .transition(.opacity)
             }
+        }
+        .onAppear {
+            estimateContentHeight()
+        }
+        .onChange(of: note.content) { _, _ in
+            estimateContentHeight()
+        }
     }
 
     private func estimateContentHeight() {
