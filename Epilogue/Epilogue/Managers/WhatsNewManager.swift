@@ -7,7 +7,7 @@ import Combine
 class WhatsNewManager: ObservableObject {
     static let shared = WhatsNewManager()
 
-    private let currentVersion = "1.1.0" // Update this with each release
+    private let currentVersion = "1.2.0" // Update this with each release
     private let maxShowCount = 2
 
     @Published var shouldShow = false
