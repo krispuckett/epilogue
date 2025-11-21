@@ -1,0 +1,339 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "monomythic": {
+    "color": {
+      "brand": {
+        "navy": {
+          "$type": "color",
+          "$value": "#0A1628",
+          "$description": "Primary brand color - Deep navy representing the unknown waters"
+        },
+        "brass": {
+          "$type": "color",
+          "$value": "#C9A661",
+          "$description": "Secondary brand color - Brass gold representing guidance and illumination"
+        },
+        "brass-dark": {
+          "$type": "color",
+          "$value": "#A68B56",
+          "$description": "Darker brass for gradients and variations"
+        }
+      },
+      "neutral": {
+        "storm": {
+          "$type": "color",
+          "$value": "#4A5568",
+          "$description": "Storm grey for secondary text and elements"
+        },
+        "parchment": {
+          "$type": "color",
+          "$value": "#F4EFE6",
+          "$description": "Light parchment for backgrounds and contrast"
+        },
+        "sepia": {
+          "$type": "color",
+          "$value": "#6B5744",
+          "$description": "Sepia ink for annotations and subtle elements"
+        }
+      },
+      "accent": {
+        "verdigris": {
+          "$type": "color",
+          "$value": "#5C8D89",
+          "$description": "Aged brass patina for secondary highlights"
+        },
+        "coral": {
+          "$type": "color",
+          "$value": "#C84B31",
+          "$description": "Warning color for urgent information (use sparingly)"
+        }
+      },
+      "semantic": {
+        "background": {
+          "primary": {
+            "$type": "color",
+            "$value": "{monomythic.color.brand.navy}"
+          },
+          "secondary": {
+            "$type": "color",
+            "$value": "{monomythic.color.neutral.parchment}"
+          },
+          "elevated": {
+            "$type": "color",
+            "$value": "{monomythic.color.neutral.storm}"
+          }
+        },
+        "text": {
+          "primary": {
+            "$type": "color",
+            "$value": "{monomythic.color.brand.navy}"
+          },
+          "secondary": {
+            "$type": "color",
+            "$value": "{monomythic.color.neutral.storm}"
+          },
+          "inverse": {
+            "$type": "color",
+            "$value": "{monomythic.color.neutral.parchment}"
+          },
+          "muted": {
+            "$type": "color",
+            "$value": "{monomythic.color.neutral.sepia}"
+          }
+        },
+        "accent": {
+          "primary": {
+            "$type": "color",
+            "$value": "{monomythic.color.brand.brass}"
+          },
+          "secondary": {
+            "$type": "color",
+            "$value": "{monomythic.color.accent.verdigris}"
+          }
+        }
+      }
+    },
+    "typography": {
+      "font-family": {
+        "serif": {
+          "$type": "fontFamily",
+          "$value": ["Freight Text Pro", "Libre Baskerville", "Georgia", "serif"],
+          "$description": "Primary typeface for headlines and body text"
+        },
+        "mono": {
+          "$type": "fontFamily",
+          "$value": ["IBM Plex Mono", "Courier New", "monospace"],
+          "$description": "Technical typeface for data and code"
+        },
+        "sans": {
+          "$type": "fontFamily",
+          "$value": ["Source Sans 3", "Helvetica Neue", "Arial", "sans-serif"],
+          "$description": "UI typeface for labels and captions"
+        }
+      },
+      "font-size": {
+        "hero": {
+          "$type": "dimension",
+          "$value": "64px",
+          "$description": "Hero display text"
+        },
+        "h1": {
+          "$type": "dimension",
+          "$value": "51px"
+        },
+        "h2": {
+          "$type": "dimension",
+          "$value": "41px"
+        },
+        "h3": {
+          "$type": "dimension",
+          "$value": "33px"
+        },
+        "h4": {
+          "$type": "dimension",
+          "$value": "26px"
+        },
+        "body-large": {
+          "$type": "dimension",
+          "$value": "20px"
+        },
+        "body": {
+          "$type": "dimension",
+          "$value": "16px"
+        },
+        "body-small": {
+          "$type": "dimension",
+          "$value": "13px"
+        },
+        "caption": {
+          "$type": "dimension",
+          "$value": "10px"
+        }
+      },
+      "font-weight": {
+        "regular": {
+          "$type": "fontWeight",
+          "$value": "400"
+        },
+        "medium": {
+          "$type": "fontWeight",
+          "$value": "500"
+        },
+        "semibold": {
+          "$type": "fontWeight",
+          "$value": "600"
+        },
+        "bold": {
+          "$type": "fontWeight",
+          "$value": "700"
+        }
+      },
+      "line-height": {
+        "display": {
+          "$type": "number",
+          "$value": "1.1"
+        },
+        "heading": {
+          "$type": "number",
+          "$value": "1.2"
+        },
+        "body": {
+          "$type": "number",
+          "$value": "1.6"
+        },
+        "technical": {
+          "$type": "number",
+          "$value": "1.5"
+        }
+      }
+    },
+    "spacing": {
+      "1": {
+        "$type": "dimension",
+        "$value": "8px"
+      },
+      "2": {
+        "$type": "dimension",
+        "$value": "16px"
+      },
+      "3": {
+        "$type": "dimension",
+        "$value": "24px"
+      },
+      "4": {
+        "$type": "dimension",
+        "$value": "32px"
+      },
+      "5": {
+        "$type": "dimension",
+        "$value": "48px"
+      },
+      "6": {
+        "$type": "dimension",
+        "$value": "64px"
+      },
+      "7": {
+        "$type": "dimension",
+        "$value": "96px"
+      },
+      "8": {
+        "$type": "dimension",
+        "$value": "128px"
+      }
+    },
+    "border-radius": {
+      "small": {
+        "$type": "dimension",
+        "$value": "2px"
+      },
+      "medium": {
+        "$type": "dimension",
+        "$value": "4px"
+      },
+      "large": {
+        "$type": "dimension",
+        "$value": "8px"
+      }
+    },
+    "border-width": {
+      "thin": {
+        "$type": "dimension",
+        "$value": "1px"
+      },
+      "medium": {
+        "$type": "dimension",
+        "$value": "2px"
+      },
+      "thick": {
+        "$type": "dimension",
+        "$value": "3px"
+      }
+    },
+    "shadow": {
+      "small": {
+        "$type": "shadow",
+        "$value": {
+          "offsetX": "0px",
+          "offsetY": "1px",
+          "blur": "3px",
+          "spread": "0px",
+          "color": "rgba(10, 22, 40, 0.1)"
+        }
+      },
+      "medium": {
+        "$type": "shadow",
+        "$value": {
+          "offsetX": "0px",
+          "offsetY": "4px",
+          "blur": "6px",
+          "spread": "0px",
+          "color": "rgba(10, 22, 40, 0.1)"
+        }
+      },
+      "large": {
+        "$type": "shadow",
+        "$value": {
+          "offsetX": "0px",
+          "offsetY": "10px",
+          "blur": "15px",
+          "spread": "0px",
+          "color": "rgba(10, 22, 40, 0.1)"
+        }
+      }
+    },
+    "transition": {
+      "duration": {
+        "fast": {
+          "$type": "duration",
+          "$value": "150ms"
+        },
+        "base": {
+          "$type": "duration",
+          "$value": "300ms"
+        },
+        "slow": {
+          "$type": "duration",
+          "$value": "500ms"
+        }
+      },
+      "easing": {
+        "ease": {
+          "$type": "cubicBezier",
+          "$value": [0.25, 0.1, 0.25, 1]
+        }
+      }
+    },
+    "breakpoint": {
+      "mobile": {
+        "$type": "dimension",
+        "$value": "320px",
+        "$description": "Mobile minimum"
+      },
+      "tablet": {
+        "$type": "dimension",
+        "$value": "768px",
+        "$description": "Tablet and up"
+      },
+      "desktop": {
+        "$type": "dimension",
+        "$value": "1024px",
+        "$description": "Desktop and up"
+      },
+      "large": {
+        "$type": "dimension",
+        "$value": "1440px",
+        "$description": "Large displays"
+      }
+    },
+    "layout": {
+      "container-max-width": {
+        "$type": "dimension",
+        "$value": "1200px"
+      },
+      "grid-gap": {
+        "$type": "dimension",
+        "$value": "{monomythic.spacing.4}"
+      }
+    }
+  }
+}
