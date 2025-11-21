@@ -59,11 +59,9 @@ enum SessionType: Identifiable {
 
 // MARK: - Minimal Sessions View (Redesigned)
 struct MinimalSessionsView: View {
-    @Query(sort: \AmbientSession.startTime, order: .reverse)
-    private var ambientSessions: [AmbientSession]
-
-    @Query(sort: \ReadingSession.startDate, order: .reverse)
-    private var quickSessions: [ReadingSession]
+    // Paginated session data - only load recent 50 sessions for performance
+    @State private var ambientSessions: [AmbientSession] = []
+    @State private var quickSessions: [ReadingSession] = []
 
     @State private var searchText = ""
     @State private var showingNewChat = false
@@ -145,6 +143,9 @@ struct MinimalSessionsView: View {
                 UnifiedChatView()
             }
         }
+        .onAppear {
+            loadRecentSessions()
+        }
     }
     
     // MARK: - Empty State
@@ -206,6 +207,27 @@ struct MinimalSessionsView: View {
     }
     
     // MARK: - Helper Functions
+
+    private func loadRecentSessions() {
+        // Load recent 50 ambient sessions with pagination
+        var ambientDescriptor = FetchDescriptor<AmbientSession>(
+            sortBy: [SortDescriptor(\AmbientSession.startTime, order: .reverse)]
+        )
+        ambientDescriptor.fetchLimit = 50
+        ambientSessions = (try? modelContext.fetch(ambientDescriptor)) ?? []
+
+        // Load recent 50 quick reading sessions with pagination
+        var quickDescriptor = FetchDescriptor<ReadingSession>(
+            sortBy: [SortDescriptor(\ReadingSession.startDate, order: .reverse)]
+        )
+        quickDescriptor.fetchLimit = 50
+        quickSessions = (try? modelContext.fetch(quickDescriptor)) ?? []
+
+        #if DEBUG
+        print("📊 [MinimalSessionsView] Loaded \(ambientSessions.count) ambient sessions, \(quickSessions.count) quick sessions")
+        #endif
+    }
+
     private func formatDateHeader(_ date: Date) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) {

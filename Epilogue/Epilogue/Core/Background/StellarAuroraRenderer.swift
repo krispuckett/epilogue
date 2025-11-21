@@ -18,7 +18,8 @@ struct StellarAuroraFragmentUniforms {
     var themeColor: SIMD3<Float> = SIMD3<Float>(repeating: 1)
     var intensity: Float = 1
     var speed: Float = 1
-    var padding: Float = 0
+    var iterations: Int32 = 36  // Dynamic quality: 8 (low) to 36 (high)
+    var padding: SIMD2<Float> = .zero
 }
 
 enum StellarAuroraRendererError: Error {
@@ -92,7 +93,7 @@ final class StellarAuroraRenderer {
         }
 
         encoder.setFragmentSamplerState(samplerState, index: 0)
-        fragmentUniforms.padding = 0
+        fragmentUniforms.padding = .zero
         encoder.setFragmentBytes(&fragmentUniforms,
                                  length: MemoryLayout<StellarAuroraFragmentUniforms>.stride,
                                  index: 0)

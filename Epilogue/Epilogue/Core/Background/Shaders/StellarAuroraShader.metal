@@ -16,7 +16,8 @@ struct StellarAuroraFragmentUniforms {
     float3 themeColor;    // tinting color
     float  intensity;     // brightness scaling
     float  speed;         // animation rate multiplier
-    float  padding;       // explicit alignment padding
+    int    iterations;    // dynamic quality control (8-36 iterations)
+    float2 padding;       // explicit alignment padding
 };
 
 struct StellarAuroraVertexIn {
@@ -136,7 +137,8 @@ fragment float4 stellarAuroraFragment(
     (void)customSampler;
 
     constexpr float pi = 3.14159265359f;
-    constexpr int iterations = 36;
+    constexpr int maxIterations = 36;  // Maximum for high-end devices
+    int iterations = clamp(u.iterations, 8, maxIterations);  // Dynamic quality: 8-36
 
     float2 uv = in.texcoord;
     float4 bg = backgroundTexture.sample(backgroundSampler, uv);

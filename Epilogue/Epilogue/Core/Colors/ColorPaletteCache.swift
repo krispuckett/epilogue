@@ -34,7 +34,12 @@ public class BookColorPaletteCache {
     /// Cache warming queue
     private var warmingQueue: [String] = []
     private var isWarming = false
-    
+
+    /// Cached directory listing (to avoid repeated enumerations)
+    private var cachedDirectoryListing: [URL]?
+    private var cachedListingTimestamp: Date?
+    private let directoryListingCacheDuration: TimeInterval = 300 // 5 minutes
+
     // MARK: - Initialization
     
     private init() {
@@ -231,28 +236,53 @@ public class BookColorPaletteCache {
         }
     }
     
+    /// Get cached directory listing (with TTL to avoid repeated filesystem calls)
+    private func getCachedDirectoryListing(forceRefresh: Bool = false) -> [URL] {
+        guard let cacheDir = cacheDirectory else { return [] }
+
+        // Check if we can use cached listing
+        if !forceRefresh,
+           let cached = cachedDirectoryListing,
+           let timestamp = cachedListingTimestamp,
+           Date().timeIntervalSince(timestamp) < directoryListingCacheDuration {
+            return cached
+        }
+
+        // Refresh cache
+        do {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: cacheDir,
+                includingPropertiesForKeys: [.creationDateKey, .fileSizeKey],
+                options: [.skipsHiddenFiles]
+            )
+            cachedDirectoryListing = files
+            cachedListingTimestamp = Date()
+            return files
+        } catch {
+            #if DEBUG
+            print("❌ Failed to enumerate cache directory: \(error)")
+            #endif
+            return []
+        }
+    }
+
     private func cleanExpiredCache() {
         Task {
-            guard let cacheDir = cacheDirectory else { return }
-            
-            do {
-                let files = try FileManager.default.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: [.creationDateKey])
-                let thirtyDaysAgo = Date().addingTimeInterval(-30 * 24 * 60 * 60)
-                
-                for file in files {
-                    if let attributes = try? file.resourceValues(forKeys: [.creationDateKey]),
-                       let creationDate = attributes.creationDate,
-                       creationDate < thirtyDaysAgo {
-                        try? FileManager.default.removeItem(at: file)
-                        #if DEBUG
-                        print("🧹 Cleaned expired cache: \(file.lastPathComponent)")
-                        #endif
-                    }
+            let files = getCachedDirectoryListing(forceRefresh: true)
+            let thirtyDaysAgo = Date().addingTimeInterval(-30 * 24 * 60 * 60)
+
+            for file in files {
+                if let attributes = try? file.resourceValues(forKeys: [.creationDateKey]),
+                   let creationDate = attributes.creationDate,
+                   creationDate < thirtyDaysAgo {
+                    try? FileManager.default.removeItem(at: file)
+                    // Invalidate cache after deletion
+                    cachedDirectoryListing = nil
+
+                    #if DEBUG
+                    print("🧹 Cleaned expired cache: \(file.lastPathComponent)")
+                    #endif
                 }
-            } catch {
-                #if DEBUG
-                print("❌ Failed to clean cache: \(error)")
-                #endif
             }
         }
     }
@@ -317,22 +347,15 @@ public class BookColorPaletteCache {
         let memoryCacheCount = 0 // NSCache doesn't expose count
         var diskCacheCount = 0
         var totalDiskSize: Int64 = 0
-        
-        if let cacheDir = cacheDirectory {
-            do {
-                let files = try FileManager.default.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: [.fileSizeKey])
-                diskCacheCount = files.count
-                
-                for file in files {
-                    if let attributes = try? file.resourceValues(forKeys: [.fileSizeKey]),
-                       let size = attributes.fileSize {
-                        totalDiskSize += Int64(size)
-                    }
-                }
-            } catch {
-                #if DEBUG
-                print("❌ Failed to get cache stats: \(error)")
-                #endif
+
+        // Use cached directory listing to avoid repeated filesystem enumeration
+        let files = getCachedDirectoryListing()
+        diskCacheCount = files.count
+
+        for file in files {
+            if let attributes = try? file.resourceValues(forKeys: [.fileSizeKey]),
+               let size = attributes.fileSize {
+                totalDiskSize += Int64(size)
             }
         }
         

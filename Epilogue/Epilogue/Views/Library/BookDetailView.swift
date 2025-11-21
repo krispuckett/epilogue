@@ -75,10 +75,9 @@ struct BookDetailView: View {
     @State private var selectedSection: BookSection = .notes
     @Namespace private var sectionAnimation
 
-    // SwiftData queries for notes and quotes
-    @Query private var allCapturedNotes: [CapturedNote]
-    @Query private var allCapturedQuotes: [CapturedQuote]
-    @Query private var allBookModels: [BookModel]
+    // Efficient SwiftData queries - only load data for this specific book
+    @State private var bookModel: BookModel?
+    @State private var bookNotesCaptured: [CapturedNote] = []
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -201,12 +200,7 @@ struct BookDetailView: View {
     @State private var showingEndSession = false
     @State private var showingSessionSavedToast = false
 
-    // Get or create BookModel for this Book struct
-    private var bookModel: BookModel? {
-        allBookModels.first { $0.localId == book.localId.uuidString }
-    }
-
-    // Computed properties for filtering notes by book
+    // Computed properties for book data
     private var progressPercentage: Double {
         guard let total = book.pageCount,
               total > 0 else { return 0 }
@@ -270,7 +264,31 @@ struct BookDetailView: View {
         print("🎙️ Upgraded to Ambient Mode - Session transferred")
         #endif
     }
-    
+
+    // MARK: - Efficient Data Loading
+
+    private func loadBookData() {
+        // Load BookModel with predicated query - only fetch this specific book
+        let bookModelDescriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.localId == book.localId.uuidString }
+        )
+        bookModel = try? modelContext.fetch(bookModelDescriptor).first
+
+        // Load CapturedNotes with predicated query - only fetch notes for this book
+        let bookLocalIdString = book.localId.uuidString
+        var notesDescriptor = FetchDescriptor<CapturedNote>(
+            predicate: #Predicate { note in
+                note.bookLocalId == bookLocalIdString
+            }
+        )
+        notesDescriptor.sortBy = [SortDescriptor(\CapturedNote.timestamp, order: .reverse)]
+        bookNotesCaptured = (try? modelContext.fetch(notesDescriptor)) ?? []
+
+        #if DEBUG
+        print("📊 [BookDetailView] Loaded \(bookNotesCaptured.count) notes for book '\(book.title)'")
+        #endif
+    }
+
     var bookQuotes: [Note] {
         notesViewModel.notes.filter { note in
             note.type == .quote && (
@@ -731,6 +749,8 @@ struct BookDetailView: View {
             .opacity(coverOpacity)
             .shadow(color: Color.black.opacity(coverOpacity * 0.3), radius: 20 * coverOpacity, y: 10 * coverOpacity)
             .task(id: book.localId) {
+                // Load book-specific data efficiently with predicated queries
+                loadBookData()
                 // Color extraction now happens when image loads in SharedBookCoverView
             }
             
@@ -1124,11 +1144,6 @@ struct BookDetailView: View {
     // MARK: - Notes Section (Persistent)
     @ViewBuilder
     private var notesSection: some View {
-        // Filter notes for this specific book
-        let bookNotesCaptured = allCapturedNotes.filter { note in
-            note.book?.localId == book.localId.uuidString
-        }
-
         VStack(alignment: .leading, spacing: 16) {
             // Header with add button
             HStack {

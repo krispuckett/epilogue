@@ -12,7 +12,6 @@ struct BookSearchSheet: View {
     var mode: Mode = .add
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var allBooks: [BookModel]
 
     @StateObject private var booksService = EnhancedGoogleBooksService()
     @StateObject private var trendingService = EnhancedTrendingBooksService.shared
@@ -27,10 +26,17 @@ struct BookSearchSheet: View {
     @State private var viewMode: ViewMode = .trending
     @State private var forYouRecommendations: [RecommendationEngine.Recommendation] = []
     @State private var isLoadingForYou = false
+    @State private var libraryBookCount = 0
 
     // Library size check for For You availability
     private var hasEnoughBooksForRecommendations: Bool {
-        allBooks.count >= 5
+        libraryBookCount >= 5
+    }
+
+    // Load book count efficiently (count only, no full fetch)
+    private func loadLibraryBookCount() {
+        let descriptor = FetchDescriptor<BookModel>()
+        libraryBookCount = (try? modelContext.fetchCount(descriptor)) ?? 0
     }
     
     var body: some View {
@@ -100,6 +106,7 @@ struct BookSearchSheet: View {
             print("📚 BookSearchSheet appeared with query: '\(searchQuery)'")
             #endif
             refinedSearchQuery = searchQuery
+            loadLibraryBookCount() // Efficient count-only query
             if searchQuery.isEmpty {
                 // Start not loading to show bestsellers immediately
                 isLoading = false
@@ -894,7 +901,7 @@ struct BookSearchSheet: View {
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(.white)
 
-                    Text("Add \(5 - allBooks.count) more \(5 - allBooks.count == 1 ? "book" : "books") to unlock personalized recommendations")
+                    Text("Add \(5 - libraryBookCount) more \(5 - libraryBookCount == 1 ? "book" : "books") to unlock personalized recommendations")
                         .font(.system(size: 15))
                         .foregroundStyle(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
@@ -981,7 +988,7 @@ struct BookSearchSheet: View {
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
                     .tracking(1.2)
 
-                Text("Based on your library of \(allBooks.count) books")
+                Text("Based on your library of \(libraryBookCount) books")
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.5))
             }
@@ -1014,7 +1021,7 @@ struct BookSearchSheet: View {
 
         do {
             // Check cache first
-            if let cached = await RecommendationCache.shared.load(currentBookCount: allBooks.count) {
+            if let cached = await RecommendationCache.shared.load(currentBookCount: libraryBookCount) {
                 #if DEBUG
                 print("✅ Using cached recommendations")
                 #endif
@@ -1028,17 +1035,21 @@ struct BookSearchSheet: View {
             print("🎯 Generating fresh For You recommendations...")
             #endif
 
-            // Step 1: Analyze library on-device
+            // Step 1: Load all books for analysis (only when needed for recommendations)
+            let descriptor = FetchDescriptor<BookModel>()
+            let allBooks = (try? modelContext.fetch(descriptor)) ?? []
+
+            // Step 2: Analyze library on-device
             let profile = await LibraryTasteAnalyzer.shared.analyzeLibrary(books: allBooks)
 
-            // Step 2: Get recommendations from Perplexity
+            // Step 3: Get recommendations from Perplexity
             let recommendations = try await RecommendationEngine.shared.generateRecommendations(for: profile)
 
-            // Step 3: Cache for 30 days
+            // Step 4: Cache for 30 days
             await RecommendationCache.shared.save(
                 profile: profile,
                 recommendations: recommendations,
-                bookCount: allBooks.count
+                bookCount: libraryBookCount
             )
 
             await MainActor.run {
