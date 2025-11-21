@@ -350,6 +350,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             }
 
             // For regular books, require at least some quality indicators
+            // RELAXED for self-published books: now requires only 1 indicator instead of 2
             let hasPageCount = volumeInfo.pageCount != nil && volumeInfo.pageCount! > 0
             let hasISBN = scoredBook.hasISBN
             let hasRatings = (volumeInfo.ratingsCount ?? 0) > 0
@@ -362,11 +363,11 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                               (hasRatings ? 1 : 0) +
                               (hasMultipleImageSizes ? 1 : 0)
 
-            // Regular books need at least 2 indicators
-            let passes = qualityScore >= 2
+            // Regular books need at least 1 indicator (lowered from 2 to include self-published)
+            let passes = qualityScore >= 1
             #if DEBUG
             if !passes {
-                print("❌ Filtered out '\(scoredBook.book.title)' - Quality score: \(qualityScore) (need 2+)")
+                print("❌ Filtered out '\(scoredBook.book.title)' - Quality score: \(qualityScore) (need 1+)")
             }
             #endif
             return passes
@@ -507,7 +508,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             URLQueryItem(name: "maxResults", value: String(maxResults)),
             URLQueryItem(name: "startIndex", value: String(startIndex)),
             URLQueryItem(name: "orderBy", value: orderBy),
-            URLQueryItem(name: "printType", value: "books"),
+            // REMOVED printType restriction to include all formats (esp. self-published)
+            // URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "langRestrict", value: "en"),
             URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
@@ -610,6 +612,23 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                         break
                     }
                 }
+
+                // Self-published detection - give them a fair chance to compete
+                let selfPublishedIndicators = [
+                    "independently published", "self-published", "self published",
+                    "createspace", "kindle direct", "kdp", "ingramspark",
+                    "lulu", "smashwords", "draft2digital", "blurb"
+                ]
+
+                for indicator in selfPublishedIndicators {
+                    if publisher.contains(indicator) {
+                        score += 20  // Smaller boost to compete, but not override quality
+                        #if DEBUG
+                        print("📚 Self-published book detected: '\(book.title)' (+20 boost)")
+                        #endif
+                        break
+                    }
+                }
             }
             
             // Title match scoring
@@ -618,18 +637,35 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             // If we have a parsed query, use it for better matching
             if let parsed = parsedQuery {
                 let targetTitle = parsed.title.lowercased()
-                
-                // Exact title match (huge boost)
-                if titleLower == targetTitle {
-                    score += 100
+
+                // Clean both titles for better matching (remove common suffixes/prefixes)
+                let cleanedBookTitle = titleLower
+                    .replacingOccurrences(of: ": a novel", with: "")
+                    .replacingOccurrences(of: ": a memoir", with: "")
+                    .replacingOccurrences(of: " - a novel", with: "")
+                    .components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces) ?? titleLower
+
+                // Exact title match (MASSIVE boost to override publisher bias)
+                if titleLower == targetTitle || cleanedBookTitle == targetTitle {
+                    score += 300  // Increased from 200 for decisive wins
+                    #if DEBUG
+                    print("🎯 EXACT MATCH: '\(book.title)' scores +300")
+                    #endif
+                }
+                // Title starts with target - likely the right book with subtitle
+                else if titleLower.hasPrefix(targetTitle + ":") || titleLower.hasPrefix(targetTitle + " ") {
+                    score += 250  // Almost as good as exact match
+                    #if DEBUG
+                    print("🎯 PREFIX MATCH: '\(book.title)' scores +250")
+                    #endif
                 }
                 // Title starts with target (very good match)
                 else if titleLower.hasPrefix(targetTitle) {
-                    score += 70
+                    score += 180  // Increased from 120
                 }
                 // Target title is contained in full (good match)
                 else if titleLower.contains(targetTitle) {
-                    score += 50
+                    score += 100  // Increased from 80
                 }
                 // All words from target title are in book title
                 else {
@@ -644,20 +680,20 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                    let authors = volumeInfo.authors {
                     let targetAuthorLower = targetAuthor.lowercased()
                     let authorString = authors.joined(separator: " ").lowercased()
-                    
-                    // Exact author match
+
+                    // Exact author match (HUGE boost to ensure correct book wins)
                     if authorString == targetAuthorLower {
-                        score += 50
+                        score += 150  // Increased from 50 - title+author match is definitive
                     }
                     // Author contains target
                     else if authorString.contains(targetAuthorLower) {
-                        score += 30
+                        score += 80  // Increased from 30
                     }
                     // Last name match (common for author searches)
                     else {
                         let targetLastName = targetAuthorLower.split(separator: " ").last ?? ""
                         if !targetLastName.isEmpty && authorString.contains(targetLastName) {
-                            score += 20
+                            score += 40  // Increased from 20
                         }
                     }
                 }
@@ -678,8 +714,16 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                 }
                 
                 // Exact title match
-                if titleLower == originalQuery.lowercased() {
-                    score += 50
+                let cleanedBookTitle = titleLower
+                    .replacingOccurrences(of: ": a novel", with: "")
+                    .replacingOccurrences(of: ": a memoir", with: "")
+                    .components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces) ?? titleLower
+
+                if titleLower == originalQuery.lowercased() || cleanedBookTitle == originalQuery.lowercased() {
+                    score += 300  // Increased to match parsed query
+                    #if DEBUG
+                    print("🎯 EXACT MATCH (fallback): '\(book.title)' scores +300")
+                    #endif
                 }
                 
                 // Author match (if provided)
@@ -749,10 +793,11 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             }
             
             // Penalize if title contains unwanted terms
+            // REMOVED: "illustrated", "graphic" - legitimate books use these, esp. self-published
             let unwantedTerms = [
                 "summary", "notes", "study guide", "spark",
                 "cliff", "analysis", "workbook", "teacher",
-                "illustrated", "graphic", "companion", "annotated",
+                "companion", "annotated",
                 "movie tie-in", "calendar", "journal", "notebook",
                 "coloring", "colouring", "quickread", "condensed",
                 "abridged", "adapted", "retold", "simplified"

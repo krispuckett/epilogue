@@ -177,9 +177,10 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
     let publishedYear: String?
     var coverImageURL: String?
     let isbn: String?
-    let description: String?
+    let description: String?  // From Google Books API
+    var userDescription: String?  // User-provided description (overrides description if present)
     let pageCount: Int?
-    
+
     // For local storage
     var isInLibrary: Bool = false
     var readingStatus: ReadingStatus = .wantToRead
@@ -245,9 +246,14 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         }
     }
     
+    // Computed property: return user description if available, otherwise Google Books description
+    var effectiveDescription: String? {
+        userDescription ?? description
+    }
+
     // Custom decoding to handle migration from old model without localId
     enum CodingKeys: String, CodingKey {
-        case id, localId, title, author, publishedYear, coverImageURL, isbn, description, pageCount
+        case id, localId, title, author, publishedYear, coverImageURL, isbn, description, userDescription, pageCount
         case isInLibrary, readingStatus, currentPage, userRating, userNotes, dateAdded
     }
     
@@ -302,7 +308,12 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         #if DEBUG
         print("  📝 Description: \(description.map { "Present (\($0.prefix(50))...)" } ?? "nil")")
         #endif
-        
+
+        userDescription = try container.decodeIfPresent(String.self, forKey: .userDescription)
+        #if DEBUG
+        print("  📝 User Description: \(userDescription.map { _ in "Present" } ?? "nil")")
+        #endif
+
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount)
         if GOOGLE_API_VERBOSE { print("  📄 Page Count: \(pageCount?.description ?? "nil")") }
         
@@ -397,7 +408,12 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
         #if DEBUG
         print("  📝 Description: \(description != nil ? "Present" : "nil")")
         #endif
-        
+
+        try container.encodeIfPresent(userDescription, forKey: .userDescription)
+        #if DEBUG
+        print("  📝 User Description: \(userDescription != nil ? "Present" : "nil")")
+        #endif
+
         try container.encodeIfPresent(pageCount, forKey: .pageCount)
         #if DEBUG
         print("  📄 Page Count: \(pageCount?.description ?? "nil")")

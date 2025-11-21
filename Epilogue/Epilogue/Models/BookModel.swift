@@ -13,7 +13,8 @@ final class BookModel {
     var publishedYear: String?
     var coverImageURL: String?
     var isbn: String?
-    var desc: String? // 'description' is reserved
+    var desc: String? // 'description' is reserved - from Google Books API
+    var userDescription: String? // User-provided description (overrides desc if present)
     var pageCount: Int?
 
     // Offline cover image caching
@@ -161,6 +162,16 @@ final class BookModel {
     // Check if book has been enriched with smart context
     var isEnriched: Bool {
         smartSynopsis != nil
+    }
+
+    // Computed property: return user description if available, otherwise Google Books description
+    var effectiveDescription: String? {
+        userDescription ?? desc
+    }
+
+    // Check if user has added custom description
+    var hasUserDescription: Bool {
+        userDescription != nil && !userDescription!.isEmpty
     }
 }
 
