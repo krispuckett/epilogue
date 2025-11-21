@@ -8,6 +8,8 @@
 	</array>
 	<key>NSAppIntentsVisualIntelligenceSupported</key>
 	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>NSVisualIntelligenceUsageDescription</key>
 	<string>Epilogue uses Visual Intelligence to extract quotes and text from book pages</string>
 	<key>SKStoreKitVersion</key>
@@ -16,6 +18,7 @@
 	<array>
 		<string>remote-notification</string>
 		<string>fetch</string>
+		<string>audio</string>
 	</array>
 </dict>
 </plist>
