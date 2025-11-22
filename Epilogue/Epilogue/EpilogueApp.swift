@@ -153,6 +153,10 @@ struct EpilogueApp: App {
                          AmbientSession.self,
                          QueuedQuestion.self,
                          ReadingSession.self,
+                         ReadingJourney.self,
+                         JourneyBook.self,
+                         JourneyMilestone.self,
+                         BookMilestone.self,
                     configurations: cloudKitContainer
                 )
                 #if DEBUG

@@ -68,6 +68,27 @@ enum EpilogueSchemaV4: VersionedSchema {
     }
 }
 
+enum EpilogueSchemaV5: VersionedSchema {
+    static var versionIdentifier = Schema.Version(5, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            BookModel.self,
+            CapturedNote.self,
+            CapturedQuote.self,
+            CapturedQuestion.self,
+            AmbientSession.self,
+            QueuedQuestion.self,
+            ReadingSession.self,
+            // Reading Journey models
+            ReadingJourney.self,
+            JourneyBook.self,
+            JourneyMilestone.self,
+            BookMilestone.self
+        ]
+    }
+}
+
 // Migration plan between versions
 enum EpilogueMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
@@ -75,7 +96,8 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             EpilogueSchemaV1.self,
             EpilogueSchemaV2.self,
             EpilogueSchemaV3.self,
-            EpilogueSchemaV4.self
+            EpilogueSchemaV4.self,
+            EpilogueSchemaV5.self
         ]
     }
 
@@ -86,7 +108,9 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             // Migration from V2 to V3 (adding BookModel.coverImageData)
             migrateV2toV3,
             // Migration from V3 to V4 (adding book enrichment fields) - LIGHTWEIGHT
-            MigrationStage.lightweight(fromVersion: EpilogueSchemaV3.self, toVersion: EpilogueSchemaV4.self)
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV3.self, toVersion: EpilogueSchemaV4.self),
+            // Migration from V4 to V5 (adding ReadingJourney models) - LIGHTWEIGHT
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV4.self, toVersion: EpilogueSchemaV5.self)
         ]
     }
 
