@@ -28,8 +28,9 @@ final class CapturedNote {
     }
 
     // Computed property for content format type
+    // Safely handles nil for legacy notes (defaults to plaintext)
     var isMarkdown: Bool {
-        contentFormat == "markdown"
+        (contentFormat ?? "plaintext") == "markdown"
     }
 
     // Helper to mark note as having markdown content

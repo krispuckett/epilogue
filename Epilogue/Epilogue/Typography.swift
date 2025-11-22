@@ -176,7 +176,28 @@ struct Note: Identifiable, Codable, Equatable {
     var isMarkdown: Bool {
         contentFormat == "markdown"
     }
-    
+
+    // Custom Codable implementation for backward compatibility
+    enum CodingKeys: String, CodingKey {
+        case id, type, content, contentFormat, bookId, bookTitle, author, pageNumber, dateCreated, ambientSessionId, source
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        type = try container.decode(NoteType.self, forKey: .type)
+        content = try container.decode(String.self, forKey: .content)
+        // Provide default value for contentFormat to support legacy notes
+        contentFormat = try container.decodeIfPresent(String.self, forKey: .contentFormat) ?? "plaintext"
+        bookId = try container.decodeIfPresent(UUID.self, forKey: .bookId)
+        bookTitle = try container.decodeIfPresent(String.self, forKey: .bookTitle)
+        author = try container.decodeIfPresent(String.self, forKey: .author)
+        pageNumber = try container.decodeIfPresent(Int.self, forKey: .pageNumber)
+        dateCreated = try container.decode(Date.self, forKey: .dateCreated)
+        ambientSessionId = try container.decodeIfPresent(UUID.self, forKey: .ambientSessionId)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+    }
+
     /// Check if this note is linked to a specific book
     var isLinkedToBook: Bool {
         return bookId != nil

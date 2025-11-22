@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 // MARK: - Markdown Parser for Notes
@@ -77,15 +78,16 @@ struct MarkdownParser {
         fontSize: CGFloat = 16,
         lineSpacing: CGFloat = 6
     ) -> AttributedString {
-        var result = AttributedString(markdown)
+        // Process line-level patterns first (headers, blockquotes)
+        var baseText = AttributedString(markdown)
+        baseText.font = .system(size: fontSize)
+        baseText.foregroundColor = Color(red: 0.98, green: 0.97, blue: 0.96)
 
-        // Apply base styling
-        result.font = .system(size: fontSize)
-        result.foregroundColor = Color(red: 0.98, green: 0.97, blue: 0.96)
+        // Apply line-level formatting
+        baseText = parseHeadersAndBlockquotes(baseText, baseFontSize: fontSize)
 
-        // Parse markdown patterns
-        result = parseHeaders(result, baseFontSize: fontSize)
-        result = parseBlockquotes(result, baseFontSize: fontSize)
+        // Apply inline patterns (highlights, bold, italic)
+        var result = baseText
         result = parseHighlights(result)
         result = parseBold(result, baseFontSize: fontSize)
         result = parseItalic(result, baseFontSize: fontSize)
@@ -93,81 +95,56 @@ struct MarkdownParser {
         return result
     }
 
-    // MARK: - Pattern Parsing
-
-    /// Parse headers: # Header 1, ## Header 2
-    private static func parseHeaders(_ attributed: AttributedString, baseFontSize: CGFloat) -> AttributedString {
-        var result = attributed
-        let text = String(result.characters)
-        let lines = text.components(separatedBy: .newlines)
+    /// Combined parser for headers and blockquotes (line-level patterns)
+    private static func parseHeadersAndBlockquotes(_ attributed: AttributedString, baseFontSize: CGFloat) -> AttributedString {
+        let text = String(attributed.characters)
+        var result = AttributedString()
+        let lines = text.components(separatedBy: "\n")
 
         for (index, line) in lines.enumerated() {
-            // Header 1: # Text
-            if line.hasPrefix("# ") && !line.hasPrefix("## ") {
-                let headerText = String(line.dropFirst(2))
-                if let range = text.range(of: line),
-                   let attrRange = Range(range, in: result) {
-                    result.replaceSubrange(attrRange, with: AttributedString(headerText))
+            var lineResult: AttributedString
 
-                    // Apply H1 styling
-                    let updatedText = String(result.characters)
-                    if let headerRange = updatedText.range(of: headerText),
-                       let headerAttrRange = Range(headerRange, in: result) {
-                        result[headerAttrRange].font = .system(size: baseFontSize + 8, weight: .bold)
-                        result[headerAttrRange].foregroundColor = .white
-                    }
-                }
-            }
-
-            // Header 2: ## Text
-            else if line.hasPrefix("## ") {
+            // Header 2: ## Text (check first since it's longer)
+            if line.hasPrefix("## ") {
                 let headerText = String(line.dropFirst(3))
-                if let range = text.range(of: line),
-                   let attrRange = Range(range, in: result) {
-                    result.replaceSubrange(attrRange, with: AttributedString(headerText))
-
-                    // Apply H2 styling
-                    let updatedText = String(result.characters)
-                    if let headerRange = updatedText.range(of: headerText),
-                       let headerAttrRange = Range(headerRange, in: result) {
-                        result[headerAttrRange].font = .system(size: baseFontSize + 4, weight: .semibold)
-                        result[headerAttrRange].foregroundColor = Color.white.opacity(0.95)
-                    }
-                }
+                lineResult = AttributedString(headerText)
+                lineResult.font = .system(size: baseFontSize + 4, weight: .semibold)
+                lineResult.foregroundColor = Color.white.opacity(0.95)
             }
-        }
-
-        return result
-    }
-
-    /// Parse blockquotes: > Quote text
-    private static func parseBlockquotes(_ attributed: AttributedString, baseFontSize: CGFloat) -> AttributedString {
-        var result = attributed
-        let text = String(result.characters)
-        let lines = text.components(separatedBy: .newlines)
-
-        for line in lines {
-            if line.hasPrefix("> ") {
+            // Header 1: # Text
+            else if line.hasPrefix("# ") {
+                let headerText = String(line.dropFirst(2))
+                lineResult = AttributedString(headerText)
+                lineResult.font = .system(size: baseFontSize + 8, weight: .bold)
+                lineResult.foregroundColor = .white
+            }
+            // Blockquote: > Text
+            else if line.hasPrefix("> ") {
                 let quoteText = String(line.dropFirst(2))
-                if let range = text.range(of: line),
-                   let attrRange = Range(range, in: result) {
-                    // Add left border indicator (using em dash)
-                    let styledQuote = "│ \(quoteText)"
-                    result.replaceSubrange(attrRange, with: AttributedString(styledQuote))
+                let styledQuote = "│ \(quoteText)"
+                lineResult = AttributedString(styledQuote)
+                lineResult.font = .custom("Georgia", size: baseFontSize)
+                lineResult.foregroundColor = DesignSystem.Colors.primaryAccent.opacity(0.9)
+            }
+            // Regular line
+            else {
+                lineResult = AttributedString(line)
+                lineResult.font = .system(size: baseFontSize)
+                lineResult.foregroundColor = Color(red: 0.98, green: 0.97, blue: 0.96)
+            }
 
-                    // Apply blockquote styling
-                    let updatedText = String(result.characters)
-                    if let quoteRange = updatedText.range(of: styledQuote),
-                       let quoteAttrRange = Range(quoteRange, in: result) {
-                        result[quoteAttrRange].font = .custom("Georgia", size: baseFontSize)
-                        result[quoteAttrRange].foregroundColor = DesignSystem.Colors.primaryAccent.opacity(0.9)
-                    }
-                }
+            result.append(lineResult)
+
+            // Add newline except for last line
+            if index < lines.count - 1 {
+                result.append(AttributedString("\n"))
             }
         }
 
         return result
     }
+
+    // MARK: - Inline Pattern Parsing
 
     /// Parse highlights: ==highlighted text==
     private static func parseHighlights(_ attributed: AttributedString) -> AttributedString {
