@@ -12,12 +12,22 @@ public class EpilogueAmbientCoordinator: ObservableObject {
     @Published var initialBook: Book?  // Book to start with when launched from BookDetailView
     @Published var initialQuestion: String?  // Initial question to ask when launching
     @Published var existingSession: AmbientSession?  // Existing session to continue from
-    
+
+    // Mode switching support
+    @Published var currentMode: AmbientModeType = .generic
+
     private init() {}
     
     func launch(from context: LaunchContext = .general, book: Book? = nil) {
         preSelectedBook = book
         initialBook = book  // Set initialBook so AmbientModeView can pick it up
+
+        // Set initial mode based on whether book is provided
+        if let book = book {
+            currentMode = .bookSpecific(bookID: book.persistentModelID)
+        } else {
+            currentMode = .generic
+        }
 
         Task {
             await prepareServices()
@@ -31,15 +41,40 @@ public class EpilogueAmbientCoordinator: ObservableObject {
         #if DEBUG
         print("🚀 Launching ambient mode from: \(context)")
         if let book = book {
-            print("📚 With book: \(book.title)")
+            print("📚 With book: \(book.title) (Book Mode)")
+        } else {
+            print("💬 Generic Reading Companion Mode")
         }
         #endif
     }
-    
+
+    func switchToGenericMode() {
+        currentMode = .generic
+        preSelectedBook = nil
+        #if DEBUG
+        print("💬 Switched to Generic Mode")
+        #endif
+
+        // Light haptic feedback
+        HapticManager.shared.selectionChanged()
+    }
+
+    func switchToBookMode(book: Book) {
+        currentMode = .bookSpecific(bookID: book.persistentModelID)
+        preSelectedBook = book
+        #if DEBUG
+        print("📚 Switched to Book Mode: \(book.title)")
+        #endif
+
+        // Light haptic feedback
+        HapticManager.shared.selectionChanged()
+    }
+
     func dismiss() {
         isActive = false
         preSelectedBook = nil
         initialBook = nil
+        currentMode = .generic
     }
     
     private func prepareServices() async {
@@ -125,8 +160,17 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
             EpilogueAmbientCoordinator.shared.initialBook = book
             EpilogueAmbientCoordinator.shared.initialQuestion = initialQuestion
             EpilogueAmbientCoordinator.shared.existingSession = existingSession
+
+            // Set mode based on book presence
+            if let book = book {
+                EpilogueAmbientCoordinator.shared.currentMode = .bookSpecific(bookID: book.persistentModelID)
+            } else {
+                EpilogueAmbientCoordinator.shared.currentMode = .generic
+            }
+
             #if DEBUG
             print("🎙️ DEBUG: isPresented set to true, initial book: \(book?.title ?? "none")")
+            print("🎙️ Mode: \(book != nil ? "Book-Specific" : "Generic")")
             #endif
         }
     }

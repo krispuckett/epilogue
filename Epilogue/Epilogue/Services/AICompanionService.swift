@@ -259,43 +259,69 @@ class AICompanionService: ObservableObject {
     
     private func buildContextualMessage(message: String, bookContext: Book?, history: [UnifiedChatMessage]) -> String {
         var contextParts: [String] = []
-        
-        // Add reading session context
-        if let sessionContext = getCurrentReadingSession(for: bookContext) {
-            contextParts.append(sessionContext)
-        }
-        
-        // Add time-based context
-        contextParts.append(getTimeBasedContext())
-        
-        // Add recent content from book
-        if let book = bookContext,
-           let recentContent = getRecentContentForBook(book, from: history) {
-            contextParts.append(recentContent)
-        }
-        
-        // Add recent ambient captures
-        if let ambientContext = getRecentAmbientCaptures(from: history) {
-            contextParts.append(ambientContext)
-        }
-        
-        // Build the final context message
-        var finalContext = message
-        
-        if !contextParts.isEmpty {
-            let contextSummary = contextParts.joined(separator: " | ")
-            
-            // Keep context concise (under 500 chars)
-            let trimmedContext = String(contextSummary.prefix(490))
-            
-            if let book = bookContext {
-                finalContext = "[Context: \(trimmedContext)] Currently discussing '\(book.title)': \(message)"
+
+        if let book = bookContext {
+            // BOOK-SPECIFIC MODE: Build context for specific book
+
+            // Add reading session context
+            if let sessionContext = getCurrentReadingSession(for: book) {
+                contextParts.append(sessionContext)
+            }
+
+            // Add time-based context
+            contextParts.append(getTimeBasedContext())
+
+            // Add recent content from book
+            if let recentContent = getRecentContentForBook(book, from: history) {
+                contextParts.append(recentContent)
+            }
+
+            // Add recent ambient captures
+            if let ambientContext = getRecentAmbientCaptures(from: history) {
+                contextParts.append(ambientContext)
+            }
+
+            // Build the final context message
+            if !contextParts.isEmpty {
+                let contextSummary = contextParts.joined(separator: " | ")
+                let trimmedContext = String(contextSummary.prefix(490))
+                return "[Context: \(trimmedContext)] Currently discussing '\(book.title)': \(message)"
             } else {
-                finalContext = "[Context: \(trimmedContext)] \(message)"
+                return "Currently discussing '\(book.title)': \(message)"
+            }
+        } else {
+            // GENERIC MODE: Build library-wide context
+
+            // Use GenericAmbientContextManager for rich generic context
+            // Note: This is async, so we'll build sync context here and let the manager be called from UnifiedChatView
+            contextParts.append(getTimeBasedContext())
+
+            // Add generic reading companion system prompt
+            let systemPrompt = """
+            You are Epilogue's reading companion. Help users with their reading journey when they're not actively reading a specific book.
+
+            Focus on:
+            - Book recommendations based on their reading history and patterns
+            - Reading habit insights and suggestions
+            - Reflection on finished books
+            - Library organization and exploration
+            - Cross-book thematic connections
+
+            Boundaries:
+            - ONLY discuss books, reading, and literary topics
+            - Politely redirect off-topic questions to reading-related topics
+            - Suggest switching to book-specific mode for detailed book discussions
+
+            Be thoughtful, specific, and personalized using their actual data.
+            """
+
+            if !contextParts.isEmpty {
+                let contextSummary = contextParts.joined(separator: " | ")
+                return "[System: \(systemPrompt)]\n[Context: \(contextSummary)]\n\(message)"
+            } else {
+                return "[System: \(systemPrompt)]\n\(message)"
             }
         }
-        
-        return finalContext
     }
     
     private func extractQuotesFromHistory(_ history: [UnifiedChatMessage]) -> [String] {

@@ -202,10 +202,18 @@ struct UnifiedChatView: View {
     private var viewWithOverlays: some View {
         baseView
             .overlay(alignment: .bottom) { voiceGradientOverlay }
+            .overlay(alignment: .top) {
+                if isAmbientMode { ambientModeSelectorOverlay }
+            }
             .overlay(alignment: .topLeading) {
                 if isAmbientMode { ambientModeExitButton }
             }
             // Debug overlay removed for production
+    }
+
+    @ViewBuilder
+    private var ambientModeSelectorOverlay: some View {
+        AmbientModeSelector(coordinator: EpilogueAmbientCoordinator.shared)
     }
     
     private var viewWithNavigation: some View {
@@ -1273,7 +1281,7 @@ struct UnifiedChatView: View {
         
         // Use AICompanionService for flexibility between providers
         let aiService = AICompanionService.shared
-        
+
         // Check if service is configured
         guard aiService.isConfigured() else {
             await MainActor.run {
@@ -1287,11 +1295,32 @@ struct UnifiedChatView: View {
             }
             return
         }
-        
+
+        // If in generic mode (no book context), build rich library context
+        var enhancedInput = userInput
+        if currentBookContext == nil {
+            // Configure GenericAmbientContextManager with model context
+            GenericAmbientContextManager.shared.configure(with: modelContext)
+
+            // Build generic context asynchronously
+            let genericContext = await GenericAmbientContextManager.shared.buildContext(for: userInput)
+
+            // Prepend context to user input
+            if !genericContext.isEmpty {
+                enhancedInput = """
+                [LIBRARY CONTEXT]
+                \(genericContext)
+
+                [USER QUESTION]
+                \(userInput)
+                """
+            }
+        }
+
         do {
             // Get response from AI with conversation context
             let response = try await aiService.processMessage(
-                userInput,
+                enhancedInput,
                 bookContext: currentBookContext,
                 conversationHistory: filteredMessages  // Only this book's history
             )
