@@ -202,112 +202,39 @@ struct EndAmbientSessionIntent: AppIntent {
     }
 }
 
-// MARK: - Live Activity Manager
+// MARK: - Live Activity Manager (Legacy - Deprecated)
+// This class is deprecated. Use LiveActivityLifecycleManager instead.
+// Kept for backward compatibility during migration.
 
 @MainActor
 class AmbientLiveActivityManager {
     static let shared = AmbientLiveActivityManager()
-    
-    private var currentActivity: Activity<AmbientActivityAttributes>?
-    private var updateTimer: Timer?
-    
+
     private init() {}
-    
+
+    /// Use LiveActivityLifecycleManager.shared.startSession() instead
     func startActivity() async {
-        // Check if activities are enabled
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            #if DEBUG
-            print("Live Activities not enabled")
-            #endif
-            return
-        }
-        
-        let attributes = AmbientActivityAttributes(startTime: Date())
-        let initialState = AmbientActivityAttributes.ContentState(
-            bookTitle: nil,
-            sessionDuration: 0,
-            capturedCount: 0,
-            isListening: true,
-            lastTranscript: ""
-        )
-        
-        do {
-            currentActivity = try Activity.request(
-                attributes: attributes,
-                content: .init(state: initialState, staleDate: nil),
-                pushType: nil
-            )
-            
-            // Start update timer for duration
-            startUpdateTimer()
-            
-            #if DEBUG
-            print("✅ Live Activity started: \(currentActivity?.id ?? "unknown")")
-            #endif
-        } catch {
-            #if DEBUG
-            print("❌ Failed to start Live Activity: \(error)")
-            #endif
-        }
+        await LiveActivityLifecycleManager.shared.startSession()
     }
-    
+
+    /// Use LiveActivityLifecycleManager.shared.updateContent() instead
     func updateActivity(
         bookTitle: String? = nil,
         capturedCount: Int? = nil,
         isListening: Bool? = nil,
         lastTranscript: String? = nil
     ) async {
-        guard let activity = currentActivity else { return }
-        
-        let state = activity.content.state
-        let sessionDuration = Date().timeIntervalSince(activity.attributes.startTime)
-        
-        let updatedState = AmbientActivityAttributes.ContentState(
-            bookTitle: bookTitle ?? state.bookTitle,
-            sessionDuration: sessionDuration,
-            capturedCount: capturedCount ?? state.capturedCount,
-            isListening: isListening ?? state.isListening,
-            lastTranscript: lastTranscript ?? state.lastTranscript
+        await LiveActivityLifecycleManager.shared.updateContent(
+            bookTitle: bookTitle,
+            capturedCount: capturedCount,
+            isListening: isListening,
+            lastTranscript: lastTranscript
         )
-        
-        await activity.update(.init(state: updatedState, staleDate: nil))
     }
-    
+
+    /// Use LiveActivityLifecycleManager.shared.endSession() instead
     func endActivity() async {
-        guard let activity = currentActivity else { return }
-        
-        stopUpdateTimer()
-        
-        let finalState = AmbientActivityAttributes.ContentState(
-            bookTitle: activity.content.state.bookTitle,
-            sessionDuration: Date().timeIntervalSince(activity.attributes.startTime),
-            capturedCount: activity.content.state.capturedCount,
-            isListening: false,
-            lastTranscript: "Session ended"
-        )
-        
-        await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .after(Date().addingTimeInterval(5)))
-        
-        currentActivity = nil
-        #if DEBUG
-        print("✅ Live Activity ended")
-        #endif
-    }
-    
-    private func startUpdateTimer() {
-        stopUpdateTimer()
-        
-        // Update duration every 10 seconds
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
-            Task { @MainActor in
-                await self.updateActivity()
-            }
-        }
-    }
-    
-    private func stopUpdateTimer() {
-        updateTimer?.invalidate()
-        updateTimer = nil
+        await LiveActivityLifecycleManager.shared.endSession()
     }
 }
 
