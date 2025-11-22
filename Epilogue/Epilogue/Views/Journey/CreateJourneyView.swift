@@ -18,6 +18,19 @@ struct CreateJourneyView: View {
     @State private var readingPattern: String = "Flexible"
     @State private var isCreating: Bool = false
 
+    // Deduplicated books (only unique by book.id)
+    private var uniqueLibraryBooks: [BookModel] {
+        var seen = Set<String>()
+        return libraryBooks.filter { book in
+            if seen.contains(book.id) {
+                return false
+            } else {
+                seen.insert(book.id)
+                return true
+            }
+        }
+    }
+
     enum CreationStep {
         case welcome
         case selectBooks
@@ -151,7 +164,7 @@ struct CreateJourneyView: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
 
-            if libraryBooks.isEmpty {
+            if uniqueLibraryBooks.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "books.vertical")
                         .font(.system(size: 48))
@@ -165,7 +178,7 @@ struct CreateJourneyView: View {
                 .padding(.vertical, 40)
             } else {
                 VStack(spacing: 12) {
-                    ForEach(libraryBooks) { book in
+                    ForEach(uniqueLibraryBooks, id: \.localId) { book in
                         BookSelectionRow(
                             book: book,
                             isSelected: selectedBooks.contains(book.id)
@@ -385,7 +398,7 @@ struct CreateJourneyView: View {
         step = .creating
 
         Task {
-            let books = libraryBooks.filter { selectedBooks.contains($0.id) }
+            let books = uniqueLibraryBooks.filter { selectedBooks.contains($0.id) }
 
             let preferences = ReadingPreferences(
                 timeframe: timeframe.isEmpty ? nil : timeframe,
@@ -502,21 +515,32 @@ struct ExampleIntentButton: View {
     let text: String
     @Binding var userIntent: String
 
+    private var isSelected: Bool {
+        userIntent == text
+    }
+
     var body: some View {
         Button(action: { userIntent = text }) {
             HStack {
                 Text(text)
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(isSelected ? .white.opacity(0.95) : .white.opacity(0.7))
 
                 Spacer()
 
-                Image(systemName: "arrow.up.forward")
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "arrow.up.forward")
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.549, blue: 0.259) : .white.opacity(0.4))
             }
             .padding(12)
             .glassEffect(in: .rect(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(
+                        isSelected ? Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.5) : Color.clear,
+                        lineWidth: isSelected ? 1.5 : 0
+                    )
+            )
         }
         .buttonStyle(.plain)
     }
