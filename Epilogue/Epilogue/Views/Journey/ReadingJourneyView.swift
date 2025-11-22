@@ -245,41 +245,56 @@ struct TimelineBookRow: View {
         VStack(alignment: .leading, spacing: 0) {
             // Main row
             HStack(alignment: .top, spacing: 16) {
-                // Timeline marker
-                VStack(spacing: 0) {
-                    // Line above (if not first)
-                    if !isFirst {
-                        Rectangle()
-                            .fill(journeyBook.isCompleted ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.2))
-                            .frame(width: 2, height: 24)
-                    }
-
-                    // Marker circle
-                    ZStack {
-                        Circle()
-                            .fill(journeyBook.isCompleted ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.1))
-                            .frame(width: 24, height: 24)
-
-                        if journeyBook.isCompleted {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
-                        } else if journeyBook.isCurrentlyReading {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 8, height: 8)
+                // Timeline marker - extends through full content height
+                ZStack(alignment: .top) {
+                    // Continuous vertical line
+                    VStack(spacing: 0) {
+                        // Line above (if not first)
+                        if !isFirst {
+                            Rectangle()
+                                .fill(journeyBook.isCompleted ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.2))
+                                .frame(width: 2, height: 24)
                         } else {
-                            Circle()
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                .frame(width: 12, height: 12)
+                            Spacer()
+                                .frame(height: 24)
+                        }
+
+                        // Line below extends to bottom
+                        if !isLast {
+                            Rectangle()
+                                .fill(journeyBook.isCompleted ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.2))
+                                .frame(width: 2)
                         }
                     }
 
-                    // Line below (if not last)
-                    if !isLast {
-                        Rectangle()
-                            .fill(journeyBook.isCompleted ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.2))
-                            .frame(width: 2, height: 24)
+                    // Marker circle positioned at top
+                    VStack(spacing: 0) {
+                        if !isFirst {
+                            Spacer()
+                                .frame(height: 12) // Half of line above to center marker
+                        }
+
+                        ZStack {
+                            Circle()
+                                .fill(journeyBook.isCompleted ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.1))
+                                .frame(width: 24, height: 24)
+
+                            if journeyBook.isCompleted {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                            } else if journeyBook.isCurrentlyReading {
+                                Circle()
+                                    .fill(.white)
+                                    .frame(width: 8, height: 8)
+                            } else {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    .frame(width: 12, height: 12)
+                            }
+                        }
+
+                        Spacer()
                     }
                 }
                 .frame(width: 24)
