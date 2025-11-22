@@ -235,14 +235,7 @@ struct CreateJourneyView: View {
                     .foregroundStyle(.white)
                     .padding()
                     .lineLimit(3...6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                            )
-                    )
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
 
             Spacer()
@@ -284,14 +277,7 @@ struct CreateJourneyView: View {
                     .font(.system(size: 16))
                     .foregroundStyle(.white)
                     .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                            )
-                    )
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -457,14 +443,7 @@ struct InfoCard: View {
             Spacer()
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.02))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                )
-        )
+        .glassEffect(.thin, in: .rect(cornerRadius: 12))
     }
 }
 
@@ -506,15 +485,12 @@ struct BookSelectionRow: View {
                     .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.3))
             }
             .padding(12)
-            .background(
+            .glassEffect(isSelected ? .regular : .thin, in: .rect(cornerRadius: 12))
+            .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.white.opacity(0.05) : Color.white.opacity(0.02))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(
-                                isSelected ? Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3) : Color.white.opacity(0.1),
-                                lineWidth: isSelected ? 1 : 0.5
-                            )
+                    .strokeBorder(
+                        isSelected ? Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.5) : Color.clear,
+                        lineWidth: isSelected ? 1.5 : 0
                     )
             )
         }
@@ -540,14 +516,7 @@ struct ExampleIntentButton: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
             .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-                    )
-            )
+            .glassEffect(.ultraThin, in: .rect(cornerRadius: 8))
         }
         .buttonStyle(.plain)
     }

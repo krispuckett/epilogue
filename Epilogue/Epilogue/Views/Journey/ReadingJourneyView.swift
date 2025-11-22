@@ -169,14 +169,7 @@ struct ReadingJourneyView: View {
             }
         }
         .padding(DesignSystem.Spacing.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                .fill(Color.white.opacity(0.02))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-        )
+        .glassEffect(.thin, in: .rect(cornerRadius: DesignSystem.CornerRadius.small))
     }
 
     // MARK: - Timeline Section
