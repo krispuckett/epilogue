@@ -270,56 +270,82 @@ struct CreateJourneyView: View {
 
     // MARK: - Set Preferences Step
     private var setPreferencesStep: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 32) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("A Few Preferences")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
-
-                Text("Optional, but helps me create a better timeline for you.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Timeframe (optional)")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-
-                TextField("This month, this season, by end of year...", text: $timeframe)
-                    .font(.system(size: 16))
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding()
-                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+
+                Text("These help create a timeline that works for you.")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineSpacing(2)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Reading pattern")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+            VStack(alignment: .leading, spacing: 20) {
+                // Timeframe
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
 
-                Picker("Reading pattern", selection: $readingPattern) {
-                    Text("Flexible").tag("Flexible")
-                    Text("Morning reader").tag("Morning")
-                    Text("Evening reader").tag("Evening")
-                    Text("Weekend reading").tag("Weekend")
+                        Text("Timeframe")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+
+                        Text("(optional)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+
+                    TextField("This month, this season, by end of year...", text: $timeframe)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white)
+                        .padding(16)
+                        .glassEffect(in: .rect(cornerRadius: 12))
                 }
-                .pickerStyle(.segmented)
-                .colorScheme(.dark)
+
+                // Reading pattern
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "clock")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+
+                        Text("Reading Pattern")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+
+                    Picker("Reading pattern", selection: $readingPattern) {
+                        Text("Flexible").tag("Flexible")
+                        Text("Morning").tag("Morning")
+                        Text("Evening").tag("Evening")
+                        Text("Weekend").tag("Weekend")
+                    }
+                    .pickerStyle(.segmented)
+                    .colorScheme(.dark)
+                }
             }
 
             Spacer()
 
             Button(action: createJourney) {
-                Text("Create Journey")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                    )
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+
+                    Text("Create Journey")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                )
             }
         }
     }
@@ -349,39 +375,89 @@ struct CreateJourneyView: View {
 
     // MARK: - Complete Step
     private var completeStep: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 32) {
+                Spacer()
+                    .frame(height: 80)
 
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                // Success icon with animation effect
+                ZStack {
+                    // Outer glow
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
+                        .frame(width: 140, height: 140)
+                        .blur(radius: 30)
 
-            VStack(spacing: 12) {
-                Text("Journey Created!")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
+                    // Inner glow
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2))
+                        .frame(width: 100, height: 100)
+                        .blur(radius: 15)
 
-                Text("Your personalized reading timeline is ready. Remember, this is a companion, not a strict schedule.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
+                    // Icon
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 72, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.549, blue: 0.259),
+                                    Color(red: 1.0, green: 0.649, blue: 0.359)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: 20) {
+                    Text("Journey Created!")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    VStack(spacing: 12) {
+                        Text("Your personalized reading timeline is ready.")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.85))
+
+                        Text("Remember: this is a companion, not a strict schedule. Adjust anytime it doesn't feel right.")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white.opacity(0.65))
+                            .lineSpacing(3)
+                    }
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-            }
+                    .padding(.horizontal, 32)
+                }
 
-            Spacer()
+                VStack(spacing: 16) {
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "map.fill")
+                                .font(.system(size: 15, weight: .semibold))
 
-            Button(action: { dismiss() }) {
-                Text("View Journey")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                    )
+                            Text("View Your Journey")
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: 280)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                        )
+                    }
+
+                    Text("You can adjust your journey anytime")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(.top, 8)
+
+                Spacer()
+                    .frame(height: 80)
             }
+            .frame(maxWidth: .infinity)
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     // MARK: - Helper Methods

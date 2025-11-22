@@ -196,40 +196,75 @@ struct ReadingJourneyView: View {
 
     // MARK: - Empty State
     private var emptyState: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 32) {
+                Spacer()
+                    .frame(height: 60)
 
-            Image(systemName: "map.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(.white.opacity(0.3))
+                // Icon with subtle glow
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.1))
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 20)
 
-            VStack(spacing: 12) {
-                Text("Your Reading Journey")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
+                    Image(systemName: "map.fill")
+                        .font(.system(size: 56, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.549, blue: 0.259),
+                                    Color(red: 1.0, green: 0.649, blue: 0.359)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
 
-                Text("Let's create a thoughtful reading plan that helps you accomplish your goals without feeling like homework.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                VStack(spacing: 16) {
+                    Text("Your Reading Journey")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text("Create a thoughtful reading plan that helps you accomplish your goals without feeling like homework.")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 32)
+                }
+
+                VStack(spacing: 16) {
+                    Button(action: { showingCreateJourney = true }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 15, weight: .semibold))
+
+                            Text("Start Your Journey")
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: 280)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                        )
+                    }
+
+                    Text("Takes about 2 minutes")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(.top, 8)
+
+                Spacer()
+                    .frame(height: 60)
             }
-
-            Button(action: { showingCreateJourney = true }) {
-                Text("Start Your Journey")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                    )
-            }
-            .padding(.top, 8)
-
-            Spacer()
+            .frame(maxWidth: .infinity)
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
 }
 
