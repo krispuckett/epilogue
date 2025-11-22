@@ -332,12 +332,20 @@ struct RegularNoteCard: View {
                     .foregroundStyle(Color.white.opacity(0.2))
             }
             
-            // Content
-            Text(note.content)
-                .font(.custom("SF Pro Display", size: 16))
-                .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(4)
+            // Content - render as formatted text if markdown
+            if note.isMarkdown {
+                FormattedNoteText(
+                    markdown: note.content,
+                    fontSize: 16,
+                    lineSpacing: 4
+                )
+            } else {
+                Text(note.content)
+                    .font(.custom("SF Pro Display", size: 16))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(4)
+            }
             
             // Book info (if available)
             if note.bookTitle != nil || note.author != nil {

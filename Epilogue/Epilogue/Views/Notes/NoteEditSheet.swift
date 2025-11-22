@@ -41,16 +41,16 @@ struct NoteEditSheet: View {
             .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
             .padding(.bottom, 12)
             
-            // Text editor with proper padding
-            TextEditor(text: $editedContent)
-                .font(.system(size: 16, design: note.type == .quote ? .serif : .default))
-                .foregroundStyle(.white)
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                .padding(.bottom, 16)
-                .focused($isTextFocused)
+            // Rich text editor with formatting toolbar
+            SimpleRichTextEditor(
+                text: $editedContent,
+                placeholder: note.type == .quote ? "Add your thoughts about this quote..." : "What are you thinking about?",
+                isFocused: $isTextFocused
+            )
+            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
+            .padding(.bottom, 16)
         }
-        .presentationDetents([.fraction(0.35)])
+        .presentationDetents([.fraction(0.7), .large])  // Taller for formatting toolbar
         .presentationDragIndicator(.hidden) // We have our own drag indicator
         .interactiveDismissDisabled()
         .onAppear {
@@ -63,21 +63,12 @@ struct NoteEditSheet: View {
             notesViewModel.isEditingNote = false
         }
         .sensoryFeedback(.impact(weight: .light), trigger: isTextFocused)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                
-                Button("Done") {
-                    isTextFocused = false
-                    saveAndDismiss()
-                }
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(DesignSystem.Colors.primaryAccent)
-            }
-        }
     }
     
     private func saveAndDismiss() {
+        // Detect if content has markdown formatting
+        let hasMarkdown = detectMarkdown(in: editedContent)
+
         // Since Note is a struct with immutable properties, we need to update through the view model
         let updatedNote = Note(
             type: note.type,
@@ -87,18 +78,45 @@ struct NoteEditSheet: View {
             author: note.author,
             pageNumber: note.pageNumber,
             dateCreated: note.dateCreated,
-            id: note.id
+            id: note.id,
+            ambientSessionId: note.ambientSessionId,
+            source: note.source,
+            contentFormat: hasMarkdown ? "markdown" : "plaintext"
         )
-        
+
         // Update through view model
         notesViewModel.updateNote(updatedNote)
-        
+
         // Also post a notification so SwiftDataNotesView can update if needed
         NotificationCenter.default.post(
             name: Notification.Name("NoteUpdated"),
             object: updatedNote
         )
-        
+
         dismiss()
+    }
+
+    /// Detects if text contains markdown formatting
+    private func detectMarkdown(in text: String) -> Bool {
+        let markdownPatterns = [
+            "\\*\\*.*?\\*\\*",  // Bold
+            "__.*?__",           // Bold alternative
+            "\\*.*?\\*",         // Italic
+            "_.*?_",             // Italic alternative
+            "==.*?==",           // Highlight
+            "^> ",               // Blockquote
+            "^# ",               // Header 1
+            "^## ",              // Header 2
+            "^- ",               // Bullet list
+            "^\\d+\\. "          // Numbered list
+        ]
+
+        for pattern in markdownPatterns {
+            if text.range(of: pattern, options: .regularExpression) != nil {
+                return true
+            }
+        }
+
+        return false
     }
 }

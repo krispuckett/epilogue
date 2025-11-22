@@ -149,6 +149,7 @@ struct Note: Identifiable, Codable, Equatable {
     let id: UUID
     let type: NoteType
     let content: String
+    let contentFormat: String  // "markdown" or "plaintext"
     let bookId: UUID?  // Link to specific book
     let bookTitle: String?
     let author: String?
@@ -157,10 +158,11 @@ struct Note: Identifiable, Codable, Equatable {
     let ambientSessionId: UUID?  // Link to ambient session
     let source: String?  // Source of the note (manual, ambient, etc.)
 
-    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil) {
+    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil, contentFormat: String = "plaintext") {
         self.id = id
         self.type = type
         self.content = content
+        self.contentFormat = contentFormat
         self.bookId = bookId
         self.bookTitle = bookTitle
         self.author = author
@@ -169,7 +171,33 @@ struct Note: Identifiable, Codable, Equatable {
         self.ambientSessionId = ambientSessionId
         self.source = source
     }
-    
+
+    // Computed property to check if content is markdown
+    var isMarkdown: Bool {
+        contentFormat == "markdown"
+    }
+
+    // Custom Codable implementation for backward compatibility
+    enum CodingKeys: String, CodingKey {
+        case id, type, content, contentFormat, bookId, bookTitle, author, pageNumber, dateCreated, ambientSessionId, source
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        type = try container.decode(NoteType.self, forKey: .type)
+        content = try container.decode(String.self, forKey: .content)
+        // Provide default value for contentFormat to support legacy notes
+        contentFormat = try container.decodeIfPresent(String.self, forKey: .contentFormat) ?? "plaintext"
+        bookId = try container.decodeIfPresent(UUID.self, forKey: .bookId)
+        bookTitle = try container.decodeIfPresent(String.self, forKey: .bookTitle)
+        author = try container.decodeIfPresent(String.self, forKey: .author)
+        pageNumber = try container.decodeIfPresent(Int.self, forKey: .pageNumber)
+        dateCreated = try container.decode(Date.self, forKey: .dateCreated)
+        ambientSessionId = try container.decodeIfPresent(UUID.self, forKey: .ambientSessionId)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+    }
+
     /// Check if this note is linked to a specific book
     var isLinkedToBook: Bool {
         return bookId != nil
