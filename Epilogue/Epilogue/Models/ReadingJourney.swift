@@ -209,7 +209,7 @@ final class JourneyBook {
 final class JourneyMilestone {
     var id: UUID = UUID()
     var title: String = ""
-    var description: String?
+    var milestoneDescription: String?
     var milestoneType: String = MilestoneType.bookCompletion.rawValue
     var order: Int = 0
 
@@ -238,7 +238,7 @@ final class JourneyMilestone {
 final class BookMilestone {
     var id: UUID = UUID()
     var title: String = ""
-    var description: String? // "Part 1: The Fellowship Forms", "The turning point"
+    var milestoneDescription: String? // "Part 1: The Fellowship Forms", "The turning point"
     var order: Int = 0
 
     var journeyBook: JourneyBook?

@@ -443,7 +443,7 @@ struct InfoCard: View {
             Spacer()
         }
         .padding(16)
-        .glassEffect(.thin, in: .rect(cornerRadius: 12))
+        .glassEffect(in: .rect(cornerRadius: 12))
     }
 }
 
@@ -485,7 +485,7 @@ struct BookSelectionRow: View {
                     .foregroundStyle(isSelected ? Color(red: 1.0, green: 0.549, blue: 0.259) : Color.white.opacity(0.3))
             }
             .padding(12)
-            .glassEffect(isSelected ? .regular : .thin, in: .rect(cornerRadius: 12))
+            .glassEffect(in: .rect(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(
@@ -516,7 +516,7 @@ struct ExampleIntentButton: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
             .padding(12)
-            .glassEffect(.ultraThin, in: .rect(cornerRadius: 8))
+            .glassEffect(in: .rect(cornerRadius: 8))
         }
         .buttonStyle(.plain)
     }

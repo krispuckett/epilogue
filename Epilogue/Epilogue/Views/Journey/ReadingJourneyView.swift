@@ -169,7 +169,7 @@ struct ReadingJourneyView: View {
             }
         }
         .padding(DesignSystem.Spacing.cardPadding)
-        .glassEffect(.thin, in: .rect(cornerRadius: DesignSystem.CornerRadius.small))
+        .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.small))
     }
 
     // MARK: - Timeline Section
@@ -384,7 +384,7 @@ struct MilestoneRow: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.white.opacity(milestone.isCompleted ? 0.6 : 0.85))
 
-                if let description = milestone.description {
+                if let description = milestone.milestoneDescription {
                     Text(description)
                         .font(.system(size: 13))
                         .foregroundStyle(.white.opacity(0.5))

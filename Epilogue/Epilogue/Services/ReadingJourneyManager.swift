@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import Combine
 import OSLog
 #if canImport(FoundationModels)
 import FoundationModels
@@ -39,7 +40,7 @@ class ReadingJourneyManager: ObservableObject {
         do {
             let journeys = try context.fetch(descriptor)
             currentJourney = journeys.first
-            logger.info("📖 Loaded active journey: \(currentJourney?.id.uuidString ?? "none")")
+            logger.info("📖 Loaded active journey: \(self.currentJourney?.id.uuidString ?? "none")")
         } catch {
             logger.error("❌ Failed to load journey: \(error)")
         }
@@ -203,7 +204,7 @@ class ReadingJourneyManager: ObservableObject {
                 type: milestoneData.type,
                 order: index
             )
-            milestone.description = milestoneData.description
+            milestone.milestoneDescription = milestoneData.description
             milestone.reflectionPrompt = milestoneData.reflectionPrompt
 
             journeyBook.addMilestone(milestone)
@@ -291,7 +292,7 @@ class ReadingJourneyManager: ObservableObject {
 
         for (index, (percentage, title, description)) in milestones.enumerated() {
             let milestone = BookMilestone(title: title, type: .custom, order: index)
-            milestone.description = description
+            milestone.milestoneDescription = description
             milestone.pageNumber = Int(Double(pageCount) * percentage)
             milestone.reflectionPrompt = "How are you feeling about the book so far?"
 
@@ -313,7 +314,7 @@ class ReadingJourneyManager: ObservableObject {
                 type: .bookCompletion,
                 order: index
             )
-            milestone.description = "Finish reading \(book.title) by \(book.author)"
+            milestone.milestoneDescription = "Finish reading \(book.title) by \(book.author)"
             milestone.reflectionPrompt = await generateCompletionReflectionPrompt(for: book)
 
             if journey.milestones == nil {
@@ -331,7 +332,7 @@ class ReadingJourneyManager: ObservableObject {
                 type: .halfway,
                 order: halfwayIndex
             )
-            halfway.description = "You've completed half of your reading journey"
+            halfway.milestoneDescription = "You've completed half of your reading journey"
             halfway.reflectionPrompt = "How has your reading experience been so far? Any surprises?"
 
             halfway.journey = journey
