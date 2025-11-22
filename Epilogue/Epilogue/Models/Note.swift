@@ -7,6 +7,7 @@ import SwiftData
 final class CapturedNote {
     var id: UUID? = UUID()
     var content: String? = ""
+    var contentFormat: String? = "plaintext"  // "markdown" or "plaintext"
     var timestamp: Date? = Date()
     var pageNumber: Int?
     var bookLocalId: String?
@@ -17,25 +18,37 @@ final class CapturedNote {
     // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
-    
+
     @Relationship(inverse: \AmbientSession.capturedNotes)
     var ambientSession: AmbientSession?
-    
+
     // Computed property for CaptureSource
     var captureSource: CaptureSource {
         CaptureSource(rawValue: source ?? CaptureSource.manual.rawValue) ?? .manual
     }
-    
+
+    // Computed property for content format type
+    var isMarkdown: Bool {
+        contentFormat == "markdown"
+    }
+
+    // Helper to mark note as having markdown content
+    func markAsMarkdown() {
+        contentFormat = "markdown"
+    }
+
     init(
         content: String,
         book: BookModel? = nil,
         pageNumber: Int? = nil,
         timestamp: Date = Date(),
         source: CaptureSource = .manual,
-        tags: [String] = []
+        tags: [String] = [],
+        contentFormat: String = "plaintext"
     ) {
         self.id = UUID()
         self.content = content
+        self.contentFormat = contentFormat
         self.book = book
         self.bookLocalId = book?.localId
         self.pageNumber = pageNumber

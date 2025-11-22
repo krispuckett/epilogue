@@ -149,6 +149,7 @@ struct Note: Identifiable, Codable, Equatable {
     let id: UUID
     let type: NoteType
     let content: String
+    let contentFormat: String  // "markdown" or "plaintext"
     let bookId: UUID?  // Link to specific book
     let bookTitle: String?
     let author: String?
@@ -157,10 +158,11 @@ struct Note: Identifiable, Codable, Equatable {
     let ambientSessionId: UUID?  // Link to ambient session
     let source: String?  // Source of the note (manual, ambient, etc.)
 
-    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil) {
+    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil, contentFormat: String = "plaintext") {
         self.id = id
         self.type = type
         self.content = content
+        self.contentFormat = contentFormat
         self.bookId = bookId
         self.bookTitle = bookTitle
         self.author = author
@@ -168,6 +170,11 @@ struct Note: Identifiable, Codable, Equatable {
         self.dateCreated = dateCreated
         self.ambientSessionId = ambientSessionId
         self.source = source
+    }
+
+    // Computed property to check if content is markdown
+    var isMarkdown: Bool {
+        contentFormat == "markdown"
     }
     
     /// Check if this note is linked to a specific book
