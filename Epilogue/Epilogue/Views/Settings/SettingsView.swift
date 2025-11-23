@@ -278,22 +278,23 @@ struct SettingsView: View {
                             .padding(.vertical, 4)
                         }
 
-                        // Experimental Custom Camera Toggle
+                        // Experimental Ambient Capture Toggle
                         Toggle(isOn: $experimentalCustomCamera) {
                             HStack {
-                                Image(systemName: "camera.fill")
+                                Image(systemName: "text.viewfinder")
                                     .foregroundColor(.orange)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Custom Camera")
-                                    Text("Experimental AVFoundation camera for text capture")
-                                        .font(.caption)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ambient Capture")
+                                        .font(.system(size: 15, weight: .regular))
+                                    Text("Live text recognition")
+                                        .font(.system(size: 12))
                                         .foregroundColor(.secondary)
                                 }
                             }
                         }
                         .onChange(of: experimentalCustomCamera) { _, newValue in
                             #if DEBUG
-                            print("🎥 [EXPERIMENT] Custom camera \(newValue ? "enabled" : "disabled")")
+                            print("🎥 [EXPERIMENT] Ambient Capture \(newValue ? "enabled" : "disabled")")
                             #endif
 
                             if newValue {
@@ -590,7 +591,7 @@ struct SettingsView: View {
         Task {
             do {
                 let exportData = try await generateExportData()
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let documentsPath = try FileManager.default.safeURL(for: .documentDirectory)
                 let exportURL = documentsPath.appendingPathComponent("EpilogueExport-\(Date().formatted(date: .numeric, time: .omitted)).json")
 
                 try exportData.write(to: exportURL)

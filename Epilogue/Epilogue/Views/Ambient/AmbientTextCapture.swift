@@ -54,17 +54,44 @@ struct AmbientTextCapture: View {
                 selectionBar
             }
         }
-        .sheet(isPresented: $showingCamera) {
-            // Feature flag: Use experimental custom camera or fallback to system camera
+        .fullScreenCover(isPresented: $showingCamera) {
+            // Feature flag: Use experimental live quote capture or fallback to traditional flow
             if experimentalCustomCamera {
-                SmoothCameraCapture { image in
-                    if let image = image {
-                        capturedImage = image
-                        extractPageNumber(from: image)
-                    }
-                    showingCamera = false
+                #if DEBUG
+                let _ = print("🚀 [AMBIENT] Launching LiveTextQuoteCapture (experimental)")
+                #endif
+
+                if #available(iOS 16.0, *) {
+                    LiveTextQuoteCapture(
+                        bookContext: bookContext,
+                        onQuoteSaved: { text, page in
+                            #if DEBUG
+                            print("💾 [AMBIENT] Quote saved from LiveTextQuoteCapture")
+                            #endif
+                            // Direct save - no need for intermediate image
+                            onQuoteSaved(text, page)
+                            showingCamera = false
+                            // Also dismiss AmbientTextCapture to go back to ambient mode
+                            isPresented = false
+                        },
+                        onQuestionAsked: { question in
+                            #if DEBUG
+                            print("🤔 [AMBIENT] Question asked from LiveTextQuoteCapture")
+                            #endif
+                            // Direct question - no need for intermediate image
+                            onQuestionAsked(question)
+                            showingCamera = false
+                            // Also dismiss AmbientTextCapture to go back to ambient mode
+                            isPresented = false
+                        }
+                    )
                 }
             } else {
+                #if DEBUG
+                let _ = print("📷 [AMBIENT] Launching traditional CameraCapture")
+                #endif
+
+                // Traditional flow: Capture image first, then select text
                 CameraCapture { image in
                     if let image = image {
                         capturedImage = image

@@ -112,7 +112,14 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     // Debug logging counters
     private var voiceBufferLogCounter = 0
     private var vadCheckLogCounter = 0
-    
+
+    // ✅ CONTINUOUS SESSION MANAGEMENT (Perplexity/ChatGPT pattern)
+    private var appLifecycleObservers: [Any] = []  // Store observers for cleanup
+    private let maxWhisperBufferCount = 150  // ~5 seconds at 30 buffers/sec, prevents memory bloat
+    private var engineHealthTimer: Timer?  // Monitor if audio engine stalls
+    private var lastAudioBufferTime = Date()  // Track last buffer received
+    private var isHandlingInterruption = false  // Prevent multiple simultaneous restarts
+
     enum RecognitionState: String {
         case idle = "Idle"
         case listening = "Listening..."
@@ -227,6 +234,18 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         super.init()
         // Don't initialize anything here - wait for first use
         logger.info("VoiceRecognitionManager created - deferring initialization")
+
+        // ✅ CONTINUOUS SESSION: Setup lifecycle observers (Perplexity/ChatGPT pattern)
+        setupContinuousSessionManagement()
+    }
+
+    deinit {
+        // ✅ CLEANUP: Remove all observers to prevent leaks
+        appLifecycleObservers.forEach { observer in
+            NotificationCenter.default.removeObserver(observer)
+        }
+        engineHealthTimer?.invalidate()
+        logger.info("VoiceRecognitionManager cleaned up")
     }
     
     // Lazy initialization when first needed
@@ -511,6 +530,9 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                 guard let self = self else { return }
 
+                // ✅ HEALTH MONITORING: Track last buffer time for stall detection
+                self.updateLastAudioBufferTime()
+
                 // PERFORMANCE OPTIMIZATION: Throttle expensive operations
                 // Keep buffer size at 1024 for smooth gradient response
                 // But only run expensive analysis every 3rd buffer (saves ~60% CPU on analysis)
@@ -562,13 +584,20 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             audioEngine.prepare()
             try audioEngine.start()
             
-            // Start recognition task with iOS 26 configuration
+            // Start recognition task with streaming support (Perplexity/ChatGPT pattern)
             recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 guard let self = self else { return }
-                
+
                 if let result = result {
                     Task { @MainActor in
+                        // ✅ STREAMING: Show partial results immediately (feels instant like ChatGPT)
                         await self.processTranscriptionResult(result)
+
+                        // ✅ ACCURACY: Only run Whisper on final results for correction
+                        if result.isFinal {
+                            logger.info("🎯 Final result detected - running Whisper correction")
+                            await self.runWhisperCorrectionPass(appleText: result.bestTranscription.formattedString)
+                        }
                     }
                 }
                 
@@ -1044,7 +1073,219 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     }
     
     // MARK: - Whisper Integration
-    
+
+    /// Run Whisper correction pass on final results (Perplexity/ChatGPT pattern)
+    /// Only runs when user stops talking for accuracy, not on every partial result
+    private func runWhisperCorrectionPass(appleText: String) async {
+        guard !audioBufferForWhisper.isEmpty else {
+            logger.debug("No audio buffers for Whisper correction")
+            return
+        }
+
+        logger.info("🔄 Running Whisper correction on: '\(appleText.prefix(50))...'")
+        isProcessingWhisper = true
+
+        // Combine audio buffers for Whisper processing
+        guard let combinedBuffer = combineAudioBuffers(audioBufferForWhisper) else {
+            logger.error("Failed to combine buffers for Whisper")
+            isProcessingWhisper = false
+            return
+        }
+
+        // Process with WhisperKit
+        do {
+            let result = try await whisperProcessor.transcribe(audioBuffer: combinedBuffer)
+
+            if !result.text.isEmpty {
+                logger.info("✅ Whisper result: '\(result.text.prefix(50))...' (confidence: \(result.segments.first?.probability ?? 0))")
+
+                // Update with Whisper's more accurate transcription
+                self.whisperTranscribedText = result.text
+                self.whisperConfidence = result.segments.first?.probability ?? 0
+
+                // If Whisper is significantly different and more confident, prefer it
+                if result.segments.first?.probability ?? 0 > 0.7 {
+                    self.transcribedText = result.text
+                    logger.info("🎯 Using Whisper result (high confidence)")
+                } else {
+                    logger.info("📱 Keeping Apple Speech result (Whisper low confidence)")
+                }
+            }
+
+            // Clear processed buffers
+            audioBufferForWhisper.removeAll()
+
+        } catch {
+            logger.error("Whisper correction failed: \(error.localizedDescription)")
+        }
+
+        isProcessingWhisper = false
+    }
+
+    // MARK: - Continuous Session Management (Perplexity/ChatGPT Pattern)
+
+    /// Setup lifecycle observers for background/foreground transitions and audio interruptions
+    private func setupContinuousSessionManagement() {
+        let nc = NotificationCenter.default
+
+        // ✅ BACKGROUND: Handle app going to background (maintain audio session)
+        let willResignActive = nc.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleWillResignActive()
+        }
+        appLifecycleObservers.append(willResignActive)
+
+        // ✅ FOREGROUND: Handle app returning to foreground (resume if needed)
+        let didBecomeActive = nc.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleDidBecomeActive()
+        }
+        appLifecycleObservers.append(didBecomeActive)
+
+        // ✅ INTERRUPTION: Handle audio interruptions (phone calls, Siri, etc.)
+        let audioInterruption = nc.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleAudioInterruption(notification)
+        }
+        appLifecycleObservers.append(audioInterruption)
+
+        // ✅ ROUTE CHANGE: Handle audio route changes (headphones plugged/unplugged)
+        let routeChange = nc.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleAudioRouteChange(notification)
+        }
+        appLifecycleObservers.append(routeChange)
+
+        logger.info("✅ Continuous session management configured")
+    }
+
+    /// Handle app going to background - maintain audio session for continuous listening
+    private func handleWillResignActive() {
+        guard isListening else { return }
+        logger.info("📱 App backgrounding - maintaining audio session for ambient mode")
+
+        // Audio session stays active for background listening
+        // Live Activities keep the session alive
+    }
+
+    /// Handle app returning to foreground - check if we need to restart
+    private func handleDidBecomeActive() {
+        guard isListening else { return }
+        logger.info("📱 App foregrounding - checking audio engine health")
+
+        // Check if audio engine stalled while backgrounded
+        let timeSinceLastBuffer = Date().timeIntervalSince(lastAudioBufferTime)
+        if timeSinceLastBuffer > 5.0 {  // No buffers for 5+ seconds = stalled
+            logger.warning("⚠️ Audio engine stalled (\(timeSinceLastBuffer)s), restarting")
+            Task {
+                await restartAudioEngine()
+            }
+        }
+    }
+
+    /// Handle audio interruptions (phone calls, Siri, notifications, etc.)
+    private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+
+        switch type {
+        case .began:
+            logger.info("🔕 Audio interruption began (phone call, Siri, etc.)")
+            // Don't stop listening - just pause audio engine
+            // We'll resume when interruption ends
+            if audioEngine.isRunning {
+                audioEngine.pause()
+            }
+
+        case .ended:
+            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
+                return
+            }
+            let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+
+            if options.contains(.shouldResume) && isListening {
+                logger.info("🔔 Audio interruption ended - resuming ambient mode")
+                Task {
+                    await restartAudioEngine()
+                }
+            }
+
+        @unknown default:
+            break
+        }
+    }
+
+    /// Handle audio route changes (headphones plugged/unplugged, Bluetooth connected/disconnected)
+    private func handleAudioRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+
+        switch reason {
+        case .newDeviceAvailable:
+            logger.info("🎧 New audio device connected")
+            // Continue listening on new device
+
+        case .oldDeviceUnavailable:
+            logger.info("🎧 Audio device disconnected")
+            // Continue with built-in mic/speaker
+            if isListening {
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000)  // Brief delay
+                    await restartAudioEngine()
+                }
+            }
+
+        default:
+            break
+        }
+    }
+
+    /// Restart audio engine gracefully (for interruptions, route changes, stalls)
+    private func restartAudioEngine() async {
+        guard isListening && !isHandlingInterruption else { return }
+
+        isHandlingInterruption = true
+        logger.info("🔄 Restarting audio engine...")
+
+        // Stop current engine
+        audioEngine.stop()
+        inputNode?.removeTap(onBus: 0)
+        recognitionTask?.cancel()
+        recognitionRequest?.endAudio()
+
+        // Brief pause to let system settle
+        try? await Task.sleep(nanoseconds: 250_000_000)  // 0.25 seconds
+
+        // Restart recognition
+        await startContinuousRecognition()
+
+        isHandlingInterruption = false
+        logger.info("✅ Audio engine restarted")
+    }
+
+    /// Track audio buffer timing for health monitoring
+    private func updateLastAudioBufferTime() {
+        lastAudioBufferTime = Date()
+    }
+
     private func bufferAudioForWhisper(_ buffer: AVAudioPCMBuffer) {
         // Validate buffer
         guard buffer.frameLength > 0 && buffer.frameCapacity > 0 else {
@@ -1072,16 +1313,19 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
             }
         }
         
-        // Add safety limit - prevent excessive buffer accumulation (max ~20 seconds of audio at 100ms per buffer)
-        let maxBuffers = 200
-        if audioBufferForWhisper.count >= maxBuffers {
-            logger.warning("Buffer limit reached (\(maxBuffers)), clearing oldest buffers")
-            // Keep only the most recent buffers
-            let keepCount = maxBuffers / 2
-            audioBufferForWhisper = Array(audioBufferForWhisper.suffix(keepCount))
+        // ✅ ROLLING BUFFER: Keep only recent audio (~5 seconds at 30 buffers/sec)
+        // This prevents memory bloat during long ambient sessions
+        if self.audioBufferForWhisper.count >= maxWhisperBufferCount {
+            // Remove oldest buffers, keep most recent (rolling window)
+            let removeCount = self.audioBufferForWhisper.count - (maxWhisperBufferCount / 2)
+            self.audioBufferForWhisper.removeFirst(removeCount)
+
+            if self.audioBufferForWhisper.count % 50 == 0 {  // Log occasionally
+                logger.debug("🔄 Rolling buffer: trimmed \(removeCount) old buffers, keeping \(self.audioBufferForWhisper.count)")
+            }
         }
-        
-        audioBufferForWhisper.append(bufferCopy)
+
+        self.audioBufferForWhisper.append(bufferCopy)
         // Log only every 10th buffer to reduce spam
         if audioBufferForWhisper.count % 10 == 0 {
             logger.debug("Added buffer to Whisper queue. Total buffers: \(self.audioBufferForWhisper.count)")

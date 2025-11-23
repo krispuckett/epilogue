@@ -106,7 +106,7 @@ struct MarkdownExportSheet: View {
                                 .tracking(1.2)
 
                             HStack(spacing: 12) {
-                                FormatButton(
+                                ExportFormatButton(
                                     title: "Standard",
                                     isSelected: options.format == .standard
                                 ) {
@@ -116,7 +116,7 @@ struct MarkdownExportSheet: View {
                                     SensoryFeedback.light()
                                 }
 
-                                FormatButton(
+                                ExportFormatButton(
                                     title: "Obsidian",
                                     isSelected: options.format == .obsidian
                                 ) {
@@ -126,7 +126,7 @@ struct MarkdownExportSheet: View {
                                     SensoryFeedback.light()
                                 }
 
-                                FormatButton(
+                                ExportFormatButton(
                                     title: "Notion",
                                     isSelected: options.format == .notion
                                 ) {
@@ -276,8 +276,8 @@ private struct ToggleRow: View {
     }
 }
 
-// MARK: - Format Button Component
-private struct FormatButton: View {
+// MARK: - Export Format Button Component
+private struct ExportFormatButton: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void

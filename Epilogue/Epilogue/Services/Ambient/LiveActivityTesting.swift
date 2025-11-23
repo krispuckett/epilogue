@@ -326,15 +326,15 @@ struct LiveActivityTestingView: View {
                 // Tests
                 GroupBox("Tests") {
                     VStack(spacing: 12) {
-                        TestButton("Simulate Near Expiration") {
+                        TestButton(title: "Simulate Near Expiration") {
                             await LiveActivityTesting.shared.simulateNearExpiration()
                         }
 
-                        TestButton("Test State Preservation") {
+                        TestButton(title: "Test State Preservation") {
                             await LiveActivityTesting.shared.testStatePreservation()
                         }
 
-                        TestButton("Validate Production") {
+                        TestButton(title: "Validate Production") {
                             await LiveActivityTesting.shared.validateProductionReadiness()
                         }
                     }

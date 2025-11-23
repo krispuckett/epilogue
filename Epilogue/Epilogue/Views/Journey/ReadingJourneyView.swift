@@ -60,6 +60,11 @@ struct ReadingJourneyView: View {
                 if !hasAppeared {
                     manager.initialize(modelContext: modelContext)
                     hasAppeared = true
+
+                    // If no journey exists, show creation flow immediately
+                    if manager.currentJourney == nil {
+                        showingCreateJourney = true
+                    }
                 }
             }
             .sheet(isPresented: $showingCreateJourney) {
@@ -263,11 +268,24 @@ struct ReadingJourneyView: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: 280)
                             .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                    }
+                    .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 14))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                        DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.5
                             )
                     }
+                    .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+                    .buttonStyle(.plain)
 
                     Text("Takes about 2 minutes")
                         .font(.system(size: 14))

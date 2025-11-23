@@ -14,55 +14,57 @@ struct NoteEditSheet: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Drag indicator
-            Capsule()
-                .fill(DesignSystem.Colors.textQuaternary)
-                .frame(width: 36, height: 5)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-            
-            // Glass header with Done button
-            HStack {
-                Spacer()
-                
-                Button("Done") {
-                    saveAndDismiss()
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Drag indicator
+                Capsule()
+                    .fill(DesignSystem.Colors.textQuaternary)
+                    .frame(width: 36, height: 5)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+
+                // Glass header with Done button
+                HStack {
+                    Spacer()
+
+                    Button("Done") {
+                        saveAndDismiss()
+                    }
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
+                    .padding(.vertical, 8)
+                    .glassEffect(
+                        .regular.interactive(),
+                        in: .capsule
+                    )
                 }
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.white)
                 .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-                .padding(.vertical, 8)
-                .glassEffect(
-                    .regular.interactive(),
-                    in: .capsule
+                .padding(.bottom, 12)
+
+                // Rich text editor with formatting toolbar
+                RichTextEditor(
+                    text: $editedContent,
+                    placeholder: note.type == .quote ? "Add your thoughts about this quote..." : "What are you thinking about?",
+                    isFocused: $isTextFocused
                 )
+                .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-            .padding(.bottom, 12)
-            
-            // Rich text editor with formatting toolbar
-            SimpleRichTextEditor(
-                text: $editedContent,
-                placeholder: note.type == .quote ? "Add your thoughts about this quote..." : "What are you thinking about?",
-                isFocused: $isTextFocused
-            )
-            .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
-            .padding(.bottom, 16)
+            .presentationDetents([.fraction(0.7), .large])  // Taller for formatting toolbar
+            .presentationDragIndicator(.hidden) // We have our own drag indicator
+            .interactiveDismissDisabled()
+            .onAppear {
+                isTextFocused = true
+                // Set editing state to hide action bar
+                notesViewModel.isEditingNote = true
+            }
+            .onDisappear {
+                // Clear editing state to show action bar again
+                notesViewModel.isEditingNote = false
+            }
+            .sensoryFeedback(.impact(weight: .light), trigger: isTextFocused)
         }
-        .presentationDetents([.fraction(0.7), .large])  // Taller for formatting toolbar
-        .presentationDragIndicator(.hidden) // We have our own drag indicator
-        .interactiveDismissDisabled()
-        .onAppear {
-            isTextFocused = true
-            // Set editing state to hide action bar
-            notesViewModel.isEditingNote = true
-        }
-        .onDisappear {
-            // Clear editing state to show action bar again
-            notesViewModel.isEditingNote = false
-        }
-        .sensoryFeedback(.impact(weight: .light), trigger: isTextFocused)
     }
     
     private func saveAndDismiss() {
@@ -98,21 +100,29 @@ struct NoteEditSheet: View {
 
     /// Detects if text contains markdown formatting
     private func detectMarkdown(in text: String) -> Bool {
-        let markdownPatterns = [
+        // Check inline patterns
+        let inlinePatterns = [
             "\\*\\*.*?\\*\\*",  // Bold
             "__.*?__",           // Bold alternative
             "\\*.*?\\*",         // Italic
             "_.*?_",             // Italic alternative
-            "==.*?==",           // Highlight
-            "^> ",               // Blockquote
-            "^# ",               // Header 1
-            "^## ",              // Header 2
-            "^- ",               // Bullet list
-            "^\\d+\\. "          // Numbered list
+            "==.*?=="            // Highlight
         ]
 
-        for pattern in markdownPatterns {
+        for pattern in inlinePatterns {
             if text.range(of: pattern, options: .regularExpression) != nil {
+                return true
+            }
+        }
+
+        // Check line-start patterns by splitting into lines
+        let lines = text.components(separatedBy: .newlines)
+        for line in lines {
+            if line.hasPrefix("> ") ||     // Blockquote
+               line.hasPrefix("# ") ||     // Header 1
+               line.hasPrefix("## ") ||    // Header 2
+               line.hasPrefix("- ") ||     // Bullet list
+               line.range(of: "^\\d+\\. ", options: .regularExpression) != nil {  // Numbered list
                 return true
             }
         }

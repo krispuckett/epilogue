@@ -679,18 +679,22 @@ struct AmbientModeView: View {
                 onSave: saveHighlightedQuote
             )
         }
-        .sheet(isPresented: $showVisualIntelligenceCapture) {
-            AmbientTextCapture(
-                isPresented: $showVisualIntelligenceCapture,
-                bookContext: currentBookContext,
-                onQuoteSaved: { text, pageNumber in
-                    saveQuoteFromVisualIntelligence(text, pageNumber: pageNumber)
-                },
-                onQuestionAsked: { question in
-                    keyboardText = question
-                    sendTextMessage()
-                }
-            )
+        .fullScreenCover(isPresented: $showVisualIntelligenceCapture) {
+            // Direct to LiveTextQuoteCapture - no interstitial
+            if #available(iOS 16.0, *) {
+                LiveTextQuoteCapture(
+                    bookContext: currentBookContext,
+                    onQuoteSaved: { text, pageNumber in
+                        saveQuoteFromVisualIntelligence(text, pageNumber: pageNumber)
+                        showVisualIntelligenceCapture = false
+                    },
+                    onQuestionAsked: { question in
+                        keyboardText = question
+                        sendTextMessage()
+                        showVisualIntelligenceCapture = false
+                    }
+                )
+            }
         }
         .onChange(of: isRecording) { _, newValue in
             // Clear transcription when recording stops
@@ -1252,7 +1256,6 @@ struct AmbientModeView: View {
                                             .contentShape(Circle())
                                     }
                                     .buttonStyle(.plain)
-                                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: cameraJustUsed)
                                     .accessibilityLabel("Capture book page")
                                     .accessibilityHint("Double tap to open camera and capture a quote or page from your book")
                                     
@@ -1319,15 +1322,12 @@ struct AmbientModeView: View {
                                 .padding(.vertical, 8)  // Dynamic vertical padding
                             }
                             .opacity(inputMode == .textInput || !isVoiceModeEnabled ? 1 : 0)
-                            .blur(radius: inputMode == .textInput || !isVoiceModeEnabled ? 0 : 8)  // Add blur transition
-                            .scaleEffect(inputMode == .textInput || !isVoiceModeEnabled ? 1 : 0.95)  // Slight scale for depth
+                            .blur(radius: inputMode == .textInput || !isVoiceModeEnabled ? 0 : 8)
+                            .scaleEffect(inputMode == .textInput || !isVoiceModeEnabled ? 1 : 0.95)
                             .allowsHitTesting(inputMode == .textInput || !isVoiceModeEnabled)
-                            .animation(inputMode == .textInput || !isVoiceModeEnabled ?
-                                .easeOut(duration: 0.25).delay(0.35) :  // Smoother easeOut
-                                .easeOut(duration: 0.1),
-                                value: inputMode
-                            )
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isVoiceModeEnabled)
+                            // Single smooth animation - no delay, synchronized with container
+                            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: inputMode)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isVoiceModeEnabled)
                         }
                     }
                     .onAppear {

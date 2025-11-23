@@ -21,6 +21,9 @@ final class LibraryService {
     private var lastLoadTime: Date?
     private let cacheTimeout: TimeInterval = 5.0 // 5 seconds
 
+    /// Flag indicating if we're running in memory-only mode due to storage failure
+    private(set) var isMemoryOnlyMode = false
+
     // MARK: - Initialization
 
     private init() {
@@ -64,7 +67,36 @@ final class LibraryService {
                     configurations: localConfig
                 )
             } catch {
-                fatalError("Could not initialize ModelContainer: \(error)")
+                // Last resort: memory-only container to prevent crash
+                logger.critical("❌ Failed to initialize persistent storage, using memory-only mode: \(error.localizedDescription)")
+                isMemoryOnlyMode = true
+
+                do {
+                    let memoryConfig = ModelConfiguration(
+                        isStoredInMemoryOnly: true
+                    )
+
+                    modelContainer = try ModelContainer(
+                        for: BookModel.self,
+                             CapturedNote.self,
+                             CapturedQuote.self,
+                             CapturedQuestion.self,
+                             AmbientSession.self,
+                             QueuedQuestion.self,
+                             ReadingSession.self,
+                        configurations: memoryConfig
+                    )
+
+                    logger.warning("⚠️ Running in memory-only mode - data will not persist")
+                } catch {
+                    // This should never happen with memory-only, but handle it
+                    logger.critical("❌ Critical: Could not initialize even memory-only storage: \(error)")
+                    // Create a minimal container as absolute last resort
+                    modelContainer = try! ModelContainer(
+                        for: BookModel.self,
+                        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                    )
+                }
             }
         }
     }

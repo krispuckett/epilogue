@@ -93,14 +93,25 @@ class AmbientLifecycleManager: ObservableObject {
     
     private func configureBackgroundAudio() {
         do {
+            // ✅ VOICE-OPTIMIZED: Use .voiceChat mode for better speech recognition
+            // ✅ DUCK OTHERS: Lower other audio instead of stopping it
+            // ✅ BLUETOOTH: Support all Bluetooth devices for ambient listening
             try audioSession?.setCategory(
                 .playAndRecord,
-                mode: .default,
-                options: [.defaultToSpeaker, .allowBluetoothA2DP, .mixWithOthers]
+                mode: .voiceChat,  // Optimized for voice recognition (Perplexity/ChatGPT pattern)
+                options: [
+                    .defaultToSpeaker,
+                    .allowBluetoothHFP,  // Allow Bluetooth hands-free devices (renamed from .allowBluetooth)
+                    .allowBluetoothA2DP,  // Allow high-quality Bluetooth audio
+                    .duckOthers  // Lower other audio, don't stop it completely
+                ]
             )
-            try audioSession?.setActive(true)
+
+            // ✅ NOTIFY OTHERS: Properly notify other apps when we deactivate
+            try audioSession?.setActive(true, options: .notifyOthersOnDeactivation)
+
             #if DEBUG
-            print("🔊 Audio session configured for ambient mode")
+            print("🔊 Audio session configured for ambient mode (voice-optimized)")
             #endif
         } catch {
             #if DEBUG
@@ -111,7 +122,8 @@ class AmbientLifecycleManager: ObservableObject {
     
     private func resetAudioSession() {
         do {
-            try audioSession?.setActive(false)
+            // ✅ NOTIFY OTHERS: Let other apps know we're deactivating so they can resume audio
+            try audioSession?.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             #if DEBUG
             print("❌ Failed to reset audio session: \(error)")

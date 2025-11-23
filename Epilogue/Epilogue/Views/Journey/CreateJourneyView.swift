@@ -8,7 +8,10 @@ struct CreateJourneyView: View {
     @Environment(\.modelContext) private var modelContext
 
     @StateObject private var manager = ReadingJourneyManager.shared
-    @Query(filter: #Predicate<BookModel> { $0.isInLibrary }, sort: \BookModel.dateAdded)
+    @Query(
+        filter: #Predicate<BookModel> { $0.isInLibrary && $0.readingStatus != "Read" },
+        sort: \BookModel.dateAdded
+    )
     private var libraryBooks: [BookModel]
 
     @State private var step: CreationStep = .welcome
@@ -129,7 +132,7 @@ struct CreateJourneyView: View {
                 )
 
                 InfoCard(
-                    icon: "sparkles",
+                    icon: "map.fill",
                     title: "Get Your Timeline",
                     description: "I'll suggest a thoughtful reading order"
                 )
@@ -142,11 +145,24 @@ struct CreateJourneyView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+            }
+            .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                DesignSystem.Colors.primaryAccent.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
                     )
             }
+            .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+            .buttonStyle(.plain)
             .padding(.top, 8)
         }
     }
@@ -195,11 +211,29 @@ struct CreateJourneyView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(selectedBooks.isEmpty ? Color.white.opacity(0.1) : Color(red: 1.0, green: 0.549, blue: 0.259))
-                    )
             }
+            .glassEffect(
+                selectedBooks.isEmpty ? .regular : .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)),
+                in: .rect(cornerRadius: 12)
+            )
+            .overlay {
+                if !selectedBooks.isEmpty {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+            }
+            .shadow(color: selectedBooks.isEmpty ? .clear : DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+            .buttonStyle(.plain)
             .disabled(selectedBooks.isEmpty)
         }
     }
@@ -259,11 +293,29 @@ struct CreateJourneyView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(userIntent.isEmpty ? Color.white.opacity(0.1) : Color(red: 1.0, green: 0.549, blue: 0.259))
-                    )
             }
+            .glassEffect(
+                userIntent.isEmpty ? .regular : .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)),
+                in: .rect(cornerRadius: 12)
+            )
+            .overlay {
+                if !userIntent.isEmpty {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+            }
+            .shadow(color: userIntent.isEmpty ? .clear : DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+            .buttonStyle(.plain)
             .disabled(userIntent.isEmpty)
         }
     }
@@ -337,11 +389,24 @@ struct CreateJourneyView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+            }
+            .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                DesignSystem.Colors.primaryAccent.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
                     )
             }
+            .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+            .buttonStyle(.plain)
         }
     }
 
@@ -370,43 +435,20 @@ struct CreateJourneyView: View {
 
     // MARK: - Complete Step
     private var completeStep: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                Spacer()
-                    .frame(height: 80)
+        VStack(spacing: 0) {
+            Spacer()
 
-                // Success icon with animation effect
-                ZStack {
-                    // Outer glow
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
-                        .frame(width: 140, height: 140)
-                        .blur(radius: 30)
+            VStack(spacing: 40) {
+                // Success icon
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 80, weight: .medium))
+                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.3), radius: 20, y: 8)
 
-                    // Inner glow
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2))
-                        .frame(width: 100, height: 100)
-                        .blur(radius: 15)
-
-                    // Icon
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 72, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.0, green: 0.549, blue: 0.259),
-                                    Color(red: 1.0, green: 0.649, blue: 0.359)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-
-                VStack(spacing: 20) {
-                    Text("Journey Created!")
-                        .font(.system(size: 32, weight: .bold))
+                // Text content
+                VStack(spacing: 16) {
+                    Text("Journey Created")
+                        .font(.system(size: 32, weight: .semibold))
                         .foregroundStyle(.white)
 
                     VStack(spacing: 12) {
@@ -414,40 +456,45 @@ struct CreateJourneyView: View {
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(.white.opacity(0.85))
 
-                        Text("Remember: this is a companion, not a strict schedule. Adjust anytime it doesn't feel right.")
+                        Text("This is a companion, not a strict schedule. Adjust anytime it doesn't feel right.")
                             .font(.system(size: 16))
                             .foregroundStyle(.white.opacity(0.65))
-                            .lineSpacing(3)
+                            .lineSpacing(4)
                     }
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
                 }
+                .padding(.horizontal, 32)
 
-                VStack(spacing: 16) {
-                    Button(action: { dismiss() }) {
-                        Text("View Your Journey")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: 280)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                            )
-                    }
-
-                    Text("You can adjust your journey anytime")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.5))
+                // Action button
+                Button(action: { dismiss() }) {
+                    Text("View Your Journey")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: 280)
+                        .padding(.vertical, 16)
                 }
-                .padding(.top, 8)
-
-                Spacer()
-                    .frame(height: 80)
+                .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+                .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity)
+
+            Spacer()
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Helper Methods

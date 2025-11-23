@@ -147,20 +147,29 @@ struct MarkdownParser {
     // MARK: - Inline Pattern Parsing
 
     /// Parse highlights: ==highlighted text==
+    /// Edge case handling: Incomplete markers (e.g., "==text" without closing) are left as-is
     private static func parseHighlights(_ attributed: AttributedString) -> AttributedString {
         var result = attributed
         let text = String(result.characters)
         var searchRange = text.startIndex..<text.endIndex
 
         while let startRange = text.range(of: "==", range: searchRange) {
+            // Safety: If no closing marker found, leave incomplete syntax as-is
             guard let endRange = text.range(of: "==", range: startRange.upperBound..<text.endIndex) else { break }
 
             let contentStart = startRange.upperBound
             let contentEnd = endRange.lowerBound
             let fullRange = startRange.lowerBound..<endRange.upperBound
 
+            // Safety: Only process if there's actual content (prevents "====" empty highlights)
             if contentStart < contentEnd {
                 let content = String(text[contentStart..<contentEnd])
+
+                // Safety: Skip if content is whitespace-only
+                guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    searchRange = endRange.upperBound..<text.endIndex
+                    continue
+                }
 
                 if let attributedFullRange = Range(fullRange, in: result) {
                     result.replaceSubrange(attributedFullRange, with: AttributedString(content))
@@ -200,14 +209,22 @@ struct MarkdownParser {
         var searchRange = text.startIndex..<text.endIndex
 
         while let startRange = text.range(of: pattern, range: searchRange) {
+            // Safety: If no closing marker found, leave incomplete syntax as-is
             guard let endRange = text.range(of: pattern, range: startRange.upperBound..<text.endIndex) else { break }
 
             let contentStart = startRange.upperBound
             let contentEnd = endRange.lowerBound
             let fullRange = startRange.lowerBound..<endRange.upperBound
 
+            // Safety: Only process if there's actual content
             if contentStart < contentEnd {
                 let content = String(text[contentStart..<contentEnd])
+
+                // Safety: Skip if content is whitespace-only
+                guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    searchRange = endRange.upperBound..<text.endIndex
+                    continue
+                }
 
                 if let attributedFullRange = Range(fullRange, in: result) {
                     result.replaceSubrange(attributedFullRange, with: AttributedString(content))
@@ -258,14 +275,22 @@ struct MarkdownParser {
                 }
             }
 
+            // Safety: If no closing marker found, leave incomplete syntax as-is
             guard let endRange = text.range(of: pattern, range: startRange.upperBound..<text.endIndex) else { break }
 
             let contentStart = startRange.upperBound
             let contentEnd = endRange.lowerBound
             let fullRange = startRange.lowerBound..<endRange.upperBound
 
+            // Safety: Only process if there's actual content
             if contentStart < contentEnd {
                 let content = String(text[contentStart..<contentEnd])
+
+                // Safety: Skip if content is whitespace-only
+                guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    searchRange = endRange.upperBound..<text.endIndex
+                    continue
+                }
 
                 if let attributedFullRange = Range(fullRange, in: result) {
                     result.replaceSubrange(attributedFullRange, with: AttributedString(content))

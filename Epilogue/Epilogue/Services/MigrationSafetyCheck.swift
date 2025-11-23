@@ -167,8 +167,14 @@ final class MigrationSafetyCheck {
     /// Check cover images exist
     private func checkCoverImages(modelContext: ModelContext) async -> [SafetyIssue] {
         var issues: [SafetyIssue] = []
-        
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+
+        let documentsPath: URL
+        do {
+            documentsPath = try FileManager.default.safeURL(for: .documentDirectory)
+        } catch {
+            issues.append(.fetchError(entity: "DocumentDirectory", error: error))
+            return issues
+        }
         let imagesPath = documentsPath.appendingPathComponent("BookCovers")
         
         do {

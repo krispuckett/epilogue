@@ -238,27 +238,20 @@ So you can see that I'm talking and it's pulling up real time and this is using 
     }
 
     private var offsetBlurEffect: some View {
-        ZStack(alignment: .topLeading) {
-            // Base text - always readable
-            Text(sampleText)
-                .font(.system(size: 16, weight: .regular, design: .default))
-                .foregroundStyle(.white.opacity(0.95))
-                .multilineTextAlignment(.leading)
-                .lineLimit(isExpanded ? nil : 5)
-                .lineSpacing(6)
+        VStack(alignment: .leading, spacing: 6) {
+            let lines = sampleText.split(separator: "\n")
+            let previewLines = 4
 
-            // Blur overlay only when expanding/collapsing
-            if !isExpanded {
-                Text(sampleText)
-                    .font(.system(size: 16, weight: .regular, design: .default))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(5)
-                    .lineSpacing(6)
-                    .blur(radius: blurRadius)
-                    .offset(y: offsetY)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                if isExpanded || index < previewLines {
+                    Text(String(line))
+                        .font(.system(size: 16, weight: .regular, design: .default))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .offset(y: isExpanded ? 0 : (index >= previewLines ? offsetY : 0))
+                        .blur(radius: isExpanded ? 0 : (index >= previewLines ? blurRadius : 0))
+                        .opacity(isExpanded ? 1.0 : (index < previewLines ? 1.0 : 0.0))
+                        .animation(.easeInOut(duration: animationDuration).delay(Double(index) * 0.02), value: isExpanded)
+                }
             }
         }
     }

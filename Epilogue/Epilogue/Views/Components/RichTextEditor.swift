@@ -10,6 +10,7 @@ struct RichTextEditor: View {
     @FocusState.Binding var isFocused: Bool
 
     @StateObject private var cursorTracker = TextEditorCursorTracker()
+    @State private var toolbarView: UIView?
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -34,28 +35,169 @@ struct RichTextEditor: View {
                         .allowsHitTesting(false)
                 }
 
-                // Custom tracked text editor
-                TrackedTextEditor(
+                // Custom tracked text editor with toolbar
+                TrackedTextEditorWrapper(
                     text: $text,
                     placeholder: placeholder,
-                    font: UIFont.systemFont(ofSize: 16),
-                    foregroundColor: UIColor.white,
-                    tracker: cursorTracker
+                    cursorTracker: cursorTracker,
+                    onDismiss: { isFocused = false }
                 )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                FormattingToolbar(
-                    text: $text,
-                    cursorTracker: cursorTracker,
-                    onDismiss: {
-                        isFocused = false
-                    }
-                )
+    }
+}
+
+// MARK: - Wrapper to manage toolbar
+private struct TrackedTextEditorWrapper: UIViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let cursorTracker: TextEditorCursorTracker
+    let onDismiss: () -> Void
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.font = UIFont.systemFont(ofSize: 16)
+        textView.textColor = UIColor.white
+        textView.backgroundColor = .clear
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.autocapitalizationType = .sentences
+        textView.autocorrectionType = .yes
+        textView.keyboardType = .default
+        textView.returnKeyType = .default
+
+        // Store reference to textView in coordinator
+        context.coordinator.textView = textView
+
+        // Create toolbar with callback-based formatting
+        let toolbar = ToolbarContainer(
+            onFormat: { syntax in
+                context.coordinator.insertMarkdown(syntax)
+            },
+            onDismiss: onDismiss
+        )
+        let hostingController = UIHostingController(rootView: toolbar)
+        hostingController.view.backgroundColor = .clear
+
+        let size = hostingController.view.systemLayoutSizeFitting(
+            CGSize(width: UIScreen.main.bounds.width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        hostingController.view.frame = CGRect(origin: .zero, size: size)
+        textView.inputAccessoryView = hostingController.view
+
+        // Track this textView
+        cursorTracker.trackTextView(textView)
+
+        // Store hosting controller to prevent deallocation
+        context.coordinator.hostingController = hostingController
+
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        if uiView.text != text {
+            let selectedRange = uiView.selectedRange
+            uiView.text = text
+            if selectedRange.location <= text.count {
+                uiView.selectedRange = selectedRange
             }
         }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, cursorTracker: cursorTracker)
+    }
+
+    class Coordinator: NSObject, UITextViewDelegate {
+        @Binding var text: String
+        let cursorTracker: TextEditorCursorTracker
+        var textView: UITextView?
+        var hostingController: UIHostingController<ToolbarContainer>?
+
+        init(text: Binding<String>, cursorTracker: TextEditorCursorTracker) {
+            _text = text
+            self.cursorTracker = cursorTracker
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text
+        }
+
+        func insertMarkdown(_ syntax: MarkdownSyntax) {
+            guard let textView = textView else { return }
+
+            print("📝 Coordinator.insertMarkdown:")
+            print("  - Current text: '\(textView.text ?? "")'")
+            print("  - Cursor position: \(cursorTracker.cursorPosition)")
+            print("  - Selected range: \(cursorTracker.selectedRange?.description ?? "nil")")
+
+            let result = MarkdownParser.insertMarkdown(
+                in: textView.text ?? "",
+                syntax: syntax,
+                cursorPosition: cursorTracker.cursorPosition,
+                selectedRange: cursorTracker.selectedRange
+            )
+
+            print("  - New text: '\(result.text)'")
+            print("  - New cursor: \(result.cursorPosition)")
+
+            // Update UITextView directly
+            textView.text = result.text
+            textView.selectedRange = NSRange(location: result.cursorPosition, length: 0)
+
+            // Update binding
+            text = result.text
+
+            print("  - Text after update: '\(textView.text ?? "")'")
+        }
+    }
+}
+
+// MARK: - Toolbar Container
+private struct ToolbarContainer: View {
+    let onFormat: (MarkdownSyntax) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            FormatButton(icon: MarkdownSyntax.bold.systemIcon, syntax: .bold) {
+                onFormat(.bold)
+                SensoryFeedback.light()
+            }
+
+            FormatButton(icon: MarkdownSyntax.italic.systemIcon, syntax: .italic) {
+                onFormat(.italic)
+                SensoryFeedback.light()
+            }
+
+            FormatButton(icon: MarkdownSyntax.highlight.systemIcon, syntax: .highlight) {
+                onFormat(.highlight)
+                SensoryFeedback.light()
+            }
+
+            FormatButton(icon: MarkdownSyntax.blockquote.systemIcon, syntax: .blockquote) {
+                onFormat(.blockquote)
+                SensoryFeedback.light()
+            }
+
+            FormatButton(icon: MarkdownSyntax.bulletList.systemIcon, syntax: .bulletList) {
+                onFormat(.bulletList)
+                SensoryFeedback.light()
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(
+            Rectangle()
+                .fill(.clear)
+                .glassEffect()
+        )
     }
 }
 
@@ -117,7 +259,11 @@ struct SimpleRichTextEditor: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
+                .background(
+                    Rectangle()
+                        .fill(.clear)
+                        .glassEffect()
+                )
                 .overlay(alignment: .top) {
                     LinearGradient(
                         colors: [

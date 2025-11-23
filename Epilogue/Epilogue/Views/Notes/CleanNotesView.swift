@@ -343,7 +343,6 @@ struct CleanNotesView: View {
                     if let note = capturedNotes.first(where: { $0.id == noteID }) {
                         // Show edit sheet for the note
                         editingNote = note
-                        editedText = note.content ?? ""
                         notesViewModel.isEditingNote = true
                         showEditSheet = true
 
@@ -511,19 +510,16 @@ struct CleanNotesView: View {
                 }
             }
         }
-        .overlay {
-            if showEditSheet {
-                EditContentOverlay(
-                    originalText: editingNote?.content ?? editingQuote?.text ?? "",
-                    editedText: $editedText,
-                    isPresented: $showEditSheet,
-                    onSave: saveEdit
-                )
+        .sheet(isPresented: $showEditSheet) {
+            if let capturedNote = editingNote {
+                NoteEditSheet(note: capturedNote.toNote())
+                    .environmentObject(notesViewModel)
             }
         }
         .onChange(of: showEditSheet) { _, newValue in
             if !newValue {
                 notesViewModel.isEditingNote = false
+                editingNote = nil
             }
         }
         .alert("Delete Item", isPresented: $showingDeleteAlert) {
@@ -922,7 +918,6 @@ struct CleanNotesView: View {
     private func startEdit(note: CapturedNote) {
         editingNote = note
         editingQuote = nil
-        editedText = note.content ?? ""
         notesViewModel.isEditingNote = true
         showEditSheet = true
         SensoryFeedback.light()

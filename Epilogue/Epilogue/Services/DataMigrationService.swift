@@ -342,14 +342,22 @@ final class DataMigrationService {
     /// Migrates cover image data to file system
     private func migrateCoverImage(imageData: Data, for book: BookModel) async {
         // Save to the same location where new system expects images
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let documentsPath: URL
+        do {
+            documentsPath = try FileManager.default.safeURL(for: .documentDirectory)
+        } catch {
+            #if DEBUG
+            print("❌ Failed to access documents directory for '\(book.title)': \(error)")
+            #endif
+            return
+        }
         let imagesPath = documentsPath.appendingPathComponent("BookCovers")
-        
+
         // Create directory if needed
         try? FileManager.default.createDirectory(at: imagesPath, withIntermediateDirectories: true)
-        
+
         let imagePath = imagesPath.appendingPathComponent("\(book.localId).jpg")
-        
+
         do {
             try imageData.write(to: imagePath)
             #if DEBUG

@@ -374,7 +374,13 @@ final class PerformanceMonitorService: ObservableObject {
     }
 
     private func getDiskUsage() -> DiskUsage {
-        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let documentDirectory: URL
+        do {
+            documentDirectory = try FileManager.default.safeURL(for: .documentDirectory)
+        } catch {
+            logger.error("Failed to access document directory: \(error.localizedDescription)")
+            return DiskUsage(used: 0, available: 0, total: 0)
+        }
 
         do {
             let attributes = try FileManager.default.attributesOfFileSystem(forPath: documentDirectory.path)

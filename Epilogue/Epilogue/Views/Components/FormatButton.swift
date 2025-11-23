@@ -15,14 +15,13 @@ struct FormatButton: View {
     var body: some View {
         Button(action: handleTap) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(foregroundColor)
                 .frame(width: 44, height: 44)
-                .background(backgroundView)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .scaleEffect(isPressed ? 0.85 : 1.0)
         .animation(DesignSystem.Animation.springQuick, value: isPressed)
         .accessibilityLabel(syntax.accessibilityLabel)
         .accessibilityHint(syntax.accessibilityHint)
@@ -31,17 +30,9 @@ struct FormatButton: View {
 
     private var foregroundColor: Color {
         if isPressed {
-            return .white
+            return DesignSystem.Colors.primaryAccent
         } else {
             return .white.opacity(0.7)
-        }
-    }
-
-    @ViewBuilder
-    private var backgroundView: some View {
-        if isPressed {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.15))
         }
     }
 

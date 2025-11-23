@@ -54,6 +54,7 @@ struct TrackedTextEditor: UIViewRepresentable {
     let font: UIFont
     let foregroundColor: UIColor
     let tracker: TextEditorCursorTracker
+    var inputAccessoryView: UIView?
 
     func makeUIView(context: Context) -> UITextView {
         let textView = UITextView()
@@ -67,6 +68,11 @@ struct TrackedTextEditor: UIViewRepresentable {
         textView.autocorrectionType = .yes
         textView.keyboardType = .default
         textView.returnKeyType = .default
+
+        // Add custom input accessory view (toolbar)
+        if let accessoryView = inputAccessoryView {
+            textView.inputAccessoryView = accessoryView
+        }
 
         // Track this textView
         tracker.trackTextView(textView)
