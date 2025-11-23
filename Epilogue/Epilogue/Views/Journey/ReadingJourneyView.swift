@@ -10,7 +10,6 @@ struct ReadingJourneyView: View {
 
     @StateObject private var manager = ReadingJourneyManager.shared
     @State private var hasAppeared = false
-    @State private var showingCreateJourney = false
     @State private var showingDeleteConfirmation = false
 
     var body: some View {
@@ -22,7 +21,7 @@ struct ReadingJourneyView: View {
                 if let journey = manager.currentJourney {
                     journeyContent(journey)
                 } else {
-                    emptyState
+                    CreateJourneyView()
                 }
             }
             .navigationTitle("Your Reading Journey")
@@ -60,15 +59,7 @@ struct ReadingJourneyView: View {
                 if !hasAppeared {
                     manager.initialize(modelContext: modelContext)
                     hasAppeared = true
-
-                    // If no journey exists, show creation flow immediately
-                    if manager.currentJourney == nil {
-                        showingCreateJourney = true
-                    }
                 }
-            }
-            .sheet(isPresented: $showingCreateJourney) {
-                CreateJourneyView()
             }
         }
     }
@@ -220,86 +211,6 @@ struct ReadingJourneyView: View {
         }
     }
 
-    // MARK: - Empty State
-    private var emptyState: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                Spacer()
-                    .frame(height: 60)
-
-                // Icon with subtle glow
-                ZStack {
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.1))
-                        .frame(width: 120, height: 120)
-                        .blur(radius: 20)
-
-                    Image(systemName: "map.fill")
-                        .font(.system(size: 56, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.0, green: 0.549, blue: 0.259),
-                                    Color(red: 1.0, green: 0.649, blue: 0.359)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-
-                VStack(spacing: 16) {
-                    Text("Your Reading Journey")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(.white)
-
-                    Text("Create a thoughtful reading plan that helps you accomplish your goals without feeling like homework.")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(4)
-                        .padding(.horizontal, 32)
-                }
-
-                VStack(spacing: 16) {
-                    Button(action: { showingCreateJourney = true }) {
-                        Text("Start Your Journey")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: 280)
-                            .padding(.vertical, 16)
-                    }
-                    .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 14))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        DesignSystem.Colors.primaryAccent.opacity(0.5),
-                                        DesignSystem.Colors.primaryAccent.opacity(0.2)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.5
-                            )
-                    }
-                    .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
-                    .buttonStyle(.plain)
-
-                    Text("Takes about 2 minutes")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .padding(.top, 8)
-
-                Spacer()
-                    .frame(height: 60)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-    }
 }
 
 // MARK: - Timeline Book Row
