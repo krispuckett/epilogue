@@ -46,7 +46,13 @@ final class ReadingJourney {
     // MARK: - Computed Properties
 
     var orderedBooks: [JourneyBook] {
-        (books ?? []).sorted { $0.order < $1.order }
+        // Filter out books that have been deleted from the library
+        (books ?? [])
+            .filter { journeyBook in
+                guard let book = journeyBook.bookModel else { return false }
+                return book.isInLibrary
+            }
+            .sorted { $0.order < $1.order }
     }
 
     var currentBook: JourneyBook? {

@@ -40,9 +40,34 @@ class ReadingJourneyManager: ObservableObject {
         do {
             let journeys = try context.fetch(descriptor)
             currentJourney = journeys.first
+
+            // Clean up orphaned journey books
+            if let journey = currentJourney {
+                cleanupOrphanedBooks(in: journey)
+            }
+
             logger.info("📖 Loaded active journey: \(self.currentJourney?.id.uuidString ?? "none")")
         } catch {
             logger.error("❌ Failed to load journey: \(error)")
+        }
+    }
+
+    /// Remove journey books whose bookModel has been deleted from the library
+    private func cleanupOrphanedBooks(in journey: ReadingJourney) {
+        guard let books = journey.books else { return }
+
+        var removedCount = 0
+        for journeyBook in books {
+            // Remove if bookModel is nil or not in library
+            if journeyBook.bookModel == nil || journeyBook.bookModel?.isInLibrary == false {
+                journey.removeBook(journeyBook)
+                removedCount += 1
+            }
+        }
+
+        if removedCount > 0 {
+            saveContext()
+            logger.info("🧹 Cleaned up \(removedCount) orphaned book(s) from journey")
         }
     }
 
