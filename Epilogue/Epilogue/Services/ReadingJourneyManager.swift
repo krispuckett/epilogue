@@ -474,6 +474,40 @@ class ReadingJourneyManager: ObservableObject {
         }
     }
 
+    func removeBook(_ journeyBook: JourneyBook, from journey: ReadingJourney) {
+        journey.removeBook(journeyBook)
+        saveContext()
+        logger.info("📚 Removed book from journey: \(journeyBook.bookModel?.title ?? "Unknown")")
+    }
+
+    func moveBook(_ journeyBook: JourneyBook, up: Bool, in journey: ReadingJourney) {
+        guard let books = journey.books else { return }
+        guard let currentIndex = books.firstIndex(where: { $0.id == journeyBook.id }) else { return }
+
+        let newIndex = up ? currentIndex - 1 : currentIndex + 1
+        guard newIndex >= 0 && newIndex < books.count else { return }
+
+        // Swap order values
+        let temp = books[currentIndex].order
+        books[currentIndex].order = books[newIndex].order
+        books[newIndex].order = temp
+
+        saveContext()
+        let direction = up ? "up" : "down"
+        logger.info("📚 Moved book \(direction): \(journeyBook.bookModel?.title ?? "Unknown")")
+    }
+
+    func addBooksToJourney(_ newBooks: [BookModel], to journey: ReadingJourney) {
+        for book in newBooks {
+            // Check if book is already in journey
+            if journey.books?.contains(where: { $0.bookModel?.id == book.id }) == false {
+                journey.addBook(book, reasoning: "Added to journey")
+            }
+        }
+        saveContext()
+        logger.info("📚 Added \(newBooks.count) books to journey")
+    }
+
     func deleteJourney(_ journey: ReadingJourney) {
         guard let context = modelContext else { return }
         context.delete(journey)

@@ -11,6 +11,8 @@ struct ReadingJourneyView: View {
     @StateObject private var manager = ReadingJourneyManager.shared
     @State private var hasAppeared = false
     @State private var showingDeleteConfirmation = false
+    @State private var isEditMode = false
+    @State private var showingBookSelector = false
 
     var body: some View {
         NavigationStack {
@@ -28,7 +30,7 @@ struct ReadingJourneyView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if manager.currentJourney != nil {
+                    if manager.currentJourney != nil && !isEditMode {
                         Button(action: { showingDeleteConfirmation = true }) {
                             Image(systemName: "trash")
                                 .font(.system(size: 17, weight: .medium))
@@ -38,11 +40,25 @@ struct ReadingJourneyView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                    HStack(spacing: 16) {
+                        if manager.currentJourney != nil && !isEditMode {
+                            Button("Edit") {
+                                withAnimation { isEditMode = true }
+                            }
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                        }
+
+                        Button(isEditMode ? "Done" : "Done") {
+                            if isEditMode {
+                                withAnimation { isEditMode = false }
+                            } else {
+                                dismiss()
+                            }
+                        }
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
                     }
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
                 }
             }
             .alert("Delete Journey?", isPresented: $showingDeleteConfirmation) {
@@ -59,6 +75,11 @@ struct ReadingJourneyView: View {
                 if !hasAppeared {
                     manager.initialize(modelContext: modelContext)
                     hasAppeared = true
+                }
+            }
+            .sheet(isPresented: $showingBookSelector) {
+                if let journey = manager.currentJourney {
+                    BookSelectorSheet(journey: journey, manager: manager)
                 }
             }
         }
@@ -203,11 +224,57 @@ struct ReadingJourneyView: View {
                     TimelineBookRow(
                         journeyBook: journeyBook,
                         isFirst: index == 0,
-                        isLast: index == journey.orderedBooks.count - 1
+                        isLast: index == journey.orderedBooks.count - 1,
+                        isEditMode: isEditMode,
+                        onRemove: {
+                            withAnimation {
+                                manager.removeBook(journeyBook, from: journey)
+                            }
+                        },
+                        onMoveUp: {
+                            withAnimation {
+                                manager.moveBook(journeyBook, up: true, in: journey)
+                            }
+                        },
+                        onMoveDown: {
+                            withAnimation {
+                                manager.moveBook(journeyBook, up: false, in: journey)
+                            }
+                        }
                     )
                 }
             }
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+
+            // Add Books button (only in edit mode)
+            if isEditMode {
+                Button(action: { showingBookSelector = true }) {
+                    Label("Add Books", systemImage: "plus.circle.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
+                .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)), in: .rect(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primaryAccent.opacity(0.5),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
+                .buttonStyle(.plain)
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                .padding(.top, 16)
+            }
         }
     }
 
@@ -218,6 +285,10 @@ struct TimelineBookRow: View {
     let journeyBook: JourneyBook
     let isFirst: Bool
     let isLast: Bool
+    var isEditMode: Bool = false
+    var onRemove: (() -> Void)? = nil
+    var onMoveUp: (() -> Void)? = nil
+    var onMoveDown: (() -> Void)? = nil
 
     @State private var isExpanded = false
 
@@ -289,9 +360,43 @@ struct TimelineBookRow: View {
 
                             Spacer()
 
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
+                            if isEditMode {
+                                // Edit controls
+                                HStack(spacing: 12) {
+                                    // Move up
+                                    if !isFirst {
+                                        Button(action: { onMoveUp?() }) {
+                                            Image(systemName: "arrow.up")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundStyle(.white.opacity(0.7))
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+
+                                    // Move down
+                                    if !isLast {
+                                        Button(action: { onMoveDown?() }) {
+                                            Image(systemName: "arrow.down")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundStyle(.white.opacity(0.7))
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+
+                                    // Remove
+                                    Button(action: { onRemove?() }) {
+                                        Image(systemName: "minus.circle.fill")
+                                            .font(.system(size: 20, weight: .medium))
+                                            .foregroundStyle(.red.opacity(0.8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            } else {
+                                // Expand/collapse chevron
+                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
+                            }
                         }
 
                         Text(book.author)
@@ -315,8 +420,10 @@ struct TimelineBookRow: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(DesignSystem.Animation.easeQuick) {
-                    isExpanded.toggle()
+                if !isEditMode {
+                    withAnimation(DesignSystem.Animation.easeQuick) {
+                        isExpanded.toggle()
+                    }
                 }
             }
             .padding(.vertical, 16)
