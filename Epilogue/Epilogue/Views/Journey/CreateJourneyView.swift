@@ -332,20 +332,15 @@ struct CreateJourneyView: View {
             Spacer()
 
             Button(action: createJourney) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .semibold))
-
-                    Text("Create Journey")
-                        .font(.system(size: 17, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                )
+                Text("Create Journey")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                    )
             }
         }
     }
@@ -430,20 +425,15 @@ struct CreateJourneyView: View {
 
                 VStack(spacing: 16) {
                     Button(action: { dismiss() }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "map.fill")
-                                .font(.system(size: 15, weight: .semibold))
-
-                            Text("View Your Journey")
-                                .font(.system(size: 17, weight: .semibold))
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: 280)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                        )
+                        Text("View Your Journey")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: 280)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                            )
                     }
 
                     Text("You can adjust your journey anytime")

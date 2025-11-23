@@ -11,6 +11,7 @@ struct ReadingJourneyView: View {
     @StateObject private var manager = ReadingJourneyManager.shared
     @State private var hasAppeared = false
     @State private var showingCreateJourney = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,16 @@ struct ReadingJourneyView: View {
             .navigationTitle("Your Reading Journey")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if manager.currentJourney != nil {
+                        Button(action: { showingDeleteConfirmation = true }) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.red.opacity(0.8))
+                        }
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -34,6 +45,16 @@ struct ReadingJourneyView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
                 }
+            }
+            .alert("Delete Journey?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    if let journey = manager.currentJourney {
+                        manager.deleteJourney(journey)
+                    }
+                }
+            } message: {
+                Text("This will delete your entire reading journey. You can always create a new one.")
             }
             .onAppear {
                 if !hasAppeared {
@@ -237,20 +258,15 @@ struct ReadingJourneyView: View {
 
                 VStack(spacing: 16) {
                     Button(action: { showingCreateJourney = true }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 15, weight: .semibold))
-
-                            Text("Start Your Journey")
-                                .font(.system(size: 17, weight: .semibold))
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: 280)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
-                        )
+                        Text("Start Your Journey")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: 280)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(red: 1.0, green: 0.549, blue: 0.259))
+                            )
                     }
 
                     Text("Takes about 2 minutes")
