@@ -16,9 +16,21 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        
+
         let userInfo = response.notification.request.content.userInfo
-        
+
+        // Check if this is a journey check-in
+        if userInfo["type"] as? String == "journeyCheckIn",
+           let journeyId = userInfo["journeyId"] as? String {
+            // Navigate to journey view and record check-in
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: Notification.Name("NavigateToJourneyFromNotification"),
+                    object: journeyId
+                )
+            }
+        }
+
         // Check if this is a reading reminder
         if let bookId = userInfo["bookId"] as? String {
             // Navigate to the book
@@ -29,7 +41,7 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
                 )
             }
         }
-        
+
         // Check if this is a general reading reminder
         if userInfo["type"] as? String == "readingReminder" {
             // Navigate to library tab
@@ -40,7 +52,7 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
                 )
             }
         }
-        
+
         completionHandler()
     }
 }

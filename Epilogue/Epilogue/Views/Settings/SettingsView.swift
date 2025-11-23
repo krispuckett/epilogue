@@ -122,6 +122,13 @@ struct SettingsView: View {
                     Text(L10n.Settings.Section.library)
                 }
 
+                // MARK: - Reading Journey
+                Section {
+                    JourneyCheckInSettingsView()
+                } header: {
+                    Text("Reading Journey")
+                }
+
                 // MARK: - Data & Enrichment
                 Section {
                     VStack(alignment: .leading, spacing: 8) {

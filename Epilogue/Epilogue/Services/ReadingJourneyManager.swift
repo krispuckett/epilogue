@@ -91,6 +91,9 @@ class ReadingJourneyManager: ObservableObject {
         try context.save()
         currentJourney = journey
 
+        // Schedule first check-in notification
+        await JourneyCheckInManager.shared.scheduleNextCheckIn(for: journey)
+
         logger.info("✅ Created journey with \(books.count) books")
         return journey
     }
@@ -510,6 +513,12 @@ class ReadingJourneyManager: ObservableObject {
 
     func deleteJourney(_ journey: ReadingJourney) {
         guard let context = modelContext else { return }
+
+        // Cancel any scheduled notifications for this journey
+        Task {
+            await JourneyCheckInManager.shared.cancelCheckIn(for: journey)
+        }
+
         context.delete(journey)
         if currentJourney?.id == journey.id {
             currentJourney = nil

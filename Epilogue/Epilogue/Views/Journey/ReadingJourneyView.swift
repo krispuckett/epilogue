@@ -77,6 +77,17 @@ struct ReadingJourneyView: View {
                     hasAppeared = true
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToJourneyFromNotification"))) { notification in
+                // Handle navigation from check-in notification
+                if let journeyId = notification.object as? String,
+                   let journey = manager.currentJourney,
+                   journey.id.uuidString == journeyId {
+                    // Record the check-in
+                    Task {
+                        await JourneyCheckInManager.shared.recordCheckIn(for: journey)
+                    }
+                }
+            }
             .sheet(isPresented: $showingBookSelector) {
                 if let journey = manager.currentJourney {
                     BookSelectorSheet(journey: journey, manager: manager)
