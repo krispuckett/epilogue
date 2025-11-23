@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Settings UI for reading journey check-ins
 struct JourneyCheckInSettingsView: View {
-    @StateObject private var checkInManager = JourneyCheckInManager.shared
+    @ObservedObject private var checkInManager = JourneyCheckInManager.shared
 
     @State private var showingPermissionAlert = false
     @State private var hasRequestedPermission = false
