@@ -111,7 +111,7 @@ struct CreateJourneyView: View {
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
 
-                Text("I'll help you create a thoughtful reading timeline that honors your goals and gives you breathing room.")
+                Text("Let's create a thoughtful reading timeline that honors your goals and gives you breathing room.")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
@@ -128,13 +128,13 @@ struct CreateJourneyView: View {
                 InfoCard(
                     icon: "bubble.left.fill",
                     title: "Share Your Intent",
-                    description: "Tell me what you're hoping for"
+                    description: "What are you hoping for?"
                 )
 
                 InfoCard(
                     icon: "map.fill",
                     title: "Get Your Timeline",
-                    description: "I'll suggest a thoughtful reading order"
+                    description: "We'll create a thoughtful reading order"
                 )
             }
             .padding(.top, 16)
@@ -175,7 +175,7 @@ struct CreateJourneyView: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
 
-                Text("Choose the books you want to include in your reading journey. I'll help you figure out a good order.")
+                Text("Choose the books you want to include in your reading journey. We'll figure out a good order together.")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -246,7 +246,7 @@ struct CreateJourneyView: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
 
-                Text("Share what you're hoping to get from your reading. This helps me create a timeline that makes sense for you.")
+                Text("Share what you're hoping to get from your reading. This helps create a timeline that makes sense for you.")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -277,7 +277,7 @@ struct CreateJourneyView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.7))
 
-                TextField("Tell me what you're hoping for...", text: $userIntent, axis: .vertical)
+                TextField("What are you hoping for?", text: $userIntent, axis: .vertical)
                     .font(.system(size: 16))
                     .foregroundStyle(.white)
                     .padding()
