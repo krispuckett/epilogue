@@ -163,8 +163,22 @@ struct AmbientModeView: View {
     @FocusState private var isTranscriptionFocused: Bool
     // Removed: isWaitingForAIResponse and shouldCollapseThinking - now using inline thinking messages
     @State private var pendingQuestion: String?
+    @State private var isGenericModeThinking = false  // Typing indicator for Generic mode
     @State private var lastProcessedCount = 0
+    @State private var showRecommendationFlow = false  // Quick question flow for recommendations
+    @State private var recommendationContext: RecommendationContext? = nil  // Context from questions
+    @State private var showReadingPlanFlow: ReadingPlanQuestionFlow.FlowType? = nil  // Reading habit/challenge flow
+    @State private var readingPlanContext: ReadingPlanContext? = nil
     @State private var debounceTimer: Timer?
+    @State private var createdReadingPlan: ReadingHabitPlan? = nil  // Newly created plan to display
+    @State private var showPlanDetail = false  // Show full plan detail view
+    @State private var showLocalToast = false  // Local toast for ambient mode
+    @State private var localToastMessage = ""
+    @Query(filter: #Predicate<ReadingHabitPlan> { $0.isActive == true }, sort: \ReadingHabitPlan.createdAt, order: .reverse)
+    private var activeReadingPlans: [ReadingHabitPlan]  // Query for active plans
+
+    @Query(sort: \BookModel.dateAdded, order: .reverse)
+    private var allBookModels: [BookModel]  // For book selection in reading plans
     
     // New keyboard input states
     @State private var inputMode: AmbientInputMode = .listening
@@ -199,6 +213,7 @@ struct AmbientModeView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @EnvironmentObject var libraryViewModel: LibraryViewModel
     @EnvironmentObject var notesViewModel: NotesViewModel
+    @EnvironmentObject var appStateCoordinator: AppStateCoordinator
     
     // Settings
     @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
@@ -246,7 +261,25 @@ struct AmbientModeView: View {
             return DesignSystem.Colors.primaryAccent
         }
     }
-    
+
+    // Available books for reading plan selection (excludes current book context if present)
+    private var availableBooksForPlan: [Book] {
+        // Deduplicate by book ID (keep first occurrence, usually most recently added)
+        var seenIds = Set<String>()
+        return allBookModels
+            .filter { $0.isInLibrary } // Only books actually in library
+            .filter { $0.readingStatus == ReadingStatus.currentlyReading.rawValue || $0.readingStatus == ReadingStatus.wantToRead.rawValue }
+            .filter { currentBookContext == nil || $0.id != currentBookContext?.id }
+            .filter { book in
+                if seenIds.contains(book.id) {
+                    return false
+                }
+                seenIds.insert(book.id)
+                return true
+            }
+            .map { $0.toBook() }
+    }
+
     // MARK: - Simple Live Transcription View
     private var liveTranscriptionView: some View {
         GeometryReader { geometry in
@@ -321,6 +354,41 @@ struct AmbientModeView: View {
                 .animation(.easeInOut(duration: 0.8), value: onboardingOpacity)
                 .allowsHitTesting(false)
                 .zIndex(200)
+            }
+
+            // Recommendation question flow overlay (for generic mode)
+            if showRecommendationFlow {
+                RecommendationQuestionFlow(
+                    onComplete: { context in
+                        handleRecommendationFlowComplete(context)
+                    },
+                    onDismiss: {
+                        withAnimation(DesignSystem.Animation.springStandard) {
+                            showRecommendationFlow = false
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .zIndex(300)
+            }
+
+            // Reading plan/habit/challenge question flow overlay
+            if let flowType = showReadingPlanFlow {
+                ReadingPlanQuestionFlow(
+                    flowType: flowType,
+                    preselectedBook: currentBookContext,
+                    availableBooks: availableBooksForPlan,
+                    onComplete: { context in
+                        handleReadingPlanFlowComplete(context)
+                    },
+                    onDismiss: {
+                        withAnimation(DesignSystem.Animation.springStandard) {
+                            showReadingPlanFlow = nil
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .zIndex(300)
             }
         }
         // Double tap gesture to show keyboard
@@ -447,19 +515,29 @@ struct AmbientModeView: View {
                 EpilogueAmbientCoordinator.shared.initialBook = nil
             }
 
-            // Initialize voice mode based on settings
-            isVoiceModeEnabled = !alwaysShowInput
-            if !isVoiceModeEnabled {
-                // Start with text input if voice mode is disabled
+            // For generic mode (no book), default to text input (not voice)
+            let isGenericMode = EpilogueAmbientCoordinator.shared.ambientMode.isGeneric
+
+            // Initialize voice mode based on settings, but ALWAYS disable for generic mode
+            if isGenericMode {
+                // Generic mode is text-first - voice can be enabled by tapping the orb
+                isVoiceModeEnabled = false
                 inputMode = .textInput
-                // Initialize text field height properly
                 textFieldHeight = 44
-                // Clear any lingering transcription
                 liveTranscription = ""
                 voiceManager.transcribedText = ""
-                // Initialize container blur for proper rendering
                 containerBlur = 0
-                // Don't auto-focus keyboard on appear - let user tap to focus
+            } else {
+                // Book mode uses voice setting preference
+                isVoiceModeEnabled = !alwaysShowInput
+
+                if !isVoiceModeEnabled {
+                    inputMode = .textInput
+                    textFieldHeight = 44
+                    liveTranscription = ""
+                    voiceManager.transcribedText = ""
+                    containerBlur = 0
+                }
             }
             
             startAmbientExperience()
@@ -709,6 +787,51 @@ struct AmbientModeView: View {
         .sheet(isPresented: $showPaywall) {
             PremiumPaywallView()
         }
+        .sheet(isPresented: $showPlanDetail) {
+            if let plan = createdReadingPlan ?? activeReadingPlans.first {
+                NavigationStack {
+                    ZStack {
+                        Color.black.ignoresSafeArea()
+                        AmbientChatGradientView()
+                            .ignoresSafeArea()
+
+                        ReadingPlanTimelineView(plan: plan)
+                    }
+                    .navigationBarBackButtonHidden(true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                showPlanDetail = false
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                        }
+
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Menu {
+                                Button("Pause Plan", systemImage: "pause.circle") {
+                                    plan.pause()
+                                    try? modelContext.save()
+                                }
+                                Divider()
+                                Button("Delete Plan", systemImage: "trash", role: .destructive) {
+                                    modelContext.delete(plan)
+                                    try? modelContext.save()
+                                    createdReadingPlan = nil
+                                    showPlanDetail = false
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                        }
+                    }
+                }
+            }
+        }
         .onReceive(voiceManager.$transcribedText) { text in
             // CRITICAL: Only update if actually recording AND voice mode is enabled
             guard isRecording && isVoiceModeEnabled else {
@@ -760,8 +883,10 @@ struct AmbientModeView: View {
                 }
             }
             
-            // Detect book mentions - always check, even for short text  
-            if cleanedText.count > 5 {
+            // Detect book mentions - but NOT in generic mode
+            // Generic mode should stay generic unless user explicitly requests a book
+            let isGenericMode = EpilogueAmbientCoordinator.shared.ambientMode.isGeneric
+            if cleanedText.count > 5 && !isGenericMode {
                 bookDetector.detectBookInText(cleanedText)
             }
         }
@@ -808,8 +933,34 @@ struct AmbientModeView: View {
         .onDisappear {
             NotificationCenter.default.removeObserver(self, name: Notification.Name("QueuedQuestionProcessed"), object: nil)
         }
+        // Local toast for ambient mode (since fullScreenCover covers ContentView's toast)
+        .overlay(alignment: .top) {
+            if showLocalToast {
+                Text(localToastMessage)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                    .padding(.vertical, 12)
+                    .glassEffect(.regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.2)))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
+                    .padding(.horizontal)
+                    .padding(.top, 60)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showLocalToast = false
+                            }
+                        }
+                    }
+            }
+        }
     }
-    
+
     // MARK: - Gradient Background (Smooth Loading)
     @ViewBuilder
     private var gradientBackground: some View {
@@ -911,13 +1062,18 @@ struct AmbientModeView: View {
                         !msg.content.contains("[Transcribing]")
                     }
                     
-                    if !hasRealContent {
+                    if !hasRealContent && !showRecommendationFlow && showReadingPlanFlow == nil {
                         if currentBookContext == nil {
-                            // Simplified welcome - show even when recording
-                            minimalWelcomeView
-                                .padding(.top, 34) // ← Reduced from 50 to 34
-                                .opacity(isRecording ? 0.7 : 1.0) // Slightly dim when recording
-                                .animation(.easeInOut(duration: 0.3), value: isRecording)
+                            // Generic ambient mode - beautiful liquid glass pills
+                            GenericAmbientEmptyState(
+                                onSuggestionTap: { suggestion in
+                                    handleSuggestionTap(suggestion)
+                                },
+                                librarySize: libraryViewModel.books.count,
+                                recentBookTitle: recentlyReadBookTitle
+                            )
+                            .opacity(isRecording ? 0.7 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: isRecording)
                         }
                     }
 
@@ -984,7 +1140,7 @@ struct AmbientModeView: View {
                                                 keyboardText = noteText
                                                 editingMessageId = message.id
                                                 editingMessageType = .note(capturedNote)
-                                                
+
                                                 // Switch to text input mode
                                                 withAnimation(DesignSystem.Animation.springStandard) {
                                                     inputMode = .textInput
@@ -993,7 +1149,52 @@ struct AmbientModeView: View {
                                             }
                                         )
                                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else if case .bookRecommendations(let recommendations) = message.messageType {
+                                        // Display book recommendations with interactive cards
+                                        BookRecommendationsMessageView(
+                                            recommendations: recommendations,
+                                            introText: message.content,
+                                            onAddToLibrary: { rec in
+                                                addRecommendationToLibrary(rec)
+                                            },
+                                            onPurchase: { url in
+                                                openPurchaseURL(url)
+                                            }
+                                        )
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else if case .conversationalResponse(let text, let followUps) = message.messageType {
+                                        // Display conversational response with follow-up questions
+                                        ConversationalResponseMessageView(
+                                            text: text,
+                                            followUpQuestions: followUps,
+                                            onFollowUpTap: { question in
+                                                // Send the follow-up question as user input
+                                                SensoryFeedback.light()
+                                                Task {
+                                                    await sendMessage(question)
+                                                }
+                                            }
+                                        )
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else if EpilogueAmbientCoordinator.shared.ambientMode.isGeneric {
+                                        // Generic mode: Use chat bubble style (no numbered format)
+                                        GenericModeChatBubble(
+                                            message: message,
+                                            isExpanded: expandedMessageIds.contains(message.id),
+                                            onToggle: {
+                                                SensoryFeedback.selection()
+                                                withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.86, blendDuration: 0)) {
+                                                    if expandedMessageIds.contains(message.id) {
+                                                        expandedMessageIds.remove(message.id)
+                                                    } else {
+                                                        expandedMessageIds.insert(message.id)
+                                                    }
+                                                }
+                                            }
+                                        )
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                                     } else {
+                                        // Book mode: Use numbered thread format
                                         AmbientMessageThreadView(
                                             message: message,
                                             index: index,
@@ -1032,7 +1233,33 @@ struct AmbientModeView: View {
                             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                         }
                     }
-                    
+
+                    // Reading Plan Card - appears after AI generates plan
+                    if let plan = createdReadingPlan {
+                        ReadingPlanCard(
+                            plan: plan,
+                            onTap: {
+                                showPlanDetail = true
+                            },
+                            onMarkComplete: {
+                                plan.markDayComplete(plan.currentDayNumber)
+                                SensoryFeedback.success()
+                            }
+                        )
+                        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                        .padding(.top, 16)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .id("reading-plan-card")
+                    }
+
+                    // Generic Mode typing indicator (V0 pattern)
+                    if isGenericModeThinking && EpilogueAmbientCoordinator.shared.ambientMode.isGeneric {
+                        GenericModeTypingIndicator()
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            .id("typing-indicator")
+                    }
+
                     // Bottom spacer for input area - adjusted for keyboard mode
                     // Add more bottom padding to ensure content is scrollable above input
                     Color.clear
@@ -1085,7 +1312,608 @@ struct AmbientModeView: View {
                 .padding(.horizontal, 40)
         }
     }
-    
+
+    // MARK: - Generic Ambient Mode Helpers
+
+    /// Get the title of a recently read book for suggestions
+    private var recentlyReadBookTitle: String? {
+        libraryViewModel.books
+            .filter { $0.readingStatus == .currentlyReading }
+            .first?.title ?? libraryViewModel.books.first?.title
+    }
+
+    /// Handle tapping a suggestion pill - shows question flow for recommendations or populates input
+    private func handleSuggestionTap(_ suggestion: String) {
+        let lowercased = suggestion.lowercased()
+
+        // Check for recommendation requests
+        let isRecommendationRequest = lowercased.contains("read next") ||
+                                       lowercased.contains("recommend") ||
+                                       lowercased.contains("something like")
+
+        // Check for reading habit flow
+        let isHabitRequest = lowercased.contains("reading habit") ||
+                             lowercased.contains("build a habit")
+
+        // Check for reading challenge flow
+        let isChallengeRequest = lowercased.contains("reading challenge") ||
+                                  lowercased.contains("create a challenge")
+
+        // Check for reading taste/patterns analysis
+        let isAnalysisRequest = lowercased.contains("reading taste") ||
+                                 lowercased.contains("reading patterns") ||
+                                 lowercased.contains("analyze my")
+
+        if isRecommendationRequest {
+            withAnimation(DesignSystem.Animation.springStandard) {
+                showRecommendationFlow = true
+            }
+        } else if isHabitRequest {
+            isKeyboardFocused = false // Dismiss keyboard before showing flow
+            withAnimation(DesignSystem.Animation.springStandard) {
+                showReadingPlanFlow = .habit
+            }
+        } else if isChallengeRequest {
+            isKeyboardFocused = false // Dismiss keyboard before showing flow
+            withAnimation(DesignSystem.Animation.springStandard) {
+                showReadingPlanFlow = .challenge
+            }
+        } else if isAnalysisRequest {
+            // Trigger reading taste analysis directly with library context
+            triggerReadingTasteAnalysis()
+        } else {
+            // Populate the input bar with the suggestion text
+            keyboardText = suggestion
+            inputMode = .textInput
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isKeyboardFocused = true
+            }
+        }
+    }
+
+    /// Triggers the reading taste analysis flow
+    private func triggerReadingTasteAnalysis() {
+        // Build analysis prompt with library context
+        let analysisPrompt = buildReadingTasteAnalysisPrompt()
+
+        // Add user message
+        let userMessage = UnifiedChatMessage(
+            content: "Analyze my reading taste",
+            isUser: true,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        messages.append(userMessage)
+
+        // Get AI response
+        isGenericModeThinking = true
+        Task {
+            await getGenericAIResponseWithCustomPrompt(
+                userQuery: analysisPrompt,
+                systemPrompt: buildReadingAnalysisSystemPrompt()
+            )
+        }
+    }
+
+    /// Build the prompt for reading taste analysis
+    private func buildReadingTasteAnalysisPrompt() -> String {
+        let libraryContext = buildLibraryContext()
+        return """
+        Based on my reading history, analyze my reading taste and patterns.
+
+        \(libraryContext)
+
+        Tell me:
+        1. What themes and genres I gravitate toward
+        2. My reading comfort zone vs. blind spots
+        3. Authors or styles I might enjoy but haven't tried
+        4. One surprising insight about my reading patterns
+        """
+    }
+
+    /// System prompt specifically for reading analysis
+    private func buildReadingAnalysisSystemPrompt() -> String {
+        return """
+        You are a literary analyst in the Epilogue reading app. Analyze the user's reading taste based on their library data.
+
+        FORMAT:
+        - Start with a brief, insightful summary of their reading identity (2-3 sentences)
+        - Use clear sections with bold headers: **Themes You Love**, **Your Comfort Zone**, **Blind Spots**, **Try Next**
+        - Keep each section to 2-3 bullet points max
+        - End with ONE genuinely surprising or insightful observation
+
+        RULES:
+        - Be specific and reference actual books from their library
+        - No generic advice - everything should feel personalized
+        - No emojis
+        - Be direct, insightful, occasionally witty
+        - If they have few books, acknowledge this and focus on what patterns exist
+        """
+    }
+
+    /// Handle completion of the recommendation question flow
+    private func handleRecommendationFlowComplete(_ context: RecommendationContext) {
+        // Hide the question flow
+        withAnimation(DesignSystem.Animation.springStandard) {
+            showRecommendationFlow = false
+        }
+
+        // Store context and send enhanced request
+        recommendationContext = context
+
+        // Build the enhanced prompt
+        let enhancedPrompt = context.buildPromptContext()
+
+        // Add user message
+        let userMessage = UnifiedChatMessage(
+            content: enhancedPrompt,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        messages.append(userMessage)
+
+        // Get AI response with the context
+        isGenericModeThinking = true
+        Task {
+            await getGenericAIResponse(for: enhancedPrompt)
+        }
+    }
+
+    /// Handle completion of the reading plan question flow (habit or challenge)
+    private func handleReadingPlanFlowComplete(_ context: ReadingPlanContext) {
+        // Store context for later parsing
+        readingPlanContext = context
+
+        // Hide the question flow
+        withAnimation(DesignSystem.Animation.springStandard) {
+            showReadingPlanFlow = nil
+        }
+
+        // Create the plan directly from context (no AI chat needed)
+        createReadingPlanFromContext(context)
+    }
+
+    /// Create a reading plan directly from the question flow context
+    private func createReadingPlanFromContext(_ context: ReadingPlanContext) {
+        let days = context.durationDays
+        let planBook = context.selectedBook ?? currentBookContext
+
+        // Use book title if selected, otherwise generic title
+        let title: String
+        let goal: String
+
+        switch context.flowType {
+        case .habit:
+            title = planBook?.title ?? "\(days)-Day Reading Kickstart"
+            goal = "Build a sustainable reading habit that fits your schedule"
+        case .challenge:
+            title = planBook?.title ?? "Reading Challenge"
+            goal = context.challengeOrBlocker ?? "Complete your reading goal"
+        }
+
+        #if DEBUG
+        print("📋 Creating reading plan: '\(title)' (type: \(context.flowType))")
+        #endif
+
+        let plan = ReadingHabitPlan(
+            type: context.flowType == .habit ? .habit : .challenge,
+            title: title,
+            goal: goal
+        )
+        plan.preferredTime = context.timePreference
+        plan.commitmentLevel = context.commitmentLevel
+        plan.planDuration = context.planDuration
+        if let book = planBook {
+            plan.bookId = book.id
+            plan.bookTitle = book.title
+            plan.bookAuthor = book.author
+            plan.bookCoverURL = book.coverImageURL
+        }
+
+        // Set notification preferences from onboarding
+        plan.notificationsEnabled = context.notificationsEnabled
+        if context.notificationsEnabled {
+            plan.notificationTime = context.notificationTime
+        }
+
+        // Initialize days for both habit and challenge plans
+        if context.flowType == .habit {
+            plan.initializeDays(count: days)
+        } else {
+            plan.challengeType = context.planDuration
+            plan.ambitionLevel = context.commitmentLevel
+            plan.timeframe = context.timePreference
+            plan.initializeDays(count: days) // Challenges also need days initialized
+        }
+
+        #if DEBUG
+        print("📋 Plan configured - isActive: \(plan.isActive), days: \(plan.days?.count ?? 0)")
+        #endif
+
+        // Insert and save
+        modelContext.insert(plan)
+
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ Reading plan saved successfully: \(plan.title) (id: \(plan.id))")
+            #endif
+
+            // Store reference and show the timeline directly
+            withAnimation(DesignSystem.Animation.springStandard) {
+                createdReadingPlan = plan
+                showPlanDetail = true  // Go directly to timeline view
+            }
+
+            // Provide haptic feedback
+            SensoryFeedback.success()
+
+            // Show local toast notification (visible in fullScreenCover)
+            let toastMessage = context.flowType == .habit
+                ? "Reading habit created! Find it in Reading Plans."
+                : "Challenge created! Find it in Reading Plans."
+            localToastMessage = toastMessage
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showLocalToast = true
+            }
+
+            // Ask user about notification preferences
+            promptForNotifications(plan: plan)
+
+        } catch {
+            #if DEBUG
+            print("❌ Failed to save reading plan: \(error)")
+            print("❌ Error details: \(error.localizedDescription)")
+            #endif
+
+            // Show error toast (local for fullScreenCover visibility)
+            localToastMessage = "Failed to create plan. Please try again."
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showLocalToast = true
+            }
+        }
+    }
+
+    /// Get AI response for reading plan and create structured plan from it
+    private func getReadingPlanAIResponse(userQuery: String, context: ReadingPlanContext) async {
+        // Create AI response message placeholder
+        let aiMessage = UnifiedChatMessage(
+            content: "",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        let messageId = aiMessage.id
+
+        do {
+            let service = OptimizedPerplexityService.shared
+            let systemPrompt = buildReadingPlanSystemPrompt(for: context.flowType)
+
+            var fullResponse = ""
+            var isFirstChunk = true
+
+            // Stream the response
+            for try await response in service.streamSonarResponse(
+                userQuery,
+                bookContext: nil,
+                enrichment: nil,
+                sessionHistory: nil,
+                userNotes: nil,
+                userQuotes: nil,
+                userQuestions: nil,
+                currentPage: nil,
+                customSystemPrompt: systemPrompt
+            ) {
+                fullResponse = response.text
+
+                await MainActor.run {
+                    if isFirstChunk {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isGenericModeThinking = false
+                        }
+                        messages.append(aiMessage)
+                        withAnimation(DesignSystem.Animation.easeStandard) {
+                            expandedMessageIds.removeAll()
+                            expandedMessageIds.insert(messageId)
+                        }
+                        isFirstChunk = false
+                    }
+
+                    // Update streaming message
+                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                        messages[index] = UnifiedChatMessage(
+                            id: messageId,
+                            content: fullResponse,
+                            isUser: false,
+                            timestamp: aiMessage.timestamp,
+                            bookContext: nil,
+                            messageType: .text
+                        )
+                    }
+                }
+            }
+
+            // After streaming completes, parse and create the plan
+            await MainActor.run {
+                createReadingPlanFromResponse(fullResponse, context: context)
+            }
+
+        } catch {
+            #if DEBUG
+            print("❌ Reading plan AI response error: \(error)")
+            #endif
+            await MainActor.run {
+                isGenericModeThinking = false
+            }
+        }
+    }
+
+    /// Parse AI response and create a ReadingHabitPlan
+    private func createReadingPlanFromResponse(_ response: String, context: ReadingPlanContext) {
+        let plan: ReadingHabitPlan?
+
+        switch context.flowType {
+        case .habit:
+            plan = ReadingPlanParser.parseHabitPlan(from: response, context: context)
+        case .challenge:
+            plan = ReadingPlanParser.parseChallengePlan(from: response, context: context)
+        }
+
+        guard let plan = plan else {
+            #if DEBUG
+            print("⚠️ Could not parse reading plan from response")
+            #endif
+            return
+        }
+
+        // Save to SwiftData
+        modelContext.insert(plan)
+
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ Reading plan saved: \(plan.title)")
+            #endif
+
+            // Store reference and show the card
+            withAnimation(DesignSystem.Animation.springStandard) {
+                createdReadingPlan = plan
+            }
+
+            // Provide haptic feedback
+            SensoryFeedback.success()
+
+            // Ask user about notification preferences
+            promptForNotifications(plan: plan)
+
+        } catch {
+            #if DEBUG
+            print("❌ Failed to save reading plan: \(error)")
+            #endif
+        }
+    }
+
+    /// Update active reading plan progress from a completed ambient session
+    private func updateReadingPlanFromSession(_ session: AmbientSession) {
+        // Find an active reading plan
+        guard let activePlan = activeReadingPlans.first else {
+            #if DEBUG
+            print("📚 No active reading plan to update")
+            #endif
+            return
+        }
+
+        // Need a start time to calculate duration
+        guard let startTime = session.startTime else {
+            #if DEBUG
+            print("📚 Session has no start time, cannot record")
+            #endif
+            return
+        }
+
+        // Calculate session duration in minutes
+        let sessionDuration: TimeInterval
+        if let endTime = session.endTime {
+            sessionDuration = endTime.timeIntervalSince(startTime)
+        } else {
+            sessionDuration = Date().timeIntervalSince(startTime)
+        }
+
+        let sessionMinutes = Int(sessionDuration / 60)
+
+        // Only record if session was at least 1 minute
+        guard sessionMinutes >= 1 else {
+            #if DEBUG
+            print("📚 Session too short to count: \(sessionMinutes) min")
+            #endif
+            return
+        }
+
+        #if DEBUG
+        print("📚 Recording \(sessionMinutes) minutes to reading plan: \(activePlan.title)")
+        #endif
+
+        // Record the reading session to the plan
+        activePlan.recordReading(minutes: sessionMinutes, fromAmbientSession: true)
+
+        // Save the updated plan
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ Reading plan progress updated - Day \(activePlan.currentDayNumber), \(activePlan.todayDay?.minutesRead ?? 0) mins today")
+            #endif
+
+            // Update the local reference if this is the same plan
+            if createdReadingPlan?.id == activePlan.id {
+                createdReadingPlan = activePlan
+            }
+        } catch {
+            #if DEBUG
+            print("❌ Failed to save reading plan progress: \(error)")
+            #endif
+        }
+    }
+
+    /// Prompt user to enable notifications for their reading plan
+    private func promptForNotifications(plan: ReadingHabitPlan) {
+        // Only prompt if user chose to enable notifications during onboarding
+        guard plan.notificationsEnabled else {
+            #if DEBUG
+            print("🔔 Skipping notification prompt - user selected 'No reminders'")
+            #endif
+            return
+        }
+
+        Task {
+            // Check current permission status
+            let status = await ReadingPlanNotificationService.shared.checkPermissionStatus()
+
+            switch status {
+            case .notDetermined:
+                // Request permission and schedule if granted
+                let granted = await ReadingPlanNotificationService.shared.requestPermission()
+                if granted {
+                    try? modelContext.save()
+                    await ReadingPlanNotificationService.shared.scheduleReminders(for: plan)
+
+                    // Add a chat message about notifications
+                    await MainActor.run {
+                        addNotificationConfirmationMessage(for: plan)
+                    }
+                } else {
+                    // User denied - update plan
+                    plan.notificationsEnabled = false
+                    try? modelContext.save()
+                }
+
+            case .authorized:
+                // Already authorized, just schedule
+                try? modelContext.save()
+                await ReadingPlanNotificationService.shared.scheduleReminders(for: plan)
+
+                await MainActor.run {
+                    addNotificationConfirmationMessage(for: plan)
+                }
+
+            case .denied, .provisional, .ephemeral:
+                // Can't send notifications - update plan
+                plan.notificationsEnabled = false
+                try? modelContext.save()
+                #if DEBUG
+                print("🔔 Notifications not available (status: \(status.rawValue))")
+                #endif
+
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    /// Add a chat message confirming notification setup
+    private func addNotificationConfirmationMessage(for plan: ReadingHabitPlan) {
+        let timeDescription: String
+        if let preferredTime = plan.preferredTime {
+            timeDescription = "around \(preferredTime.lowercased())"
+        } else {
+            timeDescription = "each day"
+        }
+
+        let message = UnifiedChatMessage(
+            content: "I'll send you a gentle reminder \(timeDescription) to help you stay on track. You can adjust or turn off notifications anytime in Settings.",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        messages.append(message)
+    }
+
+    /// Build specialized system prompt for reading habit/challenge plans
+    private func buildReadingPlanSystemPrompt(for flowType: ReadingPlanQuestionFlow.FlowType) -> String {
+        let libraryContext = buildLibraryContext()
+
+        switch flowType {
+        case .habit:
+            return """
+            You are a reading coach in the Epilogue app. Create a personalized, actionable reading habit plan.
+
+            \(libraryContext.isEmpty ? "" : "USER'S LIBRARY:\n\(libraryContext)\n")
+
+            FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+
+            **Your 7-Day Reading Kickstart**
+
+            **The Goal**: [One clear, specific goal based on their answers]
+
+            **Your Daily Ritual**:
+            - **When**: [Specific time based on their preference]
+            - **Where**: [Suggest a cozy spot]
+            - **How long**: [Based on their commitment level]
+            - **The trigger**: [A habit stack suggestion - "After I [existing habit], I will read"]
+
+            **Week 1 Roadmap**:
+            - Day 1-2: Start with just 5 pages, no pressure
+            - Day 3-4: Increase to [their target]
+            - Day 5-7: Establish the full routine
+
+            **Your First Book**: [Suggest a specific book from their TBR or a new one that's easy to start]
+
+            **One Pro Tip**: [Specific advice addressing their blocker]
+
+            RULES:
+            - Be specific, not generic. Reference their actual time preference and blockers.
+            - Make it feel achievable, not overwhelming
+            - If they mentioned being busy, emphasize small wins
+            - If they struggle with focus, suggest audiobooks or short chapters
+            - No emojis
+            - End with an encouraging but not cheesy closing line
+            """
+
+        case .challenge:
+            return """
+            You are a reading challenge creator in the Epilogue app. Design an exciting, personalized reading challenge.
+
+            \(libraryContext.isEmpty ? "" : "USER'S LIBRARY:\n\(libraryContext)\n")
+
+            FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+
+            **Your [Timeframe] Reading Challenge**
+
+            **The Challenge**: [Clear challenge statement based on their goals]
+
+            **Your Target**: [Specific number of books or pages based on ambition level]
+
+            **The Rules**:
+            1. [Rule based on their challenge type - e.g., "Each book must be from a different genre"]
+            2. [Supporting rule]
+            3. [Flexibility rule - one "wildcard" or skip allowed]
+
+            **Milestone Checkpoints**:
+            - [First milestone]: [Reward/celebration suggestion]
+            - [Mid-point]: [Check-in activity]
+            - [Final stretch]: [Motivation boost]
+
+            **Starter Books**:
+            1. **[Book Title]** by [Author] - [Why it fits the challenge]
+            2. **[Book Title]** by [Author] - [Why it fits]
+            3. **[Book Title]** by [Author] - [Why it fits]
+
+            **Accountability Tip**: [One specific suggestion for staying on track]
+
+            RULES:
+            - Match intensity to their ambition level (Gentle = 3-5 books, Ambitious = 10+, All in = stretch goal)
+            - If they want to explore genres, suggest specific genres to try
+            - If they want to clear TBR, reference books from their want-to-read list
+            - Make milestones feel rewarding, not arbitrary
+            - No emojis
+            - End with a rallying cry that matches their energy level
+            """
+        }
+    }
+
     // MARK: - Clean Bottom Input Area
     @ViewBuilder
     private var bottomInputArea: some View {
@@ -2523,9 +3351,10 @@ struct AmbientModeView: View {
             // Find and update the message
             if let index = messages.firstIndex(where: { $0.id == editingId }) {
                 let updatedMessage = messages[index]
-                
-                // Update the message content
+
+                // Update the message content (preserve the original ID)
                 messages[index] = UnifiedChatMessage(
+                    id: editingId,  // Preserve the original message ID
                     content: messageText,
                     isUser: updatedMessage.isUser,
                     timestamp: updatedMessage.timestamp,
@@ -2601,6 +3430,13 @@ struct AmbientModeView: View {
         if !storeKit.canStartConversation() {
             SensoryFeedback.warning()
             showPaywall = true
+            return
+        }
+
+        // GENERIC MODE: Route ALL input to AI conversation (no note/quote classification)
+        let isGenericMode = EpilogueAmbientCoordinator.shared.ambientMode.isGeneric
+        if isGenericMode {
+            sendToGenericAIConversation(messageText)
             return
         }
 
@@ -2738,7 +3574,503 @@ struct AmbientModeView: View {
         
         // Don't auto-return to voice - let user control this
     }
-    
+
+    // MARK: - Generic Mode AI Conversation
+    /// Routes ALL input to AI in Generic mode - no note/quote classification
+    private func sendToGenericAIConversation(_ text: String) {
+        // 1. Add user message to display
+        let userMessage = UnifiedChatMessage(
+            content: text,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: nil,  // No book context in Generic mode
+            messageType: .text
+        )
+        messages.append(userMessage)
+
+        // 2. Show typing indicator (V0 pattern)
+        withAnimation(.easeOut(duration: 0.2)) {
+            isGenericModeThinking = true
+        }
+
+        #if DEBUG
+        print("🤖 Generic Mode: Routing to AI conversation: '\(text)'")
+        #endif
+
+        // 3. Check for specialized flow intents (recommendations, reading plans, insights)
+        let conversationFlows = AmbientConversationFlows.shared
+        if let flowIntent = conversationFlows.detectFlowIntent(from: text) {
+            #if DEBUG
+            print("🎯 Detected flow intent: \(flowIntent)")
+            #endif
+            Task {
+                await handleSpecializedFlow(flowIntent, userText: text)
+            }
+            return
+        }
+
+        // 4. Standard AI conversation for general questions
+        Task {
+            await getGenericAIResponse(for: text)
+        }
+    }
+
+    /// Handles specialized conversation flows (recommendations, reading plans, insights)
+    private func handleSpecializedFlow(_ flow: AmbientConversationFlows.ConversationFlow, userText: String) async {
+        let conversationFlows = AmbientConversationFlows.shared
+        let books = libraryViewModel.books
+
+        switch flow {
+        case .recommendation, .moodBasedRecommendation:
+            // Start recommendation flow
+            for await update in await conversationFlows.startRecommendationFlow(books: books) {
+                await handleFlowUpdate(update)
+            }
+
+        case .readingPlan:
+            // Generic plan request - show habit flow
+            await MainActor.run {
+                isGenericModeThinking = false
+                isKeyboardFocused = false
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    showReadingPlanFlow = .habit
+                }
+            }
+
+        case .readingHabit:
+            // Show the reading habit question flow
+            await MainActor.run {
+                isGenericModeThinking = false
+                isKeyboardFocused = false
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    showReadingPlanFlow = .habit
+                }
+            }
+
+        case .readingChallenge:
+            // Show the reading challenge question flow
+            await MainActor.run {
+                isGenericModeThinking = false
+                isKeyboardFocused = false
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    showReadingPlanFlow = .challenge
+                }
+            }
+
+        case .libraryInsights:
+            // Generate library insights
+            let insights = await conversationFlows.generateLibraryInsights(books: books)
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                // Add insights as AI message
+                let aiMessage = UnifiedChatMessage(
+                    content: insights,
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                )
+                messages.append(aiMessage)
+                withAnimation(DesignSystem.Animation.easeStandard) {
+                    expandedMessageIds.insert(aiMessage.id)
+                }
+            }
+        }
+    }
+
+    /// Handles flow updates from AmbientConversationFlows
+    private func handleFlowUpdate(_ update: FlowUpdate) async {
+        await MainActor.run {
+            switch update {
+            case .status(let statusText):
+                // Update a status message or show progress
+                #if DEBUG
+                print("📊 Flow status: \(statusText)")
+                #endif
+
+            case .clarificationNeeded(let question):
+                // Hide thinking, show clarification
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                let aiMessage = UnifiedChatMessage(
+                    content: question.question,
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                )
+                messages.append(aiMessage)
+                withAnimation(DesignSystem.Animation.easeStandard) {
+                    expandedMessageIds.insert(aiMessage.id)
+                }
+
+            case .recommendations(let recs):
+                // Hide thinking, show recommendations
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                // Convert RecommendationEngine.Recommendation to UnifiedChatMessage.BookRecommendation
+                let bookRecs = recs.map { rec in
+                    UnifiedChatMessage.BookRecommendation(
+                        title: rec.title,
+                        author: rec.author,
+                        reason: rec.reasoning,
+                        coverURL: rec.coverURL,
+                        isbn: nil,  // RecommendationEngine doesn't provide ISBN
+                        purchaseURL: nil
+                    )
+                }
+                // Add as a recommendations message
+                let aiMessage = UnifiedChatMessage(
+                    content: formatRecommendationsText(recs),
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .bookRecommendations(bookRecs)
+                )
+                messages.append(aiMessage)
+                withAnimation(DesignSystem.Animation.easeStandard) {
+                    expandedMessageIds.insert(aiMessage.id)
+                }
+
+            case .readingPlan(let journey):
+                // Hide thinking, show reading plan
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                let journeyDescription = journey.userIntent ?? "your reading journey"
+                let bookCount = journey.books?.count ?? 0
+                let aiMessage = UnifiedChatMessage(
+                    content: "I've created a reading plan for you! 📚\n\n**\(journeyDescription)**\n\n\(bookCount) books queued up for your journey. You can view and manage it in your Reading Journey section.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                )
+                messages.append(aiMessage)
+                withAnimation(DesignSystem.Animation.easeStandard) {
+                    expandedMessageIds.insert(aiMessage.id)
+                }
+
+            case .insights(let insightsText):
+                // Hide thinking, show insights
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                let aiMessage = UnifiedChatMessage(
+                    content: insightsText,
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                )
+                messages.append(aiMessage)
+                withAnimation(DesignSystem.Animation.easeStandard) {
+                    expandedMessageIds.insert(aiMessage.id)
+                }
+
+            case .error(let errorMessage):
+                // Hide thinking, show error
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                let aiMessage = UnifiedChatMessage(
+                    content: "Sorry, I ran into an issue: \(errorMessage)",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                )
+                messages.append(aiMessage)
+            }
+        }
+    }
+
+    /// Formats recommendations into readable text
+    private func formatRecommendationsText(_ recs: [RecommendationEngine.Recommendation]) -> String {
+        if recs.isEmpty {
+            return "I couldn't find specific recommendations right now. Try telling me more about what you're in the mood for!"
+        }
+
+        var text = "Based on your library, here are some books I think you'd love:\n\n"
+        for (index, rec) in recs.prefix(5).enumerated() {
+            text += "**\(index + 1). \(rec.title)** by \(rec.author)\n"
+            text += "\(rec.reasoning)\n\n"
+        }
+        return text
+    }
+
+    /// Processes AI response for Generic mode conversations
+    private func getGenericAIResponse(for text: String) async {
+        // Create AI response message placeholder
+        let aiMessage = UnifiedChatMessage(
+            content: "",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        let messageId = aiMessage.id
+
+        do {
+            // Use the existing Perplexity service for streaming
+            let service = OptimizedPerplexityService.shared
+
+            var fullResponse = ""
+            var isFirstChunk = true
+
+            // Build the specialized Generic Mode system prompt
+            let genericModePrompt = buildGenericModeSystemPrompt()
+
+            // Use streamSonarResponse with custom system prompt for Generic mode
+            for try await response in service.streamSonarResponse(
+                text,
+                bookContext: nil,  // No book context in Generic mode
+                enrichment: nil,
+                sessionHistory: nil,
+                userNotes: nil,
+                userQuotes: nil,
+                userQuestions: nil,
+                currentPage: nil,
+                customSystemPrompt: genericModePrompt
+            ) {
+                fullResponse = response.text
+
+                await MainActor.run {
+                    // On first chunk, hide typing indicator and add the message
+                    if isFirstChunk {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isGenericModeThinking = false
+                        }
+                        messages.append(aiMessage)
+                        // Expand the new AI message
+                        withAnimation(DesignSystem.Animation.easeStandard) {
+                            expandedMessageIds.removeAll()
+                            expandedMessageIds.insert(messageId)
+                        }
+                        isFirstChunk = false
+                    }
+
+                    // Update the streaming message content (preserve the original ID)
+                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                        messages[index] = UnifiedChatMessage(
+                            id: messageId,  // Preserve the original message ID
+                            content: fullResponse,
+                            isUser: false,
+                            timestamp: aiMessage.timestamp,
+                            bookContext: nil,
+                            messageType: .text
+                        )
+                    }
+                }
+            }
+
+        } catch {
+            #if DEBUG
+            print("❌ Generic AI response error: \(error)")
+            #endif
+
+            await MainActor.run {
+                // Hide typing indicator on error
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+
+                // Add error message
+                messages.append(UnifiedChatMessage(
+                    content: "Sorry, I couldn't process that. Please try again.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                ))
+            }
+        }
+    }
+
+    /// Processes AI response with a custom system prompt (for specialized flows like reading plans, analysis)
+    private func getGenericAIResponseWithCustomPrompt(userQuery: String, systemPrompt: String) async {
+        // Create AI response message placeholder
+        let aiMessage = UnifiedChatMessage(
+            content: "",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        let messageId = aiMessage.id
+
+        do {
+            let service = OptimizedPerplexityService.shared
+
+            var fullResponse = ""
+            var isFirstChunk = true
+
+            // Use streamSonarResponse with the custom system prompt
+            for try await response in service.streamSonarResponse(
+                userQuery,
+                bookContext: nil,
+                enrichment: nil,
+                sessionHistory: nil,
+                userNotes: nil,
+                userQuotes: nil,
+                userQuestions: nil,
+                currentPage: nil,
+                customSystemPrompt: systemPrompt
+            ) {
+                fullResponse = response.text
+
+                await MainActor.run {
+                    if isFirstChunk {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isGenericModeThinking = false
+                        }
+                        messages.append(aiMessage)
+                        withAnimation(DesignSystem.Animation.easeStandard) {
+                            expandedMessageIds.removeAll()
+                            expandedMessageIds.insert(messageId)
+                        }
+                        isFirstChunk = false
+                    }
+
+                    // Update streaming message (preserve ID)
+                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                        messages[index] = UnifiedChatMessage(
+                            id: messageId,
+                            content: fullResponse,
+                            isUser: false,
+                            timestamp: aiMessage.timestamp,
+                            bookContext: nil,
+                            messageType: .text
+                        )
+                    }
+                }
+            }
+
+        } catch {
+            #if DEBUG
+            print("❌ Custom prompt AI response error: \(error)")
+            #endif
+
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+                messages.append(UnifiedChatMessage(
+                    content: "Sorry, I couldn't process that. Please try again.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                ))
+            }
+        }
+    }
+
+    /// Builds the system prompt for Generic mode AI conversations
+    private func buildGenericModeSystemPrompt() -> String {
+        // Fetch user's library for personalized recommendations
+        let libraryContext = buildLibraryContext()
+
+        var prompt = """
+        You are a book recommendation assistant in the Epilogue reading app.
+
+        CRITICAL RULE: When asked for book recommendations, you MUST provide EXACTLY 3-5 book suggestions. Never give just 1 book. This is mandatory.
+        """
+
+        // Add personalized library context if available
+        if !libraryContext.isEmpty {
+            prompt += "\n\n" + libraryContext
+        }
+
+        prompt += """
+
+        FORMAT (follow exactly):
+        1. **Book Title** by Author Name - Brief 1-2 sentence description explaining why this book fits.
+        2. **Book Title** by Author Name - Brief description.
+        3. **Book Title** by Author Name - Brief description.
+        [Continue to 4-5 if relevant]
+
+        Then ask ONE follow-up question to refine future recommendations.
+
+        RULES:
+        - MINIMUM 3 books per recommendation request
+        - Use markdown bold for titles: **Title**
+        - Keep descriptions concise (1-2 sentences each)
+        - End with a single follow-up question
+        - No emojis
+        - No phrases like "Great question!" or "Excellent choice!"
+        - Be direct and helpful
+        - NEVER recommend books the user has already read or owns
+        - Base suggestions on their reading history and preferences
+        """
+
+        return prompt
+    }
+
+    /// Builds context from user's library for personalized recommendations
+    private func buildLibraryContext() -> String {
+        // Fetch books from SwiftData
+        let fetchDescriptor = FetchDescriptor<BookModel>(
+            sortBy: [SortDescriptor(\.dateAdded, order: .reverse)]
+        )
+
+        guard let books = try? modelContext.fetch(fetchDescriptor), !books.isEmpty else {
+            return ""
+        }
+
+        // Categorize books by reading status
+        let readBooks = books.filter { $0.readingStatus == ReadingStatus.read.rawValue }
+        let currentlyReading = books.filter { $0.readingStatus == ReadingStatus.currentlyReading.rawValue }
+        let wantToRead = books.filter { $0.readingStatus == ReadingStatus.wantToRead.rawValue }
+
+        // Extract themes from read books (keyThemes is the AI-enriched themes array)
+        let allThemes: [String] = readBooks.flatMap { $0.keyThemes ?? [] }
+        let uniqueThemes = Array(Set(allThemes)).prefix(6)
+
+        // Extract favorite authors (from highly rated books - userRating is Double 0-5)
+        let ratedBooks = readBooks.filter { ($0.userRating ?? 0) >= 4.0 }
+        let favoriteAuthors = Array(Set(ratedBooks.map { $0.author })).prefix(5)
+
+        var context = "USER'S READING PROFILE:\n"
+
+        // Books they've read (sample of recent ones)
+        if !readBooks.isEmpty {
+            let recentRead = readBooks.prefix(8).map { "\($0.title) by \($0.author)" }
+            context += "Recently finished: \(recentRead.joined(separator: ", "))\n"
+        }
+
+        // Currently reading
+        if !currentlyReading.isEmpty {
+            let current = currentlyReading.prefix(3).map { "\($0.title) by \($0.author)" }
+            context += "Currently reading: \(current.joined(separator: ", "))\n"
+        }
+
+        // Want to read (don't recommend these - they already want them)
+        if !wantToRead.isEmpty {
+            let tbr = wantToRead.prefix(5).map { $0.title }
+            context += "Already on their TBR list (don't recommend): \(tbr.joined(separator: ", "))\n"
+        }
+
+        // Preferred themes
+        if !uniqueThemes.isEmpty {
+            context += "Themes they enjoy: \(uniqueThemes.joined(separator: ", "))\n"
+        }
+
+        // Favorite authors
+        if !favoriteAuthors.isEmpty {
+            context += "Favorite authors: \(favoriteAuthors.joined(separator: ", "))\n"
+        }
+
+        // Total library size for context
+        context += "Library size: \(books.count) books (\(readBooks.count) read, \(currentlyReading.count) in progress, \(wantToRead.count) on TBR)\n"
+
+        return context
+    }
+
     private func determineContentType(_ text: String) -> AmbientProcessedContent.ContentType {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowercased = trimmed.lowercased()
@@ -3181,9 +4513,316 @@ struct AmbientModeView: View {
         SensoryFeedback.success()
     }
 
+    // MARK: - Conversation Flow Handler
+    /// Routes specialized queries to their proper handlers (reading plans, library insights, etc.)
+    private func handleConversationFlow(_ flow: AmbientConversationFlows.ConversationFlow, originalText: String) async {
+        let conversationFlows = AmbientConversationFlows.shared
+
+        switch flow {
+        case .recommendation:
+            // Start recommendation flow
+            updateOrAppendMessage(question: originalText, response: "Analyzing your library for recommendations...")
+            let stream = await conversationFlows.startRecommendationFlow(books: libraryViewModel.books)
+            for await update in stream {
+                switch update {
+                case .status(let status):
+                    updateOrAppendMessage(question: originalText, response: status)
+                case .clarificationNeeded(let question):
+                    let options = question.options?.joined(separator: ", ") ?? ""
+                    updateOrAppendMessage(question: originalText, response: question.question + (options.isEmpty ? "" : "\n\nOptions: " + options))
+                case .recommendations(let recs):
+                    let recText = recs.map { "**\($0.title)** by \($0.author)\n\($0.reasoning)" }.joined(separator: "\n\n")
+                    updateOrAppendMessage(question: originalText, response: recText.isEmpty ? "No recommendations found based on your library." : recText)
+                case .error(let error):
+                    updateOrAppendMessage(question: originalText, response: error)
+                default:
+                    break
+                }
+            }
+
+        case .readingPlan:
+            // Start reading plan flow - returns a single FlowUpdate (clarification question)
+            updateOrAppendMessage(question: originalText, response: "Creating your personalized reading plan...")
+            let update = conversationFlows.startReadingPlanFlow(books: libraryViewModel.books)
+            switch update {
+            case .status(let status):
+                updateOrAppendMessage(question: originalText, response: status)
+            case .clarificationNeeded(let question):
+                let options = question.options?.joined(separator: ", ") ?? ""
+                updateOrAppendMessage(question: originalText, response: question.question + (options.isEmpty ? "" : "\n\nOptions: " + options))
+            case .readingPlan(let plan):
+                let planText = "**Your Reading Plan**\n\n" + (plan.books?.map { "• \($0.bookModel?.title ?? "Unknown")" }.joined(separator: "\n") ?? "No books in plan")
+                updateOrAppendMessage(question: originalText, response: planText)
+            case .error(let error):
+                updateOrAppendMessage(question: originalText, response: error)
+            default:
+                break
+            }
+
+        case .libraryInsights:
+            // Generate library insights
+            updateOrAppendMessage(question: originalText, response: "Analyzing your reading patterns...")
+            let insights = await conversationFlows.generateLibraryInsights(books: libraryViewModel.books)
+            updateOrAppendMessage(question: originalText, response: insights)
+
+        case .moodBasedRecommendation(let mood):
+            // Handle mood-based recommendation
+            updateOrAppendMessage(question: originalText, response: "Finding books for your \(mood) mood...")
+            let stream = await conversationFlows.startRecommendationFlow(books: libraryViewModel.books)
+            for await update in stream {
+                switch update {
+                case .status(let status):
+                    updateOrAppendMessage(question: originalText, response: status)
+                case .recommendations(let recs):
+                    let recText = recs.map { "**\($0.title)** by \($0.author)\n\($0.reasoning)" }.joined(separator: "\n\n")
+                    updateOrAppendMessage(question: originalText, response: recText.isEmpty ? "No recommendations found." : recText)
+                default:
+                    break
+                }
+            }
+
+        case .readingHabit:
+            // Show the reading habit question flow
+            await MainActor.run {
+                isGenericModeThinking = false
+                isKeyboardFocused = false
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    showReadingPlanFlow = .habit
+                }
+            }
+
+        case .readingChallenge:
+            // Show the reading challenge question flow
+            await MainActor.run {
+                isGenericModeThinking = false
+                isKeyboardFocused = false
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    showReadingPlanFlow = .challenge
+                }
+            }
+        }
+    }
+
+    /// Helper to update existing thinking message or append new one
+    private func updateOrAppendMessage(question: String, response: String) {
+        if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && ($0.content.contains("**\(question)**") || $0.content == "Analyzing your library...") }) {
+            let updatedMessage = UnifiedChatMessage(
+                content: "**\(question)**\n\n\(response)",
+                isUser: false,
+                timestamp: messages[thinkingIndex].timestamp,
+                bookContext: currentBookContext
+            )
+            messages[thinkingIndex] = updatedMessage
+            expandedMessageIds.insert(updatedMessage.id)
+        } else {
+            let newMessage = UnifiedChatMessage(
+                content: "**\(question)**\n\n\(response)",
+                isUser: false,
+                timestamp: Date(),
+                bookContext: currentBookContext
+            )
+            messages.append(newMessage)
+            expandedMessageIds.insert(newMessage.id)
+        }
+    }
+
+    // MARK: - Conversational Mode Helpers
+
+    /// Add a book recommendation to the user's library
+    private func addRecommendationToLibrary(_ rec: UnifiedChatMessage.BookRecommendation) {
+        Task { @MainActor in
+            // Create BookModel directly with proper initialization
+            let bookModel = BookModel(
+                id: UUID().uuidString,
+                title: rec.title,
+                author: rec.author,
+                publishedYear: nil,
+                coverImageURL: rec.coverURL,
+                isbn: rec.isbn,
+                description: rec.reason,
+                pageCount: nil,
+                localId: UUID().uuidString
+            )
+            bookModel.isInLibrary = true
+            bookModel.readingStatus = "want_to_read"
+            bookModel.dateAdded = Date()
+
+            modelContext.insert(bookModel)
+
+            do {
+                try modelContext.save()
+
+                // Show success feedback
+                SensoryFeedback.success()
+
+                #if DEBUG
+                print("📚 Added recommendation to library: \(rec.title) by \(rec.author)")
+                #endif
+            } catch {
+                #if DEBUG
+                print("❌ Failed to save recommendation: \(error)")
+                #endif
+                SensoryFeedback.error()
+            }
+        }
+    }
+
+    /// Open purchase URL in Safari
+    private func openPurchaseURL(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        UIApplication.shared.open(url)
+
+        #if DEBUG
+        print("🛒 Opening purchase URL: \(urlString)")
+        #endif
+    }
+
+    /// Send a message (for follow-up questions)
+    private func sendMessage(_ text: String) async {
+        // Add user message
+        let userMessage = UnifiedChatMessage(
+            content: text,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        messages.append(userMessage)
+
+        // Add thinking indicator
+        let thinkingMessage = UnifiedChatMessage(
+            content: "**\(text)**",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: currentBookContext
+        )
+        messages.append(thinkingMessage)
+        expandedMessageIds.insert(thinkingMessage.id)
+
+        // Get AI response
+        await getAIResponse(for: text)
+    }
+
+    /// Parse conversational response to extract book recommendations and generate follow-ups
+    private func parseConversationalResponse(_ response: String, originalQuestion: String) -> ConversationalResponseParsed {
+        var recommendations: [UnifiedChatMessage.BookRecommendation] = []
+        var cleanedText = response
+        var followUps: [String] = []
+
+        // Pattern to detect book recommendations: **Title** by Author
+        let bookPattern = #"\*\*([^*]+)\*\*\s+by\s+([^(\n]+)"#
+        if let regex = try? NSRegularExpression(pattern: bookPattern, options: []) {
+            let matches = regex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
+
+            for match in matches {
+                if let titleRange = Range(match.range(at: 1), in: response),
+                   let authorRange = Range(match.range(at: 2), in: response) {
+                    let title = String(response[titleRange]).trimmingCharacters(in: .whitespaces)
+                    let author = String(response[authorRange]).trimmingCharacters(in: .whitespaces)
+
+                    // Extract reason (text following the book on the same line or next line)
+                    let fullMatchRange = Range(match.range, in: response)!
+                    let afterMatch = response[fullMatchRange.upperBound...]
+                    let reason = extractReason(from: String(afterMatch))
+
+                    let rec = UnifiedChatMessage.BookRecommendation(
+                        title: title,
+                        author: author,
+                        reason: reason,
+                        coverURL: nil, // Could be fetched from Google Books API
+                        isbn: nil,
+                        purchaseURL: nil
+                    )
+                    recommendations.append(rec)
+                }
+            }
+        }
+
+        // If we found recommendations, extract intro text
+        let hasRecommendations = recommendations.count >= 2
+        if hasRecommendations {
+            // Get text before the first book mention
+            if let firstBookIndex = response.range(of: "**")?.lowerBound {
+                let introText = String(response[..<firstBookIndex])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                cleanedText = introText.isEmpty ? "Here are some books you might enjoy:" : introText
+            }
+        }
+
+        // Generate follow-up questions based on context
+        followUps = generateFollowUpQuestions(originalQuestion: originalQuestion, response: response)
+
+        return ConversationalResponseParsed(
+            cleanedText: cleanedText,
+            recommendations: recommendations,
+            followUps: followUps,
+            hasRecommendations: hasRecommendations
+        )
+    }
+
+    /// Extract reason text after a book recommendation
+    private func extractReason(from text: String) -> String {
+        // Get the first line or sentence after the book
+        let lines = text.components(separatedBy: CharacterSet.newlines)
+        if let firstLine = lines.first {
+            let trimmed = firstLine
+                .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "()-–"))
+                .trimmingCharacters(in: .whitespaces)
+
+            // Limit to a reasonable length
+            if trimmed.count > 100 {
+                return String(trimmed.prefix(100)) + "..."
+            }
+            return trimmed.isEmpty ? "Recommended for you" : trimmed
+        }
+        return "Recommended for you"
+    }
+
+    /// Generate contextual follow-up questions
+    private func generateFollowUpQuestions(originalQuestion: String, response: String) -> [String] {
+        var followUps: [String] = []
+        let questionLower = originalQuestion.lowercased()
+        let responseLower = response.lowercased()
+
+        // Book recommendation context
+        if responseLower.contains("recommend") || responseLower.contains("might enjoy") || responseLower.contains("you'd like") {
+            followUps.append("Tell me more about one of these")
+            followUps.append("Something more literary")
+            followUps.append("Anything newer?")
+        }
+        // Reading habits context
+        else if questionLower.contains("read") && questionLower.contains("next") {
+            followUps.append("What genre am I in the mood for?")
+            followUps.append("Based on my favorites")
+            followUps.append("Something short")
+        }
+        // General conversation
+        else {
+            followUps.append("Tell me more")
+            followUps.append("Any book recommendations?")
+            followUps.append("What else should I know?")
+        }
+
+        // Check if AI asked a question - if so, don't add generic follow-ups
+        if response.contains("?") {
+            // AI asked a question, let user respond naturally
+            return []
+        }
+
+        return Array(followUps.prefix(3))
+    }
+
     private func getAIResponse(for text: String) async {
         let aiService = AICompanionService.shared
         let offlineQueue = OfflineQueueManager.shared
+        let conversationFlows = AmbientConversationFlows.shared
+
+        // MARK: - Check for conversation flow intents FIRST
+        // This routes specialized queries (reading plans, library insights) to their proper handlers
+        if let flowIntent = conversationFlows.detectFlowIntent(from: text) {
+            await handleConversationFlow(flowIntent, originalText: text)
+            return
+        }
 
         guard aiService.isConfigured() else {
             await MainActor.run {
@@ -3256,39 +4895,91 @@ struct AmbientModeView: View {
         }
 
         do {
+            // For generic mode (no book context), use conversational prompting
+            let enhancedPrompt: String
+            if currentBookContext == nil {
+                enhancedPrompt = """
+                You are a friendly reading companion having a conversation. Be warm, curious, and engaging.
+
+                IMPORTANT FORMATTING RULES:
+                1. Keep responses concise and conversational (2-3 short paragraphs max)
+                2. When recommending books, list them clearly with:
+                   - **Title** by Author
+                   - A brief one-line reason why they'd enjoy it
+                3. End with a follow-up question to continue the conversation
+                4. Use natural paragraph breaks for readability
+
+                User's message: \(text)
+                """
+            } else {
+                enhancedPrompt = text
+            }
+
             let response = try await aiService.processMessage(
-                text,
+                enhancedPrompt,
                 bookContext: currentBookContext,
                 conversationHistory: messages
             )
-            
+
             await MainActor.run {
-                // Update thinking message if it exists, otherwise append new message
-                if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
-                    let updatedMessage = UnifiedChatMessage(
-                        content: "**\(text)**\n\n\(response)",
-                        isUser: false,
-                        timestamp: messages[thinkingIndex].timestamp,
-                        bookContext: currentBookContext
-                    )
-                    messages[thinkingIndex] = updatedMessage
-                    
-                    // AUTO-EXPAND the first question's answer!
-                    let nonUserMessages = messages.filter { !$0.isUser }
-                    if nonUserMessages.count == 1 {
-                        // This is the first question/answer - auto-expand it
-                        withAnimation(DesignSystem.Animation.easeStandard) {
-                            expandedMessageIds.insert(updatedMessage.id)
-                        }
+                // For generic mode, create conversational response with follow-ups
+                if currentBookContext == nil {
+                    // Parse response for potential book recommendations
+                    let parsedResponse = parseConversationalResponse(response, originalQuestion: text)
+
+                    // Update thinking message with conversational response
+                    if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
+                        let updatedMessage = UnifiedChatMessage(
+                            content: parsedResponse.cleanedText,
+                            isUser: false,
+                            timestamp: messages[thinkingIndex].timestamp,
+                            bookContext: nil,
+                            messageType: parsedResponse.hasRecommendations
+                                ? .bookRecommendations(parsedResponse.recommendations)
+                                : .conversationalResponse(text: parsedResponse.cleanedText, followUpQuestions: parsedResponse.followUps)
+                        )
+                        messages[thinkingIndex] = updatedMessage
+                        expandedMessageIds.insert(updatedMessage.id)
+                    } else {
+                        let aiMessage = UnifiedChatMessage(
+                            content: parsedResponse.cleanedText,
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: nil,
+                            messageType: parsedResponse.hasRecommendations
+                                ? .bookRecommendations(parsedResponse.recommendations)
+                                : .conversationalResponse(text: parsedResponse.cleanedText, followUpQuestions: parsedResponse.followUps)
+                        )
+                        messages.append(aiMessage)
+                        expandedMessageIds.insert(aiMessage.id)
                     }
                 } else {
-                    let aiMessage = UnifiedChatMessage(
-                        content: response,
-                        isUser: false,
-                        timestamp: Date(),
-                        bookContext: currentBookContext
-                    )
-                    messages.append(aiMessage)
+                    // Book mode - use existing behavior
+                    if let thinkingIndex = messages.lastIndex(where: { !$0.isUser && $0.content.contains("**") && !$0.content.contains("\n\n") }) {
+                        let updatedMessage = UnifiedChatMessage(
+                            content: "**\(text)**\n\n\(response)",
+                            isUser: false,
+                            timestamp: messages[thinkingIndex].timestamp,
+                            bookContext: currentBookContext
+                        )
+                        messages[thinkingIndex] = updatedMessage
+
+                        // AUTO-EXPAND the first question's answer!
+                        let nonUserMessages = messages.filter { !$0.isUser }
+                        if nonUserMessages.count == 1 {
+                            withAnimation(DesignSystem.Animation.easeStandard) {
+                                expandedMessageIds.insert(updatedMessage.id)
+                            }
+                        }
+                    } else {
+                        let aiMessage = UnifiedChatMessage(
+                            content: response,
+                            isUser: false,
+                            timestamp: Date(),
+                            bookContext: currentBookContext
+                        )
+                        messages.append(aiMessage)
+                    }
                 }
                 pendingQuestion = nil
                 
@@ -3587,7 +5278,17 @@ struct AmbientModeView: View {
     
     private func handleBookDetection(_ book: Book?) {
         guard let book = book else { return }
-        
+
+        // CRITICAL: Don't auto-switch to book mode when in Generic mode
+        // Generic mode should stay focused on general conversations, recommendations, etc.
+        let isGenericMode = EpilogueAmbientCoordinator.shared.ambientMode.isGeneric
+        if isGenericMode {
+            #if DEBUG
+            print("📚 Ignoring book detection in Generic mode - staying generic")
+            #endif
+            return
+        }
+
         // CRITICAL: Prevent duplicate detections for the same book
         if lastDetectedBookId == book.localId {
             #if DEBUG
@@ -3845,6 +5546,10 @@ struct AmbientModeView: View {
                 #if DEBUG
                 print("✅ Session saved with \((session.capturedQuotes ?? []).count) quotes, \((session.capturedNotes ?? []).count) notes, \((session.capturedQuestions ?? []).count) questions")
                 #endif
+
+                // Update reading habit plan if one is active
+                updateReadingPlanFromSession(session)
+
             } catch {
                 #if DEBUG
                 print("❌ Failed to save session: \(error)")
@@ -4673,4 +6378,365 @@ struct AmbientMessageThreadView: View {
     }
 }
 
+// MARK: - Generic Mode Typing Indicator
+/// Polished amber-tinted typing indicator with fluid wave animation
+struct GenericModeTypingIndicator: View {
+    @State private var dotOffsets: [CGFloat] = [0, 0, 0]
+    @State private var timer: Timer?
+
+    // Amber accent color matching app theme
+    private let amberColor = Color(red: 1.0, green: 0.6, blue: 0.2)
+
+    var body: some View {
+        HStack {
+            HStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(amberColor)
+                        .frame(width: 8, height: 8)
+                        .offset(y: dotOffsets[i])
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .glassEffect(.regular.tint(amberColor.opacity(0.15)))
+
+            Spacer()
+        }
+        .onAppear {
+            startBounceAnimation()
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    private func startBounceAnimation() {
+        // Staggered bounce for each dot
+        for i in 0..<3 {
+            let delay = Double(i) * 0.15
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                animateDot(at: i)
+            }
+        }
+
+        // Repeat the whole sequence
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            for i in 0..<3 {
+                let delay = Double(i) * 0.15
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    animateDot(at: i)
+                }
+            }
+        }
+    }
+
+    private func animateDot(at index: Int) {
+        withAnimation(.easeOut(duration: 0.25)) {
+            dotOffsets[index] = -6
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.easeIn(duration: 0.25)) {
+                dotOffsets[index] = 0
+            }
+        }
+    }
+}
+
+// MARK: - Generic Mode Chat Bubble
+/// Amber-tinted chat bubble for Generic mode with proper markdown rendering
+struct GenericModeChatBubble: View {
+    let message: UnifiedChatMessage
+    let isExpanded: Bool
+    let onToggle: () -> Void
+
+    @State private var messageOpacity: Double = 0
+    @State private var messageScale: CGFloat = 0.95
+
+    // Amber accent matching app theme
+    private let amberColor = Color(red: 1.0, green: 0.6, blue: 0.2)
+
+    var body: some View {
+        HStack {
+            if message.isUser {
+                Spacer(minLength: 50)
+            }
+
+            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
+                if message.isUser {
+                    // User message - right aligned with amber-tinted glass
+                    Text(message.content)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(amberColor.opacity(0.2))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(amberColor.opacity(0.4), lineWidth: 1)
+                        )
+                } else {
+                    // AI response - left aligned with amber glass tint
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Rendered markdown content
+                        GenericModeMarkdownText(
+                            text: message.content,
+                            isExpanded: isExpanded
+                        )
+
+                        // Expand indicator for long content
+                        if !isExpanded && message.content.count > 300 {
+                            HStack(spacing: 4) {
+                                Text("Tap to expand")
+                                    .font(.system(size: 12, weight: .medium))
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(amberColor.opacity(0.7))
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16) // More vertical padding
+                    .background(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(Color.black.opacity(0.35))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(amberColor.opacity(0.25), lineWidth: 1)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onToggle()
+                    }
+                }
+            }
+
+            if !message.isUser {
+                Spacer(minLength: 12)
+            }
+        }
+        .padding(.vertical, 10) // More spacing between bubbles
+        .opacity(messageOpacity)
+        .scaleEffect(messageScale)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.3)) {
+                messageOpacity = 1
+                messageScale = 1
+            }
+        }
+    }
+}
+
+// MARK: - Generic Mode Markdown Text Renderer
+/// Renders markdown with proper formatting - strips all markdown symbols
+struct GenericModeMarkdownText: View {
+    let text: String
+    let isExpanded: Bool
+
+    // Amber accent
+    private let amberColor = Color(red: 1.0, green: 0.6, blue: 0.2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(parsedBlocks.enumerated()), id: \.offset) { _, block in
+                renderBlock(block)
+            }
+        }
+        .lineLimit(isExpanded ? nil : 8)
+    }
+
+    private var parsedBlocks: [MarkdownBlock] {
+        parseMarkdown(text)
+    }
+
+    private enum MarkdownBlock {
+        case paragraph(String)
+        case numberedItem(Int, String, String?) // num, title, description
+        case bulletItem(String)
+    }
+
+    private func parseMarkdown(_ text: String) -> [MarkdownBlock] {
+        var blocks: [MarkdownBlock] = []
+        let lines = text.components(separatedBy: "\n")
+        var currentParagraph = ""
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // Skip empty lines
+            guard !trimmed.isEmpty else {
+                if !currentParagraph.isEmpty {
+                    blocks.append(.paragraph(cleanAllMarkdown(currentParagraph)))
+                    currentParagraph = ""
+                }
+                continue
+            }
+
+            // Check for numbered list patterns like "**1." or "1." or "**1. *Title*"
+            if let numRange = trimmed.range(of: #"^\*{0,2}\d+\.?\*{0,2}\s+"#, options: .regularExpression) {
+                // Flush paragraph
+                if !currentParagraph.isEmpty {
+                    blocks.append(.paragraph(cleanAllMarkdown(currentParagraph)))
+                    currentParagraph = ""
+                }
+
+                // Extract number
+                let prefix = String(trimmed[numRange])
+                if let digitMatch = prefix.range(of: #"\d+"#, options: .regularExpression) {
+                    let num = Int(prefix[digitMatch]) ?? 1
+                    let content = String(trimmed[numRange.upperBound...])
+
+                    // Try to split into title and description
+                    // Pattern: *Title* by Author - Description OR Title by Author\nDescription
+                    let cleaned = cleanAllMarkdown(content)
+
+                    // Check if there's a " by " pattern to split title from description
+                    if let byRange = cleaned.range(of: " by ", options: .caseInsensitive) {
+                        let title = String(cleaned[..<byRange.lowerBound])
+                        let rest = String(cleaned[byRange.lowerBound...])
+                        blocks.append(.numberedItem(num, title, rest))
+                    } else {
+                        blocks.append(.numberedItem(num, cleaned, nil))
+                    }
+                }
+            }
+            // Check for bullet list
+            else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("• ") {
+                if !currentParagraph.isEmpty {
+                    blocks.append(.paragraph(cleanAllMarkdown(currentParagraph)))
+                    currentParagraph = ""
+                }
+                let content = String(trimmed.dropFirst(2))
+                blocks.append(.bulletItem(cleanAllMarkdown(content)))
+            }
+            // Regular text - accumulate into paragraph
+            else {
+                if !currentParagraph.isEmpty {
+                    currentParagraph += " "
+                }
+                currentParagraph += trimmed
+            }
+        }
+
+        // Flush remaining
+        if !currentParagraph.isEmpty {
+            blocks.append(.paragraph(cleanAllMarkdown(currentParagraph)))
+        }
+
+        return blocks
+    }
+
+    /// Strip ALL markdown formatting characters
+    private func cleanAllMarkdown(_ text: String) -> String {
+        var result = text
+        // Remove bold markers
+        result = result.replacingOccurrences(of: "**", with: "")
+        // Remove italic markers (but be careful not to break contractions)
+        result = result.replacingOccurrences(of: "*", with: "")
+        // Remove code markers
+        result = result.replacingOccurrences(of: "`", with: "")
+        // Remove heading markers
+        result = result.replacingOccurrences(of: "### ", with: "")
+        result = result.replacingOccurrences(of: "## ", with: "")
+        result = result.replacingOccurrences(of: "# ", with: "")
+        // Remove footnote references like [1], [2], etc.
+        let footnotePattern = "\\[\\d+\\]"
+        if let regex = try? NSRegularExpression(pattern: footnotePattern) {
+            result = regex.stringByReplacingMatches(
+                in: result,
+                range: NSRange(result.startIndex..., in: result),
+                withTemplate: ""
+            )
+        }
+        // Clean up extra spaces
+        while result.contains("  ") {
+            result = result.replacingOccurrences(of: "  ", with: " ")
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    @ViewBuilder
+    private func renderBlock(_ block: MarkdownBlock) -> some View {
+        switch block {
+        case .paragraph(let text):
+            Text(text)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(.white.opacity(0.92))
+                .fixedSize(horizontal: false, vertical: true)
+
+        case .numberedItem(let num, let title, let description):
+            VStack(alignment: .leading, spacing: 8) {
+                // Title line with number integrated
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text("\(num). ")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(amberColor.opacity(0.6))
+
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Spacer(minLength: 16)
+
+                    // Minimal action icons - tighter, lighter
+                    HStack(spacing: 16) {
+                        Button {
+                            SensoryFeedback.light()
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("AddBookToLibrary"),
+                                object: title
+                            )
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.35))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            SensoryFeedback.light()
+                            let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                            if let url = URL(string: "https://www.amazon.com/s?k=\(query)&i=stripbooks") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Image(systemName: "cart")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.35))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Description with author - softer, more space
+                if let desc = description {
+                    Text(desc)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineSpacing(3)
+                        .padding(.leading, "\(num). ".count > 2 ? 20 : 16) // Align with title
+                }
+            }
+            .padding(.vertical, 4) // Breathing room between items
+
+        case .bulletItem(let text):
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Circle()
+                    .fill(amberColor)
+                    .frame(width: 6, height: 6)
+                    .padding(.leading, 8)
+
+                Text(text)
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.92))
+            }
+        }
+    }
+}
 
