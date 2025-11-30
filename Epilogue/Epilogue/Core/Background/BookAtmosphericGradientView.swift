@@ -44,23 +44,37 @@ struct BookAtmosphericGradientView: View {
                     // Voice-responsive gradient
                     let voiceBoost = 1.0 + Double(audioLevel) * 0.5 // 0-50% boost based on voice
                     let voiceScale = 1.0 + Double(audioLevel) * 0.1 // Subtle scale effect
-                    
+
+                    // Main gradient - balanced depth and vibrancy
                     LinearGradient(
                         stops: [
                             .init(color: palette.primary.opacity(intensity * voiceBoost), location: 0.0),
-                            .init(color: palette.secondary.opacity(intensity * 0.8 * voiceBoost), location: 0.2),
-                            .init(color: palette.accent.opacity(intensity * 0.5 * voiceBoost), location: 0.35),
+                            .init(color: palette.secondary.opacity(intensity * 0.85 * voiceBoost), location: 0.18),
+                            .init(color: palette.accent.opacity(intensity * 0.55 * voiceBoost), location: 0.35),
                             .init(color: palette.background.opacity(intensity * 0.3 * voiceBoost), location: 0.5),
-                            .init(color: Color.clear, location: 0.6)
+                            .init(color: Color.clear, location: 0.65)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .blur(radius: 40 - Double(audioLevel) * 10) // Less blur when speaking (30-40 range)
-                    .scaleEffect(voiceScale) // Subtle breathing effect
+                    .blur(radius: 38 - Double(audioLevel) * 10)
+                    .scaleEffect(voiceScale)
                     .ignoresSafeArea()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    .animation(.easeInOut(duration: 0.1), value: audioLevel) // Fast response to voice
+                    .animation(.easeInOut(duration: 0.1), value: audioLevel)
+
+                    // Subtle accent layer - adds depth without being overpowering
+                    RadialGradient(
+                        colors: [
+                            palette.accent.opacity(intensity * 0.15),
+                            Color.clear
+                        ],
+                        center: UnitPoint(x: 0.3, y: 0.3),
+                        startRadius: 80,
+                        endRadius: 300
+                    )
+                    .blur(radius: 50)
+                    .ignoresSafeArea()
                     
                     // Voice-responsive pulse overlay
                     if audioLevel > 0.3 {
@@ -256,9 +270,9 @@ struct BookAtmosphericGradientView: View {
 
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
 
-        // EXACT same enhancement as ambient chat
-        saturation = min(saturation * 1.2, 1.0)  // Boost vibrancy
-        brightness = max(brightness, 0.4)         // Minimum brightness
+        // 1.3x saturation - balanced between 1.2 (too washed) and 1.4 (too intense)
+        saturation = min(saturation * 1.3, 1.0)  // Boost vibrancy
+        brightness = max(brightness, 0.45)        // Minimum brightness
 
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }

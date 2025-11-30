@@ -102,14 +102,12 @@ struct SessionsArchiveView: View {
                 colorPalette: colorPalettes[session.id ?? UUID()]
             )
         }
-        .fullScreenCover(item: $continuingSession) { session in
-            UnifiedChatView(
-                preSelectedBook: convertBookModelToBook(session.bookModel),
-                startInVoiceMode: false,
-                isAmbientMode: false
-            )
-            .environmentObject(libraryViewModel)
-            .environmentObject(notesViewModel)
+        .onChange(of: continuingSession) { _, session in
+            // Launch ambient mode via coordinator when continuing a session
+            if let session = session, let book = convertBookModelToBook(session.bookModel) {
+                EpilogueAmbientCoordinator.shared.launchBookMode(book: book)
+                continuingSession = nil // Reset after launching
+            }
         }
         .onAppear {
             loadColorPalettes()

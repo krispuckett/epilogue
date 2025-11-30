@@ -7,6 +7,9 @@ import SwiftData
 class BookEnrichmentService {
     static let shared = BookEnrichmentService()
 
+    /// Track books currently being enriched to prevent duplicate API calls
+    private var enrichingBookIds: Set<String> = []
+
     private init() {}
 
     // MARK: - Enrichment Data
@@ -33,6 +36,19 @@ class BookEnrichmentService {
             #endif
             return
         }
+
+        // Skip if already in progress (prevents duplicate simultaneous API calls)
+        let bookId = book.localId
+        guard !enrichingBookIds.contains(bookId) else {
+            #if DEBUG
+            print("⏭️ [ENRICHMENT] Already in progress for: \(book.title)")
+            #endif
+            return
+        }
+
+        // Mark as in progress
+        enrichingBookIds.insert(bookId)
+        defer { enrichingBookIds.remove(bookId) }
 
         #if DEBUG
         print("🎨 [ENRICHMENT] Starting for '\(book.title)' by \(book.author)")

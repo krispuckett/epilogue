@@ -11,6 +11,10 @@ The app uses iOS 26 Liquid Glass - NO .background() before .glassEffect()
 4. ColorCube extraction is working - don't rewrite it
 5. Gradient system uses enhanceColor like ambient chat
 6. Commit message format: "Fix: [what was fixed]
+7. NEVER use "sparkles" SF Symbol - forbidden in this app
+8. NEVER use Image(systemName: "sparkles") or any sparkle-related icons
+9. NEVER say "You're absolutely right" 
+10. Be concise, direct, focused, and an iOS 26 expert.
 
 Critical Project Rules
 1. NEVER Modify These Files

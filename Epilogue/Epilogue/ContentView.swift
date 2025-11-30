@@ -40,8 +40,7 @@ struct ContentView: View {
             .environmentObject(deepLinkHandler)
             .setupAppearanceConfiguration()
             .setupSheetPresentations()
-            .setupAmbientMode(libraryViewModel: libraryViewModel, notesViewModel: notesViewModel)
-            .simplifiedAmbientPresentation()
+            .setupAmbientMode(libraryViewModel: libraryViewModel, notesViewModel: notesViewModel, appStateCoordinator: appStateCoordinator)
             .withCloudKitMigration()
             .onAppear {
                 performInitialSetup()
@@ -72,33 +71,33 @@ struct ContentView: View {
             } content: {
                 WhatsNewView()
             }
+            .glassToast(isShowing: $appStateCoordinator.showingGlassToast, message: appStateCoordinator.toastMessage)
             .id(themeManager.currentTheme) // Force complete view recreation on theme change
     }
 
     // MARK: - Main Content
     private var mainContent: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             // Use subtle themed gradient like original amber
             SubtleThemedBackground()
                 .ignoresSafeArea()
 
             NavigationContainer(selectedTab: $selectedTab)
-
-            // Action bar hidden when card is shown or when editing note
+        }
+        // Action bar - sits above tab bar
+        .overlay(alignment: .bottom) {
             if !showQuickActionCard && !notesViewModel.isEditingNote {
-                VStack {
-                    Spacer()
-                    SimpleActionBar(showCard: $showQuickActionCard)
-                        .environmentObject(libraryViewModel)
-                        .padding(.bottom, 54)
-                }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
-                ))
+                SimpleActionBar(showCard: $showQuickActionCard)
+                    .environmentObject(libraryViewModel)
+                    .padding(.bottom, 54)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
             }
-
-            // Input card overlay when plus is tapped
+        }
+        // Input card overlay when plus is tapped
+        .overlay(alignment: .bottom) {
             if showQuickActionCard {
                 UnifiedQuickActionCard(isPresented: $showQuickActionCard)
                     .environmentObject(libraryViewModel)

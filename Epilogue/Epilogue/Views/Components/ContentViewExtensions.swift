@@ -197,7 +197,7 @@ extension View {
             }
     }
 
-    func setupAmbientMode(libraryViewModel: LibraryViewModel, notesViewModel: NotesViewModel) -> some View {
+    func setupAmbientMode(libraryViewModel: LibraryViewModel, notesViewModel: NotesViewModel, appStateCoordinator: AppStateCoordinator) -> some View {
         self.fullScreenCover(isPresented: .init(
             get: { EpilogueAmbientCoordinator.shared.isActive },
             set: { _ in }
@@ -205,6 +205,7 @@ extension View {
             AmbientModeView()
                 .environmentObject(libraryViewModel)
                 .environmentObject(notesViewModel)
+                .environmentObject(appStateCoordinator)
                 .preferredColorScheme(.dark)
                 .statusBarHidden(true)
                 .interactiveDismissDisabled()

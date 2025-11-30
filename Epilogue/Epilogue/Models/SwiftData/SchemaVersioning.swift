@@ -89,6 +89,30 @@ enum EpilogueSchemaV5: VersionedSchema {
     }
 }
 
+enum EpilogueSchemaV6: VersionedSchema {
+    static var versionIdentifier = Schema.Version(6, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            BookModel.self,
+            CapturedNote.self,
+            CapturedQuote.self,
+            CapturedQuestion.self,
+            AmbientSession.self,
+            QueuedQuestion.self,
+            ReadingSession.self,
+            // Reading Journey models
+            ReadingJourney.self,
+            JourneyBook.self,
+            JourneyMilestone.self,
+            BookMilestone.self,
+            // Reading Habit Plan models
+            ReadingHabitPlan.self,
+            HabitDay.self
+        ]
+    }
+}
+
 // Migration plan between versions
 enum EpilogueMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
@@ -97,7 +121,8 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             EpilogueSchemaV2.self,
             EpilogueSchemaV3.self,
             EpilogueSchemaV4.self,
-            EpilogueSchemaV5.self
+            EpilogueSchemaV5.self,
+            EpilogueSchemaV6.self
         ]
     }
 
@@ -110,7 +135,9 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             // Migration from V3 to V4 (adding book enrichment fields) - LIGHTWEIGHT
             MigrationStage.lightweight(fromVersion: EpilogueSchemaV3.self, toVersion: EpilogueSchemaV4.self),
             // Migration from V4 to V5 (adding ReadingJourney models) - LIGHTWEIGHT
-            MigrationStage.lightweight(fromVersion: EpilogueSchemaV4.self, toVersion: EpilogueSchemaV5.self)
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV4.self, toVersion: EpilogueSchemaV5.self),
+            // Migration from V5 to V6 (adding ReadingHabitPlan models) - LIGHTWEIGHT
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV5.self, toVersion: EpilogueSchemaV6.self)
         ]
     }
 

@@ -23,7 +23,11 @@ struct UnifiedQuickActionCard: View {
     @State private var showRecentBooks = false
     @State private var showNotesSearch = false
     @State private var selectedBookContext: Book? = nil
-    
+
+    // Rich text editor sheet
+    @State private var showRichTextEditor = false
+    @State private var richTextContent = ""
+
     // Toast notification state
     @State private var showingToast = false
     @State private var toastMessage = ""
@@ -121,6 +125,29 @@ struct UnifiedQuickActionCard: View {
                                     .onSubmit {
                                         if !searchText.isEmpty || isExpanded {
                                             processInput()
+                                        }
+                                    }
+                                    .onChange(of: searchText) { _, newValue in
+                                        // Auto-open rich text editor when typing more than 4 words
+                                        let wordCount = newValue.components(separatedBy: .whitespacesAndNewlines)
+                                            .filter { !$0.isEmpty }
+                                            .count
+
+                                        if wordCount > 4 && !showRichTextEditor {
+                                            // Smooth transition to rich text editor
+                                            SensoryFeedback.light()
+
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.88)) {
+                                                richTextContent = newValue
+                                                searchText = "" // Clear the input field
+                                            }
+
+                                            // Small delay for smooth sheet presentation
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                                                    showRichTextEditor = true
+                                                }
+                                            }
                                         }
                                     }
 
@@ -439,6 +466,40 @@ struct UnifiedQuickActionCard: View {
                 showRecentBooks = false
             }
             .environmentObject(libraryViewModel)
+        }
+        .sheet(isPresented: $showRichTextEditor, onDismiss: {
+            // Clear state when sheet is dismissed
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                richTextContent = ""
+            }
+
+            // Dismiss the card after rich text editor closes with smooth animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
+                    isPresented = false
+                }
+            }
+        }) {
+            // Rich text editor for longer notes with smooth presentation
+            NoteEditSheet(
+                note: Note(
+                    type: .note,
+                    content: richTextContent,
+                    bookId: (selectedBookContext ?? libraryViewModel.currentDetailBook)?.localId,
+                    bookTitle: (selectedBookContext ?? libraryViewModel.currentDetailBook)?.title,
+                    author: (selectedBookContext ?? libraryViewModel.currentDetailBook)?.author,
+                    pageNumber: nil,
+                    dateCreated: Date(),
+                    id: UUID(),
+                    ambientSessionId: nil,
+                    source: "manual",
+                    contentFormat: "markdown"
+                )
+            )
+            .environmentObject(notesViewModel)
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+            .interactiveDismissDisabled(false)
         }
     }
 

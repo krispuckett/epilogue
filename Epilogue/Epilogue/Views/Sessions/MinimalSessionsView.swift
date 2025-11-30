@@ -138,9 +138,11 @@ struct MinimalSessionsView: View {
         .navigationTitle("Sessions")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
-        .fullScreenCover(isPresented: $showingNewChat) {
-            NavigationStack {
-                UnifiedChatView()
+        .onChange(of: showingNewChat) { _, showing in
+            // Launch generic ambient mode via coordinator
+            if showing {
+                EpilogueAmbientCoordinator.shared.launchGenericMode()
+                showingNewChat = false
             }
         }
         .onAppear {
@@ -363,24 +365,21 @@ struct MinimalSessionCard: View {
                 isPressed = pressing
             }
         }
-        .sheet(isPresented: $showingDetail) {
-            switch sessionType {
-            case .ambient:
-                if let book = book {
-                    NavigationStack {
-                        UnifiedChatView(preSelectedBook: book)
+        .onChange(of: showingDetail) { _, showing in
+            // Launch ambient mode via coordinator
+            if showing {
+                switch sessionType {
+                case .ambient:
+                    if let book = book {
+                        EpilogueAmbientCoordinator.shared.launchBookMode(book: book)
+                    }
+                case .quick:
+                    // For quick sessions, just launch generic mode
+                    if let book = book {
+                        EpilogueAmbientCoordinator.shared.launchBookMode(book: book)
                     }
                 }
-            case .quick:
-                // For quick sessions, just show book detail for now
-                // TODO: Create a dedicated quick session summary view
-                if let book = book {
-                    NavigationStack {
-                        BookDetailView(book: book)
-                            .environmentObject(libraryViewModel)
-                            .environmentObject(NotesViewModel())
-                    }
-                }
+                showingDetail = false
             }
         }
     }

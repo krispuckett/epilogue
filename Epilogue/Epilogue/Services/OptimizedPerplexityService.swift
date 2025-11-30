@@ -127,7 +127,8 @@ class OptimizedPerplexityService: ObservableObject {
         userNotes: [(content: String, page: Int?)]? = nil,
         userQuotes: [(text: String, page: Int?, notes: String?)]? = nil,
         userQuestions: [(question: String, page: Int?, answer: String?)]? = nil,
-        currentPage: Int? = nil
+        currentPage: Int? = nil,
+        customSystemPrompt: String? = nil
     ) -> AsyncThrowingStream<PerplexityResponse, Error> {
         AsyncThrowingStream { continuation in
             Task { [weak self] in
@@ -195,7 +196,8 @@ class OptimizedPerplexityService: ObservableObject {
                         userNotes: userNotes,
                         userQuotes: userQuotes,
                         userQuestions: userQuestions,
-                        currentPage: currentPage
+                        currentPage: currentPage,
+                        customSystemPrompt: customSystemPrompt
                     )
                     
                     // Start streaming with automatic reconnection
@@ -536,7 +538,8 @@ class OptimizedPerplexityService: ObservableObject {
         userNotes: [(content: String, page: Int?)]? = nil,
         userQuotes: [(text: String, page: Int?, notes: String?)]? = nil,
         userQuestions: [(question: String, page: Int?, answer: String?)]? = nil,
-        currentPage: Int? = nil
+        currentPage: Int? = nil,
+        customSystemPrompt: String? = nil
     ) throws -> URLRequest {
         guard let url = URL(string: currentEndpoint) else {
             throw PerplexityError.invalidURL
@@ -572,8 +575,15 @@ class OptimizedPerplexityService: ObservableObject {
         }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let systemPrompt = bookContext.map { book in
-            buildEnrichedBookContext(
+        // Use custom prompt if provided, otherwise build from book context
+        let systemPrompt: String
+        if let custom = customSystemPrompt {
+            systemPrompt = custom
+            #if DEBUG
+            print("📝 Using custom system prompt (\(custom.count) chars)")
+            #endif
+        } else if let book = bookContext {
+            systemPrompt = buildEnrichedBookContext(
                 for: book,
                 enrichment: enrichment,
                 sessionHistory: sessionHistory,
@@ -582,7 +592,9 @@ class OptimizedPerplexityService: ObservableObject {
                 userQuestions: userQuestions,
                 currentPage: currentPage
             )
-        } ?? "Be concise and helpful."
+        } else {
+            systemPrompt = "Be concise and helpful."
+        }
 
         // CRITICAL FIX: Enhance query with book context so web search finds relevant results
         // Without this, "Who is Gandalf?" searches general web and finds Star Wars/chefs
@@ -616,7 +628,7 @@ class OptimizedPerplexityService: ObservableObject {
             "return_images": false,
             "search_domain_filter": [],  // No domain restrictions
             "temperature": 0.7,
-            "max_tokens": 500  // Reduced for faster responses
+            "max_tokens": 800  // Increased for richer recommendations with follow-ups
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

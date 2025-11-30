@@ -98,7 +98,7 @@ struct AmbientSessionSummaryView: View {
                 }
                 .scrollIndicators(.hidden)
             }
-            .navigationTitle("Reading Session")
+            .navigationTitle(session.bookModel != nil ? "Reading Session" : "Ambient Chat")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

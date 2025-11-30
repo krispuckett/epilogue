@@ -122,13 +122,6 @@ struct SettingsView: View {
                     Text(L10n.Settings.Section.library)
                 }
 
-                // MARK: - Reading Journey
-                Section {
-                    JourneyCheckInSettingsView()
-                } header: {
-                    Text("Reading Journey")
-                }
-
                 // MARK: - Data & Enrichment
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
@@ -285,23 +278,22 @@ struct SettingsView: View {
                             .padding(.vertical, 4)
                         }
 
-                        // Experimental Ambient Capture Toggle
+                        // Experimental Custom Camera Toggle
                         Toggle(isOn: $experimentalCustomCamera) {
                             HStack {
-                                Image(systemName: "text.viewfinder")
+                                Image(systemName: "camera.fill")
                                     .foregroundColor(.orange)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ambient Capture")
-                                        .font(.system(size: 15, weight: .regular))
-                                    Text("Live text recognition")
-                                        .font(.system(size: 12))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Custom Camera")
+                                    Text("Experimental AVFoundation camera for text capture")
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
                         }
                         .onChange(of: experimentalCustomCamera) { _, newValue in
                             #if DEBUG
-                            print("🎥 [EXPERIMENT] Ambient Capture \(newValue ? "enabled" : "disabled")")
+                            print("🎥 [EXPERIMENT] Custom camera \(newValue ? "enabled" : "disabled")")
                             #endif
 
                             if newValue {
@@ -397,10 +389,24 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
-                            GradientComparisonLab()
+                            WelcomeBackCardExperiment()
                         } label: {
-                            Label("Gradient Comparison Lab", systemImage: "rectangle.split.2x1")
+                            Label("Welcome Back Card", systemImage: "hand.wave.fill")
                                 .foregroundStyle(.mint)
+                        }
+
+                        NavigationLink {
+                            ReadingWrappedExperiment()
+                        } label: {
+                            Label("Reading Wrapped", systemImage: "gift.fill")
+                                .foregroundStyle(.pink)
+                        }
+
+                        NavigationLink {
+                            TouchRippleExperiment()
+                        } label: {
+                            Label("Touch Ripple Shader", systemImage: "water.waves")
+                                .foregroundStyle(.blue)
                         }
                     } header: {
                         Text("Developer Options")
@@ -429,6 +435,7 @@ struct SettingsView: View {
                             // Clear all caches
                             SharedBookCoverManager.shared.clearAllCaches()
                             DisplayedImageStore.clearAllCaches()
+                            await BookColorPaletteCache.shared.clearCache()
 
                             // Show confirmation toast
                             toastMessage = "toast.image_caches_cleared".localized()
@@ -524,6 +531,47 @@ struct SettingsView: View {
                 } header: {
                     Text(L10n.Settings.Section.about)
                 }
+
+                // MARK: - Developer Mode (Hidden, unlocked by tapping version 7 times)
+                if developerModeUnlocked {
+                    Section {
+                        NavigationLink {
+                            AmbientPresenceStatesExperiment()
+                        } label: {
+                            HStack {
+                                Label("Ambient Presence States", systemImage: "waveform.circle.fill")
+                                    .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                Spacer()
+                                Text("Experiment")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityLabel("Ambient Presence States Experiment")
+                        .accessibilityHint("Developer tool for tuning ambient orb behavior")
+
+                        NavigationLink {
+                            LiquidGlassGradientExperiment()
+                        } label: {
+                            HStack {
+                                Label("Liquid Glass Gradients", systemImage: "rectangle.stack.fill")
+                                    .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
+                                Spacer()
+                                Text("Experiment")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("🧙‍♂️ Developer Mode")
+                    } footer: {
+                        Text("Experimental features and developer tools. Tap version 7 times to lock.")
+                            .onTapGesture(count: 7) {
+                                developerModeUnlocked = false
+                                SensoryFeedback.impact(.medium)
+                            }
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Color.clear)
@@ -598,7 +646,7 @@ struct SettingsView: View {
         Task {
             do {
                 let exportData = try await generateExportData()
-                let documentsPath = try FileManager.default.safeURL(for: .documentDirectory)
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
                 let exportURL = documentsPath.appendingPathComponent("EpilogueExport-\(Date().formatted(date: .numeric, time: .omitted)).json")
 
                 try exportData.write(to: exportURL)

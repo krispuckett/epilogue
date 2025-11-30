@@ -33,6 +33,7 @@ struct LiquidCommandPaletteV2: View {
     
     enum CommandResult {
         case note(String)
+        case richTextNote
         case quote(String, attribution: String?)
         case bookAdded(Book)
         case search(String)
@@ -328,7 +329,24 @@ struct LiquidCommandPaletteV2: View {
     }
     
     private var commandSuggestions: [SearchResult] {
-        [
+        var suggestions: [SearchResult] = []
+
+        // Ask Epilogue - only show when NOT in book detail context
+        // Book-specific ambient is accessed via the ambient icon in book views
+        if case .bookDetail = context {
+            // Don't show generic ambient option in book context
+        } else {
+            suggestions.append(SearchResult(
+                type: .command,
+                title: "Ask Epilogue",
+                subtitle: "Recommendations, reading plans, insights",
+                icon: "sparkles",
+                action: { launchGenericAmbient() }
+            ))
+        }
+
+        // Standard commands
+        suggestions.append(contentsOf: [
             SearchResult(
                 type: .command,
                 title: "New Note",
@@ -350,7 +368,9 @@ struct LiquidCommandPaletteV2: View {
                 icon: "plus.circle",
                 action: { startBookAdd() }
             )
-        ]
+        ])
+
+        return suggestions
     }
     
     private func iconColor(for type: SearchResult.ResultType) -> Color {
@@ -457,13 +477,25 @@ struct LiquidCommandPaletteV2: View {
     private func startNote() {
         commandText = "note: "
     }
-    
+
     private func startQuote() {
         commandText = "\""
     }
-    
+
     private func startBookAdd() {
         commandText = "add book "
+    }
+
+    /// Launch generic ambient mode from command palette
+    private func launchGenericAmbient() {
+        // Dismiss palette first
+        dismissPalette()
+
+        // Small delay to allow palette dismissal animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Launch generic ambient mode via coordinator
+            EpilogueAmbientCoordinator.shared.launchGenericMode()
+        }
     }
     
     private func loadRecentCommands() {

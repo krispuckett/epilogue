@@ -32,7 +32,7 @@ struct LibraryView: View {
     @State private var showingBookAddedToast = false
     @State private var toastMessage = ""
     @State private var showingWebSearch = false
-    @State private var showingReadingJourney = false
+    @State private var showingReadingPlansHub = false
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -468,20 +468,20 @@ struct LibraryView: View {
         // Fixed spacer between menu and journey
         ToolbarSpacer(.fixed)
 
-        // Reading Journey button
+        // Reading Plans Hub button
         ToolbarItem {
             Button {
-                showingReadingJourney = true
+                showingReadingPlansHub = true
                 SensoryFeedback.light()
             } label: {
-                Image(systemName: "map.fill")
+                Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 18))
                     .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .symbolRenderingMode(.hierarchical)
             }
-            .accessibilityLabel("Reading Journey")
-            .accessibilityHint("Double tap to view your reading journey")
-            .accessibilityIdentifier("library.readingJourneyButton")
+            .accessibilityLabel("Reading Plans")
+            .accessibilityHint("Double tap to view your reading plans and challenges")
+            .accessibilityIdentifier("library.readingPlansButton")
         }
 
         // Fixed spacer between journey and settings
@@ -712,8 +712,8 @@ struct LibraryView: View {
             WebSearchView()
                 .presentationDetents([.large])
         }
-        .sheet(isPresented: $showingReadingJourney) {
-            ReadingJourneyView()
+        .sheet(isPresented: $showingReadingPlansHub) {
+            ReadingPlansHubView()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
             if let book = notification.object as? Book {

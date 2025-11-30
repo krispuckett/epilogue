@@ -374,6 +374,11 @@ struct TestButton: View {
     let title: String
     let action: () async -> Void
 
+    init(_ title: String, action: @escaping () async -> Void) {
+        self.title = title
+        self.action = action
+    }
+
     var body: some View {
         Button(title) {
             Task { await action() }

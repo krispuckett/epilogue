@@ -148,9 +148,42 @@ struct AdvancedOnboardingView: View {
         .opacity(viewOpacity)
         .blur(radius: viewBlur)
         .onAppear {
+            // Preload ALL video players immediately for instant playback
+            preloadAllVideos()
+
             withAnimation(.easeOut(duration: 0.6)) {
                 viewOpacity = 1
             }
+        }
+    }
+
+    // MARK: - Video Preloading
+    private func preloadAllVideos() {
+        for (index, page) in pages.enumerated() {
+            guard page.type == .video,
+                  let videoName = page.videoName,
+                  let videoExt = page.videoExtension,
+                  let url = Bundle.main.url(forResource: videoName, withExtension: videoExt),
+                  players[index] == nil else { continue }
+
+            let player = AVPlayer(url: url)
+            player.isMuted = true
+            player.actionAtItemEnd = .none
+
+            // Preload buffer for instant playback
+            player.currentItem?.preferredForwardBufferDuration = 10
+
+            // Loop video when it ends
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: player.currentItem,
+                queue: .main
+            ) { _ in
+                player.seek(to: .zero)
+                player.play()
+            }
+
+            players[index] = player
         }
     }
 
@@ -275,25 +308,7 @@ struct AdvancedOnboardingView: View {
                         .opacity(currentPage == index ? 1 : 0.8)
                         .offset(y: -48) // Move video up by 48px
                         .onAppear {
-                            // Create player if needed
-                            if players[index] == nil {
-                                let newPlayer = AVPlayer(url: videoURL)
-                                newPlayer.isMuted = true
-                                newPlayer.actionAtItemEnd = .none
-
-                                // Loop video
-                                NotificationCenter.default.addObserver(
-                                    forName: .AVPlayerItemDidPlayToEndTime,
-                                    object: newPlayer.currentItem,
-                                    queue: .main
-                                ) { _ in
-                                    newPlayer.seek(to: .zero)
-                                    newPlayer.play()
-                                }
-
-                                players[index] = newPlayer
-                            }
-
+                            // Player already preloaded - just play
                             players[index]?.seek(to: .zero)
                             players[index]?.play()
                         }

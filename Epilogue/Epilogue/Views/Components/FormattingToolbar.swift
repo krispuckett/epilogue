@@ -12,8 +12,8 @@ struct FormattingToolbar: View {
     @State private var showingPreview = false
 
     var body: some View {
-        HStack(spacing: 16) {
-            // All formatting buttons in one clean row
+        // Compact centered liquid glass pill
+        HStack(spacing: 12) {
             FormatButton(icon: MarkdownSyntax.bold.systemIcon, syntax: .bold) {
                 insertMarkdown(.bold)
             }
@@ -33,29 +33,13 @@ struct FormattingToolbar: View {
             FormatButton(icon: MarkdownSyntax.bulletList.systemIcon, syntax: .bulletList) {
                 insertMarkdown(.bulletList)
             }
-
-            Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(toolbarBackground)
-    }
-
-    @ViewBuilder
-    private var toolbarBackground: some View {
-        // iOS 26 Liquid Glass - Direct glass effect without .background()
-        Rectangle()
-            .fill(.clear)
-            .glassEffect()
+        .padding(.vertical, 10)
+        .glassEffect(.regular, in: .capsule)
     }
 
     private func insertMarkdown(_ syntax: MarkdownSyntax) {
-        print("📝 FormattingToolbar.insertMarkdown:")
-        print("  - Current text: '\(text)'")
-        print("  - Cursor position: \(cursorTracker.cursorPosition)")
-        print("  - Selected range: \(cursorTracker.selectedRange?.description ?? "nil")")
-        print("  - Syntax: \(syntax)")
-
         let result = MarkdownParser.insertMarkdown(
             in: text,
             syntax: syntax,
@@ -63,13 +47,8 @@ struct FormattingToolbar: View {
             selectedRange: cursorTracker.selectedRange
         )
 
-        print("  - New text: '\(result.text)'")
-        print("  - New cursor: \(result.cursorPosition)")
-
         text = result.text
         cursorTracker.updateCursor(to: result.cursorPosition)
-
-        print("  - Text after update: '\(text)'")
     }
 
     private func handleDone() {
@@ -107,11 +86,7 @@ struct CompactFormattingToolbar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(
-            Rectangle()
-                .fill(.clear)
-                .glassEffect()
-        )
+        .background(.ultraThinMaterial)
     }
 
     private func insertMarkdown(_ syntax: MarkdownSyntax) {

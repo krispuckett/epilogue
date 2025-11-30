@@ -268,11 +268,55 @@ struct BookDetailView: View {
     // MARK: - Efficient Data Loading
 
     private func loadBookData() {
-        // Load BookModel with predicated query - only fetch this specific book
-        let bookModelDescriptor = FetchDescriptor<BookModel>(
-            predicate: #Predicate { $0.localId == book.localId.uuidString }
+        // Load BookModel with predicated query - try multiple matching strategies
+        let localIdString = book.localId.uuidString
+        let googleBooksId = book.id
+
+        #if DEBUG
+        print("📖 [loadBookData] Looking for BookModel:")
+        print("   Book.localId: \(localIdString)")
+        print("   Book.id (Google): \(googleBooksId)")
+        print("   Book.title: \(book.title)")
+        #endif
+
+        // Strategy 1: Match by localId (primary)
+        var bookModelDescriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.localId == localIdString }
         )
         bookModel = try? modelContext.fetch(bookModelDescriptor).first
+
+        // Strategy 2: If not found, try matching by Google Books ID
+        if bookModel == nil {
+            #if DEBUG
+            print("   ⚠️ No match by localId, trying Google Books ID...")
+            #endif
+            bookModelDescriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.id == googleBooksId }
+            )
+            bookModel = try? modelContext.fetch(bookModelDescriptor).first
+        }
+
+        // Strategy 3: If still not found, try matching by title and author
+        if bookModel == nil {
+            #if DEBUG
+            print("   ⚠️ No match by Google ID, trying title+author...")
+            #endif
+            let bookTitle = book.title
+            let bookAuthor = book.author
+            bookModelDescriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.title == bookTitle && $0.author == bookAuthor }
+            )
+            bookModel = try? modelContext.fetch(bookModelDescriptor).first
+        }
+
+        #if DEBUG
+        if let found = bookModel {
+            print("   ✅ Found BookModel: \(found.title) (localId: \(found.localId))")
+            print("   isEnriched: \(found.isEnriched), smartSynopsis: \(found.smartSynopsis?.prefix(30) ?? "nil")")
+        } else {
+            print("   ❌ No BookModel found for: \(book.title)")
+        }
+        #endif
 
         // Load CapturedNotes with predicated query - only fetch notes for this book
         let bookLocalIdString = book.localId.uuidString
@@ -287,6 +331,26 @@ struct BookDetailView: View {
         #if DEBUG
         print("📊 [BookDetailView] Loaded \(bookNotesCaptured.count) notes for book '\(book.title)'")
         #endif
+
+        // Auto-enrich book if not already done (moved here from onAppear since bookModel is now available)
+        if let bookModel = bookModel {
+            if !bookModel.isEnriched {
+                #if DEBUG
+                print("📖 [loadBookData] Auto-triggering enrichment for: \(bookModel.title)")
+                #endif
+                Task {
+                    await BookEnrichmentService.shared.enrichBook(bookModel)
+                    #if DEBUG
+                    print("✅ [loadBookData] Enrichment completed for: \(bookModel.title)")
+                    print("   Synopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
+                    #endif
+                }
+            } else {
+                #if DEBUG
+                print("ℹ️ [loadBookData] Book already enriched: \(bookModel.title)")
+                #endif
+            }
+        }
     }
 
     var bookQuotes: [Note] {
@@ -519,32 +583,7 @@ struct BookDetailView: View {
             MicroInteractionManager.shared.enteredBookView()
 
             // Sessions checked on demand when button tapped
-
-            // Enrich book with smart synopsis/themes if not already done
-            if let bookModel = bookModel {
-                if !bookModel.isEnriched {
-                    #if DEBUG
-                    print("📖 Triggering enrichment for: \(bookModel.title)")
-                    #endif
-                    Task {
-                        await BookEnrichmentService.shared.enrichBook(bookModel)
-                        #if DEBUG
-                        print("✅ Enrichment completed for: \(bookModel.title)")
-                        #endif
-                        #if DEBUG
-                        print("   Synopsis: \(bookModel.smartSynopsis?.prefix(50) ?? "nil")")
-                        #endif
-                    }
-                } else {
-                    #if DEBUG
-                    print("ℹ️ Book already enriched: \(bookModel.title)")
-                    #endif
-                }
-            } else {
-                #if DEBUG
-                print("⚠️ Could not find BookModel for: \(book.title)")
-                #endif
-            }
+            // Note: Auto-enrichment moved to loadBookData() where bookModel is available
         }
         .onDisappear {
             // Clear the current detail book when leaving
@@ -707,9 +746,35 @@ struct BookDetailView: View {
                 }
             }
         }
-        .onChange(of: coverImage) { _, _ in
-            // Don't reset color palette when cover changes
-            // The color extraction will handle updates automatically
+        .onChange(of: coverImage) { oldImage, newImage in
+            // Extract colors when cover image is loaded
+            // Using onChange instead of callback to avoid stale closure issues
+            guard let uiImage = newImage else { return }
+
+            #if DEBUG
+            print("🖼️ BookDetailView onChange(coverImage) fired for: \(book.title)")
+            print("   colorPalette: \(colorPalette == nil ? "nil" : "has value")")
+            print("   isExtractingColors: \(isExtractingColors)")
+            print("   hasLowResColors: \(hasLowResColors)")
+            print("   image size: \(uiImage.size)")
+            #endif
+
+            // Only extract if we don't have colors yet
+            if colorPalette == nil && !isExtractingColors && !hasLowResColors {
+                #if DEBUG
+                print("   ✅ Starting color extraction from onChange...")
+                #endif
+                Task {
+                    await extractColorsFromDisplayedImage(uiImage)
+                    await MainActor.run {
+                        hasLowResColors = true
+                    }
+                }
+            } else {
+                #if DEBUG
+                print("   ⏭️ Skipping extraction - already have palette or extracting")
+                #endif
+            }
         }
     }
     
@@ -723,24 +788,14 @@ struct BookDetailView: View {
                 loadFullImage: true,  // Explicitly request full quality
                 isLibraryView: false,
                 onImageLoaded: { uiImage in
-                    // Store the actual displayed image
+                    // Store the actual displayed image - this triggers onChange(coverImage)
+                    // which handles color extraction with proper view instance binding
                     self.coverImage = uiImage
-                    
+
                     // Trigger smooth cover blur-in animation
                     withAnimation(.easeOut(duration: 0.4)) {
-                    coverBlur = 0
-                    coverOpacity = 1.0
-                    }
-                    
-                    // Only extract colors if we don't have them yet
-                    if colorPalette == nil && !isExtractingColors {
-                    Task.detached(priority: .userInitiated) {
-                        // Quick extraction from displayed image
-                        if !hasLowResColors {
-                            await extractColorsFromDisplayedImage(uiImage)
-                            hasLowResColors = true
-                        }
-                    }
+                        coverBlur = 0
+                        coverOpacity = 1.0
                     }
                 }
             )
@@ -2092,8 +2147,41 @@ struct BookDetailView: View {
                 print("  Background: \(palette.background)")
                 #endif
 
-                // Save to BookModel for widgets
-                if let bookModel = bookModel {
+                // Save to BookModel for widgets - fetch directly if not available
+                var targetBookModel = bookModel
+                if targetBookModel == nil {
+                    // Fetch BookModel directly using multi-strategy lookup
+                    let localIdString = book.localId.uuidString
+                    let googleBooksId = book.id
+                    let bookTitle = book.title
+                    let bookAuthor = book.author
+
+                    var descriptor = FetchDescriptor<BookModel>(
+                        predicate: #Predicate { $0.localId == localIdString }
+                    )
+                    targetBookModel = try? modelContext.fetch(descriptor).first
+
+                    if targetBookModel == nil {
+                        descriptor = FetchDescriptor<BookModel>(
+                            predicate: #Predicate { $0.id == googleBooksId }
+                        )
+                        targetBookModel = try? modelContext.fetch(descriptor).first
+                    }
+
+                    if targetBookModel == nil {
+                        descriptor = FetchDescriptor<BookModel>(
+                            predicate: #Predicate { $0.title == bookTitle && $0.author == bookAuthor }
+                        )
+                        targetBookModel = try? modelContext.fetch(descriptor).first
+                    }
+
+                    // Update the state if we found it
+                    if targetBookModel != nil {
+                        self.bookModel = targetBookModel
+                    }
+                }
+
+                if let bookModel = targetBookModel {
                     bookModel.extractedColors = [
                         palette.primary.toHexString(),
                         palette.secondary.toHexString(),
@@ -2106,6 +2194,7 @@ struct BookDetailView: View {
 
                     // Update widgets with new color data
                     BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                    // Note: Enrichment is triggered in loadBookData() - do not duplicate here
                 } else {
                     #if DEBUG
                     print("⚠️ Could not find BookModel to save colors")
@@ -2120,7 +2209,7 @@ struct BookDetailView: View {
             print("❌ Error in color extraction: \(error)")
             #endif
         }
-        
+
         isExtractingColors = false
     }
     
@@ -2221,8 +2310,41 @@ struct BookDetailView: View {
                 print("  Background: \(palette.background)")
                 #endif
 
-                // Save to BookModel for widgets
-                if let bookModel = bookModel {
+                // Save to BookModel for widgets - fetch directly if not available
+                var targetBookModel = bookModel
+                if targetBookModel == nil {
+                    // Fetch BookModel directly using multi-strategy lookup
+                    let localIdString = book.localId.uuidString
+                    let googleBooksId = book.id
+                    let bookTitle = book.title
+                    let bookAuthor = book.author
+
+                    var descriptor = FetchDescriptor<BookModel>(
+                        predicate: #Predicate { $0.localId == localIdString }
+                    )
+                    targetBookModel = try? modelContext.fetch(descriptor).first
+
+                    if targetBookModel == nil {
+                        descriptor = FetchDescriptor<BookModel>(
+                            predicate: #Predicate { $0.id == googleBooksId }
+                        )
+                        targetBookModel = try? modelContext.fetch(descriptor).first
+                    }
+
+                    if targetBookModel == nil {
+                        descriptor = FetchDescriptor<BookModel>(
+                            predicate: #Predicate { $0.title == bookTitle && $0.author == bookAuthor }
+                        )
+                        targetBookModel = try? modelContext.fetch(descriptor).first
+                    }
+
+                    // Update the state if we found it
+                    if targetBookModel != nil {
+                        self.bookModel = targetBookModel
+                    }
+                }
+
+                if let bookModel = targetBookModel {
                     bookModel.extractedColors = [
                         palette.primary.toHexString(),
                         palette.secondary.toHexString(),
@@ -2235,6 +2357,7 @@ struct BookDetailView: View {
 
                     // Update widgets with new color data
                     BookWidgetUpdater.shared.updateCurrentBook(from: bookModel)
+                    // Note: Enrichment is triggered in loadBookData() - do not duplicate here
                 } else {
                     #if DEBUG
                     print("⚠️ Could not find BookModel to save colors")

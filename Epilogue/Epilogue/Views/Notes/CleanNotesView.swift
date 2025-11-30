@@ -58,6 +58,11 @@ struct CleanNotesView: View {
 
     @State private var exportContent: ExportContent?
 
+    // Command palette and rich text note state
+    @State private var showingCommandPalette = false
+    @State private var creatingNewRichTextNote = false
+    @State private var showingRichTextNoteSheet = false
+
     enum FilterType: String, CaseIterable {
         case all = "All"
         case favorites = "Favorites"
@@ -85,7 +90,25 @@ struct CleanNotesView: View {
             }
         }
     }
-    
+
+    // Rich text note to edit (for new note creation)
+    private var noteToEdit: Note? {
+        guard creatingNewRichTextNote else { return nil }
+        return Note(
+            type: .note,
+            content: "",
+            bookId: nil,
+            bookTitle: nil,
+            author: nil,
+            pageNumber: nil,
+            dateCreated: Date(),
+            id: UUID(),
+            ambientSessionId: nil,
+            source: "manual",
+            contentFormat: "markdown"
+        )
+    }
+
     // Combined items (unfiltered)
     private var allItems: [(date: Date, note: Note?, quote: CapturedQuote?)] {
         var items: [(date: Date, note: Note?, quote: CapturedQuote?)] = []
@@ -267,297 +290,337 @@ struct CleanNotesView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Permanent ambient gradient background
-                AmbientChatGradientView()
-                    .opacity(0.4)
-                    .ignoresSafeArea(.all)
-                    .allowsHitTesting(false)
-                
-                // Subtle darkening overlay for better readability
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea(.all)
-                    .allowsHitTesting(false)
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        // Progressive Search Bar
-                        searchBarView
-                        
-                        // Content
-                        if filteredItems.isEmpty {
-                            emptyState
-                        } else {
-                            contentSections
-                        }
-                    }
-                }
-                .coordinateSpace(name: "scroll")
-                
-                // Toast overlay
-                if showingToast {
-                    VStack {
-                        Spacer()
-                        
-                        HStack(spacing: 12) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                            
-                            Text(toastMessage)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
-                        .glassEffect(in: Capsule())
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            DesignSystem.Colors.primaryAccent.opacity(0.3),
-                                            DesignSystem.Colors.primaryAccent.opacity(0.1)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.95).combined(with: .opacity)
-                        ))
-                        .padding(.bottom, 100)
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingToast)
-                }
+        navigationContent
+            .sheet(isPresented: $showEditSheet, onDismiss: { notesViewModel.isEditingNote = false }) {
+                editSheet
             }
+            .alert("Delete Item", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { deleteItem() }
+            } message: {
+                Text("Are you sure you want to delete this \(itemToDelete is CapturedNote ? "note" : "quote")? This action cannot be undone.")
+            }
+            .sheet(isPresented: $showingSessionSummary) { sessionSummarySheet }
+            .sheet(item: $quoteShareData) { data in
+                QuoteShareSheet(quote: data.text, author: data.author, bookTitle: data.bookTitle)
+            }
+            .sheet(item: $exportContent) { exportSheet(for: $0) }
+            .sheet(isPresented: $showingRichTextNoteSheet) { richTextNoteSheet }
+            .onChange(of: showingRichTextNoteSheet) { _, newValue in
+                if !newValue { creatingNewRichTextNote = false }
+            }
+            .liquidCommandPalette(isPresented: $showingCommandPalette, context: .notes, onComplete: handleCommandPaletteResult)
+            .onReceive(navigationCoordinator.$highlightedNoteID) { handleHighlightedNote($0) }
+            .onReceive(navigationCoordinator.$highlightedQuoteID) { handleHighlightedQuote($0) }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { handleCreateNewNote($0) }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { handleSaveQuote($0) }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowToastMessage"))) { handleShowToast($0) }
+    }
+
+    // MARK: - Navigation Content
+
+    private var navigationContent: some View {
+        NavigationStack {
+            mainContent
                 .navigationTitle("Notes")
                 .navigationBarTitleDisplayMode(.large)
-            .onReceive(navigationCoordinator.$highlightedNoteID) { noteID in
-                if let noteID = noteID {
-                    // Find and scroll to the note
-                    if let note = capturedNotes.first(where: { $0.id == noteID }) {
-                        // Show edit sheet for the note
-                        editingNote = note
-                        notesViewModel.isEditingNote = true
-                        showEditSheet = true
+                .toolbar { notesToolbar }
+        }
+    }
 
-                        // Clear the navigation flag
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            navigationCoordinator.highlightedNoteID = nil
-                        }
+    // MARK: - Sheet Views
+
+    @ViewBuilder
+    private var editSheet: some View {
+        if let note = editingNote {
+            NoteEditSheet(note: note.toNote())
+                .environmentObject(notesViewModel)
+        } else if let quote = editingQuote {
+            NoteEditSheet(note: quote.toNote())
+                .environmentObject(notesViewModel)
+        }
+    }
+
+    @ViewBuilder
+    private var sessionSummarySheet: some View {
+        NavigationStack {
+            if selectedSessionNote != nil || selectedSessionQuote != nil {
+                SessionSummaryPlaceholderView(note: selectedSessionNote, quote: selectedSessionQuote)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func exportSheet(for content: ExportContent) -> some View {
+        switch content {
+        case .singleNote(let note):
+            MarkdownExportSheet(note: note, quote: nil, notes: [], quotes: [])
+        case .singleQuote(let quote):
+            MarkdownExportSheet(note: nil, quote: quote, notes: [], quotes: [])
+        case .batch(let notes, let quotes):
+            MarkdownExportSheet(note: nil, quote: nil, notes: notes, quotes: quotes)
+        }
+    }
+
+    @ViewBuilder
+    private var richTextNoteSheet: some View {
+        if let note = noteToEdit {
+            NoteEditSheet(note: note)
+                .environmentObject(notesViewModel)
+        }
+    }
+
+    // MARK: - Main Content
+
+    private var mainContent: some View {
+        ZStack {
+            // Permanent ambient gradient background
+            AmbientChatGradientView()
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+
+            // Subtle darkening overlay for better readability
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Progressive Search Bar
+                    searchBarView
+
+                    // Content
+                    if filteredItems.isEmpty {
+                        emptyState
+                    } else {
+                        contentSections
                     }
                 }
             }
-            .onReceive(navigationCoordinator.$highlightedQuoteID) { quoteID in
-                if let quoteID = quoteID {
-                    // Find and scroll to the quote
-                    if let quote = capturedQuotes.first(where: { $0.id == quoteID }) {
-                        // Show edit sheet for the quote
-                        editingQuote = quote
-                        editedText = quote.text ?? ""
-                        notesViewModel.isEditingNote = true
-                        showEditSheet = true
+            .coordinateSpace(name: "scroll")
 
-                        // Clear the navigation flag
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            navigationCoordinator.highlightedQuoteID = nil
-                        }
-                    }
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { notification in
-                #if DEBUG
-                print("📝 CleanNotesView: Received CreateNewNote notification")
-                #endif
-                if let data = notification.object as? [String: Any],
-                   let content = data["content"] as? String {
-                    #if DEBUG
-                    print("📝 Note content: \(content)")
-                    #endif
-                    let bookId = data["bookId"] as? String
-                    let bookTitle = data["bookTitle"] as? String
-                    let bookAuthor = data["bookAuthor"] as? String
-                    #if DEBUG
-                    print("📝 Book context: ID=\(bookId ?? "nil"), Title=\(bookTitle ?? "nil"), Author=\(bookAuthor ?? "nil")")
-                    #endif
-                    createNote(content: content, bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
-                } else {
-                    #if DEBUG
-                    print("❌ Failed to parse notification data")
-                    #endif
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
-                if let data = notification.object as? [String: Any],
-                   let quote = data["quote"] as? String {
-                    let attribution = data["attribution"] as? String
-                    let bookId = data["bookId"] as? String
-                    let bookTitle = data["bookTitle"] as? String
-                    let bookAuthor = data["bookAuthor"] as? String
-                    createQuote(content: quote, attribution: attribution?.isEmpty ?? true ? nil : attribution, 
-                               bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowToastMessage"))) { notification in
-                if let data = notification.object as? [String: String],
-                   let message = data["message"] {
-                    showToast(message: message)
-                }
-            }
-            .toolbar {
-                // Push content to the right
-                ToolbarSpacer(.flexible)
-                
-                // Search button
-                ToolbarItem {
-                    Button {
-                        withAnimation(DesignSystem.Animation.springStandard) {
-                            showSearchBar.toggle()
-                            if !showSearchBar {
-                                searchText = ""
-                            }
-                        }
-                        SensoryFeedback.light()
-                    } label: {
-                        Image(systemName: showSearchBar ? "xmark.circle.fill" : "magnifyingglass")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(showSearchBar ? DesignSystem.Colors.primaryAccent : .white.opacity(0.8))
-                            .symbolRenderingMode(.hierarchical)
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .accessibilityLabel(showSearchBar ? "Close search" : "Search notes")
-                    .accessibilityHint("Double tap to \(showSearchBar ? "close" : "open") search bar")
-                }
-                
-                // Fixed spacer between search and layout menu
-                ToolbarSpacer(.fixed)
-                
-                // Layout/filter options menu
-                ToolbarItem {
-                    Menu {
-                        // Filter type picker
-                        Picker("View", selection: $selectedFilter.animation(DesignSystem.Animation.springStandard)) {
-                            ForEach(FilterType.allCases, id: \.self) { filter in
-                                Label(filter.description, systemImage: filter.icon)
-                                    .tag(filter)
-                            }
-                        }
-                        .pickerStyle(.inline)
-                        .onChange(of: selectedFilter) { _, _ in
-                            SensoryFeedback.light()
-                            // Exit selection mode when switching filters
-                            if isSelectionMode {
-                                withAnimation(DesignSystem.Animation.springStandard) {
-                                    isSelectionMode = false
-                                    selectedItems.removeAll()
-                                }
-                            }
-                        }
+            // Toast overlay
+            toastOverlay
+        }
+    }
 
-                        // Selection mode section
-                        Section {
-                            Button {
-                                withAnimation(DesignSystem.Animation.springStandard) {
-                                    isSelectionMode.toggle()
-                                    if !isSelectionMode {
-                                        selectedItems.removeAll()
-                                    }
-                                }
-                                SensoryFeedback.medium()
-                            } label: {
-                                Label(
-                                    isSelectionMode ? "Done Selecting" : "Select Items",
-                                    systemImage: isSelectionMode ? "checkmark.circle" : "checkmark.circle.badge.xmark"
-                                )
-                            }
+    // MARK: - Toast Overlay
 
-                            // Actions for selected items (only show when items are selected)
-                            if isSelectionMode && !selectedItems.isEmpty {
-                                Button {
-                                    exportSelectedItems()
-                                } label: {
-                                    Label("Export \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")",
-                                          systemImage: "doc.text")
-                                }
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if showingToast {
+            VStack {
+                Spacer()
 
-                                Button(role: .destructive) {
-                                    deleteSelectedItems()
-                                } label: {
-                                    Label("Delete \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")",
-                                          systemImage: "trash")
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: selectedFilter.icon)
-                                .font(.system(size: 18, weight: .medium))
-                            if allItems.count > 0 {
-                                Text("\(allItems.count)")
-                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            }
-                        }
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                        .symbolRenderingMode(.hierarchical)
+
+                    Text(toastMessage)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .glassEffect(in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    DesignSystem.Colors.primaryAccent.opacity(0.3),
+                                    DesignSystem.Colors.primaryAccent.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                }
+                .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.95).combined(with: .opacity)
+                ))
+                .padding(.bottom, 100)
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showingToast)
+        }
+    }
+
+    // MARK: - Notification Handlers
+
+    private func handleHighlightedNote(_ noteID: UUID?) {
+        guard let noteID = noteID else { return }
+        if let note = capturedNotes.first(where: { $0.id == noteID }) {
+            editingNote = note
+            editedText = note.content ?? ""
+            notesViewModel.isEditingNote = true
+            showEditSheet = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                navigationCoordinator.highlightedNoteID = nil
+            }
+        }
+    }
+
+    private func handleHighlightedQuote(_ quoteID: UUID?) {
+        guard let quoteID = quoteID else { return }
+        if let quote = capturedQuotes.first(where: { $0.id == quoteID }) {
+            editingQuote = quote
+            editedText = quote.text ?? ""
+            notesViewModel.isEditingNote = true
+            showEditSheet = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                navigationCoordinator.highlightedQuoteID = nil
+            }
+        }
+    }
+
+    private func handleCreateNewNote(_ notification: Notification) {
+        #if DEBUG
+        print("📝 CleanNotesView: Received CreateNewNote notification")
+        #endif
+        if let data = notification.object as? [String: Any],
+           let content = data["content"] as? String {
+            #if DEBUG
+            print("📝 Note content: \(content)")
+            #endif
+            let bookId = data["bookId"] as? String
+            let bookTitle = data["bookTitle"] as? String
+            let bookAuthor = data["bookAuthor"] as? String
+            #if DEBUG
+            print("📝 Book context: ID=\(bookId ?? "nil"), Title=\(bookTitle ?? "nil"), Author=\(bookAuthor ?? "nil")")
+            #endif
+            createNote(content: content, bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
+        } else {
+            #if DEBUG
+            print("❌ Failed to parse notification data")
+            #endif
+        }
+    }
+
+    private func handleSaveQuote(_ notification: Notification) {
+        if let data = notification.object as? [String: Any],
+           let quote = data["quote"] as? String {
+            let attribution = data["attribution"] as? String
+            let bookId = data["bookId"] as? String
+            let bookTitle = data["bookTitle"] as? String
+            let bookAuthor = data["bookAuthor"] as? String
+            createQuote(content: quote, attribution: attribution?.isEmpty ?? true ? nil : attribution,
+                       bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
+        }
+    }
+
+    private func handleShowToast(_ notification: Notification) {
+        if let data = notification.object as? [String: String],
+           let message = data["message"] {
+            showToast(message: message)
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var notesToolbar: some ToolbarContent {
+        // Push content to the right
+        ToolbarSpacer(.flexible)
+
+        // Search button
+        ToolbarItem {
+            Button {
+                withAnimation(DesignSystem.Animation.springStandard) {
+                    showSearchBar.toggle()
+                    if !showSearchBar {
+                        searchText = ""
                     }
-                    .accessibilityLabel("Filter and actions menu, \(allItems.count) total items")
-                    .accessibilityHint("Double tap to filter notes and quotes or select multiple items")
+                }
+                SensoryFeedback.light()
+            } label: {
+                Image(systemName: showSearchBar ? "xmark.circle.fill" : "magnifyingglass")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(showSearchBar ? DesignSystem.Colors.primaryAccent : .white.opacity(0.8))
+                    .symbolRenderingMode(.hierarchical)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .accessibilityLabel(showSearchBar ? "Close search" : "Search notes")
+            .accessibilityHint("Double tap to \(showSearchBar ? "close" : "open") search bar")
+        }
+
+        // Layout/filter options menu
+        ToolbarItem {
+            filterMenu
+        }
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            // Filter type picker
+            Picker("View", selection: $selectedFilter.animation(DesignSystem.Animation.springStandard)) {
+                ForEach(FilterType.allCases, id: \.self) { filter in
+                    Label(filter.description, systemImage: filter.icon)
+                        .tag(filter)
                 }
             }
-        }
-        .sheet(isPresented: $showEditSheet) {
-            if let capturedNote = editingNote {
-                NoteEditSheet(note: capturedNote.toNote())
-                    .environmentObject(notesViewModel)
+            .pickerStyle(.inline)
+            .onChange(of: selectedFilter) { _, _ in
+                SensoryFeedback.light()
+                if isSelectionMode {
+                    withAnimation(DesignSystem.Animation.springStandard) {
+                        isSelectionMode = false
+                        selectedItems.removeAll()
+                    }
+                }
             }
-        }
-        .onChange(of: showEditSheet) { _, newValue in
-            if !newValue {
-                notesViewModel.isEditingNote = false
-                editingNote = nil
-            }
-        }
-        .alert("Delete Item", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                deleteItem()
-            }
-        } message: {
-            let itemType = (itemToDelete as? CapturedNote) != nil ? "note" : "quote"
-            Text("Are you sure you want to delete this \(itemType)? This action cannot be undone.")
-        }
-        .sheet(isPresented: $showingSessionSummary) {
-            NavigationStack {
-                if selectedSessionNote != nil || selectedSessionQuote != nil {
-                    SessionSummaryPlaceholderView(
-                        note: selectedSessionNote,
-                        quote: selectedSessionQuote
+
+            // Selection mode section
+            Section {
+                Button {
+                    withAnimation(DesignSystem.Animation.springStandard) {
+                        isSelectionMode.toggle()
+                        if !isSelectionMode {
+                            selectedItems.removeAll()
+                        }
+                    }
+                    SensoryFeedback.medium()
+                } label: {
+                    Label(
+                        isSelectionMode ? "Done Selecting" : "Select Items",
+                        systemImage: isSelectionMode ? "checkmark.circle" : "checkmark.circle.badge.xmark"
                     )
                 }
+
+                // Actions for selected items
+                if isSelectionMode && !selectedItems.isEmpty {
+                    Button {
+                        exportSelectedItems()
+                    } label: {
+                        Label("Export \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")",
+                              systemImage: "doc.text")
+                    }
+
+                    Button(role: .destructive) {
+                        deleteSelectedItems()
+                    } label: {
+                        Label("Delete \(selectedItems.count) Item\(selectedItems.count == 1 ? "" : "s")",
+                              systemImage: "trash")
+                    }
+                }
             }
-        }
-        .sheet(item: $quoteShareData) { data in
-            QuoteShareSheet(
-                quote: data.text,
-                author: data.author,
-                bookTitle: data.bookTitle
-            )
-        }
-        .sheet(item: $exportContent) { content in
-            switch content {
-            case .singleNote(let note):
-                MarkdownExportSheet(note: note, quote: nil, notes: [], quotes: [])
-            case .singleQuote(let quote):
-                MarkdownExportSheet(note: nil, quote: quote, notes: [], quotes: [])
-            case .batch(let notes, let quotes):
-                MarkdownExportSheet(note: nil, quote: nil, notes: notes, quotes: quotes)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: selectedFilter.icon)
+                    .font(.system(size: 18, weight: .medium))
+                if allItems.count > 0 {
+                    Text("\(allItems.count)")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                }
             }
+            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+            .symbolRenderingMode(.hierarchical)
         }
+        .accessibilityLabel("Filter and actions menu, \(allItems.count) total items")
+        .accessibilityHint("Double tap to filter notes and quotes or select multiple items")
     }
 
     // Removed headerView - now using navigation title
@@ -918,6 +981,7 @@ struct CleanNotesView: View {
     private func startEdit(note: CapturedNote) {
         editingNote = note
         editingQuote = nil
+        editedText = note.content ?? ""
         notesViewModel.isEditingNote = true
         showEditSheet = true
         SensoryFeedback.light()
@@ -1059,6 +1123,25 @@ struct CleanNotesView: View {
             deleteQuote(quote)
         }
         itemToDelete = nil
+    }
+
+    // MARK: - Command Palette Handler
+    private func handleCommandPaletteResult(_ result: LiquidCommandPaletteV2.CommandResult) {
+        switch result {
+        case .richTextNote:
+            creatingNewRichTextNote = true
+            showingRichTextNoteSheet = true
+        case .note(let content):
+            let note = CapturedNote(content: content, source: .manual)
+            modelContext.insert(note)
+            try? modelContext.save()
+        case .quote(let text, let attribution):
+            let quote = CapturedQuote(text: text, author: attribution, source: .manual)
+            modelContext.insert(quote)
+            try? modelContext.save()
+        default:
+            break
+        }
     }
     
     private func deleteNote(_ note: CapturedNote) {
@@ -1599,18 +1682,19 @@ private struct NoteCardView: View {
 
     // MARK: - Content Text with Character-Based Measurement
     private var contentText: some View {
-        Text(note.content)
-            .font(.system(size: 16, weight: .regular, design: .default))
-            .foregroundStyle(.white.opacity(0.95))
-            .multilineTextAlignment(.leading)
-            .lineLimit(isExpanded ? nil : previewLineLimit)
-            .lineSpacing(6)
-            .onAppear {
-                estimateContentHeight()
-            }
-            .onChange(of: note.content) { _, _ in
-                estimateContentHeight()
-            }
+        FormattedNoteText(
+            markdown: note.content,
+            fontSize: 16,
+            lineSpacing: 6
+        )
+        .lineLimit(isExpanded ? nil : previewLineLimit)
+        .foregroundStyle(.white.opacity(0.95))
+        .onAppear {
+            estimateContentHeight()
+        }
+        .onChange(of: note.content) { _, _ in
+            estimateContentHeight()
+        }
     }
 
     private func estimateContentHeight() {

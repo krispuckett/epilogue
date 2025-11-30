@@ -235,36 +235,42 @@ struct SharedBookCoverView: View {
         
         if loadFullImage {
             // For detail views, skip thumbnail and load full quality directly
+            // Capture the URL and callback at task creation to avoid stale references
+            let expectedURL = urlString
+            let callback = onImageLoaded  // Capture callback now, before async work
             Task {
-                if LOG_COVER_DEBUG { print("🎯 BookDetailView: Loading FULL quality image directly") }
-                if let fullImage = await SharedBookCoverManager.shared.loadFullImage(from: urlString) {
+                if LOG_COVER_DEBUG { print("🎯 BookDetailView: Loading FULL quality image directly for: \(expectedURL)") }
+                if let fullImage = await SharedBookCoverManager.shared.loadFullImage(from: expectedURL) {
                     if LOG_COVER_DEBUG { print("🖼️ BookDetailView full image loaded: \(fullImage.size)") }
                     await MainActor.run {
-                        // Only update if we're still expecting this URL
-                        if self.currentLoadingURL == urlString {
-                            self.fullImage = fullImage
-                            self.isLoading = false
-                            self.currentLoadingURL = nil
-                            self.onImageLoaded?(fullImage)
-                            DisplayedImageStore.shared.store(image: fullImage, for: urlString)
-                            // Store in quick cache
-                            let cleanedURL = cleanURL(urlString)
-                            Self.quickImageCache.setObject(fullImage, forKey: "\(cleanedURL)_full" as NSString)
-                        }
+                        // Always update state and call callback - the callback was captured at task creation
+                        // so it has the correct closure from when loadImage() was called
+                        self.fullImage = fullImage
+                        self.isLoading = false
+                        self.currentLoadingURL = nil
+
+                        // Call the captured callback
+                        callback?(fullImage)
+
+                        DisplayedImageStore.shared.store(image: fullImage, for: expectedURL)
+                        // Store in quick cache
+                        let cleanedURL = cleanURL(expectedURL)
+                        Self.quickImageCache.setObject(fullImage, forKey: "\(cleanedURL)_full" as NSString)
+                        if LOG_COVER_DEBUG { print("   ✅ Updated fullImage and called onImageLoaded") }
                     }
                 } else {
                     if LOG_COVER_DEBUG { print("❌ Failed to load full image") }
                     await MainActor.run {
-                        if self.currentLoadingURL == urlString {
-                            self.isLoading = false
-                            self.loadFailed = true
-                            self.currentLoadingURL = nil
-                        }
+                        self.isLoading = false
+                        self.loadFailed = true
+                        self.currentLoadingURL = nil
                     }
                 }
             }
         } else {
             // Only load thumbnail for grid views
+            // Capture callback before async work to avoid stale references
+            let callback = onImageLoaded
             Task {
                 let thumbnail: UIImage?
                 if isLibraryView {
@@ -274,26 +280,24 @@ struct SharedBookCoverView: View {
                     // Use standard thumbnails for other views
                     thumbnail = await SharedBookCoverManager.shared.loadThumbnail(from: urlString)
                 }
-                
+
                 await MainActor.run {
-                    // Only update if we're still expecting this URL
-                    if self.currentLoadingURL == urlString {
-                        if let thumbnail = thumbnail {
-                            self.thumbnailImage = thumbnail
-                            self.isLoading = false
-                            self.currentLoadingURL = nil
-                            self.onImageLoaded?(thumbnail)
-                            // Store in quick cache
-                            let cleanedURL = cleanURL(urlString)
-                            let cacheKey = "\(cleanedURL)_\(loadFullImage ? "full" : "thumb")" as NSString
-                            Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
-                        } else {
-                            // Image failed to load
-                            self.isLoading = false
-                            self.loadFailed = true
-                            self.currentLoadingURL = nil
-                            if LOG_COVER_DEBUG { print("❌ Failed to load image from: \(urlString)") }
-                        }
+                    if let thumbnail = thumbnail {
+                        self.thumbnailImage = thumbnail
+                        self.isLoading = false
+                        self.currentLoadingURL = nil
+                        // Call the captured callback
+                        callback?(thumbnail)
+                        // Store in quick cache
+                        let cleanedURL = cleanURL(urlString)
+                        let cacheKey = "\(cleanedURL)_thumb" as NSString
+                        Self.quickImageCache.setObject(thumbnail, forKey: cacheKey)
+                    } else {
+                        // Image failed to load
+                        self.isLoading = false
+                        self.loadFailed = true
+                        self.currentLoadingURL = nil
+                        if LOG_COVER_DEBUG { print("❌ Failed to load image from: \(urlString)") }
                     }
                 }
             }

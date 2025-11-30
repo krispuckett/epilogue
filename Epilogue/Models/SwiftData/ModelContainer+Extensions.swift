@@ -11,8 +11,8 @@ extension ModelContainer {
             AIMessage.self,
             UsageTracking.self,
             ReadingSession.self,
-            BookEnrichment.self,
-            GeneratedTemplate.self
+            ReadingHabitPlan.self,
+            HabitDay.self
         ])
         
         let modelConfiguration = ModelConfiguration(
@@ -38,8 +38,8 @@ extension ModelContainer {
             AIMessage.self,
             UsageTracking.self,
             ReadingSession.self,
-            BookEnrichment.self,
-            GeneratedTemplate.self
+            ReadingHabitPlan.self,
+            HabitDay.self
         ])
         
         let modelConfiguration = ModelConfiguration(
@@ -100,6 +100,6 @@ enum SchemaV1: VersionedSchema {
     static var versionIdentifier = Schema.Version(1, 0, 0)
 
     static var models: [any PersistentModel.Type] {
-        [Book.self, Quote.self, Note.self, AISession.self, AIMessage.self, UsageTracking.self, ReadingSession.self, BookEnrichment.self, GeneratedTemplate.self]
+        [Book.self, Quote.self, Note.self, AISession.self, AIMessage.self, UsageTracking.self, ReadingSession.self, ReadingHabitPlan.self, HabitDay.self]
     }
 }

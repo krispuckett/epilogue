@@ -625,53 +625,84 @@ public class OKLABColorExtractor {
             
             return (primary, secondary, accent, background)
         } else {
-            // For normal covers, just use frequency order directly
-            let primary = sortedPeaks[safe: 0]?.color ?? UIColor.orange
-            let secondary = sortedPeaks[safe: 1]?.color ?? primary
-            let accent = sortedPeaks[safe: 2]?.color ?? secondary
-            
-            // Smart background selection
+            // For light/normal covers, prefer vibrant/saturated colors for primary
+            // This prevents washed-out tan/cream backgrounds from dominating
+            let vibrantPeaks = sortedPeaks.filter { peak in
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                return s > 0.3  // Has meaningful saturation (not beige/cream/gray)
+            }
+
+            // Also get non-vibrant peaks that are still colorful (like deeper tones)
+            let colorfulPeaks = sortedPeaks.filter { peak in
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                return s > 0.15  // At least slightly saturated
+            }
+
+            // Primary: prefer most frequent vibrant color, fall back to any colorful, then any
+            let primary: UIColor
+            if let firstVibrant = vibrantPeaks.first {
+                primary = firstVibrant.color
+            } else if let firstColorful = colorfulPeaks.first {
+                primary = firstColorful.color
+            } else {
+                primary = sortedPeaks[safe: 0]?.color ?? UIColor.orange
+            }
+
+            // Secondary: next vibrant or next in frequency
+            let secondary: UIColor
+            if vibrantPeaks.count > 1 {
+                secondary = vibrantPeaks[1].color
+            } else if let next = sortedPeaks.first(where: { $0.color != primary }) {
+                secondary = next.color
+            } else {
+                secondary = primary
+            }
+
+            // Accent: find most saturated color for visual pop
+            let accent: UIColor
+            if let mostSaturated = sortedPeaks.max(by: { peak1, peak2 in
+                var s1: CGFloat = 0, s2: CGFloat = 0
+                peak1.color.getHue(nil, saturation: &s1, brightness: nil, alpha: nil)
+                peak2.color.getHue(nil, saturation: &s2, brightness: nil, alpha: nil)
+                return s1 < s2
+            }) {
+                accent = mostSaturated.color
+            } else {
+                accent = secondary
+            }
+
+            // Smart background selection - prefer dark colors
             let background: UIColor
             if let darkestPeak = sortedPeaks.last {
-                // Check if the "background" candidate is actually dark
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 darkestPeak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                
+
                 if b < 0.3 {
-                    // Use it if actually dark
                     background = darkestPeak.color
-                    #if DEBUG
-                    print("  Using darkest color as background: \(colorDescription(darkestPeak.color)) (brightness: \(String(format: "%.2f", b)))")
-                    #endif
                 } else {
-                    // Otherwise, try to find a dark color in the peaks
+                    // Try to find any dark color in the peaks
                     if let darkColor = sortedPeaks.first(where: { peak in
-                        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
-                        peak.color.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                        return b < 0.3
+                        var brightness: CGFloat = 0
+                        peak.color.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
+                        return brightness < 0.3
                     }) {
                         background = darkColor.color
-                        #if DEBUG
-                        print("  Found dark color for background: \(colorDescription(darkColor.color)) (brightness: \(String(format: "%.2f", b)))")
-                        #endif
                     } else {
-                        // Default to dark gray if no dark colors found
-                        background = UIColor(white: 0.1, alpha: 1)
-                        #if DEBUG
-                        print("  No dark colors found, using default dark gray for background")
-                        #endif
+                        // Create a tinted dark background from the primary color
+                        background = self.tintedDarkBackground(from: primary)
                     }
                 }
             } else {
-                // Fallback to dark gray
-                background = UIColor(white: 0.1, alpha: 1)
-                #if DEBUG
-                print("  No peaks available, using default dark gray for background")
-                #endif
+                background = self.tintedDarkBackground(from: primary)
             }
-            
+
             #if DEBUG
-            print("🎯 Normal Cover Role Assignment (Pure Frequency):")
+            print("🎯 Light Cover Role Assignment (Vibrant Preference):")
+            #if DEBUG
+            print("  Vibrant peaks found: \(vibrantPeaks.count)")
+            #endif
             #if DEBUG
             print("  Sorted order: \(sortedPeaks.prefix(4).map { colorDescription($0.color) + " (\($0.count)px)" })")
             #endif
@@ -691,7 +722,7 @@ public class OKLABColorExtractor {
             print("    Background: \(colorDescription(background))")
             #endif
             #endif
-            
+
             return (primary, secondary, accent, background)
         }
     }

@@ -2,6 +2,26 @@ import SwiftUI
 import Combine
 import OSLog
 
+// MARK: - Ambient Mode Type
+
+/// Defines the two distinct ambient mode experiences
+enum AmbientModeType: Equatable {
+    /// Generic ambient mode - library-wide intelligence, recommendations, reading plans
+    case generic
+    /// Book-specific ambient mode - deep dive into a specific book
+    case bookSpecific(Book)
+
+    var isGeneric: Bool {
+        if case .generic = self { return true }
+        return false
+    }
+
+    var book: Book? {
+        if case .bookSpecific(let book) = self { return book }
+        return nil
+    }
+}
+
 /// Enhanced coordinator for Epilogue ambient mode
 @MainActor
 public class EpilogueAmbientCoordinator: ObservableObject {
@@ -12,12 +32,20 @@ public class EpilogueAmbientCoordinator: ObservableObject {
     @Published var initialBook: Book?  // Book to start with when launched from BookDetailView
     @Published var initialQuestion: String?  // Initial question to ask when launching
     @Published var existingSession: AmbientSession?  // Existing session to continue from
-    
+    @Published var ambientMode: AmbientModeType = .generic  // Track which mode we're in
+
     private init() {}
-    
+
     func launch(from context: LaunchContext = .general, book: Book? = nil) {
         preSelectedBook = book
         initialBook = book  // Set initialBook so AmbientModeView can pick it up
+
+        // Set ambient mode type based on book presence
+        if let book = book {
+            ambientMode = .bookSpecific(book)
+        } else {
+            ambientMode = .generic
+        }
 
         Task {
             await prepareServices()
@@ -30,36 +58,81 @@ public class EpilogueAmbientCoordinator: ObservableObject {
 
         #if DEBUG
         print("🚀 Launching ambient mode from: \(context)")
+        print("🎯 Mode: \(ambientMode.isGeneric ? "Generic" : "Book-Specific")")
         if let book = book {
             print("📚 With book: \(book.title)")
         }
         #endif
     }
-    
+
+    /// Launch generic ambient mode (no book context)
+    func launchGenericMode(initialQuestion: String? = nil) {
+        ambientMode = .generic
+        preSelectedBook = nil
+        initialBook = nil
+        self.initialQuestion = initialQuestion
+
+        Task {
+            await prepareServices()
+        }
+
+        isActive = true
+        HapticManager.shared.voiceModeStart()
+
+        #if DEBUG
+        print("🚀 Launching GENERIC ambient mode")
+        if let question = initialQuestion {
+            print("❓ Initial question: \(question)")
+        }
+        #endif
+    }
+
+    /// Launch book-specific ambient mode
+    func launchBookMode(book: Book, initialQuestion: String? = nil) {
+        ambientMode = .bookSpecific(book)
+        preSelectedBook = book
+        initialBook = book
+        self.initialQuestion = initialQuestion
+
+        Task {
+            await prepareServices()
+        }
+
+        isActive = true
+        HapticManager.shared.voiceModeStart()
+
+        #if DEBUG
+        print("🚀 Launching BOOK-SPECIFIC ambient mode")
+        print("📚 Book: \(book.title)")
+        #endif
+    }
+
     func dismiss() {
         isActive = false
         preSelectedBook = nil
         initialBook = nil
+        ambientMode = .generic
     }
-    
+
     private func prepareServices() async {
         // Comment out AppleIntelligenceCore until it's implemented
         // await AppleIntelligenceCore.shared.warmUp()
-        
+
         // Comment out VoiceRecognitionManager until it's properly configured
         // if !VoiceRecognitionManager.shared.isInitialized {
         //     await VoiceRecognitionManager.shared.initialize()
         // }
-        
+
         // For now, just add a small delay to simulate preparation
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
-    
+
     enum LaunchContext {
         case quickActions
         case bookDetail
         case library
         case general
+        case commandPalette  // New: launched from command palette
     }
 }
 
@@ -177,45 +250,5 @@ final class SimplifiedAmbientCoordinator: ObservableObject {
             name: Notification.Name("AmbientBookCleared"),
             object: nil
         )
-    }
-}
-
-// MARK: - View Extension for Presentation
-
-extension View {
-    func simplifiedAmbientPresentation() -> some View {
-        modifier(SimplifiedAmbientPresentationModifier())
-    }
-}
-
-struct SimplifiedAmbientPresentationModifier: ViewModifier {
-    @ObservedObject var coordinator = SimplifiedAmbientCoordinator.shared
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
-    @AppStorage("useNewAmbientMode") private var useNewAmbient = true
-    
-    func body(content: Content) -> some View {
-        content
-            .fullScreenCover(isPresented: $coordinator.isPresented) {
-                // Use UnifiedChatView in ambient mode for beautiful gradient interface
-                UnifiedChatView(
-                    preSelectedBook: coordinator.currentBook,
-                    startInVoiceMode: true,
-                    isAmbientMode: true
-                )
-                .environmentObject(libraryViewModel)
-                .environmentObject(notesViewModel)
-                .environmentObject(NavigationCoordinator.shared)
-                .preferredColorScheme(.dark)
-                .statusBarHidden(true)
-                .onAppear {
-                    #if DEBUG
-                    print("🎨 UNIFIED CHAT: Beautiful gradient ambient mode active!")
-                    #endif
-                    #if DEBUG
-                    print("🎨 Voice-responsive gradients with book context")
-                    #endif
-                }
-            }
     }
 }

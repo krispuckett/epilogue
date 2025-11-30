@@ -1176,8 +1176,8 @@ struct AmbientModeView: View {
                                             }
                                         )
                                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                                    } else if EpilogueAmbientCoordinator.shared.ambientMode.isGeneric {
-                                        // Generic mode: Use chat bubble style (no numbered format)
+                                    } else if currentBookContext == nil {
+                                        // Generic mode (no book context): Use chat bubble style (no numbered format)
                                         GenericModeChatBubble(
                                             message: message,
                                             isExpanded: expandedMessageIds.contains(message.id),
@@ -1193,12 +1193,20 @@ struct AmbientModeView: View {
                                             }
                                         )
                                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    } else if message.isUser {
+                                        // Book mode: Skip user messages - AI responses contain embedded question
+                                        // This prevents duplicate numbered items (user question + AI response with same question)
+                                        EmptyView()
                                     } else {
-                                        // Book mode: Use numbered thread format
+                                        // Book mode: Use numbered thread format for AI responses only
+                                        // AI responses contain both question and answer in format: **Question**\n\nAnswer
+                                        let aiOnlyMessages = messages.filter { !$0.isUser }
+                                        let aiIndex = aiOnlyMessages.firstIndex(where: { $0.id == message.id }) ?? 0
+
                                         AmbientMessageThreadView(
                                             message: message,
-                                            index: index,
-                                            totalMessages: messages.filter { !$0.isUser }.count,
+                                            index: aiIndex,
+                                            totalMessages: aiOnlyMessages.count,
                                             isExpanded: expandedMessageIds.contains(message.id),
                                             streamingText: streamingResponses[message.id],
                                             onToggle: {
@@ -1213,18 +1221,7 @@ struct AmbientModeView: View {
                                                     }
                                                 }
                                             },
-                                            onEdit: message.isUser ? { questionText in
-                                                // Prepopulate input with question text for editing
-                                                keyboardText = questionText
-                                                editingMessageId = message.id
-                                                editingMessageType = message.messageType
-
-                                                // Switch to text input mode
-                                                withAnimation(DesignSystem.Animation.springStandard) {
-                                                    inputMode = .textInput
-                                                    isKeyboardFocused = true
-                                                }
-                                            } : nil,
+                                            onEdit: nil,  // AI responses don't have edit capability here
                                             showPaywall: $showPaywall
                                         )
                                     }
@@ -1253,7 +1250,7 @@ struct AmbientModeView: View {
                     }
 
                     // Generic Mode typing indicator (V0 pattern)
-                    if isGenericModeThinking && EpilogueAmbientCoordinator.shared.ambientMode.isGeneric {
+                    if isGenericModeThinking && currentBookContext == nil {
                         GenericModeTypingIndicator()
                             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                             .transition(.opacity.combined(with: .scale(scale: 0.8)))
@@ -5425,7 +5422,7 @@ struct AmbientModeView: View {
         #if DEBUG
         print("🎨 Extracting colors for: \(book.title)")
         #endif
-        
+
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             #if DEBUG
             print("✅ Found cached palette for: \(book.title)")
@@ -5437,51 +5434,47 @@ struct AmbientModeView: View {
             }
             return
         }
-        
-        guard let coverURLString = book.coverImageURL else { 
+
+        guard let coverURLString = book.coverImageURL else {
             #if DEBUG
             print("❌ No cover URL for: \(book.title)")
             #endif
-            return 
+            return
         }
-        
-        // Convert HTTP to HTTPS for ATS compliance
-        let secureURLString = coverURLString.replacingOccurrences(of: "http://", with: "https://")
-        guard let coverURL = URL(string: secureURLString) else {
+
+        #if DEBUG
+        print("🔗 Cover URL: \(coverURLString)")
+        #endif
+
+        // Use SharedBookCoverManager to load the image - this ensures proper zoom parameter
+        // and consistent image quality across the app
+        guard let image = await SharedBookCoverManager.shared.loadFullImage(from: coverURLString) else {
             #if DEBUG
-            print("❌ Invalid URL: \(secureURLString)")
+            print("❌ Failed to load cover image for: \(book.title)")
             #endif
             return
         }
-        
+
+        #if DEBUG
+        print("📐 Image size: \(image.size)")
+        #endif
+
         do {
-            let (imageData, _) = try await URLSession.shared.data(from: coverURL)
-            guard let image = UIImage(data: imageData) else { 
-                #if DEBUG
-                print("❌ Failed to create image from data")
-                #endif
-                return 
-            }
-            
             let extractor = OKLABColorExtractor()
-            let palette = try await extractor.extractPalette(from: image)
-            
+            let palette = try await extractor.extractPalette(from: image, imageSource: book.title)
+
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 1.5)) {
                     self.colorPalette = palette
                     self.coverImage = image
                     #if DEBUG
                     print("✅ Color palette extracted for: \(book.title)")
-                    #endif
-                    #if DEBUG
                     print("  Primary: \(palette.primary)")
-                    #endif
-                    #if DEBUG
                     print("  Secondary: \(palette.secondary)")
                     #endif
                 }
             }
-            
+
             await BookColorPaletteCache.shared.cachePalette(palette, for: bookID, coverURL: book.coverImageURL)
         } catch {
             #if DEBUG

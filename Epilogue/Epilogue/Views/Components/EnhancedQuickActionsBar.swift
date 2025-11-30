@@ -401,6 +401,10 @@ struct EnhancedQuickActionsBar: View {
                 name: Notification.Name("PerformSearch"),
                 object: ["query": query]
             )
+        case .richTextNote:
+            // Rich text note - not supported in quick actions bar context
+            // This is handled in CleanNotesView instead
+            break
         case .cancel:
             // Cancelled, do nothing
             break

@@ -157,6 +157,8 @@ struct EpilogueApp: App {
                          JourneyBook.self,
                          JourneyMilestone.self,
                          BookMilestone.self,
+                         ReadingHabitPlan.self,
+                         HabitDay.self,
                     configurations: cloudKitContainer
                 )
                 #if DEBUG
@@ -273,9 +275,15 @@ struct EpilogueApp: App {
                      AmbientSession.self,
                      QueuedQuestion.self,
                      ReadingSession.self,
+                     ReadingJourney.self,
+                     JourneyBook.self,
+                     JourneyMilestone.self,
+                     BookMilestone.self,
+                     ReadingHabitPlan.self,
+                     HabitDay.self,
                 configurations: localConfig
             )
-            
+
             #if DEBUG
             print("📱 Simulator detected: Using local persistent storage")
             #endif
@@ -305,6 +313,12 @@ struct EpilogueApp: App {
                      AmbientSession.self,
                      QueuedQuestion.self,
                      ReadingSession.self,
+                     ReadingJourney.self,
+                     JourneyBook.self,
+                     JourneyMilestone.self,
+                     BookMilestone.self,
+                     ReadingHabitPlan.self,
+                     HabitDay.self,
                 configurations: localConfig
             )
 
@@ -346,6 +360,12 @@ struct EpilogueApp: App {
                          AmbientSession.self,
                          QueuedQuestion.self,
                          ReadingSession.self,
+                         ReadingJourney.self,
+                         JourneyBook.self,
+                         JourneyMilestone.self,
+                         BookMilestone.self,
+                         ReadingHabitPlan.self,
+                         HabitDay.self,
                     configurations: inMemoryConfig
                 )
 
