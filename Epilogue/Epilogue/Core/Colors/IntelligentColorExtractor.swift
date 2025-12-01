@@ -192,17 +192,24 @@ public class IntelligentColorExtractor {
 
     private func performSaliencyAnalysis(on image: CGImage) async throws -> SaliencyData {
         return try await withCheckedThrowingContinuation { continuation in
+            // Guard against double-resume (Vision callbacks can fire synchronously)
+            var hasResumed = false
+
             let request = VNGenerateAttentionBasedSaliencyImageRequest { request, error in
+                guard !hasResumed else { return }
+                hasResumed = true
+
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
                 }
 
-                guard let observation = request.results?.first as? VNSaliencyImageObservation,
-                      let pixelBuffer = observation.pixelBuffer else {
+                guard let observation = request.results?.first as? VNSaliencyImageObservation else {
                     continuation.resume(throwing: ExtractionError.saliencyFailed)
                     return
                 }
+
+                let pixelBuffer = observation.pixelBuffer
 
                 // Extract heat map values
                 let heatMap = self.extractHeatMapValues(from: pixelBuffer)
@@ -223,6 +230,8 @@ public class IntelligentColorExtractor {
             do {
                 try handler.perform([request])
             } catch {
+                guard !hasResumed else { return }
+                hasResumed = true
                 continuation.resume(throwing: error)
             }
         }
@@ -258,7 +267,13 @@ public class IntelligentColorExtractor {
 
     private func performTextDetection(on image: CGImage) async throws -> [CGRect] {
         return try await withCheckedThrowingContinuation { continuation in
+            // Guard against double-resume (Vision callbacks can fire synchronously)
+            var hasResumed = false
+
             let request = VNRecognizeTextRequest { request, error in
+                guard !hasResumed else { return }
+                hasResumed = true
+
                 if let error = error {
                     // Text detection failing is not critical
                     #if DEBUG
@@ -286,6 +301,8 @@ public class IntelligentColorExtractor {
             do {
                 try handler.perform([request])
             } catch {
+                guard !hasResumed else { return }
+                hasResumed = true
                 continuation.resume(returning: [])
             }
         }
@@ -295,9 +312,15 @@ public class IntelligentColorExtractor {
         // iOS 17+ only
         guard #available(iOS 17.0, *) else { return nil }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CGImage?, any Error>) in
+            // Guard against double-resume (Vision callbacks can fire synchronously)
+            var hasResumed = false
+
             let request = VNGenerateForegroundInstanceMaskRequest { request, error in
+                guard !hasResumed else { return }
+
                 if let error = error {
+                    hasResumed = true
                     #if DEBUG
                     print("⚠️ Foreground segmentation failed: \(error)")
                     #endif
@@ -305,23 +328,26 @@ public class IntelligentColorExtractor {
                     return
                 }
 
-                guard let result = request.results?.first else {
+                guard let result = request.results?.first as? VNInstanceMaskObservation else {
+                    hasResumed = true
                     continuation.resume(returning: nil)
                     return
                 }
 
                 // Generate mask
-                let handler = VNImageRequestHandler(cgImage: image, options: [:])
+                let maskHandler = VNImageRequestHandler(cgImage: image, options: [:])
                 do {
                     let maskBuffer = try result.generateScaledMaskForImage(
                         forInstances: result.allInstances,
-                        from: handler
+                        from: maskHandler
                     )
 
                     let ciImage = CIImage(cvPixelBuffer: maskBuffer)
                     let cgImage = self.context.createCGImage(ciImage, from: ciImage.extent)
+                    hasResumed = true
                     continuation.resume(returning: cgImage)
                 } catch {
+                    hasResumed = true
                     continuation.resume(returning: nil)
                 }
             }
@@ -330,6 +356,8 @@ public class IntelligentColorExtractor {
             do {
                 try handler.perform([request])
             } catch {
+                guard !hasResumed else { return }
+                hasResumed = true
                 continuation.resume(returning: nil)
             }
         }
