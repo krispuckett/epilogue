@@ -387,6 +387,13 @@ struct SettingsView: View {
                             Label("Liquid Glass Gradient", systemImage: "sparkles")
                                 .foregroundStyle(.cyan)
                         }
+
+                        NavigationLink {
+                            GradientComparisonLab()
+                        } label: {
+                            Label("Gradient Comparison Lab", systemImage: "rectangle.split.2x1")
+                                .foregroundStyle(.mint)
+                        }
                     } header: {
                         Text("Developer Options")
                     } footer: {
