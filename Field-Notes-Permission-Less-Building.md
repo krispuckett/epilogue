@@ -5,45 +5,59 @@
 
 ---
 
-## I Was Terrified
+## I Was Waiting
 
 Let me start there. Not with the framework, not with the methodology, not with the success story.
 
-I was terrified.
+I was waiting.
 
 I'm a designer. I've spent my career making things look good, thinking about user flows, arguing about pixels. And one day I had this idea for an app - Epilogue, a reading tracker that felt as beautiful as the books it would hold.
 
+I could see every detail in my mind. Every interaction. Every moment of delight.
+
 But I couldn't build it. Not really. I could design every pixel, but I couldn't ship it.
+
+So I waited.
+
+Waiting for what? I'm still not entirely sure.
+
+Waiting for the right engineer to appear? Waiting for the perfect moment? Waiting for permission from... someone? Myself?
 
 The traditional path was clear: find an engineer, convince them to build it, compromise on the vision, wait months for iterations. Or don't build it at all.
 
-Then AI coding tools showed up, and everyone started saying "designers can code now!" But that felt like a lie. I couldn't code. I didn't know Swift from Python from JavaScript. I'd tried learning to code before - multiple times - and bounced off it every time.
+Then AI coding tools showed up, and everyone started saying "designers can code now!"
 
-So when people said "just use AI to build it," I heard: "just do the thing you've always been terrified of, except now with a robot."
+But I still waited. Because "designers can code now" didn't answer the real question: **How do I actually begin?**
 
-Great. Still terrifying.
+I didn't need motivation. I didn't need validation. I needed to know where to put my hands on the thing to start moving it.
+
+And I didn't know. So I kept waiting.
 
 ---
 
 ## The Question That Changed Everything
 
-Six months ago, I was staring at yet another tutorial about SwiftUI, feeling like an imposter, about to give up again.
+Six months ago, I was staring at yet another tutorial about SwiftUI, trying to find the starting point.
 
-And I had this stupid, simple thought:
+Every tutorial assumed I knew something I didn't. Every guide started in the middle. I kept looking for the door into this world, but couldn't find it.
+
+And then I had this stupid, simple thought:
 
 **What if I just... asked?**
 
 Not "learned enough to know what to ask."
-Not "studied until I deserved to ask."
-Just... asked.
+Not "found the right tutorial that explains it properly."
+Just... opened Claude and asked like I would ask a person.
 
 "I want to build an iOS app that tracks books I'm reading. Where do I start?"
 
-And Claude (the AI) just... told me. In plain English. No jargon. No assumption I knew anything.
+And Claude just... told me. In plain English. No jargon. No assumption I knew anything.
 
 "Okay, let's create a SwiftUI project. Here's the code for a simple book list..."
 
 Wait, that's it? I can just... ask?
+
+**That was the door. The starting point I'd been looking for was just: ask.**
 
 **"I don't know how to make the book covers look good on dark backgrounds."**
 
@@ -95,20 +109,24 @@ The second version gets me a real solution. And I learned something in the proce
 
 **Being clear about what you don't know is more valuable than pretending expertise.**
 
-### Field Note #3: Fear Doesn't Go Away, But It Changes Shape
+### Field Note #3: The Questions Evolve (And That's Progress)
 
-I'm still scared. Just differently.
+I still don't know everything. But what I don't know has changed.
 
-Month 1: "What if I can't do this at all?"
-Month 2: "What if my code is garbage?"
-Month 3: "What if real engineers see this and laugh?"
-Month 6: "What if I ship this and it breaks for users?"
+Month 1: "I don't know where to start."
+Month 2: "I don't know why the Silmarillion shows green instead of blue."
+Month 3: "I don't know if this code is maintainable long-term."
+Month 6: "I don't know the optimal way to handle this edge case."
 
-The fear evolved, but it didn't disappear. I just learned to walk with it.
+See the difference? The questions got **more specific**.
 
-Aragorn didn't stop being afraid when he accepted the crown. He just decided the calling was bigger than the fear.
+Early on, I didn't know enough to even ask good questions. Now I can point precisely at what I don't understand.
 
-Same here. The vision for Epilogue was bigger than my fear of not knowing how to build it.
+That's not mastery. But it's progress.
+
+**Vague uncertainty ("I don't know how to build apps") became specific curiosity ("I don't know why this color is being prioritized").**
+
+And specific questions get specific answers. Vague uncertainty just keeps you waiting.
 
 ### Field Note #4: The Conversation Is the Code
 
