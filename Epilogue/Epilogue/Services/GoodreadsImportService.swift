@@ -421,8 +421,8 @@ class GoodreadsImportService: ObservableObject {
         var totalAPICalls = 0
         
         for (index, batch) in batches.enumerated() {
-            // Check for pause
-            while isPaused {
+            // Check for pause - update progress once, then wait
+            if isPaused {
                 currentProgress = ImportProgress(
                     current: processedCount,
                     total: books.count,
@@ -432,7 +432,9 @@ class GoodreadsImportService: ObservableObject {
                     batchNumber: index + 1,
                     totalBatches: totalBatches
                 )
-                try await Task.sleep(nanoseconds: 500_000_000)
+                while isPaused {
+                    try await Task.sleep(nanoseconds: 500_000_000)
+                }
             }
             
             // Update progress for batch

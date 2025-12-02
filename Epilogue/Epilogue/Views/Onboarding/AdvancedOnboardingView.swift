@@ -8,6 +8,7 @@ struct AdvancedOnboardingView: View {
 
     @State private var currentPage = 0
     @State private var players: [Int: AVPlayer] = [:]
+    @State private var videoObservers: [NSObjectProtocol] = []
     @State private var pageAnimationComplete = false
     @State private var viewOpacity: Double = 0
     @State private var pageTransition: Bool = false
@@ -155,6 +156,19 @@ struct AdvancedOnboardingView: View {
                 viewOpacity = 1
             }
         }
+        .onDisappear {
+            // Clean up video observers to prevent leaks
+            for observer in videoObservers {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            videoObservers.removeAll()
+
+            // Stop and clean up players
+            for (_, player) in players {
+                player.pause()
+            }
+            players.removeAll()
+        }
     }
 
     // MARK: - Video Preloading
@@ -173,8 +187,8 @@ struct AdvancedOnboardingView: View {
             // Preload buffer for instant playback
             player.currentItem?.preferredForwardBufferDuration = 10
 
-            // Loop video when it ends
-            NotificationCenter.default.addObserver(
+            // Loop video when it ends - store observer for cleanup
+            let observer = NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: player.currentItem,
                 queue: .main
@@ -182,6 +196,7 @@ struct AdvancedOnboardingView: View {
                 player.seek(to: .zero)
                 player.play()
             }
+            videoObservers.append(observer)
 
             players[index] = player
         }

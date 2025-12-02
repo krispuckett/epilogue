@@ -18,6 +18,8 @@ class NoteIntelligenceEngine: ObservableObject {
     // MARK: - Private Properties
     private var processingQueue = DispatchQueue(label: "com.epilogue.noteintelligence", qos: .utility)
     private var embeddings: [UUID: [Float]] = [:]
+    private var embeddingsOrder: [UUID] = []  // Track insertion order for LRU eviction
+    private let maxEmbeddingsCache = 500  // Limit cache size to prevent memory growth
     private var sentimentAnalyzer: NLModel?
     private var cancellables = Set<AnyCancellable>()
     
@@ -169,11 +171,27 @@ class NoteIntelligenceEngine: ObservableObject {
         // Use NaturalLanguage framework for basic embeddings
         // In production, you'd use a proper embedding model
         for note in notes {
+            // Skip if already cached
+            if embeddings[note.id] != nil { continue }
+
             let embedding = await generateEmbedding(for: note.content)
             await MainActor.run {
-                self.embeddings[note.id] = embedding
+                self.storeEmbedding(embedding, for: note.id)
             }
         }
+    }
+
+    private func storeEmbedding(_ embedding: [Float], for id: UUID) {
+        // LRU cache eviction - remove oldest if at capacity
+        if embeddings.count >= maxEmbeddingsCache {
+            if let oldestId = embeddingsOrder.first {
+                embeddings.removeValue(forKey: oldestId)
+                embeddingsOrder.removeFirst()
+            }
+        }
+
+        embeddings[id] = embedding
+        embeddingsOrder.append(id)
     }
     
     private func generateEmbedding(for text: String) async -> [Float] {
@@ -215,20 +233,34 @@ class NoteIntelligenceEngine: ObservableObject {
     
     private func findConnections(between notes: [Note]) async {
         var connections: [UUID: Set<UUID>] = [:]
-        
-        for i in 0..<notes.count {
-            for j in (i+1)..<notes.count {
-                let note1 = notes[i]
-                let note2 = notes[j]
-                
+
+        // Limit notes to prevent O(n²) explosion with large libraries
+        let maxNotesToProcess = 200
+        let recentNotes = notes.suffix(maxNotesToProcess)
+        var pairsChecked = 0
+        let maxPairs = 5000  // Safety limit
+
+        for i in 0..<recentNotes.count {
+            for j in (i+1)..<recentNotes.count {
+                // Yield periodically to prevent blocking
+                pairsChecked += 1
+                if pairsChecked % 100 == 0 {
+                    await Task.yield()
+                }
+                if pairsChecked >= maxPairs { break }
+
+                let note1 = recentNotes[recentNotes.startIndex + i]
+                let note2 = recentNotes[recentNotes.startIndex + j]
+
                 // Check for connections
                 if areConnected(note1, note2) {
                     connections[note1.id, default: []].insert(note2.id)
                     connections[note2.id, default: []].insert(note1.id)
                 }
             }
+            if pairsChecked >= maxPairs { break }
         }
-        
+
         await MainActor.run {
             self.noteConnections = connections
         }
@@ -391,22 +423,22 @@ class NoteIntelligenceEngine: ObservableObject {
         return dotProduct / (magnitudeA * magnitudeB)
     }
     
+    // Pre-computed Sets for O(1) sentiment lookup
+    private static let positiveWords: Set<String> = ["love", "amazing", "brilliant", "wonderful", "excellent", "great", "fantastic", "beautiful", "inspiring", "profound"]
+    private static let negativeWords: Set<String> = ["hate", "terrible", "awful", "disappointing", "bad", "boring", "confusing", "frustrating", "tedious", "weak"]
+
     private func analyzeSentiment(_ text: String) -> (sentiment: String, isStrong: Bool) {
-        // Simplified sentiment analysis
-        let positiveWords = ["love", "amazing", "brilliant", "wonderful", "excellent"]
-        let negativeWords = ["hate", "terrible", "awful", "disappointing", "bad"]
-        
         let words = text.lowercased().components(separatedBy: .whitespacesAndNewlines)
-        
-        // Count positive and negative words more efficiently
+
+        // Count positive and negative words with O(1) Set lookup
         var positiveCount = 0
         var negativeCount = 0
-        
+
         for word in words {
-            if positiveWords.contains(word) {
+            if Self.positiveWords.contains(word) {
                 positiveCount += 1
             }
-            if negativeWords.contains(word) {
+            if Self.negativeWords.contains(word) {
                 negativeCount += 1
             }
         }

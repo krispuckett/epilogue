@@ -160,6 +160,8 @@ class AmbientLifecycleManager: ObservableObject {
     // MARK: - Timer Management
     
     private func startSessionTimer() {
+        // Invalidate any existing timer first to prevent leaks
+        sessionTimer?.invalidate()
         sessionTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.updateSessionDuration()
         }

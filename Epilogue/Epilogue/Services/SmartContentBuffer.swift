@@ -506,6 +506,8 @@ class SmartContentBuffer: ObservableObject {
     }
     
     private func startBufferTimer() {
+        // Invalidate any existing timer first to prevent leaks
+        bufferTimer?.invalidate()
         bufferTimer = Timer.scheduledTimer(withTimeInterval: maxBufferDuration, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             

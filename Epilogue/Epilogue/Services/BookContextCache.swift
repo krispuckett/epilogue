@@ -47,7 +47,10 @@ class BookContextCache {
     }
     
     private init() {
-        loadCachedContexts()
+        // Load cache asynchronously to avoid blocking main thread
+        cacheQueue.async { [weak self] in
+            self?.loadCachedContexts()
+        }
     }
     
     // MARK: - Public Methods
