@@ -92,17 +92,17 @@ struct BookDetailView: View {
     @State private var hasAppeared = false
     @State private var contentLoaded = false
     @State private var delayedContentLoaded = false
-    @State private var summaryBlur: Double = 10
+    @State private var summaryBlur: Double = 4
     @State private var summaryOpacity: Double = 0
-    @State private var contextBlur: Double = 10
+    @State private var contextBlur: Double = 4
     @State private var contextOpacity: Double = 0
-    
+
     // Enhanced animation states - using blur instead of scale
-    @State private var coverBlur: Double = 10
+    @State private var coverBlur: Double = 8
     @State private var coverOpacity: Double = 0
-    @State private var titleBlur: Double = 10
+    @State private var titleBlur: Double = 6
     @State private var titleOpacity: Double = 0
-    @State private var metadataBlur: Double = 10
+    @State private var metadataBlur: Double = 4
     @State private var metadataOpacity: Double = 0
     
     // Dynamic gradient opacity based on scroll
@@ -748,32 +748,16 @@ struct BookDetailView: View {
         }
         .onChange(of: coverImage) { oldImage, newImage in
             // Extract colors when cover image is loaded
-            // Using onChange instead of callback to avoid stale closure issues
             guard let uiImage = newImage else { return }
-
-            #if DEBUG
-            print("🖼️ BookDetailView onChange(coverImage) fired for: \(book.title)")
-            print("   colorPalette: \(colorPalette == nil ? "nil" : "has value")")
-            print("   isExtractingColors: \(isExtractingColors)")
-            print("   hasLowResColors: \(hasLowResColors)")
-            print("   image size: \(uiImage.size)")
-            #endif
 
             // Only extract if we don't have colors yet
             if colorPalette == nil && !isExtractingColors && !hasLowResColors {
-                #if DEBUG
-                print("   ✅ Starting color extraction from onChange...")
-                #endif
                 Task {
                     await extractColorsFromDisplayedImage(uiImage)
                     await MainActor.run {
                         hasLowResColors = true
                     }
                 }
-            } else {
-                #if DEBUG
-                print("   ⏭️ Skipping extraction - already have palette or extracting")
-                #endif
             }
         }
     }
@@ -1013,17 +997,6 @@ struct BookDetailView: View {
                         .foregroundColor(textColor.opacity(0.9))
                         .lineSpacing(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .onAppear {
-                            #if DEBUG
-                            print("📱 [UI] Displaying ENRICHED synopsis for '\(book.title)'")
-                            #endif
-                            #if DEBUG
-                            print("   Length: \(synopsis.count) chars")
-                            #endif
-                            #if DEBUG
-                            print("   Preview: \(synopsis.prefix(80))...")
-                            #endif
-                        }
                 } else {
                     // Fallback to Google Books description
                     if summaryExpanded {
@@ -1034,17 +1007,6 @@ struct BookDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .transition(.opacity)
-                            .onAppear {
-                                #if DEBUG
-                                print("📱 [UI] Displaying GOOGLE BOOKS description for '\(book.title)' (expanded)")
-                                #endif
-                                #if DEBUG
-                                print("   BookModel enriched: \(bookModel?.isEnriched ?? false)")
-                                #endif
-                                #if DEBUG
-                                print("   SmartSynopsis: \(bookModel?.smartSynopsis?.prefix(30) ?? "nil")")
-                                #endif
-                            }
                     } else {
                         Text(description)
                             .font(.system(size: 15))
@@ -1054,17 +1016,6 @@ struct BookDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .transition(.opacity)
-                            .onAppear {
-                                #if DEBUG
-                                print("📱 [UI] Displaying GOOGLE BOOKS description for '\(book.title)' (collapsed)")
-                                #endif
-                                #if DEBUG
-                                print("   BookModel enriched: \(bookModel?.isEnriched ?? false)")
-                                #endif
-                                #if DEBUG
-                                print("   SmartSynopsis: \(bookModel?.smartSynopsis?.prefix(30) ?? "nil")")
-                                #endif
-                            }
                     }
                 }
             }

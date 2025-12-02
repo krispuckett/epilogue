@@ -27,16 +27,6 @@ struct BookCard: View {
         VStack(alignment: .leading, spacing: 8) {
             // Book cover with Currently Reading indicator
             ZStack(alignment: .topTrailing) {
-                // DEBUG: Log the book details
-                let _ = print("🎴 BookCard rendering book:")
-                let _ = print("   Title: \(book.title)")
-                let _ = print("   Author: \(book.author)")
-                let _ = print("   ID: \(book.id)")
-                let _ = print("   LocalID: \(book.localId)")
-                let _ = print("   Cover URL: \(book.coverImageURL ?? "nil")")
-                let _ = print("   Cover URL is nil? \(book.coverImageURL == nil)")
-                let _ = print("   Cover URL is empty? \(book.coverImageURL?.isEmpty ?? true)")
-                
                 SharedBookCoverView(
                     coverURL: book.coverImageURL,
                     width: 170,
@@ -320,8 +310,6 @@ struct CircularProgressView: View {
 
 // MARK: - Currently Reading Badge
 struct CurrentlyReadingBadge: View {
-    @State private var isAnimating = false
-
     var body: some View {
         ZStack {
             // Glass background
@@ -344,7 +332,7 @@ struct CurrentlyReadingBadge: View {
                         )
                 }
 
-            // Bookmark icon
+            // Bookmark icon - static for scroll performance
             Image(systemName: "bookmark.fill")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(
@@ -357,13 +345,7 @@ struct CurrentlyReadingBadge: View {
                         endPoint: .bottom
                     )
                 )
-                .scaleEffect(isAnimating ? 1.1 : 1.0)
                 .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.4), radius: 4)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                isAnimating = true
-            }
         }
     }
 }

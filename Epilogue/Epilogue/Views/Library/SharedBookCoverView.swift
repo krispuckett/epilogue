@@ -160,30 +160,8 @@ struct SharedBookCoverView: View {
         
         // If we're already loading this exact URL, don't start another load
         if currentLoadingURL == urlString && isLoading {
-            #if DEBUG
-            print("⏭️ Already loading: \(urlString)")
-            #endif
             return
         }
-        
-        #if DEBUG
-        print("\n🔍 SharedBookCoverView.loadImage() called:")
-        #endif
-        #if DEBUG
-        print("   Raw URL: \(urlString)")
-        #endif
-        #if DEBUG
-        print("   Contains zoom? \(urlString.contains("zoom="))")
-        #endif
-        #if DEBUG
-        print("   Starts with http? \(urlString.starts(with: "http://"))")
-        #endif
-        #if DEBUG
-        print("   isLibraryView: \(isLibraryView)")
-        #endif
-        #if DEBUG
-        print("   loadFullImage: \(loadFullImage)")
-        #endif
         
         // Optional debug URL test removed for performance
         
@@ -339,10 +317,6 @@ struct SharedBookCoverView: View {
         let fullKey = "\(cleaned)_full" as NSString
         quickImageCache.removeObject(forKey: thumbKey)
         quickImageCache.removeObject(forKey: fullKey)
-        
-        #if DEBUG
-        print("🧹 Cleared cache for URL: \(urlString)")
-        #endif
     }
     
     var body: some View {
@@ -351,20 +325,9 @@ struct SharedBookCoverView: View {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                 .fill(Color(red: 0.25, green: 0.25, blue: 0.3))
                 .onAppear {
-                    #if DEBUG
-                    print("🎨 SharedBookCoverView.onAppear - URL: \(coverURL ?? "nil")")
-                    #endif
-                    if coverURL == nil {
-                        #if DEBUG
-                        print("   ⚠️ WARNING: SharedBookCoverView received nil URL!")
-                        #endif
-                    }
                     loadImage()
                 }
                 .onChange(of: coverURL) { oldURL, newURL in
-                    #if DEBUG
-                    print("🔄 SharedBookCoverView URL changed from: \(oldURL ?? "nil") to: \(newURL ?? "nil")")
-                    #endif
                     // Only reload if URL actually changed
                     if newURL != oldURL {
                         // Clear old cache entries if URL changed

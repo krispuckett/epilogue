@@ -60,7 +60,11 @@ final class BookModel {
 
     @Relationship(deleteRule: .cascade, inverse: \ReadingSession.bookModel)
     var readingSessions: [ReadingSession]?
-    
+
+    // Reading Journey relationship (inverse of JourneyBook.bookModel)
+    @Relationship(deleteRule: .nullify, inverse: \JourneyBook.bookModel)
+    var journeyBooks: [JourneyBook]?
+
     init(
         id: String,
         title: String,

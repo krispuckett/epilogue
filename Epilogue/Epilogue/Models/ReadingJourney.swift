@@ -131,8 +131,10 @@ final class JourneyBook {
     var id: UUID = UUID()
     var order: Int = 0 // Position in the journey
 
-    // Relationship to the actual book
+    // Relationship to the actual book (inverse defined in BookModel.journeyBooks)
+    @Relationship(deleteRule: .nullify)
     var bookModel: BookModel?
+
     var journey: ReadingJourney?
 
     // Journey-specific metadata
