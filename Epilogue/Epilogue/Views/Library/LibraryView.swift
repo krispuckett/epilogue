@@ -2102,7 +2102,7 @@ class LibraryViewModel: ObservableObject {
                 #if DEBUG
                 print("  🔄 Found book by localId instead: \(book.localId)")
                 #endif
-                let bookToRemove = books[index]
+                _ = books[index]
                 books.remove(at: index)
                 saveBooks()
                 objectWillChange.send()

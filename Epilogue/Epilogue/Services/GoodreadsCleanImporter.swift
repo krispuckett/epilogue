@@ -94,7 +94,7 @@ class GoodreadsCleanImporter: ObservableObject {
             #endif
             
             // Search Google Books
-            if var book = await searchGoogleBooks(for: csvBook) {
+            if let book = await searchGoogleBooks(for: csvBook) {
                 // Add Goodreads data to the book
                 var enrichedBook = book
 

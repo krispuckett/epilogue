@@ -25,7 +25,7 @@ enum InputContext {
             return "Add quote or note from \(book.title)..."
         case .quickActions:
             return "Search, Add Note, Add Book..."
-        case .bookNote(let book):
+        case .bookNote:
             return "Add your quick note or quote..."
         }
     }

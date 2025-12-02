@@ -101,7 +101,7 @@ class ReadingJourneyManager: ObservableObject {
         let orderedBooks = await generateBookOrder(books: books, intent: userIntent, preferences: preferences)
 
         // Add books to journey with reasoning
-        for (index, bookWithReasoning) in orderedBooks.enumerated() {
+        for (_, bookWithReasoning) in orderedBooks.enumerated() {
             journey.addBook(bookWithReasoning.book, reasoning: bookWithReasoning.reasoning)
 
             // Generate milestones for each book

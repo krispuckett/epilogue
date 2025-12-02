@@ -187,7 +187,6 @@ struct CoverClassifier {
         // Find the largest gap to determine the effective range
         let sortedBuckets = significantBuckets.map { $0.offset }.sorted()
         var maxGap = 0
-        var gapStart = sortedBuckets.last!
 
         for i in 0..<sortedBuckets.count {
             let current = sortedBuckets[i]
@@ -196,7 +195,6 @@ struct CoverClassifier {
 
             if gap > maxGap {
                 maxGap = gap
-                gapStart = prev
             }
         }
 

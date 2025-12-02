@@ -58,7 +58,7 @@ class QuoteIntelligence: ObservableObject {
 
     private func generateHeuristicQuestion(_ quote: String, bookContext: Book?) -> String {
         let wordCount = quote.split(separator: " ").count
-        let sentences = quote.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        _ = quote.components(separatedBy: CharacterSet(charactersIn: ".!?"))
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
 
         // Analyze quote characteristics

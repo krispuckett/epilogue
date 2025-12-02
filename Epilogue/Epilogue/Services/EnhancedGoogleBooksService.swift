@@ -201,7 +201,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         )
 
         // Deduplicate: Only add books we don't already have
-        var existingIDs = Set(enhancedSearchResults.map { $0.id })
+        let existingIDs = Set(enhancedSearchResults.map { $0.id })
         let uniqueNewResults = newResults.filter { !existingIDs.contains($0.id) }
 
         enhancedSearchResults.append(contentsOf: uniqueNewResults)

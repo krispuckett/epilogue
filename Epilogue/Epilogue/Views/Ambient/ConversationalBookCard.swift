@@ -163,7 +163,7 @@ struct ConversationalResponseMessageView: View {
     }
 
     private func formatResponse(_ text: String) -> AttributedString {
-        var result = AttributedString(text)
+        let result = AttributedString(text)
         // Basic formatting - could be enhanced with markdown parsing
         return result
     }

@@ -140,13 +140,6 @@ struct CaptureReviewQueue: View {
     
     private func confirmCapture(_ capture: PendingCapture) {
         // Send confirmed capture back to processor
-        let contentType: AmbientProcessedContent.ContentType
-        switch capture.suggestedType {
-        case .quote: contentType = .quote
-        case .note: contentType = .note
-        case .question: contentType = .question
-        }
-        
         Task {
             await processor.processDetectedText(
                 capture.text,
@@ -172,7 +165,6 @@ struct CaptureReviewQueue: View {
     
     private func updateCaptureType(_ capture: PendingCapture, to newType: CaptureType) {
         if let index = reviewQueue.firstIndex(where: { $0.id == capture.id }) {
-            var updated = capture
             reviewQueue[index] = PendingCapture(
                 text: capture.text,
                 suggestedType: newType,

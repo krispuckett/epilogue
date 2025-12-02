@@ -787,7 +787,7 @@ struct UnifiedQuickActionCard: View {
                 object: note
             )
 
-        case .searchLibrary(let query), .searchNotes(let query), .searchAll(let query):
+        case .searchLibrary, .searchNotes, .searchAll:
             // For now, create as note - could enhance with search UI later
             createNote(trimmed)
 

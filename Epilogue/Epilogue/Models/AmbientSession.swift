@@ -286,10 +286,10 @@ final class AmbientSession {
         
         // Parse the AI response for structured data
         var theme = defaultInsights.dominantTheme
-        var arc = defaultInsights.emotionalArc
-        var realization: String? = nil
-        var connections: [String] = []
-        var reflection = defaultInsights.suggestedReflection
+        let arc = defaultInsights.emotionalArc
+        let realization: String? = nil
+        let connections: [String] = []
+        let reflection = defaultInsights.suggestedReflection
         
         let lines = response.components(separatedBy: .newlines)
         for line in lines {

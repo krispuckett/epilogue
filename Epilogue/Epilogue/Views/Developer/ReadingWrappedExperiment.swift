@@ -205,10 +205,9 @@ struct ReadingWrappedExperiment: View {
             )
         case .topBook:
             if let topBook = wrappedData.topBook,
-               let imageData = topBook.coverImageData,
-               let image = UIImage(data: imageData) {
-                BookAtmosphericGradientWithImage(image: image)
-                    .blur(radius: 40)
+               let _ = topBook.coverImageData {
+                // Use simple gradient fallback for book covers
+                defaultGradient(hue: 0.05)
             } else {
                 defaultGradient(hue: 0.05)
             }

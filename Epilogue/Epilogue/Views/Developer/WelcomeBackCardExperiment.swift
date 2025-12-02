@@ -126,9 +126,14 @@ struct WelcomeBackCardExperiment: View {
             // Card container with liquid effect
             ZStack {
                 // Atmospheric background from book
-                if let image = bookCoverImage {
-                    BookAtmosphericGradientWithImage(image: image)
-                        .blur(radius: 30)
+                if let _ = bookCoverImage {
+                    // Simple gradient fallback for atmospheric background
+                    LinearGradient(
+                        colors: [.purple.opacity(0.6), .blue.opacity(0.4), .black],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .blur(radius: 30)
                         .layerEffect(
                             ShaderLibrary.liquid_displacement(
                                 .boundingRect,

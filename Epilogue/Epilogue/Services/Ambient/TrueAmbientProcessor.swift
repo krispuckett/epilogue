@@ -539,7 +539,7 @@ public class TrueAmbientProcessor: ObservableObject {
         logger.info("🎯 Processing detected text: \(correctedText)")
         
         // Add to conversation memory
-        let memory = conversationMemory.addMemory(
+        _ = conversationMemory.addMemory(
             text: correctedText,
             intent: enhancedIntent,
             bookTitle: bookContext?.title,
@@ -1439,13 +1439,8 @@ public class TrueAmbientProcessor: ObservableObject {
             
         case .ambient, .unknown:
             // Less important content - batch process later
-            let content = AmbientProcessedContent(
-                text: text,
-                type: intent,
-                timestamp: Date(),
-                confidence: confidence
-            )
-            // Removed - using detectedContent as single source
+            // Note: AmbientProcessedContent created but not stored - using detectedContent as single source
+            break
         }
         
         // Reset to listening state
@@ -1747,7 +1742,7 @@ public class TrueAmbientProcessor: ObservableObject {
     // MARK: - Enhanced WhisperKit Context Management
     
     public func updateWhisperKitContext(for context: ReadingContextManager.ReadingContext?) async {
-        guard let context = context, let whisperModel = whisperModel else { return }
+        guard let context = context, let _ = whisperModel else { return }
         
         logger.info("📚 Updating WhisperKit with reading context for: \(context.book.title)")
         
@@ -1834,8 +1829,8 @@ public class TrueAmbientProcessor: ObservableObject {
         var type: AmbientProcessedContent.ContentType = .note
         var confidence: Float = 0.7
         var pageRef: Int? = nil
-        var theme: String? = nil
-        var mood: String? = nil
+        let theme: String? = nil
+        let mood: String? = nil
         
         let lines = response.components(separatedBy: .newlines)
         for line in lines {
@@ -2265,8 +2260,7 @@ extension TrueAmbientProcessor {
         
         // CRITICAL: Add question to UI immediately with "thinking" indicator
         // But first check if it already exists to avoid duplicates
-        // IMPORTANT: Define this first so it's available throughout the function
-        let questionIndex = await MainActor.run {
+        _ = await MainActor.run {
             if let existingIndex = self.detectedContent.firstIndex(where: { 
                 $0.type == .question && 
                 $0.text.lowercased() == question.lowercased() 
@@ -2393,13 +2387,7 @@ extension TrueAmbientProcessor {
         
         guard realTimeEnabled else {
             // Save for later if disabled
-            let content = AmbientProcessedContent(
-                text: question,
-                type: .question,
-                timestamp: Date(),
-                confidence: confidence
-            )
-            // Removed - using detectedContent as single source
+            // Note: AmbientProcessedContent not stored - using detectedContent as single source
             return
         }
         
@@ -2505,8 +2493,6 @@ extension TrueAmbientProcessor {
         var lastUpdateLength = 0
         let updateThresholds = [200, 400, 600, 800, 1000] // Progressive update points
         var thresholdIndex = 0
-        let startTime = Date()
-        
         do {
             // Look up enrichment data from BookModel
             let enrichment = getEnrichmentFromBook(bookContext)

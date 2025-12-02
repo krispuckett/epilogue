@@ -133,7 +133,6 @@ public class SharedBookCoverManager: ObservableObject {
         completedKeys.forEach { activeTasks.removeValue(forKey: $0) }
 
         // Also remove tasks that have been running too long (> 30 seconds)
-        let now = Date()
         let staleKeys = activeTasks.compactMap { key, _ in
             // Simple heuristic: if we have too many tasks, some might be stale
             activeTasks.count > 10 ? key : nil

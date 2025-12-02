@@ -235,7 +235,7 @@ class LiveActivityTesting {
         }
 
         // Check 4: Restart interval sanity
-        let manager = LiveActivityLifecycleManager.shared
+        _ = LiveActivityLifecycleManager.shared
         print("ℹ️ Restart interval: 7 hours (1 hour before iOS limit)")
 
         print("\n--- Summary ---")

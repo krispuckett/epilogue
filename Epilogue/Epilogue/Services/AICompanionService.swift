@@ -214,8 +214,7 @@ class AICompanionService: ObservableObject {
         
         // For streaming, we'll use OptimizedPerplexityService
         // TODO: Implement streaming for SmartEpilogueAI
-        let model = UserDefaults.standard.string(forKey: "perplexityModel") ?? "sonar"
-        
+
         // Create an adapter stream that converts PerplexityResponse to String
         return AsyncThrowingStream { continuation in
             Task {

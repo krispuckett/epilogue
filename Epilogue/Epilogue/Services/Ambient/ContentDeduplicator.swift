@@ -186,8 +186,7 @@ extension ContentDeduplicator {
     /// Group similar captures for intelligent merging
     public func groupSimilarCaptures(_ captures: [String], within timeWindow: TimeInterval = 30.0) -> [[String]] {
         var groups: [[String]] = []
-        let now = Date()
-        
+
         for capture in captures {
             let normalized = normalize(capture)
             var addedToGroup = false

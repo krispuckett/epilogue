@@ -137,7 +137,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         guard let channelData = buffer.floatChannelData else { return }
         
         let frameLength = Int(buffer.frameLength)
-        let channelCount = Int(buffer.format.channelCount)
+        _ = Int(buffer.format.channelCount)
         
         // Analyze amplitude (intensity)
         var sum: Float = 0
@@ -749,10 +749,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // Smooth all values
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            let previousIntensity = self.voiceIntensity
-            let previousFrequency = self.voiceFrequency
-            
+
             // Smooth intensity
             self.voiceIntensity = self.voiceIntensity * 0.85 + CGFloat(normalizedIntensity) * 0.15
             
@@ -890,13 +887,6 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 pendingTranscription = text
                 lastSpeechTime = Date()
                 
-                // Check if we have a complete sentence (ends with punctuation) and process immediately
-                // BUT: For questions, always wait for stabilization to avoid "Otis" vs "Odysseus" mistakes
-                let isQuestionText = text.lowercased().hasPrefix("who ") || text.lowercased().hasPrefix("what ") ||
-                                    text.lowercased().hasPrefix("where ") || text.lowercased().hasPrefix("when ") ||
-                                    text.lowercased().hasPrefix("why ") || text.lowercased().hasPrefix("how ") ||
-                                    text.hasSuffix("?")
-
                 // NO LONGER PROCESSING Apple Speech results directly
                 // WhisperKit will handle all processing for better accuracy
                 // Just update the pending transcription for fallback scenarios

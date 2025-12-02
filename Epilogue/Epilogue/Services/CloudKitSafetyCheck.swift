@@ -16,9 +16,7 @@ final class CloudKitSafetyCheck: ObservableObject {
             let context = container.mainContext
             
             // Try to fetch from both possible schemas to detect which one is active
-            var hasOldSchema = false
             var hasNewSchema = false
-            var oldDataCount = 0
             var newDataCount = 0
             
             // Check for new schema (BookModel, CapturedNote, etc.)
@@ -39,8 +37,6 @@ final class CloudKitSafetyCheck: ObservableObject {
             
             // We can't check for old schema directly due to type conflicts
             // Instead, check UserDefaults for migration markers
-            let hasCompletedMigration = UserDefaults.standard.bool(forKey: "hasCompletedCloudKitResync_v1")
-            let isUsingCloudKit = UserDefaults.standard.bool(forKey: "isUsingCloudKit")
             let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
             
             // Determine the state

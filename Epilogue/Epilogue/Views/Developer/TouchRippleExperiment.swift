@@ -136,10 +136,18 @@ struct TouchRippleExperiment: View {
                 }
             }
             .sheet(isPresented: $showBookPicker) {
-                ExperimentalBookPickerSheet(
-                    books: booksWithCovers,
-                    selectedBook: $selectedBook
-                )
+                // Book picker sheet - select from available books
+                NavigationStack {
+                    List(booksWithCovers, id: \.id) { book in
+                        Button {
+                            selectedBook = book
+                            showBookPicker = false
+                        } label: {
+                            Text(book.title)
+                        }
+                    }
+                    .navigationTitle("Select Book")
+                }
             }
         }
     }

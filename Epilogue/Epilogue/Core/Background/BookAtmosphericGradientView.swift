@@ -25,22 +25,6 @@ struct BookAtmosphericGradientView: View {
                 
                 // Single direction gradient - no mirroring, with intensity control
                 if let palette = displayedPalette {
-                    #if DEBUG
-                    // Toggle to see gradient logs during debugging
-                    let LOG_GRADIENT = false
-                    let _ = LOG_GRADIENT ? {
-                        #if DEBUG
-                        print("🎨 Rendering gradient with intensity: \(intensity)")
-                        #endif
-                        #if DEBUG
-                        print("   Primary: \(colorDescription(ColorPalette(primary: palette.primary, secondary: .clear, accent: .clear, background: .clear, textColor: .clear, luminance: 0, isMonochromatic: false, extractionQuality: 0)))")
-                        #endif
-                        #if DEBUG
-                        print("   Opacity applied: \(0.8 * intensity)")
-                        #endif
-                    }() : ()
-                    #endif
-                    
                     // Voice-responsive gradient
                     let voiceBoost = 1.0 + Double(audioLevel) * 0.5 // 0-50% boost based on voice
                     let voiceScale = 1.0 + Double(audioLevel) * 0.1 // Subtle scale effect
@@ -105,51 +89,12 @@ struct BookAtmosphericGradientView: View {
             }
         }
         .onAppear {
-            #if DEBUG
-            let LOG_GRADIENT = false
-            if LOG_GRADIENT {
-                #if DEBUG
-                print("🌈 BookAtmosphericGradientView.onAppear")
-                #endif
-                #if DEBUG
-                print("   Initial palette: \(colorDescription(colorPalette))")
-                #endif
-            }
-            #endif
             displayedPalette = processColors(colorPalette)
-            #if DEBUG
-            if LOG_GRADIENT {
-                #if DEBUG
-                print("   Processed palette: \(colorDescription(displayedPalette ?? colorPalette))")
-                #endif
-            }
-            #endif
             startSubtleAnimation()
         }
-        .onChange(of: colorPalette) { oldPalette, newPalette in
-            #if DEBUG
-            let LOG_GRADIENT = false
-            if LOG_GRADIENT {
-                #if DEBUG
-                print("🌈 BookAtmosphericGradientView palette changed")
-                #endif
-                #if DEBUG
-                print("   Old: \(colorDescription(oldPalette))")
-                #endif
-                #if DEBUG
-                print("   New: \(colorDescription(newPalette))")
-                #endif
-            }
-            #endif
+        .onChange(of: colorPalette) { _, newPalette in
             withAnimation(.easeInOut(duration: 0.3)) {
                 displayedPalette = processColors(newPalette)
-                #if DEBUG
-                if LOG_GRADIENT {
-                    #if DEBUG
-                    print("   Processed: \(colorDescription(displayedPalette ?? newPalette))")
-                    #endif
-                }
-                #endif
             }
         }
     }
@@ -283,17 +228,6 @@ struct BookAtmosphericGradientView: View {
         // withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
         //     gradientOffset = 0.1 // Subtle movement
         // }
-    }
-    
-    /// Debug helper
-    private func colorDescription(_ palette: ColorPalette) -> String {
-        func rgbString(_ color: Color) -> String {
-            let uiColor = UIColor(color)
-            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
-            return "RGB(\(Int(r*255)),\(Int(g*255)),\(Int(b*255)))"
-        }
-        return "P:\(rgbString(palette.primary)) S:\(rgbString(palette.secondary)) A:\(rgbString(palette.accent)) B:\(rgbString(palette.background)) mono:\(palette.isMonochromatic)"
     }
 }
 

@@ -200,7 +200,7 @@ class ReadwiseService: ObservableObject {
             "\(highlight.title ?? "Unknown")-\(highlight.author ?? "Unknown")"
         }
         
-        for (bookKey, bookHighlights) in highlightsByBook {
+        for (_, bookHighlights) in highlightsByBook {
             processedCount += bookHighlights.count
             
             syncProgress = SyncProgress(

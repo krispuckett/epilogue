@@ -50,7 +50,7 @@ struct QuickActionsSheet: View {
     
     // Dynamic commands based on context
     var quickCommands: [Command] {
-        var commands = [
+        let commands = [
             Command(
                 icon: "note.text",
                 title: "New Note",

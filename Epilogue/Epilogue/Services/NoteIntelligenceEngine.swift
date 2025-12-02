@@ -270,7 +270,7 @@ class NoteIntelligenceEngine: ObservableObject {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
         
         // Today's Thoughts
-        var allNotes = notes + quotes
+        let allNotes = notes + quotes
         let todaysNotes = allNotes.filter { note in
             note.dateCreated >= today
         }

@@ -82,9 +82,8 @@ final class PerformanceMonitorService: ObservableObject {
 
     func startMonitoring() {
         // DISABLED: Performance monitoring causes performance issues ironically
-        return
-
         guard !isMonitoring else { return }
+        return  // Early return - monitoring disabled
 
         isMonitoring = true
         appLaunchTime = ProcessInfo.processInfo.systemUptime

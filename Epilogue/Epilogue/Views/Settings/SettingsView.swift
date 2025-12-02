@@ -14,7 +14,6 @@ struct SettingsView: View {
     @AppStorage("realTimeQuestions") private var realTimeQuestions = true
     @AppStorage("audioFeedback") private var audioFeedback = false
     @AppStorage("alwaysShowInput") private var alwaysShowInput = false
-    @AppStorage("experimentalCustomCamera") private var experimentalCustomCamera = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -278,29 +277,6 @@ struct SettingsView: View {
                             .padding(.vertical, 4)
                         }
 
-                        // Experimental Custom Camera Toggle
-                        Toggle(isOn: $experimentalCustomCamera) {
-                            HStack {
-                                Image(systemName: "camera.fill")
-                                    .foregroundColor(.orange)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Custom Camera")
-                                    Text("Experimental AVFoundation camera for text capture")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                        .onChange(of: experimentalCustomCamera) { _, newValue in
-                            #if DEBUG
-                            print("🎥 [EXPERIMENT] Custom camera \(newValue ? "enabled" : "disabled")")
-                            #endif
-
-                            if newValue {
-                                SensoryFeedback.impact(.medium)
-                            }
-                        }
-
                         Button {
                             Task { @MainActor in
                                 // Safety check before migration
@@ -330,13 +306,6 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
-                            AmbientOrbExporter()
-                        } label: {
-                            Label("Export Ambient Orb", systemImage: "circle.hexagongrid.fill")
-                                .foregroundStyle(.orange)
-                        }
-
-                        NavigationLink {
                             PremiumPaywallView()
                         } label: {
                             Label("Preview Premium Paywall", systemImage: "crown.fill")
@@ -351,14 +320,6 @@ struct SettingsView: View {
                                 .foregroundStyle(.cyan)
                         }
 
-                        Toggle(isOn: Binding(
-                            get: { UserDefaults.standard.bool(forKey: "devShowConversationCounter") },
-                            set: { UserDefaults.standard.set($0, forKey: "devShowConversationCounter") }
-                        )) {
-                            Label("Show Conversation Counter", systemImage: "circle.dotted.circle")
-                                .foregroundStyle(.cyan)
-                        }
-
                         Button {
                             SimplifiedStoreKitManager.shared.resetMonthlyCount()
                             SensoryFeedback.light()
@@ -368,24 +329,10 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
-                            ShaderPlaygroundView()
-                        } label: {
-                            Label("Shader Playground", systemImage: "wand.and.rays")
-                                .foregroundStyle(.purple)
-                        }
-
-                        NavigationLink {
                             TextAnimationExperiments()
                         } label: {
                             Label("Text Animation Lab", systemImage: "text.alignleft")
                                 .foregroundStyle(.orange)
-                        }
-
-                        NavigationLink {
-                            LiquidGlassGradientExperiment()
-                        } label: {
-                            Label("Liquid Glass Gradient", systemImage: "sparkles")
-                                .foregroundStyle(.cyan)
                         }
 
                         NavigationLink {
@@ -408,6 +355,7 @@ struct SettingsView: View {
                             Label("Touch Ripple Shader", systemImage: "water.waves")
                                 .foregroundStyle(.blue)
                         }
+
                     } header: {
                         Text("Developer Options")
                     } footer: {
@@ -550,18 +498,6 @@ struct SettingsView: View {
                         .accessibilityLabel("Ambient Presence States Experiment")
                         .accessibilityHint("Developer tool for tuning ambient orb behavior")
 
-                        NavigationLink {
-                            LiquidGlassGradientExperiment()
-                        } label: {
-                            HStack {
-                                Label("Liquid Glass Gradients", systemImage: "rectangle.stack.fill")
-                                    .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
-                                Spacer()
-                                Text("Experiment")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
                     } header: {
                         Text("🧙‍♂️ Developer Mode")
                     } footer: {

@@ -255,7 +255,7 @@ class PerplexityPerformanceMonitor {
     func logPerformanceSummary() {
         monitorLogger.info("📊 Performance Summary:")
         
-        for (operation, measurements) in metrics {
+        for (operation, _) in metrics {
             if let avg = getAverageLatency(for: operation),
                let p95 = getP95Latency(for: operation) {
                 monitorLogger.info("  \(operation): avg=\(String(format: "%.2f", avg))s, p95=\(String(format: "%.2f", p95))s")

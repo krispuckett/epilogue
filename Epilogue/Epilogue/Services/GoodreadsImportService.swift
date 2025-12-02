@@ -2087,7 +2087,7 @@ class GoodreadsImportService: ObservableObject {
         let remaining = Double(totalBooks - processedCount) * averageTime
         
         Task { @MainActor in
-            if var progress = currentProgress {
+            if let progress = currentProgress {
                 currentProgress = ImportProgress(
                     current: progress.current,
                     total: progress.total,

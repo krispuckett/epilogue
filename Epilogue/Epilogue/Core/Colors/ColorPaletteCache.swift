@@ -85,11 +85,6 @@ public class BookColorPaletteCache {
     public func getCachedPalette(for bookID: String) async -> ColorPalette? {
         // Check memory cache first
         if let cached = memoryCache.object(forKey: bookID as NSString) {
-            #if DEBUG
-            // Toggle if you need cache hit/miss logs
-            let LOG_PALETTE_CACHE = false
-            if LOG_PALETTE_CACHE { print("🎨 Memory cache hit for \(bookID)") }
-            #endif
             return cached.palette
         }
         
@@ -97,16 +92,9 @@ public class BookColorPaletteCache {
         if let diskPalette = await loadFromDisk(bookID: bookID) {
             // Add to memory cache
             memoryCache.setObject(diskPalette, forKey: bookID as NSString)
-            #if DEBUG
-            let LOG_PALETTE_CACHE = false
-            if LOG_PALETTE_CACHE { print("💾 Disk cache hit for \(bookID)") }
-            #endif
             return diskPalette.palette
         }
-        #if DEBUG
-        let LOG_PALETTE_CACHE = false
-        if LOG_PALETTE_CACHE { print("❌ Cache miss for \(bookID)") }
-        #endif
+
         return nil
     }
     
@@ -127,11 +115,6 @@ public class BookColorPaletteCache {
         
         // Save to disk in background
         await saveToDisk(cached)
-        
-        #if DEBUG
-        let LOG_PALETTE_CACHE = false
-        if LOG_PALETTE_CACHE { print("✅ Cached palette for \(bookID)") }
-        #endif
     }
     
     /// Clear all caches

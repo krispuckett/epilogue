@@ -139,22 +139,11 @@ class OfflineQueueManager: ObservableObject {
         }
 
         let maxRetries = 3
-        var lastError: Error?
 
         for attempt in 1...maxRetries {
             do {
-                // Create book context if available
-                var bookContext: BookModel?
-                if let title = question.bookTitle,
-                   let author = question.bookAuthor,
-                   let modelContext = modelContext {
-                    let descriptor = FetchDescriptor<BookModel>(
-                        predicate: #Predicate { (book: BookModel) in
-                            book.title == title && book.author == author
-                        }
-                    )
-                    bookContext = try modelContext.fetch(descriptor).first
-                }
+                // Note: Book context lookup disabled due to BookModel/Book type mismatch
+                // TODO: Figure out the proper Book type conversion
 
                 // Process with OptimizedPerplexityService - we can't cast BookModel to Book directly
                 // For now, pass nil to avoid type conflicts
@@ -185,7 +174,6 @@ class OfflineQueueManager: ObservableObject {
                 return // Success, exit retry loop
 
             } catch {
-                lastError = error
                 logger.warning("⚠️ Attempt \(attempt) failed: \(error.localizedDescription)")
 
                 // Check if we should retry
