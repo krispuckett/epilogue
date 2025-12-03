@@ -144,6 +144,7 @@ struct AmbientModeView: View {
     @State private var showBookSelector = false
     @State private var bookCoverTimer: Timer?
     @State private var expandedMessageIds = Set<UUID>()  // Track expanded messages individually
+    @State private var relatedQuestionsMap: [UUID: [String]] = [:]  // Related questions per AI message
     @State private var showImagePicker = false
     @State private var capturedImage: UIImage?
     @State private var extractedText: String = ""
@@ -1072,7 +1073,24 @@ struct AmbientModeView: View {
                                 librarySize: libraryViewModel.books.count,
                                 recentBookTitle: recentlyReadBookTitle
                             )
-                            .opacity(isRecording ? 0.7 : 1.0)
+                            .opacity(isRecording ? 0.8 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: isRecording)
+                        } else if let book = currentBookContext {
+                            // Book-specific ambient mode - intelligent contextual pills
+                            BookSpecificEmptyState(
+                                book: book,
+                                colorPalette: colorPalette,
+                                currentPage: book.currentPage > 0 ? book.currentPage : nil,
+                                hasNotes: currentBookHasNotes,
+                                hasQuotes: currentBookHasQuotes,
+                                onSuggestionTap: { suggestion in
+                                    handleBookSuggestionTap(suggestion)
+                                },
+                                onCaptureQuote: {
+                                    showImagePicker = true
+                                }
+                            )
+                            .opacity(isRecording ? 0.8 : 1.0)
                             .animation(.easeInOut(duration: 0.3), value: isRecording)
                         }
                     }
@@ -1209,6 +1227,7 @@ struct AmbientModeView: View {
                                             totalMessages: aiOnlyMessages.count,
                                             isExpanded: expandedMessageIds.contains(message.id),
                                             streamingText: streamingResponses[message.id],
+                                            relatedQuestions: relatedQuestionsMap[message.id] ?? [],
                                             onToggle: {
                                                 // Refined haptic feedback
                                                 SensoryFeedback.selection()
@@ -1222,6 +1241,10 @@ struct AmbientModeView: View {
                                                 }
                                             },
                                             onEdit: nil,  // AI responses don't have edit capability here
+                                            onRelatedQuestionTap: { question in
+                                                // Continue conversation with the tapped question
+                                                handleRelatedQuestionTap(question)
+                                            },
                                             showPaywall: $showPaywall
                                         )
                                     }
@@ -1319,6 +1342,26 @@ struct AmbientModeView: View {
             .first?.title ?? libraryViewModel.books.first?.title
     }
 
+    /// Check if current book has notes (via BookModel lookup)
+    private var currentBookHasNotes: Bool {
+        guard let book = currentBookContext else { return false }
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.id == book.id }
+        )
+        guard let bookModel = try? modelContext.fetch(descriptor).first else { return false }
+        return !(bookModel.notes?.isEmpty ?? true)
+    }
+
+    /// Check if current book has quotes (via BookModel lookup)
+    private var currentBookHasQuotes: Bool {
+        guard let book = currentBookContext else { return false }
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.id == book.id }
+        )
+        guard let bookModel = try? modelContext.fetch(descriptor).first else { return false }
+        return !(bookModel.quotes?.isEmpty ?? true)
+    }
+
     /// Handle tapping a suggestion pill - shows question flow for recommendations or populates input
     private func handleSuggestionTap(_ suggestion: String) {
         let lowercased = suggestion.lowercased()
@@ -1343,16 +1386,19 @@ struct AmbientModeView: View {
 
         if isRecommendationRequest {
             withAnimation(DesignSystem.Animation.springStandard) {
+                createdReadingPlan = nil  // Dismiss any existing plan card
                 showRecommendationFlow = true
             }
         } else if isHabitRequest {
             isKeyboardFocused = false // Dismiss keyboard before showing flow
             withAnimation(DesignSystem.Animation.springStandard) {
+                createdReadingPlan = nil  // Dismiss any existing plan card
                 showReadingPlanFlow = .habit
             }
         } else if isChallengeRequest {
             isKeyboardFocused = false // Dismiss keyboard before showing flow
             withAnimation(DesignSystem.Animation.springStandard) {
+                createdReadingPlan = nil  // Dismiss any existing plan card
                 showReadingPlanFlow = .challenge
             }
         } else if isAnalysisRequest {
@@ -1365,6 +1411,295 @@ struct AmbientModeView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isKeyboardFocused = true
             }
+        }
+    }
+
+    /// Handle tapping a book-specific suggestion pill
+    /// Uses a clean pattern similar to generic mode for reliable display
+    private func handleBookSuggestionTap(_ suggestion: String) {
+        guard let book = currentBookContext else {
+            // Fallback to generic if no book context
+            keyboardText = suggestion
+            sendTextMessage()
+            return
+        }
+
+        let lowercased = suggestion.lowercased()
+
+        // Check for similar books request
+        if lowercased.contains("similar") || lowercased.contains("like this") {
+            // Show recommendation flow with book context
+            withAnimation(DesignSystem.Animation.springStandard) {
+                showRecommendationFlow = true
+            }
+            return
+        }
+
+        // Enhance the question with book context for better AI responses
+        let enhancedQuestion: String
+        if lowercased.contains("theme") {
+            enhancedQuestion = "What are the main themes in \(book.title) by \(book.author)?"
+        } else if lowercased.contains("about") {
+            enhancedQuestion = "Tell me about \(book.author), the author of \(book.title)"
+        } else if lowercased.contains("review my notes") {
+            enhancedQuestion = "Summarize my notes for \(book.title)"
+        } else if lowercased.contains("summarize where") {
+            enhancedQuestion = "Summarize where I am in \(book.title) - I'm on page \(book.currentPage)"
+        } else {
+            enhancedQuestion = suggestion
+        }
+
+        // Use clean conversation pattern (like generic mode)
+        sendToBookAIConversation(enhancedQuestion, book: book, displayQuestion: suggestion)
+    }
+
+    /// Clean book AI conversation - uses **Question**\n\nAnswer format for book mode UI
+    private func sendToBookAIConversation(_ text: String, book: Book, displayQuestion: String) {
+        // Ensure session exists
+        startAmbientSessionIfNeeded()
+
+        // Collapse previous messages
+        withAnimation(DesignSystem.Animation.easeStandard) {
+            expandedMessageIds.removeAll()
+        }
+
+        // Get AI response (will create combined Q&A message)
+        Task {
+            await getBookAIResponse(for: text, book: book, displayQuestion: displayQuestion)
+        }
+    }
+
+    /// Get AI response for book context - creates **Question**\n\nAnswer format message
+    private func getBookAIResponse(for question: String, book: Book, displayQuestion: String) async {
+        // Create placeholder AI message with question shown while loading
+        let aiMessage = UnifiedChatMessage(
+            content: "**\(displayQuestion)**",  // Show question while loading
+            isUser: false,
+            timestamp: Date(),
+            bookContext: book,
+            messageType: .text
+        )
+        let messageId = aiMessage.id
+
+        // Add message immediately so user sees their question
+        await MainActor.run {
+            messages.append(aiMessage)
+            withAnimation(DesignSystem.Animation.easeStandard) {
+                expandedMessageIds.insert(messageId)
+            }
+        }
+
+        do {
+            let service = OptimizedPerplexityService.shared
+            var fullResponse = ""
+
+            for try await response in service.streamSonarResponse(
+                question,
+                bookContext: book,
+                enrichment: nil,
+                sessionHistory: buildConversationHistory(),
+                userNotes: nil,
+                userQuotes: nil,
+                userQuestions: nil,
+                currentPage: book.currentPage > 0 ? book.currentPage : nil,
+                customSystemPrompt: nil
+            ) {
+                // Clean the response
+                fullResponse = response.text
+                    .replacingOccurrences(of: #"\[\d+\]"#, with: "", options: .regularExpression)
+                    .replacingOccurrences(of: #"\.([A-Z])"#, with: ". $1", options: .regularExpression)
+                    .replacingOccurrences(of: "  ", with: " ")
+
+                await MainActor.run {
+                    // Update message with Question + Answer format
+                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                        messages[index] = UnifiedChatMessage(
+                            id: messageId,
+                            content: "**\(displayQuestion)**\n\n\(fullResponse)",
+                            isUser: false,
+                            timestamp: aiMessage.timestamp,
+                            bookContext: book,
+                            messageType: .text
+                        )
+                    }
+                }
+            }
+
+            // Save to session
+            await MainActor.run {
+                saveQuestionToCurrentSession(question, response: fullResponse)
+            }
+
+        } catch {
+            await MainActor.run {
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: "**\(displayQuestion)**\n\nSorry, I couldn't get a response. Please try again.",
+                        isUser: false,
+                        timestamp: aiMessage.timestamp,
+                        bookContext: book,
+                        messageType: .text
+                    )
+                }
+            }
+        }
+    }
+
+    /// Handle tapping a related question pill to continue the conversation
+    private func handleRelatedQuestionTap(_ question: String) {
+        // Use the same flow as regular text input for consistency
+        keyboardText = question
+        sendTextMessage()
+    }
+
+    /// Get AI response specifically for book context questions
+    private func getBookSpecificAIResponse(for question: String, book: Book) async {
+        // Create AI response placeholder
+        let aiMessage = UnifiedChatMessage(
+            content: "",
+            isUser: false,
+            timestamp: Date(),
+            bookContext: book,
+            messageType: .text
+        )
+        let messageId = aiMessage.id
+
+        do {
+            let service = OptimizedPerplexityService.shared
+            var fullResponse = ""
+            var capturedRelatedQuestions: [String] = []
+            var isFirstChunk = true
+
+            // Use streaming with book context
+            for try await response in service.streamSonarResponse(
+                question,
+                bookContext: book,
+                enrichment: nil,
+                sessionHistory: buildConversationHistory(),
+                userNotes: nil,
+                userQuotes: nil,
+                userQuestions: nil,
+                currentPage: book.currentPage > 0 ? book.currentPage : nil,
+                customSystemPrompt: nil  // Let it use default book-aware prompt
+            ) {
+                fullResponse = response.text
+
+                // Capture related questions when available (usually at end of stream)
+                if !response.relatedQuestions.isEmpty {
+                    capturedRelatedQuestions = response.relatedQuestions
+                }
+
+                await MainActor.run {
+                    if isFirstChunk {
+                        messages.append(aiMessage)
+                        withAnimation(DesignSystem.Animation.easeStandard) {
+                            expandedMessageIds.removeAll()
+                            expandedMessageIds.insert(messageId)
+                        }
+                        isFirstChunk = false
+                    }
+
+                    // Update streaming message
+                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                        messages[index] = UnifiedChatMessage(
+                            id: messageId,
+                            content: fullResponse,
+                            isUser: false,
+                            timestamp: aiMessage.timestamp,
+                            bookContext: book,
+                            messageType: .text
+                        )
+                    }
+                }
+            }
+
+            // Store related questions for this message
+            await MainActor.run {
+                if !capturedRelatedQuestions.isEmpty {
+                    relatedQuestionsMap[messageId] = capturedRelatedQuestions
+                }
+                saveQuestionToCurrentSession(question, response: fullResponse)
+            }
+
+        } catch {
+            await MainActor.run {
+                messages.append(UnifiedChatMessage(
+                    content: "Sorry, I couldn't process that. Please try again.",
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: book,
+                    messageType: .text
+                ))
+            }
+        }
+    }
+
+    /// Ensures an ambient session exists for the current book
+    private func startAmbientSessionIfNeeded() {
+        guard currentSession == nil, let book = currentBookContext else { return }
+
+        let newSession = AmbientSession()
+        newSession.startTime = Date()
+        newSession.bookModel = BookModel(from: book)
+        modelContext.insert(newSession)
+        currentSession = newSession
+
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("📚 Created ambient session for book: \(book.title)")
+            #endif
+        } catch {
+            #if DEBUG
+            print("❌ Failed to create session: \(error)")
+            #endif
+        }
+    }
+
+    /// Saves a question and response to the current session
+    private func saveQuestionToCurrentSession(_ question: String, response: String) {
+        guard let session = currentSession else {
+            #if DEBUG
+            print("⚠️ No current session to save question to")
+            #endif
+            return
+        }
+
+        // Get BookModel if we have book context
+        var bookModel: BookModel? = nil
+        if let book = currentBookContext {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.id == book.id }
+            )
+            bookModel = try? modelContext.fetch(descriptor).first
+        }
+
+        let capturedQuestion = CapturedQuestion(
+            content: question,
+            book: bookModel,
+            pageNumber: currentBookContext?.currentPage,
+            timestamp: Date(),
+            source: .ambient
+        )
+        capturedQuestion.answer = response
+        capturedQuestion.isAnswered = true
+        capturedQuestion.ambientSession = session
+
+        if session.capturedQuestions == nil {
+            session.capturedQuestions = []
+        }
+        session.capturedQuestions?.append(capturedQuestion)
+
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ Saved question to session: \(question.prefix(50))...")
+            #endif
+        } catch {
+            #if DEBUG
+            print("❌ Failed to save question: \(error)")
+            #endif
         }
     }
 
@@ -2955,9 +3290,19 @@ struct AmbientModeView: View {
     private func saveQuestionToSwiftData(_ content: AmbientProcessedContent) {
         // Use the raw text as-is for consistency
         let questionText = content.text
-        
+
+        // Ensure a session exists (create if needed)
+        if currentSession == nil {
+            startAmbientSessionIfNeeded()
+        }
+
         // CRITICAL: Check for duplicate questions in current session
-        guard let session = currentSession else { return }
+        guard let session = currentSession else {
+            #if DEBUG
+            print("⚠️ No session available for saving question")
+            #endif
+            return
+        }
         
         // Check if question already exists in this session
         let isDuplicate = (session.capturedQuestions ?? []).contains { question in
@@ -3458,33 +3803,19 @@ struct AmbientModeView: View {
                 bookTitle: currentBookContext?.title,
                 bookAuthor: currentBookContext?.author
             )
-            // Processor manages its own content array
-            // processor.detectedContent.append(content)
-            
+
             // Save question to SwiftData immediately
             saveQuestionToSwiftData(content)
-            
+
             // Set pendingQuestion to show scrolling text
             pendingQuestion = messageText
-            
-            // For questions, add a thinking message immediately
-            let thinkingMessage = UnifiedChatMessage(
-                content: "**\(messageText)**",
-                isUser: false,
-                timestamp: Date(),
-                messageType: .text
-            )
-            messages.append(thinkingMessage)
-            
-            // Collapse all previous and expand only the new question
-            withAnimation(DesignSystem.Animation.easeStandard) {
-                expandedMessageIds.removeAll()
-                expandedMessageIds.insert(thinkingMessage.id)
-            }
-            
+
+            // The onReceive handler for processor.detectedContent will create the message
+            // with proper format for response streaming. Don't add duplicate messages here.
+
             // Get AI response using the same processor as voice input
             Task {
-                // Add to processor's detected content
+                // Add to processor's detected content - this triggers onReceive which adds the UI message
                 processor.detectedContent.append(content)
                 // Process through the same path as voice questions
                 await processor.processQuestionDirectly(messageText, bookContext: currentBookContext)
@@ -3822,12 +4153,15 @@ struct AmbientModeView: View {
             // Build the specialized Generic Mode system prompt
             let genericModePrompt = buildGenericModeSystemPrompt()
 
+            // Build conversation history for context (last 10 messages)
+            let conversationHistory = buildConversationHistory()
+
             // Use streamSonarResponse with custom system prompt for Generic mode
             for try await response in service.streamSonarResponse(
                 text,
                 bookContext: nil,  // No book context in Generic mode
                 enrichment: nil,
-                sessionHistory: nil,
+                sessionHistory: conversationHistory,
                 userNotes: nil,
                 userQuotes: nil,
                 userQuestions: nil,
@@ -4006,6 +4340,17 @@ struct AmbientModeView: View {
         """
 
         return prompt
+    }
+
+    /// Builds conversation history for AI context (last 10 messages)
+    private func buildConversationHistory() -> [String] {
+        // Get the last 10 messages (excluding the current one being responded to)
+        let recentMessages = messages.suffix(10)
+
+        return recentMessages.map { message in
+            let role = message.isUser ? "User" : "Assistant"
+            return "\(role): \(message.content)"
+        }
     }
 
     /// Builds context from user's library for personalized recommendations
@@ -6108,10 +6453,12 @@ struct AmbientMessageThreadView: View {
     let totalMessages: Int
     let isExpanded: Bool
     let streamingText: String?
+    let relatedQuestions: [String]  // Follow-up suggestions from Sonar
     let onToggle: () -> Void
     let onEdit: ((String) -> Void)?
+    let onRelatedQuestionTap: ((String) -> Void)?  // Continue conversation
     @Binding var showPaywall: Bool
-    
+
     @State private var messageOpacity: Double = 0.3
     @State private var messageBlur: Double = 12
     @State private var messageScale: CGFloat = 0.96
@@ -6312,6 +6659,14 @@ struct AmbientMessageThreadView: View {
                             .buttonStyle(.plain)
                             .padding(.top, 12)
                             .padding(.bottom, 4)
+                        }
+
+                        // Related questions pills - continue the conversation
+                        if !relatedQuestions.isEmpty, let onTap = onRelatedQuestionTap {
+                            RelatedQuestionsPillRow(
+                                questions: relatedQuestions,
+                                onQuestionTap: onTap
+                            )
                         }
                     }
                     .opacity(isExpanded ? answerOpacity : 0)

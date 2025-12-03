@@ -103,89 +103,75 @@ private struct SuggestionPill: View {
 
 // MARK: - Book-Specific Empty State
 
-/// Enhanced book-specific empty state with minimal pills
+/// Enhanced book-specific empty state with intelligent, contextual pills
+/// Matches the clean liquid glass style of generic ambient mode
 struct BookSpecificEmptyState: View {
     let book: Book
-    let colorPalette: ColorPalette?
+    let colorPalette: ColorPalette?  // Kept for API compatibility but not used for tinting
+    let currentPage: Int?
+    let hasNotes: Bool
+    let hasQuotes: Bool
     let onSuggestionTap: (String) -> Void
+    let onCaptureQuote: () -> Void  // Special action for quote capture
 
     @State private var isVisible = false
 
-    private var accentColor: Color {
-        colorPalette?.primary ?? DesignSystem.Colors.primaryAccent
-    }
+    /// Intelligent suggestions based on book context
+    private var suggestions: [BookSuggestion] {
+        var items: [BookSuggestion] = []
 
-    private var suggestions: [String] {
-        [
-            "What's the main theme?",
-            "Tell me about the author",
-            "Capture a quote",
-            "Summarize where I left off"
-        ]
+        // Always show capture quote as a primary action
+        items.append(BookSuggestion(
+            text: "Capture a quote",
+            isSpecialAction: true
+        ))
+
+        // Contextual based on reading progress
+        if let page = currentPage, page > 0 {
+            items.append(BookSuggestion(text: "Summarize where I am"))
+        }
+
+        // Theme exploration
+        items.append(BookSuggestion(text: "What are the main themes?"))
+
+        // Author context
+        let authorLastName = book.author.components(separatedBy: " ").last ?? "the author"
+        items.append(BookSuggestion(text: "Tell me about \(authorLastName)"))
+
+        // If they have notes, offer to discuss them
+        if hasNotes {
+            items.append(BookSuggestion(text: "Review my notes"))
+        }
+
+        // Similar books recommendation
+        items.append(BookSuggestion(text: "Books similar to this"))
+
+        // Limit to 5 suggestions max
+        return Array(items.prefix(5))
     }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 16) {
             Spacer()
 
-            // Book header
-            VStack(spacing: 12) {
-                // Book icon with palette color glow
-                ZStack {
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    accentColor.opacity(0.4),
-                                    accentColor.opacity(0.0)
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 40
-                            )
-                        )
-                        .frame(width: 80, height: 80)
-                        .blur(radius: 15)
-
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 28, weight: .light))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.white, accentColor.opacity(0.8)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-
-                VStack(spacing: 4) {
-                    Text(book.title)
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-
-                    Text("by \(book.author)")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.6))
+            // Centered pills - matching generic ambient style
+            VStack(spacing: 10) {
+                ForEach(Array(suggestions.enumerated()), id: \.element.text) { index, suggestion in
+                    SuggestionPill(
+                        text: suggestion.text,
+                        delay: Double(index) * 0.08
+                    ) {
+                        SensoryFeedback.light()
+                        if suggestion.isSpecialAction {
+                            onCaptureQuote()
+                        } else {
+                            onSuggestionTap(suggestion.text)
+                        }
+                    }
                 }
             }
             .opacity(isVisible ? 1 : 0)
             .offset(y: isVisible ? 0 : 15)
-
-            // Centered pills
-            VStack(spacing: 10) {
-                ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
-                    BookSuggestionPill(
-                        text: suggestion,
-                        accentColor: accentColor,
-                        delay: Double(index) * 0.08 + 0.15
-                    ) {
-                        SensoryFeedback.light()
-                        onSuggestionTap(suggestion)
-                    }
-                }
-            }
 
             Spacer()
             Spacer()
@@ -198,17 +184,72 @@ struct BookSpecificEmptyState: View {
     }
 }
 
-// MARK: - Book Suggestion Pill
-
-/// Minimal pill with liquid glass, tinted with book's accent color
-private struct BookSuggestionPill: View {
+/// Model for book-specific suggestions
+private struct BookSuggestion: Equatable {
     let text: String
-    let accentColor: Color
+    var isSpecialAction: Bool = false
+}
+
+// MARK: - Related Questions Pills Row
+
+/// Horizontal scrolling row of smaller follow-up question pills
+/// Appears below AI responses to continue the conversation
+struct RelatedQuestionsPillRow: View {
+    let questions: [String]
+    let onQuestionTap: (String) -> Void
+
+    @State private var isVisible = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Subtle label
+            Text("CONTINUE EXPLORING")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.4))
+                .tracking(1.0)
+                .opacity(isVisible ? 1 : 0)
+
+            // Horizontal scroll of compact pills
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(questions.prefix(4).enumerated()), id: \.offset) { index, question in
+                        RelatedQuestionPill(
+                            text: question,
+                            delay: Double(index) * 0.06
+                        ) {
+                            SensoryFeedback.light()
+                            onQuestionTap(question)
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+        }
+        .padding(.top, 12)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.3)) {
+                isVisible = true
+            }
+        }
+    }
+}
+
+/// Compact pill for related questions - smaller than main suggestions
+private struct RelatedQuestionPill: View {
+    let text: String
     let delay: Double
     let action: () -> Void
 
     @State private var isVisible = false
     @State private var isPressed = false
+
+    // Truncate long questions for compact display
+    private var displayText: String {
+        if text.count > 45 {
+            return String(text.prefix(42)) + "..."
+        }
+        return text
+    }
 
     var body: some View {
         Button(action: {
@@ -218,19 +259,19 @@ private struct BookSuggestionPill: View {
                 action()
             }
         }) {
-            Text(text)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .glassEffect(.regular.interactive().tint(accentColor), in: .capsule)
-                .scaleEffect(isPressed ? 0.96 : 1)
+            Text(displayText)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .scaleEffect(isPressed ? 0.95 : 1)
                 .opacity(isVisible ? 1 : 0)
-                .offset(y: isVisible ? 0 : 10)
+                .offset(x: isVisible ? 0 : 15)
         }
         .buttonStyle(.plain)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75).delay(delay)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75).delay(delay)) {
                 isVisible = true
             }
         }
@@ -238,6 +279,34 @@ private struct BookSuggestionPill: View {
 }
 
 // MARK: - Preview
+
+#Preview("Related Questions Pills") {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        AmbientChatGradientView()
+            .ignoresSafeArea()
+
+        VStack {
+            Spacer()
+
+            RelatedQuestionsPillRow(
+                questions: [
+                    "What are the main themes?",
+                    "How does the author's style compare?",
+                    "Who are the key characters?",
+                    "What inspired this work?"
+                ],
+                onQuestionTap: { question in
+                    print("Tapped: \(question)")
+                }
+            )
+            .padding(.horizontal, 20)
+
+            Spacer()
+        }
+    }
+    .preferredColorScheme(.dark)
+}
 
 #Preview("Generic Empty State") {
     ZStack {
@@ -259,6 +328,8 @@ private struct BookSuggestionPill: View {
 #Preview("Book-Specific Empty State") {
     ZStack {
         Color.black.ignoresSafeArea()
+        AmbientChatGradientView()
+            .ignoresSafeArea()
 
         BookSpecificEmptyState(
             book: Book(
@@ -268,8 +339,14 @@ private struct BookSuggestionPill: View {
                 isbn: nil
             ),
             colorPalette: nil,
+            currentPage: 150,
+            hasNotes: true,
+            hasQuotes: false,
             onSuggestionTap: { suggestion in
                 print("Tapped: \(suggestion)")
+            },
+            onCaptureQuote: {
+                print("Capture quote tapped")
             }
         )
     }

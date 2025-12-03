@@ -30,6 +30,8 @@ struct ReadingPlanQuestionFlow: View {
     @State private var isVisible = false
     @State private var questionVisible = false
     @State private var showingBookPicker = false
+    @State private var showingCustomDuration = false
+    @State private var customDurationDays: Int = 60
 
     // Base questions (before notification)
     private var baseQuestions: [QuestionData] {
@@ -38,7 +40,7 @@ struct ReadingPlanQuestionFlow: View {
             return [
                 QuestionData(
                     question: "How long should your plan last?",
-                    options: ["7 days", "14 days", "21 days", "30 days"]
+                    options: ["7 days", "14 days", "21 days", "30+ days"]
                 ),
                 QuestionData(
                     question: "How much time can you dedicate?",
@@ -54,24 +56,43 @@ struct ReadingPlanQuestionFlow: View {
                 )
             ]
         case .challenge:
-            return [
-                QuestionData(
-                    question: "What kind of challenge excites you?",
-                    options: ["Read more books", "Explore new genres", "Finish my TBR", "Read the classics"]
-                ),
-                QuestionData(
-                    question: "How ambitious are you feeling?",
-                    options: ["Gentle start", "Moderate push", "Ambitious goal", "All in"]
-                ),
-                QuestionData(
-                    question: "What's your timeframe?",
-                    options: ["This month", "This quarter", "This year", "No deadline"]
-                ),
-                QuestionData(
-                    question: "How often should I remind you?",
-                    options: ["Daily", "Every few days", "Weekly", "No reminders"]
-                )
-            ]
+            // If book is already selected, skip the "what kind of challenge" question
+            // since we know they want to finish that specific book
+            if preselectedBook != nil || selectedBook != nil {
+                return [
+                    QuestionData(
+                        question: "How ambitious are you feeling?",
+                        options: ["Gentle start", "Moderate push", "Ambitious goal", "All in"]
+                    ),
+                    QuestionData(
+                        question: "What's your timeframe?",
+                        options: ["This month", "This quarter", "This year", "No deadline"]
+                    ),
+                    QuestionData(
+                        question: "How often should I remind you?",
+                        options: ["Daily", "Every few days", "Weekly", "No reminders"]
+                    )
+                ]
+            } else {
+                return [
+                    QuestionData(
+                        question: "What kind of challenge excites you?",
+                        options: ["Read more books", "Explore new genres", "Finish my TBR", "Read the classics"]
+                    ),
+                    QuestionData(
+                        question: "How ambitious are you feeling?",
+                        options: ["Gentle start", "Moderate push", "Ambitious goal", "All in"]
+                    ),
+                    QuestionData(
+                        question: "What's your timeframe?",
+                        options: ["This month", "This quarter", "This year", "No deadline"]
+                    ),
+                    QuestionData(
+                        question: "How often should I remind you?",
+                        options: ["Daily", "Every few days", "Weekly", "No reminders"]
+                    )
+                ]
+            }
         }
     }
 
@@ -142,8 +163,76 @@ struct ReadingPlanQuestionFlow: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
                     }
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 100) // Clear input bar
                 }
+            } else if showingCustomDuration {
+                // Custom duration picker
+                VStack(spacing: 24) {
+                    Spacer()
+
+                    VStack(spacing: 24) {
+                        Text("How many days?")
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .opacity(questionVisible ? 1 : 0)
+                            .offset(y: questionVisible ? 0 : -10)
+
+                        // Duration stepper
+                        HStack(spacing: 20) {
+                            Button {
+                                if customDurationDays > 30 {
+                                    customDurationDays -= 7
+                                    SensoryFeedback.light()
+                                }
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 50, height: 50)
+                                    .glassEffect(.regular, in: .circle)
+                            }
+
+                            Text("\(customDurationDays)")
+                                .font(.system(size: 48, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 100)
+
+                            Button {
+                                if customDurationDays < 365 {
+                                    customDurationDays += 7
+                                    SensoryFeedback.light()
+                                }
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 50, height: 50)
+                                    .glassEffect(.regular, in: .circle)
+                            }
+                        }
+                        .opacity(questionVisible ? 1 : 0)
+                        .offset(y: questionVisible ? 0 : 15)
+
+                        Text("days")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+
+                        // Confirm button
+                        Button {
+                            selectCustomDuration()
+                        } label: {
+                            Text("Continue")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 150, height: 48)
+                                .glassEffect(.regular, in: .capsule)
+                        }
+                        .padding(.top, 16)
+                        .padding(.bottom, 100) // Clear input bar
+                    }
+                }
+                .padding(.horizontal, 24)
             } else if currentQuestionIndex < questions.count {
                 // Question step - centered layout
                 VStack(spacing: 24) {
@@ -203,9 +292,7 @@ struct ReadingPlanQuestionFlow: View {
                             .foregroundStyle(.white.opacity(0.5))
                     }
                     .padding(.top, 8)
-
-                    Spacer()
-                    Spacer()
+                    .padding(.bottom, 100) // Clear input bar
                 }
                 .padding(.horizontal, 24)
             }
@@ -249,7 +336,7 @@ struct ReadingPlanQuestionFlow: View {
                 .padding(.bottom, 20)
             }
 
-            // "Any book" option at bottom
+            // "Any book" option at bottom - positioned above input bar
             Button {
                 selectBook(nil)
             } label: {
@@ -258,6 +345,7 @@ struct ReadingPlanQuestionFlow: View {
                     .foregroundStyle(.white.opacity(0.6))
             }
             .padding(.vertical, 16)
+            .padding(.bottom, 80) // Space for input bar
         }
     }
 
@@ -279,6 +367,21 @@ struct ReadingPlanQuestionFlow: View {
 
     private func selectOption(_ option: String) {
         SensoryFeedback.selection()
+
+        // Handle custom duration selection
+        if option == "30+ days" {
+            withAnimation(.easeOut(duration: 0.15)) {
+                questionVisible = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showingCustomDuration = true
+                    questionVisible = true
+                }
+            }
+            return
+        }
+
         answers.append(option)
 
         // Animate out current question
@@ -287,6 +390,28 @@ struct ReadingPlanQuestionFlow: View {
         }
 
         // Move to next question or complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if currentQuestionIndex < questions.count - 1 {
+                currentQuestionIndex += 1
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    questionVisible = true
+                }
+            } else {
+                completeFlow()
+            }
+        }
+    }
+
+    private func selectCustomDuration() {
+        SensoryFeedback.selection()
+        answers.append("\(customDurationDays) days")
+        showingCustomDuration = false
+
+        // Animate out and move to next question
+        withAnimation(.easeOut(duration: 0.15)) {
+            questionVisible = false
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             if currentQuestionIndex < questions.count - 1 {
                 currentQuestionIndex += 1
@@ -471,10 +596,11 @@ struct ReadingPlanContext {
 
     var durationDays: Int {
         guard let duration = planDuration else { return 7 }
-        if duration.contains("7") { return 7 }
-        if duration.contains("14") { return 14 }
-        if duration.contains("21") { return 21 }
-        if duration.contains("30") { return 30 }
+        // Extract number from string like "60 days" or "14 days"
+        let digits = duration.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        if let days = Int(digits), days > 0 {
+            return days
+        }
         return 7
     }
 

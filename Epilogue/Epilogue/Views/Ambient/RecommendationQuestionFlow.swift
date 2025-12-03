@@ -100,9 +100,7 @@ struct RecommendationQuestionFlow: View {
                     .foregroundStyle(.white.opacity(0.5))
             }
             .padding(.top, 8)
-
-            Spacer()
-            Spacer()
+            .padding(.bottom, 100) // Clear input bar
         }
         .padding(.horizontal, 24)
         .onAppear {
@@ -230,10 +228,12 @@ private struct QuestionOptionPill: View {
             }
         } label: {
             Text(text)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.95))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .contentShape(Capsule()) // Ensure full hit area
                 .glassEffect(.regular, in: .capsule) // Removed .interactive() which can interfere
         }
