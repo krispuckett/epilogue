@@ -285,19 +285,13 @@ struct SelectableNoteCard: View {
                 }
             }
             
-            // Note content
+            // Note content - no long press gesture to allow native contextMenu
             content
                 .onTapGesture {
                     if selectionManager.isSelectionMode {
                         selectionManager.toggleSelection(for: note.id)
                     } else {
                         onTap()
-                    }
-                }
-                .onLongPressGesture(minimumDuration: 0.5) {
-                    if !selectionManager.isSelectionMode {
-                        selectionManager.enterSelectionMode()
-                        selectionManager.toggleSelection(for: note.id)
                     }
                 }
         }

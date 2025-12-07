@@ -199,6 +199,7 @@ struct BookDetailView: View {
     @State private var activeSession: ReadingSession?
     @State private var showingEndSession = false
     @State private var showingSessionSavedToast = false
+    @State private var showingQuoteCapture = false
 
     // Computed properties for book data
     private var progressPercentage: Double {
@@ -444,30 +445,48 @@ struct BookDetailView: View {
                     }
                 }
 
-                // Ambient upgrade + End session buttons
+                // Capture quote + Ambient upgrade + End session buttons
                 HStack(spacing: 8) {
+                    // Capture quote button - camera icon
+                    Button {
+                        showingQuoteCapture = true
+                        SensoryFeedback.light()
+                    } label: {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                    .accessibilityLabel("Capture quote")
+                    .accessibilityHint("Double tap to capture a quote from the page")
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.35)),
+                        removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                    ))
+
                     // Upgrade to Ambient button - using ambient orb shader
                     AmbientOrbButton(size: 32) {
-                    upgradeToAmbientMode()
+                        upgradeToAmbientMode()
                     }
                     .transition(.asymmetric(
-                    insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.38)),
-                    removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                        insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.40)),
+                        removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
                     ))
 
                     // End session button
                     Button {
-                    showingEndSession = true
+                        // Pause the timer by setting endDate
+                        activeSession?.endDate = Date()
+                        showingEndSession = true
                     } label: {
-                    Image(systemName: "stop.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.white.opacity(0.9))
+                        Image(systemName: "stop.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.white.opacity(0.9))
                     }
                     .accessibilityLabel("End reading session")
                     .accessibilityHint("Double tap to end your current reading session")
                     .transition(.asymmetric(
-                    insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.45)),
-                    removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
+                        insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.45)),
+                        removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
                     ))
                 }
             }
@@ -670,7 +689,12 @@ struct BookDetailView: View {
             )
             .environmentObject(libraryViewModel)
         }
-        .sheet(isPresented: $showingEndSession) {
+        .sheet(isPresented: $showingEndSession, onDismiss: {
+            // If user cancelled (activeSession still exists), resume the timer
+            if activeSession != nil {
+                activeSession?.endDate = nil
+            }
+        }) {
             if let session = activeSession {
                 EndSessionSheet(
                     session: session,
@@ -684,6 +708,33 @@ struct BookDetailView: View {
                 .presentationBackground(.clear)
                 .presentationCornerRadius(32)
             }
+        }
+        .sheet(isPresented: $showingQuoteCapture) {
+            AmbientTextCapture(
+                isPresented: $showingQuoteCapture,
+                bookContext: book,
+                onQuoteSaved: { text, pageNumber in
+                    // Post SaveQuote notification to persist to SwiftData
+                    var quoteData: [String: Any] = [
+                        "quote": text,
+                        "bookId": book.localId.uuidString,
+                        "bookTitle": book.title,
+                        "bookAuthor": book.author
+                    ]
+                    if let page = pageNumber {
+                        quoteData["pageNumber"] = page
+                    }
+                    NotificationCenter.default.post(
+                        name: Notification.Name("SaveQuote"),
+                        object: quoteData
+                    )
+                    SensoryFeedback.success()
+                    showingQuoteCapture = false
+                },
+                onQuestionAsked: { question in
+                    showingQuoteCapture = false
+                }
+            )
         }
         .glassToast(isShowing: $showingSessionSavedToast, message: "Quick Session Saved")
         .onAppear {
@@ -1240,24 +1291,57 @@ struct BookDetailView: View {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 16))
                     .foregroundStyle(accentColor)
-                
-                Text("Recent Activity")
+
+                Text("Notes & Quotes")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                
+
                 Spacer()
             }
-            
-            // Show last 2 notes and 2 quotes
-            let recentNotes = bookNotes.prefix(2)
-            let recentQuotes = bookQuotes.prefix(2)
-            
-            ForEach(recentNotes) { note in
-                BookNoteCard(note: note)
+
+            // Summary of notes and quotes
+            HStack(spacing: 24) {
+                if !bookNotes.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 14))
+                            .foregroundStyle(accentColor)
+                        Text("\(bookNotes.count) note\(bookNotes.count == 1 ? "" : "s")")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+
+                if !bookQuotes.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "quote.opening")
+                            .font(.system(size: 14))
+                            .foregroundStyle(accentColor)
+                        Text("\(bookQuotes.count) quote\(bookQuotes.count == 1 ? "" : "s")")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
             }
-            
-            ForEach(recentQuotes) { quote in
-                BookQuoteCard(quote: quote)
+
+            // Navigate to Notes button
+            Button {
+                NavigationCoordinator.shared.selectedTab = .notes
+                SensoryFeedback.light()
+            } label: {
+                HStack {
+                    Text("View All in Notes")
+                        .font(.system(size: 15, weight: .medium))
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundStyle(accentColor)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
             }
         }
         .padding(DesignSystem.Spacing.listItemPadding)
@@ -1540,18 +1624,23 @@ struct BookDetailView: View {
     
     @ViewBuilder
     private var memorableQuotesSection: some View {
+        quotesOverviewSection
+    }
+
+    @ViewBuilder
+    private var quotesOverviewSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "quote.opening")
                     .font(.system(size: 16))
                     .foregroundStyle(accentColor)
-                
-                Text("Memorable Quotes")
+
+                Text("Quotes")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                
+
                 Spacer()
-                
+
                 Text("\(bookQuotes.count)")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.6))
@@ -1559,14 +1648,34 @@ struct BookDetailView: View {
                     .padding(.vertical, 4)
                     .glassEffect(in: Capsule())
             }
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(bookQuotes) { quote in
-                    BookQuoteCard(quote: quote)
-                        .frame(width: 280)
-                    }
+
+            // Preview of the most recent quote
+            if let latestQuote = bookQuotes.first {
+                Text("\"\(latestQuote.content.prefix(150))\(latestQuote.content.count > 150 ? "..." : "")\"")
+                    .font(.custom("Georgia", size: 16))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(3)
+                    .italic()
+            }
+
+            // Navigate to Notes button
+            Button {
+                NavigationCoordinator.shared.selectedTab = .notes
+                SensoryFeedback.light()
+            } label: {
+                HStack {
+                    Text("View All in Notes")
+                        .font(.system(size: 15, weight: .medium))
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 13, weight: .medium))
                 }
+                .foregroundStyle(accentColor)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
             }
         }
         .padding(DesignSystem.Spacing.listItemPadding)
@@ -1708,107 +1817,9 @@ struct BookDetailView: View {
     
     @ViewBuilder
     private var allQuotesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "quote.opening")
-                    .font(.system(size: 16))
-                    .foregroundStyle(accentColor)
-                
-                Text("All Quotes")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                
-                Spacer()
-                
-                Text("\(bookQuotes.count)")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .glassEffect(in: Capsule())
-            }
-            
-            ForEach(bookQuotes) { quote in
-                BookQuoteCard(quote: quote)
-                    .iOS26SwipeActions([
-                    SwipeAction(
-                        icon: "square.and.arrow.up",
-                        backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
-                        handler: {
-                            ShareQuoteService.shareQuote(quote)
-                            SensoryFeedback.success()
-                        }
-                    ),
-                    SwipeAction(
-                        icon: "trash.fill",
-                        backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                        isDestructive: true,
-                        handler: {
-                            withAnimation(.spring(response: 0.4)) {
-                                notesViewModel.deleteNote(quote)
-                            }
-                        }
-                    )
-                    ])
-            }
-        }
-        .padding(DesignSystem.Spacing.listItemPadding)
-        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+        quotesOverviewSection
     }
     
-    private var quotesSection: some View {
-        VStack(spacing: 16) {
-            if bookQuotes.isEmpty {
-                emptyStateView(
-                    icon: "quote.opening",
-                    title: "No quotes yet",
-                    subtitle: "Use the command bar below to add a quote"
-                )
-            } else {
-                ForEach(bookQuotes) { quote in
-                    BookQuoteCard(quote: quote)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.9).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
-                    .iOS26SwipeActions([
-                        SwipeAction(
-                            icon: "pencil",
-                            backgroundColor: accentColor,
-                            handler: {
-                                // Edit quote
-                                NotificationCenter.default.post(
-                                    name: Notification.Name("EditNote"),
-                                    object: quote
-                                )
-                                SensoryFeedback.light()
-                            }
-                        ),
-                        SwipeAction(
-                            icon: "square.and.arrow.up",
-                            backgroundColor: Color(red: 0.2, green: 0.6, blue: 1.0),
-                            handler: {
-                                // Share quote
-                                ShareQuoteService.shareQuote(quote)
-                                SensoryFeedback.success()
-                            }
-                        ),
-                        SwipeAction(
-                            icon: "trash.fill",
-                            backgroundColor: Color(red: 1.0, green: 0.3, blue: 0.3),
-                            isDestructive: true,
-                            handler: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    notesViewModel.deleteNote(quote)
-                                }
-                            }
-                        )
-                    ])
-                }
-            }
-        }
-    }
-
     private var oldNotesSection_Disabled: some View {
         VStack(spacing: 16) {
             if bookNotes.isEmpty {
@@ -2555,100 +2566,6 @@ struct StatusPill: View {
     }
 }
 
-struct BookQuoteCard: View {
-    let quote: Note
-    @State private var isExpanded = false
-    
-    var firstLetter: String {
-        String(quote.content.prefix(1))
-    }
-    
-    var restOfContent: String {
-        String(quote.content.dropFirst())
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Large transparent opening quote
-            Text("\u{201C}")
-                .font(.custom("Georgia", size: 80))
-                .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.8))
-                .offset(x: -10, y: 20)
-                .frame(height: 0)
-            
-            // Quote content with drop cap
-            HStack(alignment: .top, spacing: 0) {
-                // Drop cap
-                Text(firstLetter)
-                    .font(.custom("Georgia", size: 56))
-                    .foregroundStyle(DesignSystem.Colors.surfaceBackground)
-                    .padding(.trailing, 4)
-                    .offset(y: -8)
-                
-                // Rest of quote
-                Text(restOfContent)
-                    .font(.custom("Georgia", size: 24))
-                    .foregroundStyle(DesignSystem.Colors.surfaceBackground)
-                    .lineSpacing(11) // Line height 1.5
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
-            }
-            .padding(.top, 20)
-            
-            // Attribution section
-            VStack(alignment: .leading, spacing: 12) {
-                // Thin horizontal rule with gradient
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                    .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 0),
-                    .init(color: DesignSystem.Colors.surfaceBackground.opacity(1.0), location: 0.5),
-                    .init(color: DesignSystem.Colors.surfaceBackground.opacity(0.1), location: 1.0)
-                    ]),
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(height: 0.5)
-                .padding(.top, 20)
-                
-                // Attribution text - reordered: Author -> Source -> Page
-                VStack(alignment: .leading, spacing: 6) {
-                    if let author = quote.author {
-                    Text(author.uppercased())
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .kerning(1.5)
-                        .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.8))
-                    }
-                    
-                    if let bookTitle = quote.bookTitle {
-                    Text(bookTitle.uppercased())
-                        .font(.system(size: 11, weight: .regular, design: .monospaced))
-                        .kerning(1.2)
-                        .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.6))
-                    }
-                    
-                    if let pageNumber = quote.pageNumber {
-                    Text("PAGE \(pageNumber)")
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
-                        .kerning(1.0)
-                        .foregroundStyle(DesignSystem.Colors.surfaceBackground.opacity(0.5))
-                    }
-                }
-            }
-        }
-        .padding(32) // Generous padding
-        .background {
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                .fill(Color(red: 0.98, green: 0.97, blue: 0.96)) // #FAF8F5
-                .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
-        }
-        .onTapGesture {
-            withAnimation {
-                isExpanded.toggle()
-            }
-        }
-    }
-}
-
 struct BookNoteCard: View {
     let note: Note
     @State private var isExpanded = false
@@ -3160,12 +3077,20 @@ struct EndSessionSheet: View {
                     session.endSession(at: finalPage)
                     if let bookModel = session.bookModel {
                         bookModel.currentPage = finalPage
+
+                        // Create an AmbientSession so it appears in Sessions archive
+                        let ambientSession = AmbientSession(
+                            startTime: session.startDate,
+                            bookModel: bookModel
+                        )
+                        ambientSession.endTime = session.endDate ?? Date()
+                        ambientSession.currentPage = finalPage
+                        modelContext.insert(ambientSession)
+
                         try? modelContext.save()
                         #if DEBUG
                         print("📊 Session ended - Updated currentPage to \(finalPage)")
-                        #endif
-                        #if DEBUG
-                        print("📊 Book total pages: \(bookModel.pageCount ?? 0)")
+                        print("📊 Created AmbientSession for sessions archive")
                         #endif
                     }
                     // Also update the Book struct through LibraryViewModel

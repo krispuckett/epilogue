@@ -154,11 +154,12 @@ struct Note: Identifiable, Codable, Equatable {
     let bookTitle: String?
     let author: String?
     let pageNumber: Int?
+    let locationReference: String?  // Flexible location: "Page 42", "3:16", "Chapter 5"
     let dateCreated: Date
     let ambientSessionId: UUID?  // Link to ambient session
     let source: String?  // Source of the note (manual, ambient, etc.)
 
-    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil, contentFormat: String = "plaintext") {
+    init(type: NoteType, content: String, bookId: UUID? = nil, bookTitle: String? = nil, author: String? = nil, pageNumber: Int? = nil, locationReference: String? = nil, dateCreated: Date = Date(), id: UUID = UUID(), ambientSessionId: UUID? = nil, source: String? = nil, contentFormat: String = "plaintext") {
         self.id = id
         self.type = type
         self.content = content
@@ -167,6 +168,7 @@ struct Note: Identifiable, Codable, Equatable {
         self.bookTitle = bookTitle
         self.author = author
         self.pageNumber = pageNumber
+        self.locationReference = locationReference
         self.dateCreated = dateCreated
         self.ambientSessionId = ambientSessionId
         self.source = source
@@ -179,7 +181,7 @@ struct Note: Identifiable, Codable, Equatable {
 
     // Custom Codable implementation for backward compatibility
     enum CodingKeys: String, CodingKey {
-        case id, type, content, contentFormat, bookId, bookTitle, author, pageNumber, dateCreated, ambientSessionId, source
+        case id, type, content, contentFormat, bookId, bookTitle, author, pageNumber, locationReference, dateCreated, ambientSessionId, source
     }
 
     init(from decoder: Decoder) throws {
@@ -193,6 +195,7 @@ struct Note: Identifiable, Codable, Equatable {
         bookTitle = try container.decodeIfPresent(String.self, forKey: .bookTitle)
         author = try container.decodeIfPresent(String.self, forKey: .author)
         pageNumber = try container.decodeIfPresent(Int.self, forKey: .pageNumber)
+        locationReference = try container.decodeIfPresent(String.self, forKey: .locationReference)
         dateCreated = try container.decode(Date.self, forKey: .dateCreated)
         ambientSessionId = try container.decodeIfPresent(UUID.self, forKey: .ambientSessionId)
         source = try container.decodeIfPresent(String.self, forKey: .source)
@@ -213,6 +216,85 @@ struct Note: Identifiable, Codable, Equatable {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: dateCreated)
+    }
+
+    // MARK: - Bible Detection
+
+    /// Known Bible book names for detection
+    private static let bibleBooks: Set<String> = [
+        "genesis", "exodus", "leviticus", "numbers", "deuteronomy",
+        "joshua", "judges", "ruth", "samuel", "kings", "chronicles",
+        "ezra", "nehemiah", "esther", "job", "psalms", "psalm", "proverbs",
+        "ecclesiastes", "song of solomon", "isaiah", "jeremiah", "lamentations",
+        "ezekiel", "daniel", "hosea", "joel", "amos", "obadiah", "jonah",
+        "micah", "nahum", "habakkuk", "zephaniah", "haggai", "zechariah", "malachi",
+        "matthew", "mark", "luke", "john", "acts", "romans", "corinthians",
+        "galatians", "ephesians", "philippians", "colossians", "thessalonians",
+        "timothy", "titus", "philemon", "hebrews", "james", "peter", "jude", "revelation",
+        // Common variations
+        "1 samuel", "2 samuel", "1 kings", "2 kings", "1 chronicles", "2 chronicles",
+        "1 corinthians", "2 corinthians", "1 thessalonians", "2 thessalonians",
+        "1 timothy", "2 timothy", "1 peter", "2 peter", "1 john", "2 john", "3 john"
+    ]
+
+    /// Bible-related keywords in book titles
+    private static let bibleKeywords: Set<String> = [
+        "bible", "scripture", "testament", "niv", "esv", "kjv", "nasb", "nlt", "nrsv", "msg"
+    ]
+
+    /// Check if this note is from a Bible
+    var isBibleQuote: Bool {
+        // Check if book title contains Bible-related keywords
+        if let title = bookTitle?.lowercased() {
+            for keyword in Note.bibleKeywords {
+                if title.contains(keyword) {
+                    return true
+                }
+            }
+        }
+
+        // Check if author field contains a Bible book name
+        if let authorField = author?.lowercased() {
+            let cleanedAuthor = authorField.trimmingCharacters(in: .whitespaces)
+            if Note.bibleBooks.contains(cleanedAuthor) {
+                return true
+            }
+            // Also check if it starts with a number followed by a book name (e.g., "1 John")
+            for book in Note.bibleBooks {
+                if cleanedAuthor.contains(book) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    /// Get display-formatted location (page number or verse reference)
+    var displayLocation: String? {
+        // Prefer locationReference if set
+        if let location = locationReference, !location.isEmpty {
+            return location
+        }
+
+        // Fall back to page number
+        if let page = pageNumber {
+            return "Page \(page)"
+        }
+
+        return nil
+    }
+
+    /// For Bible quotes: the book within the Bible (stored in author field)
+    var bibleBook: String? {
+        guard isBibleQuote else { return nil }
+        return author
+    }
+
+    /// For Bible quotes: the chapter:verse reference (stored in locationReference)
+    var bibleReference: String? {
+        guard isBibleQuote else { return nil }
+        return locationReference
     }
 }
 
@@ -422,22 +504,25 @@ class NotesViewModel: ObservableObject {
         #if DEBUG
         print("✏️ DEBUG: updateNote() called for note ID: \(oldNote.id)")
         #endif
-        
+
         if let index = notes.firstIndex(where: { $0.id == oldNote.id }) {
             #if DEBUG
             print("✏️ DEBUG: Found note at index: \(index)")
             #endif
             // Keep the same ID but update the content
-            var updatedNote = newNote
-            updatedNote = Note(
+            let updatedNote = Note(
                 type: newNote.type,
                 content: newNote.content,
                 bookId: newNote.bookId,
                 bookTitle: newNote.bookTitle,
                 author: newNote.author,
                 pageNumber: newNote.pageNumber,
+                locationReference: newNote.locationReference,
                 dateCreated: oldNote.dateCreated,
-                id: oldNote.id
+                id: oldNote.id,
+                ambientSessionId: newNote.ambientSessionId,
+                source: newNote.source,
+                contentFormat: newNote.contentFormat
             )
             notes[index] = updatedNote
             saveNotes()

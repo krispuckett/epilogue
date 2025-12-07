@@ -312,8 +312,7 @@ struct CleanNotesView: View {
             .liquidCommandPalette(isPresented: $showingCommandPalette, context: .notes, onComplete: handleCommandPaletteResult)
             .onReceive(navigationCoordinator.$highlightedNoteID) { handleHighlightedNote($0) }
             .onReceive(navigationCoordinator.$highlightedQuoteID) { handleHighlightedQuote($0) }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { handleCreateNewNote($0) }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { handleSaveQuote($0) }
+            // Note: CreateNewNote and SaveQuote are handled globally in ContentView
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowToastMessage"))) { handleShowToast($0) }
     }
 
@@ -507,8 +506,9 @@ struct CleanNotesView: View {
             let bookId = data["bookId"] as? String
             let bookTitle = data["bookTitle"] as? String
             let bookAuthor = data["bookAuthor"] as? String
+            let pageNumber = data["pageNumber"] as? Int
             createQuote(content: quote, attribution: attribution?.isEmpty ?? true ? nil : attribution,
-                       bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor)
+                       bookId: bookId, bookTitle: bookTitle, bookAuthor: bookAuthor, pageNumber: pageNumber)
         }
     }
 
@@ -1364,7 +1364,7 @@ struct CleanNotesView: View {
         }
     }
     
-    private func createQuote(content: String, attribution: String?, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil) {
+    private func createQuote(content: String, attribution: String?, bookId: String? = nil, bookTitle: String? = nil, bookAuthor: String? = nil, pageNumber: Int? = nil) {
         // Find or create BookModel if we have book context
         var bookModel: BookModel? = nil
         
@@ -1415,7 +1415,7 @@ struct CleanNotesView: View {
             text: content,
             book: bookModel,
             author: attribution,
-            pageNumber: nil,
+            pageNumber: pageNumber,
             timestamp: Date(),
             source: .manual
         )
@@ -1468,13 +1468,13 @@ private struct NoteStickyHeader: View {
     let isCollapsed: Bool
     let scrollOffset: CGFloat
     let onToggle: () -> Void
-    
+
     @State private var minY: CGFloat = 0
-    
+
     private var isPinned: Bool {
         minY < 150 && minY > -50  // Unpins when pushed up by next header
     }
-    
+
     private var opacity: Double {
         // Fade out as it gets pushed up
         if minY < -30 {
@@ -1485,7 +1485,7 @@ private struct NoteStickyHeader: View {
             return 1.0
         }
     }
-    
+
     var body: some View {
         HStack {
             // Section title - no button wrapper, just like chat tab
@@ -1499,9 +1499,9 @@ private struct NoteStickyHeader: View {
                 )
                 .tracking(isPinned ? 1.4 : 1.2)
                 .animation(DesignSystem.Animation.easeQuick, value: isPinned)
-            
+
             Spacer()
-            
+
             // Count - format like chat tab
             Text("\(itemCount) \(itemCount == 1 ? "item" : "items")")
                 .font(.system(
@@ -1566,9 +1566,9 @@ private struct NoteCardView: View {
 
     // MARK: - Constants (Steve would approve these numbers)
     private let lineHeight: CGFloat = 27  // 16pt font + 6pt line spacing + 5pt padding
-    private let previewLineLimit = 5
-    private let mediumThreshold: CGFloat = 12  // lines
-    private let longThreshold: CGFloat = 20    // lines
+    private let previewLineLimit = 3  // Truncate earlier for cleaner cards
+    private let mediumThreshold: CGFloat = 10  // lines
+    private let longThreshold: CGFloat = 18    // lines
 
     // MARK: - Content Tier Detection
     private var approximateLineCount: Int {
@@ -1809,7 +1809,8 @@ private struct NoteCardView: View {
     // MARK: - Main Body
     var body: some View {
         cardContent
-        .padding(DesignSystem.Spacing.cardPadding)
+        .padding(.horizontal, 16)  // Tighter horizontal for more text width
+        .padding(.vertical, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)

@@ -131,15 +131,15 @@ struct QuoteCard: View {
     @State private var tapCount = 0
     @State private var lastTapTime = Date()
     @State private var showingSessionSummary = false
-    
+
     var firstLetter: String {
         String(note.content.prefix(1))
     }
-    
+
     var restOfContent: String {
         String(note.content.dropFirst())
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Large transparent opening quote
@@ -149,26 +149,38 @@ struct QuoteCard: View {
                 .offset(x: -10, y: 20)
                 .frame(height: 0)
                 .accessibilityHidden(true)
-            
-            // Quote content with drop cap
-            HStack(alignment: .top, spacing: 0) {
-                // Drop cap
-                Text(firstLetter)
-                    .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 70 : 56))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    .padding(.trailing, 4)
-                    .offset(y: -8)
-                
-                // Rest of quote
-                Text(restOfContent)
-                    .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 30 : 24))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    .lineSpacing(sizeCategory.isAccessibilitySize ? 14 : 11) // Line height 1.5
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
+
+            // Quote content - Bible verses get special formatting, regular quotes get drop cap
+            if note.isBibleQuote {
+                // Bible verses: full-width with styled verse numbers
+                BibleVerseText(
+                    note.content,
+                    fontSize: sizeCategory.isAccessibilitySize ? 22 : 18,
+                    textColor: Color(red: 0.98, green: 0.97, blue: 0.96),
+                    lineSpacing: sizeCategory.isAccessibilitySize ? 12 : 8
+                )
+                .padding(.top, 16)
+            } else {
+                // Standard quotes: drop cap layout
+                HStack(alignment: .top, spacing: 0) {
+                    // Drop cap
+                    Text(firstLetter)
+                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 70 : 56))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        .padding(.trailing, 4)
+                        .offset(y: -8)
+
+                    // Rest of quote
+                    Text(restOfContent)
+                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 30 : 24))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        .lineSpacing(sizeCategory.isAccessibilitySize ? 14 : 11)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                }
+                .padding(.top, 20)
             }
-            .padding(.top, 20)
-            
+
             // Attribution section
             VStack(alignment: .leading, spacing: 16) {
                 // Thin horizontal rule with gradient
@@ -183,29 +195,14 @@ struct QuoteCard: View {
                 )
                 .frame(height: 0.5)
                 .padding(.top, 28)
-                
-                // Attribution text - reordered: Author -> Source -> Page
-                VStack(alignment: .leading, spacing: 6) {
-                    if let author = note.author {
-                        Text(author.uppercased())
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .kerning(1.5)
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
-                    }
-                    
-                    if let bookTitle = note.bookTitle {
-                        Text(bookTitle.uppercased())
-                            .font(.system(size: 11, weight: .regular, design: .monospaced))
-                            .kerning(1.2)
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
-                    }
-                    
-                    if let pageNumber = note.pageNumber {
-                        Text("PAGE \(pageNumber)")
-                            .font(.system(size: 10, weight: .regular, design: .monospaced))
-                            .kerning(1.0)
-                            .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
-                    }
+
+                // Attribution text - different format for Bible quotes
+                if note.isBibleQuote {
+                    // Bible attribution: "John 3:16" style or "John 3:16 (NIV)" if translation specified
+                    bibleAttribution
+                } else {
+                    // Standard attribution: Author -> Source -> Page
+                    standardAttribution
                 }
 
                 // Session pill for ambient quotes
@@ -236,7 +233,7 @@ struct QuoteCard: View {
                     .padding(.top, 8)
                 }
             }
-            
+
             // Date overlay that fades in on swipe
             if showDate {
                 HStack {
@@ -249,10 +246,11 @@ struct QuoteCard: View {
                 }
             }
         }
-        .padding(32) // Generous padding
+        .padding(.horizontal, 20)  // Tighter horizontal for more text width
+        .padding(.vertical, note.isBibleQuote ? 20 : 28)
         .background(
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                .fill(DesignSystem.Colors.surfaceBackground) // Dark charcoal matching LibraryView
+                .fill(DesignSystem.Colors.surfaceBackground)
         )
         .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
@@ -266,6 +264,67 @@ struct QuoteCard: View {
                 NavigationStack {
                     AmbientSessionSummaryView(session: session, colorPalette: nil)
                 }
+            }
+        }
+    }
+
+    // MARK: - Bible Attribution
+
+    @ViewBuilder
+    private var bibleAttribution: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Bible book and reference: "John 3:16" or "Psalm 23:1-6"
+            HStack(spacing: 4) {
+                if let bibleBook = note.author {
+                    Text(bibleBook.uppercased())
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .kerning(1.5)
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
+                }
+
+                if let reference = note.locationReference, !reference.isEmpty {
+                    Text(reference.uppercased())
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .kerning(1.5)
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
+                }
+            }
+
+            // Translation (stored in bookTitle): "NIV", "ESV", etc.
+            if let translation = note.bookTitle {
+                Text(translation.uppercased())
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .kerning(1.0)
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
+            }
+        }
+    }
+
+    // MARK: - Standard Attribution
+
+    @ViewBuilder
+    private var standardAttribution: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let author = note.author {
+                Text(author.uppercased())
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .kerning(1.5)
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.8))
+            }
+
+            if let bookTitle = note.bookTitle {
+                Text(bookTitle.uppercased())
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .kerning(1.2)
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.6))
+            }
+
+            // Display location - prefer locationReference, fall back to pageNumber
+            if let location = note.displayLocation {
+                Text(location.uppercased())
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .kerning(1.0)
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
             }
         }
     }
@@ -323,9 +382,9 @@ struct RegularNoteCard: View {
                 Text(note.formattedDate)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96).opacity(0.5))
-                
+
                 Spacer()
-                
+
                 // Note indicator
                 Image(systemName: "note.text")
                     .font(.system(size: 14))
@@ -423,10 +482,6 @@ struct RegularNoteCard: View {
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(DesignSystem.Animation.springStandard, value: isPressed)
-        .onTapGesture(count: 2) {
-            SensoryFeedback.medium()
-            showingOptions = true
-        }
         .sheet(isPresented: $showingSessionSummary) {
             if let session = ambientSession {
                 NavigationStack {

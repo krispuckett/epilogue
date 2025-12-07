@@ -74,18 +74,14 @@ struct ConversationalBookCard: View {
                 }
                 .disabled(isAdded)
 
-                // Purchase link button
-                if recommendation.amazonURL != nil {
-                    Button {
-                        SensoryFeedback.light()
-                        if let url = recommendation.amazonURL {
-                            onPurchase(url)
-                        }
-                    } label: {
-                        Image(systemName: "cart.circle.fill")
-                            .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
+                // Purchase link button - uses user's preferred bookstore
+                Button {
+                    SensoryFeedback.light()
+                    onPurchase(recommendation.bookstoreURL)
+                } label: {
+                    Image(systemName: "cart.circle.fill")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
                 }
             }
         }

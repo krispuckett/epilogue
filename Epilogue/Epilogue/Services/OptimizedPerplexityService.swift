@@ -20,6 +20,16 @@ struct PerplexityResponse {
     let model: String
     let confidence: Double
     let cached: Bool
+    let relatedQuestions: [String]  // Spoiler-filtered follow-up suggestions
+
+    init(text: String, citations: [Citation], model: String, confidence: Double, cached: Bool, relatedQuestions: [String] = []) {
+        self.text = text
+        self.citations = citations
+        self.model = model
+        self.confidence = confidence
+        self.cached = cached
+        self.relatedQuestions = relatedQuestions
+    }
 }
 
 // MARK: - Perplexity Error
@@ -206,6 +216,7 @@ class OptimizedPerplexityService: ObservableObject {
                         query: query,
                         bookContext: bookContext,
                         model: model,
+                        currentPage: currentPage,
                         continuation: continuation
                     )
                     
@@ -222,20 +233,22 @@ class OptimizedPerplexityService: ObservableObject {
         query: String,
         bookContext: Book?,
         model: String,
+        currentPage: Int? = nil,
         continuation: AsyncThrowingStream<PerplexityResponse, Error>.Continuation
     ) async throws {
         var accumulatedText = ""
         var citations: [Citation] = []
+        var relatedQuestions: [String] = []
         let startTime = CFAbsoluteTimeGetCurrent()
-        
+
         do {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 logger.error("❌ Invalid response type")
                 throw PerplexityError.invalidResponse
             }
-            
+
             // Handle various HTTP status codes
             switch httpResponse.statusCode {
             case 200:
@@ -255,43 +268,78 @@ class OptimizedPerplexityService: ObservableObject {
                 logger.error("❌ Unexpected status code: \(httpResponse.statusCode)")
                 throw PerplexityError.invalidResponse
             }
-            
+
             // Process SSE stream with token batching
             for try await line in bytes.lines {
                 if line.hasPrefix("data: ") {
                     let data = String(line.dropFirst(6))
-                    
+
                     if data == "[DONE]" {
+                        // Process related questions
+                        var finalQuestions: [String] = []
+
+                        if !relatedQuestions.isEmpty {
+                            // Filter Sonar's questions to keep only topic-relevant ones
+                            finalQuestions = filterSonarQuestionsForRelevance(relatedQuestions, response: accumulatedText)
+                        }
+
+                        // If Sonar didn't provide relevant questions, generate contextual ones
+                        if finalQuestions.isEmpty {
+                            finalQuestions = generateContextualFollowUps(
+                                response: accumulatedText,
+                                book: bookContext
+                            )
+                        }
+
+                        // Filter related questions for spoilers before finalizing
+                        let filteredQuestions = filterRelatedQuestionsForSpoilers(
+                            finalQuestions,
+                            book: bookContext,
+                            currentPage: currentPage
+                        )
+
                         // Stream complete
                         let finalResponse = PerplexityResponse(
                             text: accumulatedText,
                             citations: citations,
                             model: model,
                             confidence: calculateConfidence(text: accumulatedText, citations: citations),
-                            cached: false
+                            cached: false,
+                            relatedQuestions: filteredQuestions
                         )
-                        
+
                         // Cache the response
                         await cacheResponse(
                             query: query,
                             bookContext: bookContext,
                             response: finalResponse
                         )
-                        
+
                         continuation.yield(finalResponse)
                         continuation.finish()
-                        
+
                         let duration = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-                        logger.info("✅ Stream complete in \(String(format: "%.1f", duration))ms")
+                        logger.info("✅ Stream complete in \(String(format: "%.1f", duration))ms, \(filteredQuestions.count) follow-up questions")
                         break
                     }
-                    
-                    // Parse SSE token
-                    if let tokenData = parseSSEData(data) {
-                        // Extract text token
-                        if let token = tokenData["content"] as? String {
+
+                    // Parse SSE chunk (could be delta or final with related_questions)
+                    if let jsonData = data.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+
+                        // Extract related questions from the response (comes with every chunk)
+                        // Only update if we haven't captured them yet
+                        if let questions = json["related_questions"] as? [String], relatedQuestions.isEmpty {
+                            relatedQuestions = questions
+                            logger.info("📋 Received \(questions.count) related questions from Sonar")
+                        }
+
+                        // Extract token from delta
+                        if let choices = json["choices"] as? [[String: Any]],
+                           let delta = choices.first?["delta"] as? [String: Any],
+                           let token = delta["content"] as? String {
                             accumulatedText += token
-                            
+
                             // Batch tokens for UI (50ms intervals)
                             await tokenBatcher.addToken(token) { batchedTokens in
                                 let partialResponse = PerplexityResponse(
@@ -304,9 +352,9 @@ class OptimizedPerplexityService: ObservableObject {
                                 continuation.yield(partialResponse)
                             }
                         }
-                        
+
                         // Extract citations if present
-                        if let citationData = tokenData["citations"] as? [[String: Any]] {
+                        if let citationData = json["citations"] as? [[String: Any]] {
                             citations = parseCitations(citationData, in: accumulatedText)
                         }
                     }
@@ -368,6 +416,7 @@ class OptimizedPerplexityService: ObservableObject {
                     query: query,
                     bookContext: bookContext,
                     model: model,
+                    currentPage: currentPage,
                     continuation: continuation
                 )
             } else {
@@ -376,9 +425,175 @@ class OptimizedPerplexityService: ObservableObject {
             }
         }
     }
-    
+
+    // MARK: - Related Questions Spoiler Filter
+
+    /// Filters related questions to remove potential spoilers based on reading progress
+    private func filterRelatedQuestionsForSpoilers(
+        _ questions: [String],
+        book: Book?,
+        currentPage: Int?
+    ) -> [String] {
+        guard let book = book else {
+            // No book context - return all questions (general mode)
+            return questions
+        }
+
+        // Spoiler indicator words - questions containing these are higher risk
+        let spoilerIndicators = [
+            "death", "dies", "killed", "murder",
+            "ending", "end of", "final",
+            "reveal", "twist", "secret",
+            "betrayal", "betrays",
+            "true identity", "real identity",
+            "turns out", "discovers that",
+            "after", "later in", "eventually",
+            "fate of", "what happens to",
+            "survives", "escapes"
+        ]
+
+        // Safe question patterns - these are usually okay
+        let safePatterns = [
+            "who is", "what is", "where is",
+            "why does", "how does",
+            "theme", "symbol", "meaning",
+            "character", "motivation",
+            "relationship between",
+            "similar to", "compared to",
+            "author", "writing style",
+            "historical context", "setting"
+        ]
+
+        return questions.filter { question in
+            let lowerQuestion = question.lowercased()
+
+            // Check if it matches safe patterns
+            let isSafePattern = safePatterns.contains { lowerQuestion.contains($0) }
+
+            // Check for spoiler indicators
+            let hasSpoilerIndicator = spoilerIndicators.contains { lowerQuestion.contains($0) }
+
+            // If it has spoiler indicators and isn't clearly safe, filter it out
+            if hasSpoilerIndicator && !isSafePattern {
+                logger.info("🚫 Filtered spoiler-risk question: \(question.prefix(50))...")
+                return false
+            }
+
+            // For series books, extra caution with sequel-related questions
+            if let seriesInfo = detectSeriesInformation(for: book) {
+                let sequelIndicators = ["next book", "sequel", "book \(seriesInfo.1 + 1)", "continues in"]
+                if sequelIndicators.contains(where: { lowerQuestion.contains($0) }) {
+                    logger.info("🚫 Filtered sequel-related question: \(question.prefix(50))...")
+                    return false
+                }
+            }
+
+            return true
+        }
+    }
+
+    // MARK: - Contextual Follow-Up Generation
+
+    /// Generates contextual follow-up questions based on the response content
+    /// These should be directly related to the topic just discussed
+    private func generateContextualFollowUps(response: String, book: Book?) -> [String] {
+        guard let book = book else {
+            // Generic mode - return empty, no fallback needed
+            return []
+        }
+
+        let responseLower = response.lowercased()
+        var questions: [String] = []
+
+        // Extract key entities/topics from the response to generate relevant follow-ups
+        // Look for specific nouns/subjects mentioned
+
+        // Weapon/item-related response
+        if responseLower.contains("sword") || responseLower.contains("weapon") || responseLower.contains("blade") {
+            questions.append("What is the history of this weapon?")
+            questions.append("Who crafted it and when?")
+            questions.append("What special properties does it have?")
+        }
+
+        // Character-specific response (names commonly found)
+        let characterPatterns = [
+            ("frodo", ["What challenges does Frodo face?", "How does Frodo change throughout the journey?"]),
+            ("gandalf", ["What is Gandalf's true nature?", "How does Gandalf guide the fellowship?"]),
+            ("aragorn", ["What is Aragorn's lineage?", "How does Aragorn's character develop?"]),
+            ("sam", ["Why is Sam's loyalty so important?", "What role does Sam play in the quest?"]),
+            ("bilbo", ["What adventures did Bilbo have?", "How did Bilbo's journey shape Frodo's?"])
+        ]
+
+        for (name, followUps) in characterPatterns {
+            if responseLower.contains(name) {
+                questions.append(contentsOf: followUps)
+                break // Only add for one character to avoid too many
+            }
+        }
+
+        // Place/location-related
+        if responseLower.contains("mordor") || responseLower.contains("shire") || responseLower.contains("rivendell") || responseLower.contains("moria") {
+            questions.append("What is the significance of this place?")
+            questions.append("What events happen here?")
+        }
+
+        // Comparison to movies/adaptations
+        if responseLower.contains("movie") || responseLower.contains("film") || responseLower.contains("peter jackson") || responseLower.contains("adaptation") {
+            questions.append("What other changes were made in the films?")
+            questions.append("Which adaptation is most faithful to the book?")
+        }
+
+        // Theme-related
+        if responseLower.contains("theme") || responseLower.contains("symbol") || responseLower.contains("meaning") {
+            questions.append("Are there other examples of this theme?")
+            questions.append("How does this connect to the larger story?")
+        }
+
+        // If we couldn't detect specific topics, add general but relevant questions
+        if questions.isEmpty {
+            questions.append("Tell me more about this")
+            questions.append("How does this connect to the main plot?")
+            questions.append("What happens next in this storyline?")
+        }
+
+        // Return max 4, shuffled for variety
+        return Array(questions.shuffled().prefix(4))
+    }
+
+    /// Filters Sonar's related questions to keep only those relevant to the current topic
+    private func filterSonarQuestionsForRelevance(_ questions: [String], response: String) -> [String] {
+        let responseLower = response.lowercased()
+
+        // Extract key terms from the response (simple approach)
+        let responseWords = Set(responseLower.components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.count > 4 }) // Only words longer than 4 chars
+
+        return questions.filter { question in
+            let questionLower = question.lowercased()
+
+            // Filter out generic recommendation questions
+            let genericPatterns = [
+                "what types of", "what kind of", "do you prefer",
+                "are you interested", "would you like", "do you enjoy",
+                "recommend", "suggestion", "explore other"
+            ]
+
+            if genericPatterns.contains(where: { questionLower.contains($0) }) {
+                return false
+            }
+
+            // Keep if question relates to specific content from response
+            // Check if question shares meaningful words with response
+            let questionWords = Set(questionLower.components(separatedBy: .whitespacesAndNewlines)
+                .filter { $0.count > 4 })
+
+            let overlap = responseWords.intersection(questionWords)
+            return overlap.count >= 1 // At least one shared meaningful word
+        }
+    }
+
     // MARK: - Citation Extraction
-    
+
     private func parseCitations(_ citationData: [[String: Any]], in text: String) -> [Citation] {
         var citations: [Citation] = []
         
@@ -615,20 +830,35 @@ class OptimizedPerplexityService: ObservableObject {
             enhancedQuery = query
         }
 
-        // Back to sonar - it was working fine before
+        // Determine search context size based on query complexity
+        let searchContextSize: String
+        switch complexityAnalyzer.analyze(enhancedQuery) {
+        case .simple:
+            searchContextSize = "low"
+        case .moderate:
+            searchContextSize = "medium"
+        case .complex:
+            searchContextSize = "high"
+        }
+
+        // Build request with enhanced Sonar features
         let body: [String: Any] = [
-            "model": "sonar",  // Always use sonar for proxy
+            "model": "sonar",  // Fast, efficient for real-time responses
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": enhancedQuery]
             ],
             "stream": stream,
-            "search_recency": "month",
+            "search_recency_filter": "month",
             "return_citations": true,
             "return_images": false,
+            "return_related_questions": true,  // Get follow-up suggestions
             "search_domain_filter": [],  // No domain restrictions
+            "web_search_options": [
+                "search_context_size": searchContextSize
+            ],
             "temperature": 0.7,
-            "max_tokens": 800  // Increased for richer recommendations with follow-ups
+            "max_tokens": 800
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

@@ -274,8 +274,8 @@ private struct CalendarGridView: View {
         VStack(spacing: 8) {
             // Weekday headers
             HStack(spacing: 0) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
-                    Text(symbol)
+                ForEach(weekdaySymbols.indices, id: \.self) { index in
+                    Text(weekdaySymbols[index])
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.4))
                         .frame(maxWidth: .infinity)

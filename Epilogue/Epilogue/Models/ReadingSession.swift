@@ -54,7 +54,8 @@ final class ReadingSession {
         guard let endDate = endDate else {
             return Date().timeIntervalSince(startDate)
         }
-        return duration
+        // Calculate from endDate directly (for paused state before save)
+        return endDate.timeIntervalSince(startDate)
     }
 
     var formattedDuration: String {

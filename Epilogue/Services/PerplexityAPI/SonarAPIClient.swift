@@ -199,36 +199,48 @@ actor SonarAPIClient {
 // MARK: - Models
 
 enum SonarModel: String, CaseIterable {
-    case sonarSmall = "sonar-small-chat"
-    case sonarMedium = "sonar-medium-chat"
-    case sonarSmallOnline = "sonar-small-online"
-    case sonarMediumOnline = "sonar-medium-online"
-    
+    // Current models (2025)
+    case sonar = "sonar"                           // Fast, efficient - $0.20/1M tokens
+    case sonarPro = "sonar-pro"                    // Complex reasoning - $1.00/1M tokens
+    case sonarReasoning = "sonar-reasoning"        // Multi-step logic - $1.00/1M tokens
+    case sonarReasoningPro = "sonar-reasoning-pro" // Advanced analysis - $5.00/1M tokens
+
+    // Legacy aliases for backwards compatibility
+    static let sonarSmall = SonarModel.sonar
+    static let sonarMedium = SonarModel.sonarPro
+    static let sonarSmallOnline = SonarModel.sonar
+    static let sonarMediumOnline = SonarModel.sonarPro
+
     var isFree: Bool {
-        switch self {
-        case .sonarSmall, .sonarSmallOnline:
-            return true
-        case .sonarMedium, .sonarMediumOnline:
-            return false
-        }
+        return false // All current models are paid
     }
-    
+
     var maxTokens: Int {
         switch self {
-        case .sonarSmall, .sonarSmallOnline:
-            return 2048
-        case .sonarMedium, .sonarMediumOnline:
+        case .sonar:
             return 4096
+        case .sonarPro, .sonarReasoning:
+            return 8192
+        case .sonarReasoningPro:
+            return 16384
         }
     }
-    
-    var costPerToken: Double {
+
+    /// Cost per 1M tokens (input)
+    var costPerMillionTokens: Double {
         switch self {
-        case .sonarSmall, .sonarSmallOnline:
-            return 0.0 // Free tier
-        case .sonarMedium, .sonarMediumOnline:
-            return 0.00002 // $0.02 per 1K tokens
+        case .sonar:
+            return 0.20
+        case .sonarPro, .sonarReasoning:
+            return 1.00
+        case .sonarReasoningPro:
+            return 5.00
         }
+    }
+
+    /// Legacy: cost per token (deprecated, use costPerMillionTokens)
+    var costPerToken: Double {
+        return costPerMillionTokens / 1_000_000
     }
 }
 
@@ -242,9 +254,11 @@ struct ChatCompletionRequest: Codable {
     let stream: Bool
     let returnCitations: Bool
     let returnImages: Bool
+    let returnRelatedQuestions: Bool
     let searchDomainFilter: [String]?
     let searchRecencyFilter: String?
-    
+    let webSearchOptions: WebSearchOptions?
+
     enum CodingKeys: String, CodingKey {
         case model
         case messages
@@ -253,8 +267,18 @@ struct ChatCompletionRequest: Codable {
         case stream
         case returnCitations = "return_citations"
         case returnImages = "return_images"
+        case returnRelatedQuestions = "return_related_questions"
         case searchDomainFilter = "search_domain_filter"
         case searchRecencyFilter = "search_recency_filter"
+        case webSearchOptions = "web_search_options"
+    }
+}
+
+struct WebSearchOptions: Codable {
+    let searchContextSize: String  // "low", "medium", "high"
+
+    enum CodingKeys: String, CodingKey {
+        case searchContextSize = "search_context_size"
     }
 }
 
@@ -266,19 +290,25 @@ struct ChatCompletionResponse: Codable {
     let choices: [Choice]
     let usage: Usage?
     let citations: [Citation]?
-    
+    let relatedQuestions: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, model, object, created, choices, usage, citations
+        case relatedQuestions = "related_questions"
+    }
+
     struct Choice: Codable {
         let index: Int
         let message: Message
         let finishReason: String?
-        
+
         enum CodingKeys: String, CodingKey {
             case index
             case message
             case finishReason = "finish_reason"
         }
     }
-    
+
     struct Message: Codable {
         let role: String
         let content: String

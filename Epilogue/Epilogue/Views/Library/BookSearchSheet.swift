@@ -220,22 +220,9 @@ struct BookSearchSheet: View {
     // MARK: - Loading View
     private var loadingView: some View {
         VStack(spacing: 24) {
-            // Animated dots like ambient mode
-            HStack(spacing: 8) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.8))
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(1.0)
-                        .animation(
-                            .easeInOut(duration: 0.6)
-                                .repeatForever()
-                                .delay(Double(index) * 0.2),
-                            value: isLoading
-                        )
-                }
-            }
-            
+            // Polished thinking indicator matching ambient mode
+            BookSearchThinkingIndicator()
+
             Text(refinedSearchQuery.isEmpty ?
                  (searchQuery.isEmpty ? "Searching..." : "Searching for \"\(searchQuery)\"...") :
                  "Searching for \"\(refinedSearchQuery)\"...")
@@ -1457,5 +1444,67 @@ struct BestsellerBookCard: View {
         }
         .scaleEffect(isAdding ? 0.95 : 1.0)
         .animation(.spring(response: 0.3), value: isAdding)
+    }
+}
+
+// MARK: - Book Search Thinking Indicator
+/// Polished centered thinking indicator with fluid bounce animation (matching ambient mode style)
+struct BookSearchThinkingIndicator: View {
+    @State private var dotOffsets: [CGFloat] = [0, 0, 0]
+    @State private var timer: Timer?
+
+    // Amber accent color matching app theme
+    private let amberColor = Color(red: 1.0, green: 0.6, blue: 0.2)
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(amberColor)
+                    .frame(width: 10, height: 10)
+                    .offset(y: dotOffsets[i])
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .glassEffect(.regular.tint(amberColor.opacity(0.15)), in: Capsule())
+        .onAppear {
+            startBounceAnimation()
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    private func startBounceAnimation() {
+        // Staggered bounce for each dot
+        for i in 0..<3 {
+            let delay = Double(i) * 0.15
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                animateDot(at: i)
+            }
+        }
+
+        // Repeat the whole sequence
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            for i in 0..<3 {
+                let delay = Double(i) * 0.15
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    animateDot(at: i)
+                }
+            }
+        }
+    }
+
+    private func animateDot(at index: Int) {
+        withAnimation(.easeOut(duration: 0.25)) {
+            dotOffsets[index] = -8
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.easeIn(duration: 0.25)) {
+                dotOffsets[index] = 0
+            }
+        }
     }
 }

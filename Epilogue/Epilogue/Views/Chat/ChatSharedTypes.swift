@@ -51,13 +51,15 @@ struct UnifiedChatMessage: Identifiable {
         let isbn: String?
         let purchaseURL: String?
 
+        /// URL to buy this book at the user's preferred bookstore
+        var bookstoreURL: String {
+            BookstoreURLBuilder.shared.buildURL(title: title, author: author, isbn: isbn)
+        }
+
+        /// Legacy computed property for backwards compatibility
+        @available(*, deprecated, renamed: "bookstoreURL")
         var amazonURL: String? {
-            if let isbn = isbn {
-                return "https://www.amazon.com/dp/\(isbn)"
-            }
-            // Fallback to search URL
-            let searchQuery = "\(title) \(author)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            return "https://www.amazon.com/s?k=\(searchQuery)"
+            bookstoreURL
         }
     }
 

@@ -11,26 +11,17 @@ class TextEditorCursorTracker: ObservableObject {
     @Published var cursorPosition: Int = 0
     @Published var selectedRange: NSRange?
 
-    private var textView: UITextView?
-    private var cancellables = Set<AnyCancellable>()
+    weak var textView: UITextView?
 
     func trackTextView(_ textView: UITextView) {
         self.textView = textView
-
-        // Observe selection changes
-        NotificationCenter.default.publisher(for: UITextView.textDidChangeNotification, object: textView)
-            .sink { [weak self] _ in
-                self?.updateCursorPosition()
-            }
-            .store(in: &cancellables)
-
-        // Initial update
-        updateCursorPosition()
+        updateFromTextView()
     }
 
-    private func updateCursorPosition() {
+    /// Called by the coordinator when selection changes
+    func updateFromTextView() {
         guard let textView = textView else { return }
-
+        // Dispatch to avoid "Publishing changes from within view updates" warning
         DispatchQueue.main.async { [weak self] in
             self?.cursorPosition = textView.selectedRange.location
             self?.selectedRange = textView.selectedRange.length > 0 ? textView.selectedRange : nil
@@ -39,10 +30,8 @@ class TextEditorCursorTracker: ObservableObject {
 
     func updateCursor(to position: Int) {
         guard let textView = textView else { return }
-
-        DispatchQueue.main.async {
-            textView.selectedRange = NSRange(location: position, length: 0)
-        }
+        textView.selectedRange = NSRange(location: position, length: 0)
+        updateFromTextView()
     }
 }
 
@@ -90,21 +79,30 @@ struct TrackedTextEditor: UIViewRepresentable {
                 uiView.selectedRange = selectedRange
             }
         }
+        // Update tracker reference in case it changed
+        tracker.textView = uiView
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, tracker: tracker)
     }
 
     class Coordinator: NSObject, UITextViewDelegate {
         @Binding var text: String
+        let tracker: TextEditorCursorTracker
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, tracker: TextEditorCursorTracker) {
             _text = text
+            self.tracker = tracker
         }
 
         func textViewDidChange(_ textView: UITextView) {
             text = textView.text
+            tracker.updateFromTextView()
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            tracker.updateFromTextView()
         }
     }
 }

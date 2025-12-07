@@ -255,14 +255,11 @@ struct SwiftDataNotesView: View {
             note: note,
             isSelectionMode: selectionManager.isSelectionMode,
             isSelected: selectionManager.isSelected(note.id),
-            onSelectionToggle: { 
+            onSelectionToggle: {
                 selectionManager.toggleSelection(for: note.id)
             },
             openOptionsNoteId: $openOptionsNoteId,
-            onContextMenuRequest: { note, rect in
-                contextMenuNote = note
-                contextMenuSourceRect = rect
-            }
+            onContextMenuRequest: { _, _ in }  // No longer using custom overlay
         )
         .environmentObject(notesViewModel)
         .id(note.id)
@@ -272,7 +269,7 @@ struct SwiftDataNotesView: View {
             removal: .scale(scale: 0.95).combined(with: .opacity)
         ))
     }
-    
+
     @ViewBuilder
     private func highlightOverlay(for note: Note) -> some View {
         RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
@@ -349,8 +346,6 @@ struct SwiftDataNotesView: View {
                         }
                     }
                     
-                    contextMenuOverlay
-                    
                     // Undo snackbar overlay
                     UndoSnackbar()
                 }
@@ -415,6 +410,13 @@ struct SwiftDataNotesView: View {
                     editingNote = note
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DeleteNote"))) { notification in
+                if let note = notification.object as? Note {
+                    withAnimation(.smooth) {
+                        deleteNote(note)
+                    }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NoteUpdated"))) { notification in
                 if let updatedNote = notification.object as? Note {
                     // Force refresh by triggering SwiftUI update
@@ -428,8 +430,6 @@ struct SwiftDataNotesView: View {
                 }
             }
             } // End NavigationStack
-            
-            // Batch selection now handled in navigation bar
         }
     }
 }

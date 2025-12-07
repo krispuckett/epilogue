@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Rich Text Editor
 /// Markdown-aware text editor with formatting toolbar
@@ -24,7 +25,7 @@ struct RichTextEditor: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Text editor area
+            // Text editor area - sized to content, not full height
             ZStack(alignment: .topLeading) {
                 // Placeholder
                 if text.isEmpty {
@@ -34,28 +35,47 @@ struct RichTextEditor: View {
                         .allowsHitTesting(false)
                 }
 
-                // Custom tracked text editor
+                // Custom tracked text editor with UIKit toolbar
                 TrackedTextEditor(
                     text: $text,
                     placeholder: placeholder,
                     font: UIFont.systemFont(ofSize: 16),
                     foregroundColor: UIColor.white,
-                    tracker: cursorTracker
+                    tracker: cursorTracker,
+                    inputAccessoryView: createToolbar()
                 )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 60)
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                FormattingToolbar(
-                    text: $text,
-                    cursorTracker: cursorTracker,
-                    onDismiss: {
-                        isFocused = false
-                    }
-                )
-            }
-        }
+    }
+
+    /// Creates a UIKit toolbar hosting the SwiftUI FormattingToolbar
+    private func createToolbar() -> UIView {
+        let toolbar = FormattingToolbar(
+            text: $text,
+            cursorTracker: cursorTracker,
+            onDismiss: { isFocused = false }
+        )
+
+        let hostingController = UIHostingController(rootView: toolbar)
+        hostingController.view.backgroundColor = .clear
+
+        // Transparent container - let SwiftUI glass effect show through
+        let containerView = UIView()
+        containerView.backgroundColor = .clear
+        containerView.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 56)
+
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(hostingController.view)
+
+        NSLayoutConstraint.activate([
+            hostingController.view.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            hostingController.view.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            hostingController.view.heightAnchor.constraint(equalToConstant: 48)
+        ])
+
+        return containerView
     }
 }
 

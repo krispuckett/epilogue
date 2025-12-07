@@ -66,6 +66,15 @@ struct ContentView: View {
                 // Handle deep links from widgets and external sources
                 deepLinkHandler.handle(url: url)
             }
+            // MARK: - Global Note/Quote Persistence
+            // These handlers ensure notes and quotes are saved to SwiftData
+            // regardless of which tab the user is on
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { notification in
+                handleCreateNewNote(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
+                handleSaveQuote(notification)
+            }
             .sheet(isPresented: $whatsNewManager.shouldShow) {
                 whatsNewManager.markAsShown()
             } content: {
@@ -196,5 +205,133 @@ struct ContentView: View {
 
         // Launch ambient mode with the selected book
         ambientCoordinator.launch(from: .general, book: book)
+    }
+
+    // MARK: - Note/Quote Persistence Handlers
+
+    private func handleCreateNewNote(_ notification: Notification) {
+        guard let data = notification.object as? [String: Any],
+              let content = data["content"] as? String else {
+            logger.warning("CreateNewNote: Missing content in notification")
+            return
+        }
+
+        let bookId = data["bookId"] as? String
+        let bookTitle = data["bookTitle"] as? String
+        let bookAuthor = data["bookAuthor"] as? String
+
+        logger.info("📝 Creating note with content: \(content.prefix(50))...")
+
+        // Find or create BookModel
+        var bookModel: BookModel? = nil
+        if let bookId = bookId {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { book in book.localId == bookId }
+            )
+            if let existing = try? modelContext.fetch(descriptor).first {
+                bookModel = existing
+            } else if let libraryBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
+                let newModel = BookModel(from: libraryBook)
+                modelContext.insert(newModel)
+                bookModel = newModel
+            }
+        }
+
+        let note = CapturedNote(
+            content: content,
+            book: bookModel,
+            pageNumber: nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        modelContext.insert(note)
+
+        do {
+            try modelContext.save()
+            logger.info("✅ Note saved to SwiftData")
+
+            // Show success toast
+            appStateCoordinator.toastMessage = bookTitle.map { "Note saved to \($0)" } ?? "Note saved"
+            withAnimation { appStateCoordinator.showingGlassToast = true }
+        } catch {
+            logger.error("❌ Failed to save note: \(error.localizedDescription)")
+        }
+    }
+
+    private func handleSaveQuote(_ notification: Notification) {
+        guard let data = notification.object as? [String: Any],
+              let quoteText = data["quote"] as? String else {
+            logger.warning("SaveQuote: Missing quote in notification")
+            return
+        }
+
+        let attribution = data["attribution"] as? String
+        let bookId = data["bookId"] as? String
+        let bookTitle = data["bookTitle"] as? String
+        let bookAuthor = data["bookAuthor"] as? String
+        let pageNumber = data["pageNumber"] as? Int
+
+        logger.info("📖 Creating quote: \(quoteText.prefix(50))...")
+
+        // Find or create BookModel
+        var bookModel: BookModel? = nil
+
+        // First try by ID
+        if let bookId = bookId {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { book in book.localId == bookId }
+            )
+            if let existing = try? modelContext.fetch(descriptor).first {
+                bookModel = existing
+            } else if let libraryBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
+                let newModel = BookModel(from: libraryBook)
+                modelContext.insert(newModel)
+                bookModel = newModel
+            }
+        }
+
+        // If no bookModel yet but we have title, try to find or create by title
+        if bookModel == nil, let title = bookTitle {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { book in book.title == title }
+            )
+            if let existing = try? modelContext.fetch(descriptor).first {
+                bookModel = existing
+            } else {
+                let newModel = BookModel(
+                    id: UUID().uuidString,
+                    title: title,
+                    author: bookAuthor ?? attribution ?? "Unknown"
+                )
+                modelContext.insert(newModel)
+                bookModel = newModel
+            }
+        }
+
+        let quote = CapturedQuote(
+            text: quoteText,
+            book: bookModel,
+            author: attribution,
+            pageNumber: pageNumber,
+            timestamp: Date(),
+            source: .manual
+        )
+        modelContext.insert(quote)
+
+        do {
+            try modelContext.save()
+            logger.info("✅ Quote saved to SwiftData")
+
+            // Index for Spotlight
+            Task {
+                await SpotlightIndexingService.shared.indexQuote(quote)
+            }
+
+            // Show success toast
+            appStateCoordinator.toastMessage = bookTitle.map { "Quote saved to \($0)" } ?? "Quote saved"
+            withAnimation { appStateCoordinator.showingGlassToast = true }
+        } catch {
+            logger.error("❌ Failed to save quote: \(error.localizedDescription)")
+        }
     }
 }

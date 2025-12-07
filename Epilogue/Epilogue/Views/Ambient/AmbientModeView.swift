@@ -642,13 +642,18 @@ struct AmbientModeView: View {
             // Handle progressive response updates immediately
             for item in newContent.suffix(5) where item.type == .question {
                 if let response = item.response, !response.isEmpty && response != "Thinking..." {
+                    // Clear the thinking indicator when streaming starts
+                    if pendingQuestion != nil {
+                        pendingQuestion = nil
+                    }
+
                     // Use question text + response length as unique key
                     let responseKey = "\(item.text)_\(response.count)"
-                    
+
                     // Only update if this is a new response or longer than what we have
                     if !processedContentHashes.contains(responseKey) {
                         processedContentHashes.insert(responseKey)
-                        
+
                         // Find the message to update
                         if let existingMsgIndex = messages.lastIndex(where: { msg in
                             !msg.isUser && msg.content.contains("**\(item.text)**")
@@ -1592,6 +1597,9 @@ struct AmbientModeView: View {
 
                 await MainActor.run {
                     if isFirstChunk {
+                        // Clear thinking indicator when streaming starts
+                        pendingQuestion = nil
+
                         messages.append(aiMessage)
                         withAnimation(DesignSystem.Animation.easeStandard) {
                             expandedMessageIds.removeAll()
@@ -1600,11 +1608,13 @@ struct AmbientModeView: View {
                         isFirstChunk = false
                     }
 
-                    // Update streaming message
+                    // Update streaming message with proper format for the thread view
+                    // Format: **Question**\n\nAnswer - this allows the view to parse question vs answer
                     if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                        let formattedContent = "**\(question)**\n\n\(fullResponse)"
                         messages[index] = UnifiedChatMessage(
                             id: messageId,
-                            content: fullResponse,
+                            content: formattedContent,
                             isUser: false,
                             timestamp: aiMessage.timestamp,
                             bookContext: book,
@@ -2973,16 +2983,13 @@ struct AmbientModeView: View {
                 } else {
                     // Question detected but no response yet
                     // The thinking message is already created in the onReceive listener
-                    // Just trigger the AI response
+                    // The processor path (processQuestionDirectly) handles the AI response via
+                    // OptimizedPerplexityService streaming. DO NOT trigger a second AI call here
+                    // as it causes a race condition with duplicate/inconsistent message updates.
                     pendingQuestion = item.text
                     #if DEBUG
-                    print("💭 Triggering AI response for: \(item.text.prefix(30))...")
+                    print("💭 Question awaiting processor response: \(item.text.prefix(30))...")
                     #endif
-                    
-                    // Trigger AI response
-                    Task {
-                        await getAIResponseForAmbientQuestion(item.text)
-                    }
                 }
             }
             
@@ -3776,7 +3783,9 @@ struct AmbientModeView: View {
         }
 
         // GENERIC MODE: Route ALL input to AI conversation (no note/quote classification)
-        let isGenericMode = EpilogueAmbientCoordinator.shared.ambientMode.isGeneric
+        // Check BOTH ambientMode AND currentBookContext - if there's a book context, use book mode
+        // This handles edge cases like resuming from an existing session with a book
+        let isGenericMode = EpilogueAmbientCoordinator.shared.ambientMode.isGeneric && currentBookContext == nil
         if isGenericMode {
             sendToGenericAIConversation(messageText)
             return
@@ -3810,15 +3819,20 @@ struct AmbientModeView: View {
             // Set pendingQuestion to show scrolling text
             pendingQuestion = messageText
 
-            // The onReceive handler for processor.detectedContent will create the message
-            // with proper format for response streaming. Don't add duplicate messages here.
-
-            // Get AI response using the same processor as voice input
-            Task {
-                // Add to processor's detected content - this triggers onReceive which adds the UI message
-                processor.detectedContent.append(content)
-                // Process through the same path as voice questions
-                await processor.processQuestionDirectly(messageText, bookContext: currentBookContext)
+            // Use getBookSpecificAIResponse for book mode - it properly handles:
+            // 1. Streaming with correct **question**\n\nanswer format
+            // 2. Capturing related questions from Sonar for follow-up pills
+            // 3. Clearing pendingQuestion when streaming starts
+            if let book = currentBookContext {
+                Task {
+                    await getBookSpecificAIResponse(for: messageText, book: book)
+                }
+            } else {
+                // Fallback to processor path if no book context (shouldn't happen in book mode)
+                Task {
+                    processor.detectedContent.append(content)
+                    await processor.processQuestionDirectly(messageText, bookContext: currentBookContext)
+                }
             }
         } else {
             // For notes and quotes, save immediately
@@ -5314,8 +5328,9 @@ struct AmbientModeView: View {
                             }
                         }
                     } else {
+                        // No thinking message found - create with proper format
                         let aiMessage = UnifiedChatMessage(
-                            content: response,
+                            content: "**\(text)**\n\n\(response)",
                             isUser: false,
                             timestamp: Date(),
                             bookContext: currentBookContext
@@ -7049,10 +7064,8 @@ struct GenericModeMarkdownText: View {
 
                         Button {
                             SensoryFeedback.light()
-                            let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-                            if let url = URL(string: "https://www.amazon.com/s?k=\(query)&i=stripbooks") {
-                                UIApplication.shared.open(url)
-                            }
+                            // Use user's preferred bookstore
+                            BookstoreURLBuilder.shared.openBookstore(title: title, author: "")
                         } label: {
                             Image(systemName: "cart")
                                 .font(.system(size: 13, weight: .medium))

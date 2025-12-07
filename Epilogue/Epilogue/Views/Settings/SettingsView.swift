@@ -121,6 +121,28 @@ struct SettingsView: View {
                     Text(L10n.Settings.Section.library)
                 }
 
+                // MARK: - Bookstore Preference
+                Section {
+                    NavigationLink {
+                        BookstorePreferenceView()
+                    } label: {
+                        HStack {
+                            Label("Preferred Bookstore", systemImage: "cart")
+                                .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                            Spacer()
+                            Text(BookstoreURLBuilder.shared.preferredBookstore.rawValue)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityLabel("Preferred bookstore, currently \(BookstoreURLBuilder.shared.preferredBookstore.rawValue)")
+                    .accessibilityHint("Double tap to change where book links open")
+                    .accessibilityIdentifier("settings.bookstore")
+                } header: {
+                    Text("Shopping")
+                } footer: {
+                    Text("Choose where \"Buy\" links take you when viewing book recommendations.")
+                }
+
                 // MARK: - Data & Enrichment
                 Section {
                     VStack(alignment: .leading, spacing: 8) {

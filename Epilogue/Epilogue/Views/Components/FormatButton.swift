@@ -15,9 +15,9 @@ struct FormatButton: View {
     var body: some View {
         Button(action: handleTap) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(foregroundColor)
-                .frame(width: 44, height: 44)
+                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())

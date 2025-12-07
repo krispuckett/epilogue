@@ -13,7 +13,7 @@ struct FormattingToolbar: View {
 
     var body: some View {
         // Compact centered liquid glass pill
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             FormatButton(icon: MarkdownSyntax.bold.systemIcon, syntax: .bold) {
                 insertMarkdown(.bold)
             }
@@ -34,8 +34,8 @@ struct FormattingToolbar: View {
                 insertMarkdown(.bulletList)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .glassEffect(.regular, in: .capsule)
     }
 
