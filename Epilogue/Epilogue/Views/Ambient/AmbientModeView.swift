@@ -1092,7 +1092,7 @@ struct AmbientModeView: View {
                                     handleBookSuggestionTap(suggestion)
                                 },
                                 onCaptureQuote: {
-                                    showImagePicker = true
+                                    showVisualIntelligenceCapture = true
                                 }
                             )
                             .opacity(isRecording ? 0.8 : 1.0)
@@ -1204,6 +1204,7 @@ struct AmbientModeView: View {
                                         GenericModeChatBubble(
                                             message: message,
                                             isExpanded: expandedMessageIds.contains(message.id),
+                                            streamingText: streamingResponses[message.id],
                                             onToggle: {
                                                 SensoryFeedback.selection()
                                                 withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.86, blendDuration: 0)) {
@@ -1516,27 +1517,34 @@ struct AmbientModeView: View {
                     .replacingOccurrences(of: "  ", with: " ")
 
                 await MainActor.run {
-                    // Update message with Question + Answer format
-                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
-                        messages[index] = UnifiedChatMessage(
-                            id: messageId,
-                            content: "**\(displayQuestion)**\n\n\(fullResponse)",
-                            isUser: false,
-                            timestamp: aiMessage.timestamp,
-                            bookContext: book,
-                            messageType: .text
-                        )
+                    // v0 best practice: Update streamingResponses dictionary with smooth animation
+                    // instead of recreating the entire message struct on every chunk
+                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        streamingResponses[messageId] = fullResponse
                     }
                 }
             }
 
-            // Save to session
+            // Streaming complete - finalize message content
             await MainActor.run {
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    let finalContent = "**\(displayQuestion)**\n\n\(streamingResponses[messageId] ?? fullResponse)"
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: finalContent,
+                        isUser: false,
+                        timestamp: aiMessage.timestamp,
+                        bookContext: book,
+                        messageType: .text
+                    )
+                    streamingResponses.removeValue(forKey: messageId)
+                }
                 saveQuestionToCurrentSession(question, response: fullResponse)
             }
 
         } catch {
             await MainActor.run {
+                streamingResponses.removeValue(forKey: messageId)
                 if let index = messages.firstIndex(where: { $0.id == messageId }) {
                     messages[index] = UnifiedChatMessage(
                         id: messageId,
@@ -1559,10 +1567,12 @@ struct AmbientModeView: View {
     }
 
     /// Get AI response specifically for book context questions
+    /// Uses streamingResponses for smooth text animation (v0 best practice)
     private func getBookSpecificAIResponse(for question: String, book: Book) async {
-        // Create AI response placeholder
+        // Create AI response placeholder with question format
+        // The message content stays static; streaming text goes to streamingResponses
         let aiMessage = UnifiedChatMessage(
-            content: "",
+            content: "**\(question)**",  // Just the question - answer streams separately
             isUser: false,
             timestamp: Date(),
             bookContext: book,
@@ -1608,24 +1618,39 @@ struct AmbientModeView: View {
                         isFirstChunk = false
                     }
 
-                    // Update streaming message with proper format for the thread view
-                    // Format: **Question**\n\nAnswer - this allows the view to parse question vs answer
-                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
-                        let formattedContent = "**\(question)**\n\n\(fullResponse)"
-                        messages[index] = UnifiedChatMessage(
-                            id: messageId,
-                            content: formattedContent,
-                            isUser: false,
-                            timestamp: aiMessage.timestamp,
-                            bookContext: book,
-                            messageType: .text
-                        )
+                    // Clean citations from response
+                    let cleanedResponse = fullResponse
+                        .replacingOccurrences(of: #"\[\d+\]"#, with: "", options: .regularExpression)
+                        .replacingOccurrences(of: #"\.([A-Z])"#, with: ". $1", options: .regularExpression)
+                        .replacingOccurrences(of: #"\?([A-Z])"#, with: "? $1", options: .regularExpression)
+                        .replacingOccurrences(of: #"\!([A-Z])"#, with: "! $1", options: .regularExpression)
+                        .replacingOccurrences(of: "  ", with: " ")
+
+                    // Update streaming text with smooth animation (v0 best practice)
+                    // This avoids recreating the message struct on every chunk
+                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        streamingResponses[messageId] = cleanedResponse
                     }
                 }
             }
 
-            // Store related questions for this message
+            // Streaming complete - finalize message content and store related questions
             await MainActor.run {
+                // Update message with final content (question + answer)
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    let finalContent = "**\(question)**\n\n\(streamingResponses[messageId] ?? fullResponse)"
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: finalContent,
+                        isUser: false,
+                        timestamp: aiMessage.timestamp,
+                        bookContext: book,
+                        messageType: .text
+                    )
+                    // Clear streaming text now that it's in the message
+                    streamingResponses.removeValue(forKey: messageId)
+                }
+
                 if !capturedRelatedQuestions.isEmpty {
                     relatedQuestionsMap[messageId] = capturedRelatedQuestions
                 }
@@ -1634,8 +1659,9 @@ struct AmbientModeView: View {
 
         } catch {
             await MainActor.run {
+                pendingQuestion = nil
                 messages.append(UnifiedChatMessage(
-                    content: "Sorry, I couldn't process that. Please try again.",
+                    content: "**\(question)**\n\nSorry, I couldn't process that. Please try again.",
                     isUser: false,
                     timestamp: Date(),
                     bookContext: book,
@@ -1965,22 +1991,27 @@ struct AmbientModeView: View {
                         isFirstChunk = false
                     }
 
-                    // Update streaming message
-                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
-                        messages[index] = UnifiedChatMessage(
-                            id: messageId,
-                            content: fullResponse,
-                            isUser: false,
-                            timestamp: aiMessage.timestamp,
-                            bookContext: nil,
-                            messageType: .text
-                        )
+                    // v0 best practice: Update streamingResponses dictionary with smooth animation
+                    // instead of recreating the entire message struct on every chunk
+                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        streamingResponses[messageId] = fullResponse
                     }
                 }
             }
 
-            // After streaming completes, parse and create the plan
+            // Streaming complete - finalize message content and create the plan
             await MainActor.run {
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: streamingResponses[messageId] ?? fullResponse,
+                        isUser: false,
+                        timestamp: aiMessage.timestamp,
+                        bookContext: nil,
+                        messageType: .text
+                    )
+                    streamingResponses.removeValue(forKey: messageId)
+                }
                 createReadingPlanFromResponse(fullResponse, context: context)
             }
 
@@ -1990,6 +2021,7 @@ struct AmbientModeView: View {
             #endif
             await MainActor.run {
                 isGenericModeThinking = false
+                streamingResponses.removeValue(forKey: messageId)
             }
         }
     }
@@ -4199,17 +4231,26 @@ struct AmbientModeView: View {
                         isFirstChunk = false
                     }
 
-                    // Update the streaming message content (preserve the original ID)
-                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
-                        messages[index] = UnifiedChatMessage(
-                            id: messageId,  // Preserve the original message ID
-                            content: fullResponse,
-                            isUser: false,
-                            timestamp: aiMessage.timestamp,
-                            bookContext: nil,
-                            messageType: .text
-                        )
+                    // v0 best practice: Update streamingResponses dictionary with smooth animation
+                    // instead of recreating the entire message struct on every chunk
+                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        streamingResponses[messageId] = fullResponse
                     }
+                }
+            }
+
+            // Streaming complete - finalize message content
+            await MainActor.run {
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: streamingResponses[messageId] ?? fullResponse,
+                        isUser: false,
+                        timestamp: aiMessage.timestamp,
+                        bookContext: nil,
+                        messageType: .text
+                    )
+                    streamingResponses.removeValue(forKey: messageId)
                 }
             }
 
@@ -4223,6 +4264,7 @@ struct AmbientModeView: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     isGenericModeThinking = false
                 }
+                streamingResponses.removeValue(forKey: messageId)
 
                 // Add error message
                 messages.append(UnifiedChatMessage(
@@ -4281,17 +4323,26 @@ struct AmbientModeView: View {
                         isFirstChunk = false
                     }
 
-                    // Update streaming message (preserve ID)
-                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
-                        messages[index] = UnifiedChatMessage(
-                            id: messageId,
-                            content: fullResponse,
-                            isUser: false,
-                            timestamp: aiMessage.timestamp,
-                            bookContext: nil,
-                            messageType: .text
-                        )
+                    // v0 best practice: Update streamingResponses dictionary with smooth animation
+                    // instead of recreating the entire message struct on every chunk
+                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.86, blendDuration: 0.25)) {
+                        streamingResponses[messageId] = fullResponse
                     }
+                }
+            }
+
+            // Streaming complete - finalize message content
+            await MainActor.run {
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: streamingResponses[messageId] ?? fullResponse,
+                        isUser: false,
+                        timestamp: aiMessage.timestamp,
+                        bookContext: nil,
+                        messageType: .text
+                    )
+                    streamingResponses.removeValue(forKey: messageId)
                 }
             }
 
@@ -4304,6 +4355,8 @@ struct AmbientModeView: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     isGenericModeThinking = false
                 }
+                streamingResponses.removeValue(forKey: messageId)
+
                 messages.append(UnifiedChatMessage(
                     content: "Sorry, I couldn't process that. Please try again.",
                     isUser: false,
@@ -6636,15 +6689,15 @@ struct AmbientMessageThreadView: View {
                         let hasUpgradeButton = content.answer.contains("[UPGRADE_BUTTON]")
                         let cleanAnswer = content.answer.replacingOccurrences(of: "[UPGRADE_BUTTON]", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
 
-                        Text(formatResponseText(cleanAnswer))
-                            .font(.custom("Georgia", size: 17))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .lineSpacing(8)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 0)
-                            .padding(.trailing, 20)
-                            .padding(.vertical, 12)
-                            .padding(.bottom, hasUpgradeButton ? 0 : 4)
+                        // Use streaming text view for polished materializing effect
+                        StreamingTextView(
+                            text: formatResponseText(cleanAnswer),
+                            isStreaming: streamingText != nil
+                        )
+                        .padding(.leading, 0)
+                        .padding(.trailing, 20)
+                        .padding(.vertical, 12)
+                        .padding(.bottom, hasUpgradeButton ? 0 : 4)
 
                         // Upgrade button if present
                         if hasUpgradeButton {
@@ -6812,6 +6865,7 @@ struct GenericModeTypingIndicator: View {
 struct GenericModeChatBubble: View {
     let message: UnifiedChatMessage
     let isExpanded: Bool
+    let streamingText: String?  // v0 best practice: separate streaming text from message content
     let onToggle: () -> Void
 
     @State private var messageOpacity: Double = 0
@@ -6819,6 +6873,11 @@ struct GenericModeChatBubble: View {
 
     // Amber accent matching app theme
     private let amberColor = Color(red: 1.0, green: 0.6, blue: 0.2)
+
+    // Display streaming text if available, otherwise message content
+    private var displayContent: String {
+        streamingText ?? message.content
+    }
 
     var body: some View {
         HStack {
@@ -6845,14 +6904,15 @@ struct GenericModeChatBubble: View {
                 } else {
                     // AI response - left aligned with amber glass tint
                     VStack(alignment: .leading, spacing: 12) {
-                        // Rendered markdown content
-                        GenericModeMarkdownText(
-                            text: message.content,
+                        // Rendered markdown content with streaming effects
+                        GenericModeStreamingText(
+                            text: displayContent,
+                            isStreaming: streamingText != nil,
                             isExpanded: isExpanded
                         )
 
                         // Expand indicator for long content
-                        if !isExpanded && message.content.count > 300 {
+                        if !isExpanded && displayContent.count > 300 {
                             HStack(spacing: 4) {
                                 Text("Tap to expand")
                                     .font(.system(size: 12, weight: .medium))
@@ -6893,6 +6953,88 @@ struct GenericModeChatBubble: View {
                 messageScale = 1
             }
         }
+    }
+}
+
+// MARK: - Streaming Text View
+/// Polished streaming text with materializing fade effect
+/// Shows text with trailing content fading in smoothly as it streams
+struct StreamingTextView: View {
+    let attributedText: AttributedString
+    let isStreaming: Bool
+    let lineSpacing: CGFloat
+
+    init(
+        text: AttributedString,
+        isStreaming: Bool,
+        lineSpacing: CGFloat = 8
+    ) {
+        self.attributedText = text
+        self.isStreaming = isStreaming
+        self.lineSpacing = lineSpacing
+    }
+
+    var body: some View {
+        Text(attributedText)
+            .font(.system(size: 17, design: .serif))  // SF Serif
+            .foregroundStyle(.white.opacity(0.85))
+            .lineSpacing(lineSpacing)
+            .fixedSize(horizontal: false, vertical: true)
+            .mask {
+                if isStreaming {
+                    // Gradient mask fades trailing content for materializing effect
+                    GeometryReader { geo in
+                        LinearGradient(
+                            colors: [
+                                .white,
+                                .white,
+                                .white,
+                                .white.opacity(0.9),
+                                .white.opacity(0.6),
+                                .white.opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(width: geo.size.width, height: geo.size.height + 20)
+                    }
+                } else {
+                    Rectangle()
+                }
+            }
+    }
+}
+
+// MARK: - Generic Mode Streaming Text
+/// Streaming-aware markdown text for generic mode chat bubbles
+struct GenericModeStreamingText: View {
+    let text: String
+    let isStreaming: Bool
+    let isExpanded: Bool
+
+    var body: some View {
+        GenericModeMarkdownText(text: text, isExpanded: isExpanded)
+            .mask {
+                if isStreaming {
+                    // Gradient mask fades trailing content for materializing effect
+                    GeometryReader { geo in
+                        LinearGradient(
+                            colors: [
+                                .white,
+                                .white,
+                                .white,
+                                .white.opacity(0.85),
+                                .white.opacity(0.5)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(width: geo.size.width, height: geo.size.height + 16)
+                    }
+                } else {
+                    Rectangle()
+                }
+            }
     }
 }
 
