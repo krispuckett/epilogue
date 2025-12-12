@@ -85,7 +85,16 @@ final class NavigationCoordinator: ObservableObject {
         selectedTab = .chat
         // Book context will be handled by chat view
     }
-    
+
+    func navigateToNotesForBook(_ book: Book) {
+        #if DEBUG
+        print("[NavigationCoordinator] Navigating to notes for book: \(book.title)")
+        #endif
+        // TODO: Could add book filter state here to filter notes by book
+        selectedTab = .notes
+        shouldNavigateToNotes = true
+    }
+
     // MARK: - Clear Navigation State
     
     func clearNavigationState() {

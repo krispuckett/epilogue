@@ -200,6 +200,7 @@ struct BookDetailView: View {
     @State private var showingEndSession = false
     @State private var showingSessionSavedToast = false
     @State private var showingQuoteCapture = false
+    @State private var showingNoteCapture = false
 
     // Computed properties for book data
     private var progressPercentage: Double {
@@ -736,6 +737,12 @@ struct BookDetailView: View {
                 }
             )
         }
+        .sheet(isPresented: $showingNoteCapture) {
+            QuickNoteSheet(
+                book: book,
+                isPresented: $showingNoteCapture
+            )
+        }
         .glassToast(isShowing: $showingSessionSavedToast, message: "Quick Session Saved")
         .onAppear {
             // findOrCreateThreadForBook() // DISABLED - ChatThread removed
@@ -977,9 +984,6 @@ struct BookDetailView: View {
             // Content based on reading status
             if book.readingStatus == .currentlyReading {
                 // Currently Reading sections
-                if !bookNotes.isEmpty || !bookQuotes.isEmpty {
-                    recentActivitySection
-                }
                 
                 BookSessionHistoryCard(book: book)
                 
@@ -1010,14 +1014,7 @@ struct BookDetailView: View {
                 readingStatsSection
             }
             
-            // Always show notes and quotes at the bottom if they exist
-            if !bookNotes.isEmpty {
-                allNotesSection
-            }
-            
-            if !bookQuotes.isEmpty && book.readingStatus != .read {
-                allQuotesSection
-            }
+            // Notes and quotes now live in the Notes tab - access via notesSection
         }
         // Only animate status changes after initial load
         .animation(hasAppeared ? DesignSystem.Animation.easeStandard : nil, value: book.readingStatus)
@@ -1200,86 +1197,72 @@ struct BookDetailView: View {
     
     // MARK: - Notes Section (Persistent)
     @ViewBuilder
+    // MARK: - Quick Capture Section
+    /// Clean capture buttons + view notes - all content lives in Notes tab
     private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with add button
-            HStack {
-                Image(systemName: "note.text")
-                    .font(.system(size: 16))
-                    .foregroundStyle(accentColor)
-                    .symbolRenderingMode(.hierarchical)
-
-                Text("Notes")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(textColor)
-
-                Spacer()
-
-                // Quick add note button
+        VStack(spacing: 12) {
+            // Quick capture row
+            HStack(spacing: 12) {
+                // Add Note button
                 Button {
                     SensoryFeedback.light()
-                    // Show unified quick action card
-                    NotificationCenter.default.post(
-                        name: Notification.Name("ShowQuickActionCard"),
-                        object: nil
-                    )
+                    showingNoteCapture = true
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(accentColor)
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Note")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .glassEffect(.regular.tint(accentColor.opacity(0.2)), in: RoundedRectangle(cornerRadius: 14))
                 }
+                .buttonStyle(.plain)
+
+                // Capture Quote button
+                Button {
+                    SensoryFeedback.light()
+                    showingQuoteCapture = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Quote")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .glassEffect(.regular.tint(accentColor.opacity(0.2)), in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
             }
 
-            if bookNotesCaptured.isEmpty {
-                // Empty state
+            // View Notes button - navigates to Notes tab
+            Button {
+                SensoryFeedback.light()
+                // Navigate to Notes tab with this book filtered
+                NavigationCoordinator.shared.navigateToNotesForBook(book)
+            } label: {
                 HStack {
-                    Spacer()
-                    VStack(spacing: 12) {
                     Image(systemName: "note.text")
-                        .font(.system(size: 32))
-                        .foregroundStyle(accentColor.opacity(0.5))
-
-                    Text("No notes yet")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(textColor.opacity(0.5))
-
-                    Text("Tap + to add your first note")
-                        .font(.system(size: 12))
-                        .foregroundStyle(textColor.opacity(0.4))
-                    }
-                    .padding(.vertical, 20)
+                    Text("View Notes & Quotes")
+                        .font(.system(size: 14, weight: .medium))
                     Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .semibold))
                 }
-            } else {
-                // Compact note cards
-                VStack(spacing: 12) {
-                    ForEach(bookNotesCaptured.prefix(3)) { note in
-                    CompactNoteCard(note: note, accentColor: accentColor)
-                    }
-
-                    if bookNotesCaptured.count > 3 {
-                    Button {
-                        // Navigate to all notes
-                        selectedSection = .notes
-                    } label: {
-                        HStack {
-                            Text("View all \(bookNotesCaptured.count) notes")
-                                .font(.system(size: 14, weight: .medium))
-
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundStyle(accentColor)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    }
-                }
+                .foregroundStyle(.white.opacity(0.8))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 14))
             }
+            .buttonStyle(.plain)
         }
         .padding(DesignSystem.Spacing.listItemPadding)
-        .glassEffect(in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
     }
 
     // MARK: - Contextual Sections for Currently Reading
@@ -3136,6 +3119,103 @@ struct EndSessionSheet: View {
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.4))
                 .tracking(1.5)
+        }
+    }
+}
+
+// MARK: - Quick Note Sheet
+/// Simple sheet for adding a note - saves to SwiftData CapturedNote
+struct QuickNoteSheet: View {
+    let book: Book
+    @Binding var isPresented: Bool
+    @State private var noteText = ""
+    @FocusState private var isFocused: Bool
+    @Environment(\.modelContext) private var modelContext
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Text editor - uses system font to match app consistency
+                TextEditor(text: $noteText)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .scrollContentBackground(.hidden)
+                    .focused($isFocused)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+
+                Spacer()
+            }
+            .background(Color.black.opacity(0.95))
+            .navigationTitle("Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                    .foregroundStyle(.white.opacity(0.7))
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        saveNote()
+                    }
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(noteText.isEmpty ? .white.opacity(0.3) : .white)
+                    .disabled(noteText.isEmpty)
+                }
+            }
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            isFocused = true
+        }
+    }
+
+    private func saveNote() {
+        guard !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        // Find or create BookModel
+        let bookIdString = book.localId.uuidString
+        var bookModel: BookModel? = nil
+
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { b in b.localId == bookIdString }
+        )
+        if let existing = try? modelContext.fetch(descriptor).first {
+            bookModel = existing
+        } else {
+            let newModel = BookModel(from: book)
+            modelContext.insert(newModel)
+            bookModel = newModel
+        }
+
+        // Create and save the note
+        let note = CapturedNote(
+            content: noteText.trimmingCharacters(in: .whitespacesAndNewlines),
+            book: bookModel,
+            pageNumber: book.currentPage > 0 ? book.currentPage : nil,
+            timestamp: Date(),
+            source: .manual
+        )
+        modelContext.insert(note)
+
+        do {
+            try modelContext.save()
+            SensoryFeedback.success()
+
+            // Show glass toast notification
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowGlassToast"),
+                object: ["message": "Note saved to \(book.title)"]
+            )
+
+            isPresented = false
+        } catch {
+            print("❌ Failed to save note: \(error)")
         }
     }
 }
