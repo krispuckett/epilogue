@@ -19,7 +19,7 @@ struct LiveCameraView: UIViewControllerRepresentable {
 
 class LiveCameraViewController: UIViewController {
     private let session = AVCaptureSession()
-    private var previewLayer: AVCaptureVideoPreviewLayer!
+    private var previewLayer: AVCaptureVideoPreviewLayer?
     private let videoOutput = AVCaptureVideoDataOutput()
     private let onFrame: (CVPixelBuffer) async -> Void
 
@@ -119,10 +119,11 @@ class LiveCameraViewController: UIViewController {
         session.commitConfiguration()
 
         // Setup preview layer
-        previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.videoGravity = .resizeAspectFill
-        previewLayer.frame = view.bounds
-        view.layer.addSublayer(previewLayer)
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        layer.frame = view.bounds
+        view.layer.addSublayer(layer)
+        previewLayer = layer
 
         // Start session on background thread
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -137,7 +138,7 @@ class LiveCameraViewController: UIViewController {
             #if DEBUG
             DispatchQueue.main.async {
                 print("🎬 [LIVE CAMERA] ✅ Session started successfully")
-                print("🎬 [LIVE CAMERA] Preview layer frame: \(String(describing: self?.previewLayer.frame))")
+                print("🎬 [LIVE CAMERA] Preview layer frame: \(String(describing: self?.previewLayer?.frame))")
             }
             #endif
         }

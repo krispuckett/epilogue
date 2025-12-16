@@ -64,7 +64,7 @@ class CoreDataManager {
         let context = viewContext
         let request = CachedQuery.fetchRequest()
         
-        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date())!
+        guard let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else { return }
         request.predicate = NSPredicate(format: "lastAccessedAt < %@", cutoffDate as NSDate)
         
         do {

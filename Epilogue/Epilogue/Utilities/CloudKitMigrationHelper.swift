@@ -152,9 +152,11 @@ class CloudKitMigrationHelper {
     /// Create a backup of local data before migration
     func createLocalBackup() throws -> URL {
         let fileManager = FileManager.default
-        
+
         // Create backup directory
-        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw NSError(domain: "CloudKitMigration", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find Documents directory"])
+        }
         let backupURL = documentsURL.appendingPathComponent("EpilogueBackup_\(Date().timeIntervalSince1970)")
         try fileManager.createDirectory(at: backupURL, withIntermediateDirectories: true)
         

@@ -49,6 +49,9 @@ class BatchEnrichmentService {
         var processedCount = 0
 
         for i in stride(from: 0, to: unenrichedBooks.count, by: batchSize) {
+            // Check for task cancellation between batches
+            if Task.isCancelled { return }
+
             let batch = Array(unenrichedBooks[i..<min(i + batchSize, unenrichedBooks.count)])
 
             #if DEBUG

@@ -189,7 +189,7 @@ final class SecureAPIManager {
         let allowed = usage.questionCount < dailyQuestionLimit
         
         // Calculate reset time (midnight)
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
         let resetTime = Calendar.current.startOfDay(for: tomorrow)
         
         return (allowed, remaining, resetTime)

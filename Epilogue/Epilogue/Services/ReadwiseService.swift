@@ -153,8 +153,10 @@ class ReadwiseService: ObservableObject {
     }
     
     private func fetchHighlights(token: String, cursor: String? = nil, updatedAfter: Date? = nil) async throws -> ReadwiseResponse {
-        var components = URLComponents(string: "\(baseURL)/export/")!
-        
+        guard var components = URLComponents(string: "\(baseURL)/export/") else {
+            throw ReadwiseError.networkError("Invalid URL")
+        }
+
         var queryItems: [URLQueryItem] = []
         if let cursor = cursor {
             queryItems.append(URLQueryItem(name: "pageCursor", value: cursor))
@@ -164,8 +166,11 @@ class ReadwiseService: ObservableObject {
             queryItems.append(URLQueryItem(name: "updatedAfter", value: formatter.string(from: date)))
         }
         components.queryItems = queryItems.isEmpty ? nil : queryItems
-        
-        var request = URLRequest(url: components.url!)
+
+        guard let url = components.url else {
+            throw ReadwiseError.networkError("Invalid URL components")
+        }
+        var request = URLRequest(url: url)
         request.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -309,7 +314,10 @@ class ReadwiseService: ObservableObject {
     }
     
     private func createHighlights(token: String, highlights: [ReadwiseHighlightCreate]) async throws {
-        var request = URLRequest(url: URL(string: "\(baseURL)/highlights/")!)
+        guard let url = URL(string: "\(baseURL)/highlights/") else {
+            throw ReadwiseError.networkError("Invalid URL")
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -332,7 +340,10 @@ class ReadwiseService: ObservableObject {
     
     // MARK: - Validation
     private func validateToken(_ token: String) async throws {
-        var request = URLRequest(url: URL(string: "\(baseURL)/auth/")!)
+        guard let url = URL(string: "\(baseURL)/auth/") else {
+            throw ReadwiseError.networkError("Invalid URL")
+        }
+        var request = URLRequest(url: url)
         request.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
         
         let (_, response) = try await URLSession.shared.data(for: request)

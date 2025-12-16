@@ -24,7 +24,13 @@ class BookCoverFallbackService {
         let searchURL = "https://openlibrary.org/search.json?q=\(query)&limit=1"
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: URL(string: searchURL)!)
+            guard let url = URL(string: searchURL) else {
+                #if DEBUG
+                print("❌ Invalid Open Library search URL")
+                #endif
+                return nil
+            }
+            let (data, _) = try await URLSession.shared.data(from: url)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let docs = json["docs"] as? [[String: Any]],
                let firstResult = docs.first,
@@ -82,12 +88,17 @@ class BookCoverFallbackService {
                 UIColor(red: 0.25, green: 0.25, blue: 0.3, alpha: 1),
                 UIColor(red: 0.2, green: 0.2, blue: 0.25, alpha: 1)
             ]
-            let gradient = CGGradient(
+            guard let gradient = CGGradient(
                 colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: colors.map { $0.cgColor } as CFArray,
                 locations: [0, 1]
-            )!
-            
+            ) else {
+                // Fallback to solid color fill
+                context.cgContext.setFillColor(colors[0].cgColor)
+                context.cgContext.fill(CGRect(origin: .zero, size: size))
+                return
+            }
+
             context.cgContext.drawLinearGradient(
                 gradient,
                 start: CGPoint(x: 0, y: 0),

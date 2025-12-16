@@ -5124,12 +5124,12 @@ struct AmbientModeView: View {
 
             for match in matches {
                 if let titleRange = Range(match.range(at: 1), in: response),
-                   let authorRange = Range(match.range(at: 2), in: response) {
+                   let authorRange = Range(match.range(at: 2), in: response),
+                   let fullMatchRange = Range(match.range, in: response) {
                     let title = String(response[titleRange]).trimmingCharacters(in: .whitespaces)
                     let author = String(response[authorRange]).trimmingCharacters(in: .whitespaces)
 
                     // Extract reason (text following the book on the same line or next line)
-                    let fullMatchRange = Range(match.range, in: response)!
                     let afterMatch = response[fullMatchRange.upperBound...]
                     let reason = extractReason(from: String(afterMatch))
 

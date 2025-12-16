@@ -1164,9 +1164,9 @@ public class TrueAmbientProcessor: ObservableObject {
     /// "Otis" → "O320", "Odysseus" → "O322" (similar!)
     private func soundex(_ str: String) -> String {
         let input = str.uppercased().filter { $0.isLetter }
-        guard !input.isEmpty else { return "0000" }
+        guard let firstChar = input.first else { return "0000" }
 
-        let firstLetter = String(input.first!)
+        let firstLetter = String(firstChar)
         var code = firstLetter
 
         let soundexMap: [Character: Character] = [

@@ -132,7 +132,9 @@ class IntelligentTitleGenerator {
         var sentence = String(text[firstSentenceRange]).trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Remove trailing punctuation for title
-        while let last = sentence.last, CharacterSet.punctuationCharacters.contains(last.unicodeScalars.first!) {
+        while let last = sentence.last,
+              let scalar = last.unicodeScalars.first,
+              CharacterSet.punctuationCharacters.contains(scalar) {
             sentence.removeLast()
         }
 

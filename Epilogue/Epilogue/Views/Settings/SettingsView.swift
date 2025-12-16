@@ -378,6 +378,25 @@ struct SettingsView: View {
                                 .foregroundStyle(.blue)
                         }
 
+                        Button {
+                            SensoryFeedback.light()
+                            dismiss()
+                            // Start Welcome Back Live Activity in Dynamic Island
+                            Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay for dismiss
+                                // Find a book to show
+                                let descriptor = FetchDescriptor<BookModel>(
+                                    sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
+                                )
+                                if let book = try? modelContext.fetch(descriptor).first {
+                                    WelcomeBackActivityManager.shared.startActivity(for: book)
+                                }
+                            }
+                        } label: {
+                            Label("Show Welcome Back (Dynamic Island)", systemImage: "capsule.portrait.bottomhalf.filled")
+                                .foregroundStyle(.indigo)
+                        }
+
                     } header: {
                         Text("Developer Options")
                     } footer: {
@@ -604,7 +623,12 @@ struct SettingsView: View {
         Task {
             do {
                 let exportData = try await generateExportData()
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                    #if DEBUG
+                    print("❌ Could not access documents directory")
+                    #endif
+                    return
+                }
                 let exportURL = documentsPath.appendingPathComponent("EpilogueExport-\(Date().formatted(date: .numeric, time: .omitted)).json")
 
                 try exportData.write(to: exportURL)

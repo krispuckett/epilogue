@@ -266,7 +266,7 @@ class CameraViewController: UIViewController {
     var onCapture: ((UIImage) -> Void)?
 
     private let session = AVCaptureSession()
-    private var previewLayer: AVCaptureVideoPreviewLayer!
+    private var previewLayer: AVCaptureVideoPreviewLayer?
     private let photoOutput = AVCapturePhotoOutput()
 
     override func viewDidLoad() {
@@ -304,10 +304,11 @@ class CameraViewController: UIViewController {
                 session.addOutput(photoOutput)
             }
 
-            previewLayer = AVCaptureVideoPreviewLayer(session: session)
-            previewLayer.videoGravity = .resizeAspectFill
-            previewLayer.frame = view.bounds
-            view.layer.addSublayer(previewLayer)
+            let layer = AVCaptureVideoPreviewLayer(session: session)
+            layer.videoGravity = .resizeAspectFill
+            layer.frame = view.bounds
+            view.layer.addSublayer(layer)
+            previewLayer = layer
 
             DispatchQueue.global(qos: .userInitiated).async {
                 self.session.startRunning()
@@ -365,11 +366,11 @@ class SmartCaptureViewController: UIViewController {
     var onStatusChange: ((CaptureStatus) -> Void)?
 
     private let session = AVCaptureSession()
-    private var previewLayer: AVCaptureVideoPreviewLayer!
+    private var previewLayer: AVCaptureVideoPreviewLayer?
     private let photoOutput = AVCapturePhotoOutput()
     private let videoOutput = AVCaptureVideoDataOutput()
 
-    private var textDetectionRequest: VNRecognizeTextRequest!
+    private var textDetectionRequest: VNRecognizeTextRequest?
     private var frameCount = 0
     private var consecutiveGoodFrames = 0
     private var hasCaptured = false
@@ -387,11 +388,12 @@ class SmartCaptureViewController: UIViewController {
     }
 
     private func setupTextDetection() {
-        textDetectionRequest = VNRecognizeTextRequest { [weak self] request, error in
+        let request = VNRecognizeTextRequest { [weak self] request, error in
             self?.handleTextDetection(request: request, error: error)
         }
-        textDetectionRequest.recognitionLevel = .fast // Fast for detection, we'll do accurate on capture
-        textDetectionRequest.usesLanguageCorrection = false // Speed optimization
+        request.recognitionLevel = .fast // Fast for detection, we'll do accurate on capture
+        request.usesLanguageCorrection = false // Speed optimization
+        textDetectionRequest = request
     }
 
     private func setupCamera() {
@@ -426,10 +428,11 @@ class SmartCaptureViewController: UIViewController {
                 session.addOutput(videoOutput)
             }
 
-            previewLayer = AVCaptureVideoPreviewLayer(session: session)
-            previewLayer.videoGravity = .resizeAspectFill
-            previewLayer.frame = view.bounds
-            view.layer.addSublayer(previewLayer)
+            let layer = AVCaptureVideoPreviewLayer(session: session)
+            layer.videoGravity = .resizeAspectFill
+            layer.frame = view.bounds
+            view.layer.addSublayer(layer)
+            previewLayer = layer
 
             DispatchQueue.global(qos: .userInitiated).async {
                 self.session.startRunning()
@@ -542,7 +545,9 @@ extension SmartCaptureViewController: AVCaptureVideoDataOutputSampleBufferDelega
         #endif
 
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
-        try? handler.perform([textDetectionRequest])
+        if let request = textDetectionRequest {
+            try? handler.perform([request])
+        }
     }
 }
 

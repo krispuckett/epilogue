@@ -10,7 +10,7 @@ struct MetalShaderView: UIViewRepresentable {
 
     class Coordinator: NSObject, MTKViewDelegate {
         var parent: MetalShaderView
-        var renderer: OrbMetalRenderer!
+        var renderer: OrbMetalRenderer?
 
         init(_ parent: MetalShaderView) {
             self.parent = parent
@@ -19,10 +19,11 @@ struct MetalShaderView: UIViewRepresentable {
         }
 
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-            renderer.viewSizeChanged(to: size)
+            renderer?.viewSizeChanged(to: size)
         }
 
         func draw(in view: MTKView) {
+            guard let renderer = renderer else { return }
             renderer.isPressed = parent.isPressed
             // Pass theme color to renderer
             let uiColor = UIColor(parent.accentColor)
@@ -71,9 +72,9 @@ struct MetalShaderView: UIViewRepresentable {
 
 // MARK: - Metal Renderer
 class OrbMetalRenderer: NSObject {
-    private var device: MTLDevice!
-    private var commandQueue: MTLCommandQueue!
-    private var pipelineState: MTLRenderPipelineState!
+    private var device: MTLDevice?
+    private var commandQueue: MTLCommandQueue?
+    private var pipelineState: MTLRenderPipelineState?
     private var startTime = CACurrentMediaTime()
 
     // Texture management
@@ -293,7 +294,9 @@ class OrbMetalRenderer: NSObject {
             viewSizeChanged(to: view.drawableSize)
         }
 
-        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+        guard let commandQueue = commandQueue,
+              let pipelineState = pipelineState,
+              let commandBuffer = commandQueue.makeCommandBuffer(),
               let renderPassDescriptor = view.currentRenderPassDescriptor,
               let drawable = view.currentDrawable else {
             return
@@ -331,7 +334,8 @@ class OrbMetalRenderer: NSObject {
 
     // Render to a custom texture (for exporting)
     func renderToTexture(_ texture: MTLTexture, commandQueue: MTLCommandQueue, size: CGSize) {
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+        guard let pipelineState = pipelineState,
+              let commandBuffer = commandQueue.makeCommandBuffer() else {
             return
         }
 

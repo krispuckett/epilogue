@@ -299,7 +299,7 @@ class NoteIntelligenceEngine: ObservableObject {
         
         let now = Date()
         let today = Calendar.current.startOfDay(for: now)
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
         
         // Today's Thoughts
         let allNotes = notes + quotes

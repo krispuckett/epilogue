@@ -82,6 +82,14 @@ class GoodreadsCleanImporter: ObservableObject {
         
         // Import each book
         for (index, csvBook) in csvBooks.enumerated() {
+            // Check for task cancellation
+            if Task.isCancelled {
+                #if DEBUG
+                print("⚠️ Import cancelled")
+                #endif
+                break
+            }
+
             progress = ImportProgress(
                 current: index + 1,
                 total: csvBooks.count,

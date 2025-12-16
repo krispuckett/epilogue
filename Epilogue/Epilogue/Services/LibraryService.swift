@@ -92,10 +92,16 @@ final class LibraryService {
                     // This should never happen with memory-only, but handle it
                     logger.critical("❌ Critical: Could not initialize even memory-only storage: \(error)")
                     // Create a minimal container as absolute last resort
-                    modelContainer = try! ModelContainer(
-                        for: BookModel.self,
-                        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-                    )
+                    do {
+                        modelContainer = try ModelContainer(
+                            for: BookModel.self,
+                            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                        )
+                    } catch {
+                        // If we truly cannot create any container, the app cannot function
+                        logger.critical("❌ Fatal: Cannot create any ModelContainer - app cannot continue: \(error)")
+                        fatalError("Unable to initialize data storage. Please reinstall the app.")
+                    }
                 }
             }
         }
