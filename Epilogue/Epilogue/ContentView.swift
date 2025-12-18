@@ -21,6 +21,7 @@ struct ContentView: View {
     // MARK: - State
     @State private var selectedTab = 0
     @State private var showQuickActionCard = false
+    @State private var showReturnCard = false
     @FocusState private var isInputFocused: Bool
 
     // MARK: - Environment
@@ -75,6 +76,12 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
                 handleSaveQuote(notification)
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowReturnCard"))) { _ in
+                // Developer trigger from Gandalf Mode
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showReturnCard = true
+                }
+            }
             .sheet(isPresented: $whatsNewManager.shouldShow) {
                 whatsNewManager.markAsShown()
             } content: {
@@ -127,7 +134,17 @@ struct ContentView: View {
                 isInputFocused: $isInputFocused
             )
         }
-        
+        // Return card overlay - animates from Dynamic Island on cold launch
+        .overlay {
+            if showReturnCard {
+                ReturnCardOverlay {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        showReturnCard = false
+                    }
+                    ReturnCardManager.shared.markCardShown()
+                }
+            }
+        }
     }
 
     // MARK: - Initial Setup
@@ -138,6 +155,35 @@ struct ContentView: View {
         appStateCoordinator.libraryViewModel = libraryViewModel
         appStateCoordinator.notesViewModel = notesViewModel
         deepLinkHandler.navigationCoordinator = navigationCoordinator
+
+        // Check if we should show return card (cold start with currently reading book)
+        Task { @MainActor in
+            // Small delay to let SwiftData query complete
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+
+            if ReturnCardManager.shared.shouldShowReturnCard {
+                logger.info("🎴 Cold start detected - starting Welcome Back Live Activity")
+
+                // Find currently reading book
+                let descriptor = FetchDescriptor<BookModel>(
+                    predicate: #Predicate { $0.readingStatus == "Currently Reading" },
+                    sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
+                )
+
+                if let book = try? modelContext.fetch(descriptor).first {
+                    // Start Live Activity in Dynamic Island
+                    WelcomeBackActivityManager.shared.startActivity(for: book)
+                } else {
+                    // Fallback: any book
+                    let anyBookDescriptor = FetchDescriptor<BookModel>(
+                        sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
+                    )
+                    if let book = try? modelContext.fetch(anyBookDescriptor).first {
+                        WelcomeBackActivityManager.shared.startActivity(for: book)
+                    }
+                }
+            }
+        }
 
         // Clear command history
         Task { @MainActor in
@@ -174,6 +220,8 @@ struct ContentView: View {
         switch phase {
         case .active:
             logger.info("App became active")
+            // Record activity for return card timing
+            ReturnCardManager.shared.recordActivity()
         case .inactive:
             logger.info("App became inactive")
             // Don't end Live Activity here - let it persist
@@ -181,6 +229,8 @@ struct ContentView: View {
             logger.info("App entered background")
             // Don't end Live Activity here - Live Activities should persist in background
             // They will be ended when the user explicitly exits ambient mode
+            // Record activity timestamp for return card cold start detection
+            ReturnCardManager.shared.recordActivity()
         @unknown default:
             break
         }
@@ -216,11 +266,18 @@ struct ContentView: View {
             return
         }
 
+        // Validate content isn't empty
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else {
+            logger.warning("CreateNewNote: Content is empty after trimming - skipping save")
+            return
+        }
+
         let bookId = data["bookId"] as? String
         let bookTitle = data["bookTitle"] as? String
         let bookAuthor = data["bookAuthor"] as? String
 
-        logger.info("📝 Creating note with content: \(content.prefix(50))...")
+        logger.info("📝 Creating note with content: \(trimmedContent.prefix(50))...")
 
         // Find or create BookModel
         var bookModel: BookModel? = nil
@@ -230,15 +287,17 @@ struct ContentView: View {
             )
             if let existing = try? modelContext.fetch(descriptor).first {
                 bookModel = existing
+                logger.info("📝 Found existing BookModel for note")
             } else if let libraryBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
                 let newModel = BookModel(from: libraryBook)
                 modelContext.insert(newModel)
                 bookModel = newModel
+                logger.info("📝 Created new BookModel for note")
             }
         }
 
         let note = CapturedNote(
-            content: content,
+            content: trimmedContent,
             book: bookModel,
             pageNumber: nil,
             timestamp: Date(),
@@ -248,13 +307,21 @@ struct ContentView: View {
 
         do {
             try modelContext.save()
-            logger.info("✅ Note saved to SwiftData")
+            logger.info("✅ Note saved to SwiftData with ID: \(note.id?.uuidString ?? "nil")")
+
+            // Index for Spotlight
+            Task {
+                await SpotlightIndexingService.shared.indexNote(note)
+            }
 
             // Show success toast
             appStateCoordinator.toastMessage = bookTitle.map { "Note saved to \($0)" } ?? "Note saved"
             withAnimation { appStateCoordinator.showingGlassToast = true }
         } catch {
             logger.error("❌ Failed to save note: \(error.localizedDescription)")
+            // Show error toast
+            appStateCoordinator.toastMessage = "Failed to save note"
+            withAnimation { appStateCoordinator.showingGlassToast = true }
         }
     }
 
@@ -265,13 +332,20 @@ struct ContentView: View {
             return
         }
 
+        // Validate quote text isn't empty
+        let trimmedQuote = quoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuote.isEmpty else {
+            logger.warning("SaveQuote: Quote text is empty after trimming - skipping save")
+            return
+        }
+
         let attribution = data["attribution"] as? String
         let bookId = data["bookId"] as? String
         let bookTitle = data["bookTitle"] as? String
         let bookAuthor = data["bookAuthor"] as? String
         let pageNumber = data["pageNumber"] as? Int
 
-        logger.info("📖 Creating quote: \(quoteText.prefix(50))...")
+        logger.info("📖 Creating quote: \(trimmedQuote.prefix(50))...")
 
         // Find or create BookModel
         var bookModel: BookModel? = nil
@@ -283,10 +357,12 @@ struct ContentView: View {
             )
             if let existing = try? modelContext.fetch(descriptor).first {
                 bookModel = existing
+                logger.info("📖 Found existing BookModel for quote")
             } else if let libraryBook = libraryViewModel.books.first(where: { $0.localId.uuidString == bookId }) {
                 let newModel = BookModel(from: libraryBook)
                 modelContext.insert(newModel)
                 bookModel = newModel
+                logger.info("📖 Created new BookModel for quote")
             }
         }
 
@@ -297,6 +373,7 @@ struct ContentView: View {
             )
             if let existing = try? modelContext.fetch(descriptor).first {
                 bookModel = existing
+                logger.info("📖 Found BookModel by title for quote")
             } else {
                 let newModel = BookModel(
                     id: UUID().uuidString,
@@ -305,11 +382,12 @@ struct ContentView: View {
                 )
                 modelContext.insert(newModel)
                 bookModel = newModel
+                logger.info("📖 Created new BookModel by title for quote")
             }
         }
 
         let quote = CapturedQuote(
-            text: quoteText,
+            text: trimmedQuote,
             book: bookModel,
             author: attribution,
             pageNumber: pageNumber,
@@ -320,7 +398,7 @@ struct ContentView: View {
 
         do {
             try modelContext.save()
-            logger.info("✅ Quote saved to SwiftData")
+            logger.info("✅ Quote saved to SwiftData with ID: \(quote.id?.uuidString ?? "nil")")
 
             // Index for Spotlight
             Task {
@@ -332,6 +410,9 @@ struct ContentView: View {
             withAnimation { appStateCoordinator.showingGlassToast = true }
         } catch {
             logger.error("❌ Failed to save quote: \(error.localizedDescription)")
+            // Show error toast
+            appStateCoordinator.toastMessage = "Failed to save quote"
+            withAnimation { appStateCoordinator.showingGlassToast = true }
         }
     }
 }

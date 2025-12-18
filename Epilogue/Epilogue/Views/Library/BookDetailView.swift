@@ -3176,7 +3176,18 @@ struct QuickNoteSheet: View {
     }
 
     private func saveNote() {
-        guard !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let trimmedContent = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else {
+            #if DEBUG
+            print("⚠️ QuickNoteSheet: Note content is empty - skipping save")
+            #endif
+            return
+        }
+
+        #if DEBUG
+        print("📝 QuickNoteSheet: Saving note for book '\(book.title)'")
+        print("📝 Content: \(trimmedContent.prefix(100))...")
+        #endif
 
         // Find or create BookModel
         let bookIdString = book.localId.uuidString
@@ -3187,15 +3198,21 @@ struct QuickNoteSheet: View {
         )
         if let existing = try? modelContext.fetch(descriptor).first {
             bookModel = existing
+            #if DEBUG
+            print("📝 Found existing BookModel for '\(book.title)'")
+            #endif
         } else {
             let newModel = BookModel(from: book)
             modelContext.insert(newModel)
             bookModel = newModel
+            #if DEBUG
+            print("📝 Created new BookModel for '\(book.title)'")
+            #endif
         }
 
         // Create and save the note
         let note = CapturedNote(
-            content: noteText.trimmingCharacters(in: .whitespacesAndNewlines),
+            content: trimmedContent,
             book: bookModel,
             pageNumber: book.currentPage > 0 ? book.currentPage : nil,
             timestamp: Date(),
@@ -3205,6 +3222,9 @@ struct QuickNoteSheet: View {
 
         do {
             try modelContext.save()
+            #if DEBUG
+            print("✅ QuickNoteSheet: Note saved successfully with ID: \(note.id?.uuidString ?? "nil")")
+            #endif
             SensoryFeedback.success()
 
             // Show glass toast notification
@@ -3215,7 +3235,15 @@ struct QuickNoteSheet: View {
 
             isPresented = false
         } catch {
-            print("❌ Failed to save note: \(error)")
+            #if DEBUG
+            print("❌ QuickNoteSheet: Failed to save note: \(error)")
+            print("❌ Error details: \(error.localizedDescription)")
+            #endif
+            // Show error toast
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowGlassToast"),
+                object: ["message": "Failed to save note"]
+            )
         }
     }
 }

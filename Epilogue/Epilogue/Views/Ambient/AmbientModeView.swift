@@ -3093,7 +3093,15 @@ struct AmbientModeView: View {
             .replacingOccurrences(of: "\u{2018}", with: "") // Left single quotation mark
             .replacingOccurrences(of: "\u{2019}", with: "") // Right single quotation mark
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
+        // CRITICAL: Validate quote has actual content after cleaning
+        guard !quoteText.isEmpty else {
+            #if DEBUG
+            print("⚠️ Quote text is empty after cleaning - skipping save")
+            #endif
+            return nil
+        }
+
         // Check for duplicates
         let fetchRequest = FetchDescriptor<CapturedQuote>(
             predicate: #Predicate { quote in

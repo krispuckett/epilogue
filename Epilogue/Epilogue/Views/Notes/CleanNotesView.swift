@@ -112,18 +112,18 @@ struct CleanNotesView: View {
     // Combined items (unfiltered)
     private var allItems: [(date: Date, note: Note?, quote: CapturedQuote?)] {
         var items: [(date: Date, note: Note?, quote: CapturedQuote?)] = []
-        
+
         // Add notes
         items += capturedNotes.map { capturedNote in
             (date: capturedNote.timestamp ?? Date(), note: capturedNote.toNote(), quote: nil)
         }
-        
+
         // Add quotes
         items += capturedQuotes.map { (date: $0.timestamp ?? Date(), note: nil, quote: $0) }
-        
+
         // Sort by date
         items.sort { $0.date > $1.date }
-        
+
         return items
     }
     
@@ -1132,13 +1132,55 @@ struct CleanNotesView: View {
             creatingNewRichTextNote = true
             showingRichTextNoteSheet = true
         case .note(let content):
-            let note = CapturedNote(content: content, source: .manual)
+            // Validate content isn't empty
+            let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedContent.isEmpty else {
+                #if DEBUG
+                print("⚠️ Note content is empty - skipping save")
+                #endif
+                return
+            }
+
+            let note = CapturedNote(content: trimmedContent, source: .manual)
             modelContext.insert(note)
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+                #if DEBUG
+                print("✅ Note saved successfully: \(trimmedContent.prefix(50))...")
+                #endif
+                showToast(message: "Note saved")
+                SensoryFeedback.success()
+            } catch {
+                #if DEBUG
+                print("❌ Failed to save note: \(error)")
+                #endif
+                showToast(message: "Failed to save note")
+            }
         case .quote(let text, let attribution):
-            let quote = CapturedQuote(text: text, author: attribution, source: .manual)
+            // Validate quote text isn't empty
+            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else {
+                #if DEBUG
+                print("⚠️ Quote text is empty - skipping save")
+                #endif
+                return
+            }
+
+            let quote = CapturedQuote(text: trimmedText, author: attribution, source: .manual)
             modelContext.insert(quote)
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+                #if DEBUG
+                print("✅ Quote saved successfully: \(trimmedText.prefix(50))...")
+                #endif
+                showToast(message: "Quote saved")
+                SensoryFeedback.success()
+            } catch {
+                #if DEBUG
+                print("❌ Failed to save quote: \(error)")
+                #endif
+                showToast(message: "Failed to save quote")
+            }
         default:
             break
         }
