@@ -9,6 +9,7 @@ struct SimpleQuoteCard: View {
     @State private var showDate = false
     @State private var showingSessionSummary = false
     @State private var showingReaderMode = false
+    @State private var showingQuoteCardEditor = false
 
     // Convenience initializer for backward compatibility
     init(note: Note, capturedQuote: CapturedQuote? = nil) {
@@ -233,6 +234,50 @@ struct SimpleQuoteCard: View {
         .sheet(isPresented: $showingReaderMode) {
             QuoteReaderView(note: note, capturedQuote: capturedQuote)
         }
+        // Quote card editor for sharing as image
+        .sheet(isPresented: $showingQuoteCardEditor) {
+            QuoteCardEditorView(
+                quoteData: QuoteCardData(
+                    text: note.content,
+                    author: note.author,
+                    bookTitle: note.bookTitle,
+                    pageNumber: note.pageNumber,
+                    bookCoverImage: bookCoverImage
+                )
+            )
+        }
+        .contextMenu {
+            Button {
+                showingQuoteCardEditor = true
+            } label: {
+                Label("Share as Card", systemImage: "photo.on.rectangle.angled")
+            }
+
+            Button {
+                showingReaderMode = true
+            } label: {
+                Label("Read Full Quote", systemImage: "book")
+            }
+
+            if let capturedQuote = capturedQuote {
+                Button {
+                    capturedQuote.isFavorite.toggle()
+                } label: {
+                    Label(
+                        capturedQuote.isFavorite ? "Remove Favorite" : "Add to Favorites",
+                        systemImage: capturedQuote.isFavorite ? "star.slash" : "star"
+                    )
+                }
+            }
+        }
+    }
+
+    private var bookCoverImage: UIImage? {
+        // Try to get cover from capturedQuote's book relationship
+        if let imageData = capturedQuote?.book?.coverImageData {
+            return UIImage(data: imageData)
+        }
+        return nil
     }
     
     private func formatDate(_ date: Date) -> String {

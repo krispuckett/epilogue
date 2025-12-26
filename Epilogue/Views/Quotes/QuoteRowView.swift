@@ -4,7 +4,8 @@ import SwiftData
 struct QuoteRowView: View {
     let quote: Quote
     @State private var isExpanded = false
-    
+    @State private var showingQuoteCardEditor = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
@@ -13,13 +14,13 @@ struct QuoteRowView: View {
                         .font(.caption)
                         .foregroundColor(.yellow)
                 }
-                
+
                 Text(quote.text)
                     .font(.body)
                     .lineLimit(isExpanded ? nil : 3)
                     .animation(.easeInOut, value: isExpanded)
             }
-            
+
             if let notes = quote.notes, !notes.isEmpty {
                 Text(notes)
                     .font(.caption)
@@ -27,27 +28,27 @@ struct QuoteRowView: View {
                     .italic()
                     .padding(.leading, quote.isFavorite ? 20 : 0)
             }
-            
+
             HStack {
                 if let pageNumber = quote.pageNumber {
                     Label("Page \(pageNumber)", systemImage: "book.pages")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
-                
+
                 if let chapter = quote.chapter {
                     Text("• \(chapter)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Text(quote.dateCreated, style: .date)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
-            
+
             if !quote.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
@@ -69,6 +70,25 @@ struct QuoteRowView: View {
             withAnimation {
                 isExpanded.toggle()
             }
+        }
+        .contextMenu {
+            Button {
+                showingQuoteCardEditor = true
+            } label: {
+                Label("Share as Card", systemImage: "photo.on.rectangle.angled")
+            }
+
+            Button {
+                quote.toggleFavorite()
+            } label: {
+                Label(
+                    quote.isFavorite ? "Remove Favorite" : "Add to Favorites",
+                    systemImage: quote.isFavorite ? "star.slash" : "star"
+                )
+            }
+        }
+        .sheet(isPresented: $showingQuoteCardEditor) {
+            QuoteCardEditorView(quoteData: QuoteCardData(quote: quote))
         }
     }
 }

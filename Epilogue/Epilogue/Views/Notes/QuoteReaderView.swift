@@ -9,6 +9,7 @@ struct QuoteReaderView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var showingDeleteAlert = false
+    @State private var showingQuoteCardEditor = false
 
     // EXACTLY LIKE AMBIENT SESSION SUMMARY
     private var minimalGradientBackground: some View {
@@ -116,7 +117,17 @@ struct QuoteReaderView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
-                        // Share quote
+                        // Share as quote card (image)
+                        Button {
+                            showingQuoteCardEditor = true
+                            SensoryFeedback.light()
+                        } label: {
+                            Image(systemName: "photo.on.rectangle.angled")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        }
+
+                        // Share quote as text
                         ShareLink(item: formatShareText()) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 16, weight: .semibold))
@@ -143,6 +154,25 @@ struct QuoteReaderView: View {
         } message: {
             Text("This quote will be permanently deleted.")
         }
+        .sheet(isPresented: $showingQuoteCardEditor) {
+            QuoteCardEditorView(
+                quoteData: QuoteCardData(
+                    text: note.content,
+                    author: note.author,
+                    bookTitle: note.bookTitle,
+                    pageNumber: note.pageNumber,
+                    bookCoverImage: bookCoverImage
+                )
+            )
+        }
+    }
+
+    private var bookCoverImage: UIImage? {
+        // Try to get cover from capturedQuote's book relationship
+        if let imageData = capturedQuote?.book?.coverImageData {
+            return UIImage(data: imageData)
+        }
+        return nil
     }
 
     // MARK: - Helper Functions
