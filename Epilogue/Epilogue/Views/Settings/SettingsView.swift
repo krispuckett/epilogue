@@ -83,6 +83,26 @@ struct SettingsView: View {
                     Text(L10n.Settings.Section.appearance)
                 }
 
+                // MARK: - Reading Insights
+                Section {
+                    NavigationLink {
+                        ReadingPatternsView()
+                    } label: {
+                        HStack {
+                            Label("Reading Insights", systemImage: "chart.bar.fill")
+                                .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                            Spacer()
+                        }
+                    }
+                    .accessibilityLabel("Reading Insights")
+                    .accessibilityHint("Double tap to view your reading patterns and statistics")
+                    .accessibilityIdentifier("settings.readingInsights")
+                } header: {
+                    Text("Analytics")
+                } footer: {
+                    Text("Track your reading habits, streaks, and discover patterns in your reading journey.")
+                }
+
                 // MARK: - Library Management
                 Section {
                     NavigationLink {

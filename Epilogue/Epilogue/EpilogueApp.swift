@@ -45,6 +45,7 @@ struct EpilogueApp: App {
                             let context = ModelContext(container)
                             OfflineQueueManager.shared.configure(with: context)
                             OfflineCoverCacheService.shared.configure(with: context)
+                            ReadingAnalyticsService.shared.configure(with: context)
 
                             // Background task: Cache all library covers for offline use
                             Task.detached(priority: .background) { @MainActor in
@@ -159,6 +160,11 @@ struct EpilogueApp: App {
                          BookMilestone.self,
                          ReadingHabitPlan.self,
                          HabitDay.self,
+                         // Reading Analytics Models
+                         ReadingAnalytics.self,
+                         DailyReadingSummary.self,
+                         BookReadingStats.self,
+                         ReadingMilestone.self,
                     configurations: cloudKitContainer
                 )
                 #if DEBUG
@@ -281,6 +287,11 @@ struct EpilogueApp: App {
                      BookMilestone.self,
                      ReadingHabitPlan.self,
                      HabitDay.self,
+                     // Reading Analytics Models
+                     ReadingAnalytics.self,
+                     DailyReadingSummary.self,
+                     BookReadingStats.self,
+                     ReadingMilestone.self,
                 configurations: localConfig
             )
 
@@ -319,6 +330,11 @@ struct EpilogueApp: App {
                      BookMilestone.self,
                      ReadingHabitPlan.self,
                      HabitDay.self,
+                     // Reading Analytics Models
+                     ReadingAnalytics.self,
+                     DailyReadingSummary.self,
+                     BookReadingStats.self,
+                     ReadingMilestone.self,
                 configurations: localConfig
             )
 
@@ -366,6 +382,11 @@ struct EpilogueApp: App {
                          BookMilestone.self,
                          ReadingHabitPlan.self,
                          HabitDay.self,
+                         // Reading Analytics Models
+                         ReadingAnalytics.self,
+                         DailyReadingSummary.self,
+                         BookReadingStats.self,
+                         ReadingMilestone.self,
                     configurations: inMemoryConfig
                 )
 
