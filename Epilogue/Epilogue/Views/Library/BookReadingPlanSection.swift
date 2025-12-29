@@ -83,6 +83,10 @@ struct BookReadingPlanSection: View {
                                 }
                                 Divider()
                                 Button("Delete Plan", systemImage: "trash", role: .destructive) {
+                                    // Cancel notifications before deleting the plan
+                                    Task {
+                                        await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                                    }
                                     modelContext.delete(plan)
                                     try? modelContext.save()
                                     createdPlan = nil
