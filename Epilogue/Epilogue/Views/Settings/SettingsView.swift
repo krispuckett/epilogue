@@ -372,6 +372,20 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
+                            RealityBookShowcase()
+                        } label: {
+                            Label("3D Book Showcase", systemImage: "cube.fill")
+                                .foregroundStyle(.purple)
+                        }
+
+                        NavigationLink {
+                            ReadingRoomView()
+                        } label: {
+                            Label("The Reading Room", systemImage: "books.vertical.fill")
+                                .foregroundStyle(.orange)
+                        }
+
+                        NavigationLink {
                             TouchRippleExperiment()
                         } label: {
                             Label("Touch Ripple Shader", systemImage: "water.waves")
