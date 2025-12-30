@@ -814,13 +814,13 @@ private struct PlanDetailSheet: View {
             Divider()
 
             Button("Delete Plan", systemImage: "trash", role: .destructive) {
-                // Cancel notifications before deleting the plan
                 Task {
+                    // Cancel notifications before deleting the plan
                     await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                    modelContext.delete(plan)
+                    try? modelContext.save()
+                    onDismiss()
                 }
-                modelContext.delete(plan)
-                try? modelContext.save()
-                onDismiss()
             }
         } label: {
             Image(systemName: "ellipsis")

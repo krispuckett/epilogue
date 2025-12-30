@@ -823,14 +823,14 @@ struct AmbientModeView: View {
                                 }
                                 Divider()
                                 Button("Delete Plan", systemImage: "trash", role: .destructive) {
-                                    // Cancel notifications before deleting the plan
                                     Task {
+                                        // Cancel notifications before deleting the plan
                                         await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                                        modelContext.delete(plan)
+                                        try? modelContext.save()
+                                        createdReadingPlan = nil
+                                        showPlanDetail = false
                                     }
-                                    modelContext.delete(plan)
-                                    try? modelContext.save()
-                                    createdReadingPlan = nil
-                                    showPlanDetail = false
                                 }
                             } label: {
                                 Image(systemName: "ellipsis")

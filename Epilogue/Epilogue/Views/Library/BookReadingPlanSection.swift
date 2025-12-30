@@ -83,14 +83,14 @@ struct BookReadingPlanSection: View {
                                 }
                                 Divider()
                                 Button("Delete Plan", systemImage: "trash", role: .destructive) {
-                                    // Cancel notifications before deleting the plan
                                     Task {
+                                        // Cancel notifications before deleting the plan
                                         await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                                        modelContext.delete(plan)
+                                        try? modelContext.save()
+                                        createdPlan = nil
+                                        showPlanDetailSheet = false
                                     }
-                                    modelContext.delete(plan)
-                                    try? modelContext.save()
-                                    createdPlan = nil
-                                    showPlanDetailSheet = false
                                 }
                             } label: {
                                 Image(systemName: "ellipsis")
