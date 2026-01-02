@@ -1,7 +1,84 @@
 # Epilogue v2 Roadmap
 
 > Strategic roadmap for Epilogue iOS — a personal reading companion app.
-> Last updated: December 2025
+> Last updated: January 2026
+
+---
+
+## 🎯 Priority Feature: Reading Companion AI
+
+**Status: Architecture Complete — Ready for Integration**
+
+The Reading Companion transforms Epilogue from a reactive Q&A bot into a proactive reading guide. When you open an intimidating book like The Odyssey, the companion recognizes it and offers help *before you ask*.
+
+### What It Does
+
+| Scenario | Current Behavior | Reading Companion |
+|----------|-----------------|-------------------|
+| Open The Odyssey | Generic: "What are the main themes?" | Proactive: "Want a spoiler-free reading guide?" |
+| 10% through War and Peace | Nothing | "You're past the hardest part — keep going!" |
+| Ask confused question | Just answers | Offers clarification + detects frustration pattern |
+| Challenging book, new session | Same suggestions for all books | Tailored prep: context, approach, character guides |
+
+### Architecture (Implemented)
+
+```
+Services/Companion/
+├── BookIntelligence.swift       # Analyzes book difficulty, challenges, context needs
+├── ReadingCompanion.swift       # Brain: decides when/how to help proactively
+├── CompanionPromptLibrary.swift # Curated prompts for different scenarios
+└── CompanionSuggestionEngine.swift # Bridges to existing UI
+
+Views/Ambient/
+└── CompanionAwareEmptyState.swift  # Enhanced suggestion pills with companion awareness
+```
+
+### Key Concepts
+
+**Book Intelligence Profile:**
+- Intimidation score (0-1) based on length, era, language complexity, known difficulty
+- Reader challenges: unfamiliar names, large character cast, complex language, etc.
+- Approach recommendations: reading strategy, pace guidance, tools needed
+- Spoiler boundaries: what's safe to reveal at each progress point
+- Context needs: historical, mythological, cultural background required
+
+**Companion Modes:**
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| Guide | Intimidation > 0.7 | Proactive, detailed help — The Odyssey, Ulysses |
+| Coach | Intimidation 0.4-0.7 | Encouraging, available — War and Peace |
+| Companion | Intimidation 0.2-0.4 | Light touch — Literary fiction |
+| Observer | Intimidation < 0.2 | Quiet, responds only when asked — Beach reads |
+
+**Proactive Suggestions:**
+- Pre-read preparation ("Want a spoiler-free intro?")
+- Approach coaching ("How should I tackle this?")
+- Context briefings ("Give me historical background")
+- Character guides ("Who should I track?")
+- Progress encouragement ("You're past the hardest part")
+- Confusion detection (offers help when patterns suggest struggle)
+
+### Curated Book Intelligence
+
+Hand-crafted profiles for commonly intimidating books:
+- **The Odyssey**: Trojan War context, oral poetry conventions, book structure, epithets
+- **War and Peace**: Russian names, historical setting, family tracking
+- **Infinite Jest**: Endnotes strategy, non-linear navigation
+- *(More to add)*
+
+### Integration Points
+
+1. **AmbientModeView**: Use `CompanionAwareEmptyState` instead of `BookSpecificEmptyState`
+2. **Session Start**: Call `companion.onBookOpened(book)` to activate
+3. **Progress Updates**: Call `companion.onProgressUpdated(progress)` for dynamic suggestions
+4. **Question Detection**: Call `companion.onUserQuestion(question)` to detect confusion
+
+### Next Steps
+
+1. Wire `CompanionAwareEmptyState` into `AmbientModeView.swift`
+2. Add curated profiles for 10-15 most intimidating classics
+3. A/B test proactive vs reactive suggestions
+4. Consider Premium gating for advanced companion features
 
 ---
 
