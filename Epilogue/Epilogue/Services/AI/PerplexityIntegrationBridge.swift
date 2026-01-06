@@ -12,25 +12,29 @@ extension IntelligentQueryRouter {
         let queryType = analyzeQuery(query, bookContext: bookContext)
         
         switch queryType {
-        case .bookContent:
-            // Use local AI for book-specific content
-            extensionLogger.info("📚 Using local AI for book content")
-            
+        case .quickLookup, .offline:
+            // Use local AI for fast local queries
+            extensionLogger.info("Using local AI for quick lookup")
+
             if let book = bookContext {
                 SmartEpilogueAI.shared.setActiveBook(book.toIntelligentBookModel())
             }
-            
+
             // Check if Foundation Models are available for enhanced local processing
-            // Using the renamed AIFoundationModelsManager to avoid conflicts
             if AIFoundationModelsManager.shared.isAvailable {
                 return await AIFoundationModelsManager.shared.processQuery(query, bookContext: bookContext)
             } else {
                 return await SmartEpilogueAI.shared.smartQuery(query)
             }
-            
-        case .currentEvents, .hybrid:
+
+        case .companionGuidance:
+            // Use Claude for thoughtful companion responses
+            extensionLogger.info("Using Claude for companion guidance")
+            return await IntelligentQueryRouter.shared.processQuery(query, bookContext: bookContext)
+
+        case .webSearch, .hybrid:
             // Use optimized Perplexity with streaming and citations
-            extensionLogger.info("🌐 Using Optimized Perplexity with citations")
+            extensionLogger.info("Using Optimized Perplexity for web search")
             
             var fullResponse = ""
             var citations: [Citation] = []

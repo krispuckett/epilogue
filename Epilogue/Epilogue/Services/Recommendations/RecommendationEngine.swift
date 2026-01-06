@@ -1,10 +1,14 @@
 import Foundation
 import SwiftData
+import OSLog
 
-/// Generates personalized book recommendations using taste profile + Perplexity AI
+/// Generates personalized book recommendations using taste profile + Claude AI
+/// Supports vibe-based matching for finding books with similar emotional resonance
 @MainActor
 class RecommendationEngine {
     static let shared = RecommendationEngine()
+
+    private let logger = Logger(subsystem: "com.epilogue", category: "Recommendations")
 
     private init() {}
 
@@ -31,32 +35,24 @@ class RecommendationEngine {
     // MARK: - Generate Recommendations
 
     func generateRecommendations(for profile: LibraryTasteAnalyzer.TasteProfile) async throws -> [Recommendation] {
-        #if DEBUG
-        print("🎯 Generating recommendations from taste profile...")
-        #endif
+        logger.info("🎯 Generating recommendations from taste profile...")
 
-        // Build Perplexity prompt from taste profile
+        // Build prompt from taste profile
         let prompt = buildPrompt(from: profile)
-        #if DEBUG
-        print("📝 Prompt: \(prompt.prefix(200))...")
-        #endif
+        logger.info("📝 Prompt: \(prompt.prefix(200).description)...")
 
-        // Query Perplexity
-        let response = try await OptimizedPerplexityService.shared.chat(
+        // Use Claude for better quality recommendations
+        let response = try await ClaudeService.shared.subscriberChat(
             message: prompt,
-            bookContext: nil as Book?
+            systemPrompt: vibeSystemPrompt,
+            maxTokens: 1500
         )
 
-        #if DEBUG
-        print("✅ Received recommendation response")
-        #endif
+        logger.info("✅ Received recommendation response")
 
         // Parse response into structured recommendations
         let recommendations = parseRecommendations(from: response)
-
-        #if DEBUG
-        print("📚 Parsed \(recommendations.count) recommendations")
-        #endif
+        logger.info("📚 Parsed \(recommendations.count) recommendations")
 
         // Enrich with Google Books data (cover images, years)
         let enriched = await enrichRecommendations(recommendations)
@@ -64,10 +60,126 @@ class RecommendationEngine {
         return enriched
     }
 
+    // MARK: - Vibe-Based Recommendations
+
+    /// Find books with similar emotional resonance, themes, and atmosphere to a given book
+    /// Uses Claude for deeper understanding of the book's essence
+    func findSimilarVibes(to book: Book, count: Int = 5) async throws -> [Recommendation] {
+        logger.info("🌊 Finding vibe matches for: \(book.title)")
+
+        let prompt = buildVibePrompt(for: book)
+
+        // Use Claude with subscription-appropriate model
+        let response = try await ClaudeService.shared.subscriberChat(
+            message: prompt,
+            systemPrompt: vibeSystemPrompt,
+            maxTokens: 1200
+        )
+
+        logger.info("✅ Received vibe recommendations from Claude")
+
+        let recommendations = parseRecommendations(from: response)
+        let limited = Array(recommendations.prefix(count))
+
+        return await enrichRecommendations(limited)
+    }
+
+    /// Find books that evoke a specific mood or emotional experience
+    func findBooksForMood(_ mood: String, context: String? = nil) async throws -> [Recommendation] {
+        logger.info("🎭 Finding books for mood: \(mood)")
+
+        let prompt = buildMoodPrompt(mood: mood, context: context)
+
+        let response = try await ClaudeService.shared.subscriberChat(
+            message: prompt,
+            systemPrompt: vibeSystemPrompt,
+            maxTokens: 1200
+        )
+
+        let recommendations = parseRecommendations(from: response)
+        return await enrichRecommendations(recommendations)
+    }
+
+    // MARK: - Vibe Prompt Building
+
+    private var vibeSystemPrompt: String {
+        """
+        You are a literary companion with deep understanding of books' emotional landscapes, themes, and atmospheres. \
+        When recommending books, you focus on the intangible qualities that make a reading experience memorable: \
+        the emotional journey, the atmosphere, the pacing, the way the prose feels.
+
+        You understand that someone who loved The Odyssey might love The Count of Monte Cristo not because \
+        they're the same genre, but because both offer an epic journey of resilience, transformation, and homecoming.
+
+        When someone asks for similar vibes, look beyond surface-level matches (same author, same genre) \
+        and find books that will resonate emotionally in similar ways.
+        """
+    }
+
+    private func buildVibePrompt(for book: Book) -> String {
+        var prompt = """
+        I just finished reading "\(book.title)" by \(book.author) and I loved it.
+
+
+        """
+
+        // Add description if available for richer context
+        if let description = book.description, !description.isEmpty {
+            prompt += "About this book:\n\(description.prefix(400))\n\n"
+        }
+
+        prompt += """
+        Please recommend 5 books that capture a similar VIBE - not necessarily the same genre or author, \
+        but books that will make me feel the same way this one did.
+
+        Think about:
+        - The emotional journey and atmosphere
+        - The pacing and narrative style
+        - The thematic depth and what lingers after finishing
+        - The overall reading experience
+
+        DO NOT just recommend other books by the same author or obvious genre matches.
+        I want surprising connections that will resonate emotionally.
+
+        Format each recommendation as:
+        BOOK: [Title] by [Author]
+        WHY: [2-3 sentences explaining the emotional/thematic connection - what vibe do they share?]
+        """
+
+        return prompt
+    }
+
+    private func buildMoodPrompt(mood: String, context: String?) -> String {
+        var prompt = """
+        I'm looking for a book that will make me feel: \(mood)
+
+        """
+
+        if let context = context {
+            prompt += "Context: \(context)\n\n"
+        }
+
+        prompt += """
+        Recommend 5 books that will evoke this emotional experience. Focus on the reading experience \
+        and how the book makes you feel, not just surface-level plot elements.
+
+        Format each recommendation as:
+        BOOK: [Title] by [Author]
+        WHY: [2-3 sentences explaining how this book creates that feeling]
+        """
+
+        return prompt
+    }
+
     // MARK: - Prompt Building
 
     private func buildPrompt(from profile: LibraryTasteAnalyzer.TasteProfile) -> String {
-        var prompt = "Based on a reader's library, recommend 10 books they would love.\n\n"
+        var prompt = """
+        Based on a reader's library, recommend 10 books they would love.
+        Focus on finding books that match their emotional and thematic tastes, not just surface-level genre matches.
+
+
+        """
 
         // Add genre preferences
         if !profile.genres.isEmpty {
@@ -75,7 +187,7 @@ class RecommendationEngine {
                 .sorted(by: { $0.value > $1.value })
                 .prefix(5)
                 .map { $0.key }
-            prompt += "Favorite genres: \(topGenres.joined(separator: ", "))\n"
+            prompt += "Genres they gravitate toward: \(topGenres.joined(separator: ", "))\n"
         }
 
         // Add favorite authors
@@ -84,12 +196,12 @@ class RecommendationEngine {
                 .sorted(by: { $0.value > $1.value })
                 .prefix(5)
                 .map { $0.key }
-            prompt += "Authors they've read: \(topAuthors.joined(separator: ", "))\n"
+            prompt += "Authors they've connected with: \(topAuthors.joined(separator: ", "))\n"
         }
 
         // Add themes
         if !profile.themes.isEmpty {
-            prompt += "Interested in themes: \(profile.themes.prefix(5).joined(separator: ", "))\n"
+            prompt += "Themes that resonate: \(profile.themes.prefix(5).joined(separator: ", "))\n"
         }
 
         // Add reading level
@@ -97,17 +209,19 @@ class RecommendationEngine {
 
         // Add era preference
         if let era = profile.preferredEra {
-            prompt += "Preferred era: \(era.rawValue)\n"
+            prompt += "Era preference: \(era.rawValue)\n"
         }
 
-        prompt += "\nFor each book, provide:\n"
-        prompt += "1. Title\n"
-        prompt += "2. Author\n"
-        prompt += "3. One sentence explaining why they'd love it\n\n"
-        prompt += "Format each as:\n"
-        prompt += "BOOK: [Title] by [Author]\n"
-        prompt += "WHY: [One sentence reason]\n\n"
-        prompt += "Recommend books that match their taste but introduce them to new authors and perspectives."
+        prompt += """
+
+        For each recommendation, explain what emotional or thematic chord it strikes based on their reading history.
+        DON'T just recommend the same authors - find new voices that will resonate similarly.
+        Think about pacing, atmosphere, and the overall reading experience.
+
+        Format each as:
+        BOOK: [Title] by [Author]
+        WHY: [2-3 sentences explaining the vibe connection]
+        """
 
         return prompt
     }
@@ -159,9 +273,7 @@ class RecommendationEngine {
 
         // Fallback: Try to parse numbered list format (1. Title by Author - Reason)
         if recommendations.isEmpty {
-            #if DEBUG
-            print("⚠️ Structured format not found, trying numbered list...")
-            #endif
+            logger.debug("Structured format not found, trying numbered list...")
             recommendations = parseNumberedList(from: response)
         }
 
@@ -207,9 +319,7 @@ class RecommendationEngine {
     // MARK: - Enrichment (Google Books Data)
 
     private func enrichRecommendations(_ recommendations: [Recommendation]) async -> [Recommendation] {
-        #if DEBUG
-        print("🔍 Enriching \(recommendations.count) recommendations with Google Books data...")
-        #endif
+        logger.info("🔍 Enriching \(recommendations.count) recommendations with covers...")
 
         let booksService = EnhancedGoogleBooksService()
         var enriched: [Recommendation] = []
@@ -229,15 +339,10 @@ class RecommendationEngine {
                     year: firstResult.publishedYear,
                     coverURL: firstResult.coverImageURL
                 ))
-                #if DEBUG
-                print("✅ Enriched: \(rec.title) with cover")
-                #endif
             } else {
                 // Keep original if no match found
                 enriched.append(rec)
-                #if DEBUG
-                print("⚠️ No Google Books match for: \(rec.title)")
-                #endif
+                logger.debug("No Google Books match for: \(rec.title)")
             }
         }
 

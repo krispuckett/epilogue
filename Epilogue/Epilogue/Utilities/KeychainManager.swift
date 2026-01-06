@@ -108,13 +108,16 @@ extension KeychainManager {
     enum APIKeyType {
         case perplexity
         case readwise
-        
+        case claude
+
         var identifier: String {
             switch self {
             case .perplexity:
                 return "perplexity_api_key"
             case .readwise:
                 return "readwise_api_key"
+            case .claude:
+                return "claude_api_key"
             }
         }
     }

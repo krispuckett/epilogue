@@ -141,7 +141,11 @@ class AIFoundationModelsManager: ObservableObject {
                 ConversationHistoryTool(),
                 EntityMentionsTool(),
                 RelatedCapturesTool(),
-                ActiveThreadTool()
+                ActiveThreadTool(),
+                // Knowledge Graph tools
+                GraphQueryTool(),
+                FindConnectionsTool(),
+                GetReadingPatternsTool()
             ]
 
             logger.info("🛠️ Registering \(tools.count) tools with Foundation Models session")
@@ -193,11 +197,19 @@ class AIFoundationModelsManager: ObservableObject {
         - findRelatedCaptures: Search saved quotes and notes
         - getActiveThread: Get info about the current conversation thread
 
+        KNOWLEDGE GRAPH TOOLS (for deeper analysis across all reading):
+        - queryKnowledgeGraph: Search for themes, characters, concepts across ALL books
+        - findConnections: Discover what connects two books, authors, or themes
+        - getReadingPatterns: Analyze the user's reading patterns and favorite themes
+
         USE THESE TOOLS when helpful to provide better context-aware responses.
         For example:
         - If asked "What did I say about Gandalf?", use findEntityMentions
         - If asked "Did we discuss this before?", use getConversationHistory
         - If asked "What quotes do I have about power?", use findRelatedCaptures
+        - If asked "What connects these two books?", use findConnections
+        - If asked "What themes do I keep returning to?", use getReadingPatterns
+        - If asked "What have I read about redemption?", use queryKnowledgeGraph
 
         RESPONSE TONE:
         - Be natural and conversational, like a knowledgeable friend
@@ -403,11 +415,26 @@ class AIFoundationModelsManager: ObservableObject {
     
     // MARK: - Context Enrichment
 
-    /// Builds enriched query with context from ConversationMemory and AmbientContextManager
+    /// Builds enriched query with context from ConversationMemory, AmbientContextManager, and Persistent Memory
     private func buildEnrichedQuery(_ query: String, bookContext: Book?) async -> String {
         var contextParts: [String] = []
 
-        // 1. Get conversation memory context
+        // 1. Get PERSISTENT memory context (cross-session, SwiftData-backed)
+        // This provides "Yesterday we discussed..." continuity
+        if let bookContext = bookContext {
+            let bookModel = BookModel(from: bookContext)
+            let persistentContext = await MemoryRetrievalService.shared.buildPersistentContext(
+                for: bookModel,
+                query: query,
+                maxTokens: 500  // Keep context bounded
+            )
+            if !persistentContext.isEmpty {
+                contextParts.append(persistentContext)
+                logger.info("Added persistent memory context")
+            }
+        }
+
+        // 2. Get conversation memory context (session-based)
         // First, we need to classify the query to build proper intent
         let detector = EnhancedIntentDetector()
         let intent = detector.detectIntent(from: query, bookTitle: bookContext?.title, bookAuthor: bookContext?.author)
@@ -415,19 +442,19 @@ class AIFoundationModelsManager: ObservableObject {
         let memoryContext = ConversationMemory.shared.buildContextForResponse(currentIntent: intent)
         if !memoryContext.isEmpty {
             contextParts.append(memoryContext)
-            logger.info("📚 Added conversation memory context")
+            logger.info("Added session memory context")
         }
 
-        // 2. Get ambient context (reading progress, patterns, etc.)
+        // 3. Get ambient context (reading progress, patterns, etc.)
         let ambientContext = await AmbientContextManager.shared.buildEnhancedContext(for: query, book: bookContext)
         if !ambientContext.isEmpty {
             contextParts.append(ambientContext)
-            logger.info("🎯 Added ambient context (page, progress, patterns)")
+            logger.info("Added ambient context (page, progress)")
         }
 
-        // 3. Build final enriched query
+        // 4. Build final enriched query
         if contextParts.isEmpty {
-            logger.debug("ℹ️ No additional context available")
+            logger.debug("No additional context available")
             return query
         }
 

@@ -46,6 +46,15 @@ struct EpilogueApp: App {
                             OfflineQueueManager.shared.configure(with: context)
                             OfflineCoverCacheService.shared.configure(with: context)
 
+                            // Initialize AI Memory services (for persistent conversation context)
+                            MemoryPersistenceService.shared.configure(with: context)
+                            MemoryRetrievalService.shared.configure(with: context)
+
+                            // Initialize Knowledge Graph services
+                            Task { @MainActor in
+                                await KnowledgeGraphIndexer.shared.configure(with: context)
+                            }
+
                             // Background task: Cache all library covers for offline use
                             Task.detached(priority: .background) { @MainActor in
                                 // Wait 5 seconds after launch to avoid competing for resources
@@ -159,6 +168,11 @@ struct EpilogueApp: App {
                          BookMilestone.self,
                          ReadingHabitPlan.self,
                          HabitDay.self,
+                         // AI Memory models (V7)
+                         ConversationMemoryEntry.self,
+                         MemoryThread.self,
+                         UserReadingProfile.self,
+                         BookInsight.self,
                     configurations: cloudKitContainer
                 )
                 #if DEBUG
@@ -281,6 +295,11 @@ struct EpilogueApp: App {
                      BookMilestone.self,
                      ReadingHabitPlan.self,
                      HabitDay.self,
+                     // AI Memory models (V7)
+                     ConversationMemoryEntry.self,
+                     MemoryThread.self,
+                     UserReadingProfile.self,
+                     BookInsight.self,
                 configurations: localConfig
             )
 
@@ -319,6 +338,11 @@ struct EpilogueApp: App {
                      BookMilestone.self,
                      ReadingHabitPlan.self,
                      HabitDay.self,
+                     // AI Memory models (V7)
+                     ConversationMemoryEntry.self,
+                     MemoryThread.self,
+                     UserReadingProfile.self,
+                     BookInsight.self,
                 configurations: localConfig
             )
 
@@ -366,6 +390,11 @@ struct EpilogueApp: App {
                          BookMilestone.self,
                          ReadingHabitPlan.self,
                          HabitDay.self,
+                         // AI Memory models (V7)
+                         ConversationMemoryEntry.self,
+                         MemoryThread.self,
+                         UserReadingProfile.self,
+                         BookInsight.self,
                     configurations: inMemoryConfig
                 )
 

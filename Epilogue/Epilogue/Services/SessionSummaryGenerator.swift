@@ -7,13 +7,192 @@ import OSLog
 @MainActor
 final class SessionSummaryGenerator: ObservableObject {
     static let shared = SessionSummaryGenerator()
-    
+
     @Published var isGenerating: Bool = false  // Required for ObservableObject conformance
-    
+
     private let logger = Logger(subsystem: "com.epilogue", category: "SessionSummary")
     private let perplexityService = OptimizedPerplexityService.shared
-    
+
     private init() {}
+
+    // MARK: - Claude-Powered Session Reflection
+
+    /// Generate a thoughtful, literary reflection on a reading session using Claude
+    func generateClaudeReflection(
+        session: OptimizedAmbientSession,
+        messages: [UnifiedChatMessage],
+        quotesCaptures: [String] = [],
+        notesCreated: [String] = []
+    ) async -> SessionReflection {
+        isGenerating = true
+        defer { isGenerating = false }
+
+        let book = session.bookContext
+        let duration = Date().timeIntervalSince(session.startTime)
+
+        // Build rich context for Claude
+        let conversationSummary = buildConversationSummary(messages: messages)
+        let capturedContent = buildCapturedContent(quotes: quotesCaptures, notes: notesCreated)
+
+        let systemPrompt = """
+        You are a thoughtful reading companion reflecting on a reading session with a reader.
+        Your role is to synthesize what was discussed, connect themes, and offer a warm, insightful reflection.
+
+        Be genuine and literary, not generic. Connect the dots between their questions and the book's themes.
+        Speak as if you're a well-read friend who genuinely cares about their reading experience.
+        Keep it concise (2-3 short paragraphs max). No emojis.
+        """
+
+        let userPrompt = """
+        Please reflect on this reading session for "\(book?.title ?? "a book")" by \(book?.author ?? "the author"):
+
+        CONVERSATION TOPICS:
+        \(conversationSummary)
+
+        \(capturedContent.isEmpty ? "" : "QUOTES & NOTES CAPTURED:\n\(capturedContent)\n")
+
+        SESSION DETAILS:
+        - Duration: \(formatDuration(duration))
+        - Questions asked: \(messages.filter { $0.isUser }.count)
+
+        Generate a warm, insightful reflection that:
+        1. Summarizes what themes or questions emerged
+        2. Notes any interesting connections or insights from the conversation
+        3. Offers a thought to carry forward into their next reading session
+
+        Keep it personal and engaging, not academic.
+        """
+
+        do {
+            let reflection = try await ClaudeService.shared.subscriberChat(
+                message: userPrompt,
+                systemPrompt: systemPrompt,
+                maxTokens: 500
+            )
+
+            logger.info("✨ Generated Claude session reflection")
+
+            return SessionReflection(
+                text: reflection,
+                themes: extractThemes(from: messages),
+                duration: duration,
+                questionCount: messages.filter { $0.isUser }.count,
+                bookTitle: book?.title ?? "Reading Session",
+                generatedAt: Date()
+            )
+
+        } catch {
+            logger.error("Claude reflection failed: \(error), using fallback")
+            return SessionReflection(
+                text: generateFallbackReflection(messages: messages, book: book),
+                themes: extractThemes(from: messages),
+                duration: duration,
+                questionCount: messages.filter { $0.isUser }.count,
+                bookTitle: book?.title ?? "Reading Session",
+                generatedAt: Date()
+            )
+        }
+    }
+
+    /// Generate a "What to watch for next" prompt using Claude
+    func generateNextSessionPrompt(
+        book: Book,
+        currentProgress: Double,
+        recentQuestions: [String]
+    ) async -> String? {
+        guard !recentQuestions.isEmpty else { return nil }
+
+        let systemPrompt = """
+        You are a reading companion. Based on what the reader has been curious about,
+        suggest ONE thing to watch for in their next reading session.
+        Be specific to this book and their interests. Keep it to 1-2 sentences.
+        No spoilers beyond their current progress (\(Int(currentProgress * 100))%).
+        """
+
+        let userPrompt = """
+        Book: "\(book.title)" by \(book.author)
+        Progress: \(Int(currentProgress * 100))%
+        Recent questions: \(recentQuestions.prefix(3).joined(separator: "; "))
+
+        What's one thing they might watch for in their next reading session?
+        """
+
+        do {
+            let suggestion = try await ClaudeService.shared.subscriberChat(
+                message: userPrompt,
+                systemPrompt: systemPrompt,
+                maxTokens: 100
+            )
+            return suggestion
+        } catch {
+            logger.error("Failed to generate next session prompt: \(error)")
+            return nil
+        }
+    }
+
+    private func buildConversationSummary(messages: [UnifiedChatMessage]) -> String {
+        let userQuestions = messages
+            .filter { $0.isUser }
+            .prefix(10)
+            .map { "- \($0.content.prefix(100))" }
+            .joined(separator: "\n")
+
+        return userQuestions.isEmpty ? "No specific questions recorded" : userQuestions
+    }
+
+    private func buildCapturedContent(quotes: [String], notes: [String]) -> String {
+        var content: [String] = []
+        if !quotes.isEmpty {
+            content.append("Quotes: \(quotes.prefix(3).joined(separator: "; "))")
+        }
+        if !notes.isEmpty {
+            content.append("Notes: \(notes.prefix(3).joined(separator: "; "))")
+        }
+        return content.joined(separator: "\n")
+    }
+
+    private func generateFallbackReflection(messages: [UnifiedChatMessage], book: Book?) -> String {
+        let questionCount = messages.filter { $0.isUser }.count
+        let bookTitle = book?.title ?? "your book"
+
+        if questionCount > 5 {
+            return "You had a rich exploration of \(bookTitle) today, asking \(questionCount) questions. The curiosity you brought to this session is exactly what great reading looks like — keep following those threads."
+        } else if questionCount > 0 {
+            return "A thoughtful session with \(bookTitle). Every question you ask deepens your relationship with the text. See what emerges in your next reading."
+        } else {
+            return "Time spent with \(bookTitle) is time well spent. Looking forward to hearing what catches your attention next time."
+        }
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        if minutes < 1 {
+            return "less than a minute"
+        } else if minutes == 1 {
+            return "about a minute"
+        } else if minutes < 60 {
+            return "\(minutes) minutes"
+        } else {
+            let hours = minutes / 60
+            let remainingMinutes = minutes % 60
+            if remainingMinutes == 0 {
+                return "\(hours) hour\(hours > 1 ? "s" : "")"
+            } else {
+                return "\(hours) hour\(hours > 1 ? "s" : "") and \(remainingMinutes) minutes"
+            }
+        }
+    }
+
+    // MARK: - Session Reflection Model
+
+    struct SessionReflection {
+        let text: String
+        let themes: [String]
+        let duration: TimeInterval
+        let questionCount: Int
+        let bookTitle: String
+        let generatedAt: Date
+    }
     
     // MARK: - Smart Session Title Generation
     
