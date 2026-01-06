@@ -66,6 +66,7 @@ public struct SessionSummary {
     let questions: [AmbientProcessedContent]
     let duration: TimeInterval
     let totalContent: Int
+    var reflection: SessionSummaryGenerator.SessionReflection? = nil
 }
 
 // MARK: - TrueAmbientProcessor
@@ -1250,30 +1251,53 @@ public class TrueAmbientProcessor: ObservableObject {
         // await processSessionContent()
         
         let duration = Date().timeIntervalSince(sessionStartTime ?? Date())
-        let summary = SessionSummary(
+
+        // Extract content before clearing
+        let questionTexts = detectedContent.filter { $0.type == .question }.map { $0.text }
+        let quoteTexts = detectedContent.filter { $0.type == .quote }.map { $0.text }
+        let noteTexts = detectedContent.filter { $0.type == .note }.map { $0.text }
+        let bookTitle = AmbientBookDetector.shared.detectedBook?.title
+        let bookAuthor = AmbientBookDetector.shared.detectedBook?.author
+
+        var summary = SessionSummary(
             quotes: detectedContent.filter { $0.type == .quote },
             notes: detectedContent.filter { $0.type == .note },
             questions: detectedContent.filter { $0.type == .question },
             duration: duration,
             totalContent: detectedContent.count
         )
-        
+
         // Log enhanced session summary
         var memorySummary = conversationMemory.generateSessionSummary()
-        
+
         // Use iOS 26 to generate even better summary if available
         if foundationModels.isAvailable() {
             memorySummary = await foundationModels.summarize(memorySummary)
         }
-        
+
         logger.info("🎯 Session ended - Duration: \(Int(duration))s, Content: \(self.detectedContent.count) items")
         logger.info("\n\(memorySummary)")
-        
+
+        // Generate Claude reflection for meaningful sessions (at least 1 question or capture)
+        if !questionTexts.isEmpty || !quoteTexts.isEmpty || !noteTexts.isEmpty {
+            logger.info("✨ Generating Claude reflection for session...")
+            let reflection = await SessionSummaryGenerator.shared.generateAmbientReflection(
+                bookTitle: bookTitle,
+                bookAuthor: bookAuthor,
+                questions: questionTexts,
+                quotes: quoteTexts,
+                notes: noteTexts,
+                duration: duration
+            )
+            summary.reflection = reflection
+            logger.info("✨ Claude reflection generated: \(reflection.text.prefix(100))...")
+        }
+
         // Reset for next session
         detectedContent.removeAll()  // Single source of truth
         currentTranscript = ""
         conversationMemory.clearSession()
-        
+
         return summary
     }
     
@@ -1455,6 +1479,9 @@ public class TrueAmbientProcessor: ObservableObject {
         }
         
         await MainActor.run {
+            var savedNote: CapturedNote?
+            var savedQuote: CapturedQuote?
+
             switch content.type {
             case .quote:
                 let quote = CapturedQuote(
@@ -1465,7 +1492,8 @@ public class TrueAmbientProcessor: ObservableObject {
                 )
                 quote.ambientSession = currentAmbientSession
                 modelContext.insert(quote)
-                
+                savedQuote = quote
+
             case .note, .thought:
                 let note = CapturedNote(
                     content: content.text,
@@ -1475,15 +1503,24 @@ public class TrueAmbientProcessor: ObservableObject {
                 )
                 note.ambientSession = currentAmbientSession
                 modelContext.insert(note)
-                
+                savedNote = note
+
             default:
                 break
             }
-            
+
             // Save immediately
             do {
                 try modelContext.save()
                 logger.info("✅ Content saved immediately to SwiftData")
+
+                // Index for knowledge graph
+                if let note = savedNote {
+                    KnowledgeGraphIndexer.shared.onNoteSaved(note)
+                }
+                if let quote = savedQuote {
+                    KnowledgeGraphIndexer.shared.onQuoteSaved(quote)
+                }
             } catch {
                 logger.error("❌ Failed to save content: \(error)")
             }
@@ -1714,14 +1751,17 @@ public class TrueAmbientProcessor: ObservableObject {
         }
         
         modelContext.insert(note)
-        
+
         do {
             try modelContext.save()
             logger.info("✅ Note saved with session: \(String(content.text.prefix(50)))...")
+
+            // Index for knowledge graph
+            KnowledgeGraphIndexer.shared.onNoteSaved(note)
         } catch {
             logger.error("❌ Failed to save note: \(error)")
         }
-        
+
         // Add to recently saved for debug view
         recentlySaved.append(content)
         if recentlySaved.count > 10 {
@@ -2012,13 +2052,21 @@ public class TrueAmbientProcessor: ObservableObject {
     // MARK: - Context Helpers
     
     private func getCurrentBook() -> BookModel? {
-        // Get from AmbientBookDetector
-        // Convert Book to BookModel if needed
-        if let book = AmbientBookDetector.shared.detectedBook {
-            // For now, return nil - would need to query or convert
-            return nil
-        }
-        return nil
+        // Get from AmbientBookDetector and query SwiftData for matching BookModel
+        guard let book = AmbientBookDetector.shared.detectedBook,
+              let context = modelContext else { return nil }
+
+        // Query SwiftData for matching book by title and author
+        let title = book.title
+        let author = book.author
+        var descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { bookModel in
+                bookModel.title == title && bookModel.author == author
+            }
+        )
+        descriptor.fetchLimit = 1
+
+        return try? context.fetch(descriptor).first
     }
     
     private func getCurrentBookContext() -> String {
@@ -2895,7 +2943,23 @@ extension TrueAmbientProcessor {
             bookTitle: bookContext?.title,
             bookAuthor: bookContext?.author
         )
-        
+
+        // Persist to SwiftData for cross-session memory
+        let detectedIntent = intentDetector.detectIntent(
+            from: question,
+            bookTitle: bookContext?.title,
+            bookAuthor: bookContext?.author
+        )
+        await MemoryPersistenceService.shared.saveMemoryEntry(
+            userText: question,
+            aiResponse: response,
+            intentType: detectedIntent.primary.baseType,
+            topic: detectedIntent.primary.baseType,
+            entities: detectedIntent.entities.map { $0.text },
+            isImportant: detectedIntent.confidence > 0.8,
+            book: getCurrentBook()
+        )
+
         // Update existing question with response
         await MainActor.run {
             // Find and update the existing question

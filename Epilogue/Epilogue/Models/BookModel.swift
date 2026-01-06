@@ -65,6 +65,10 @@ final class BookModel {
     @Relationship(deleteRule: .nullify, inverse: \JourneyBook.bookModel)
     var journeyBooks: [JourneyBook]?
 
+    // Knowledge Graph relationship
+    @Relationship(deleteRule: .nullify)
+    var knowledgeNodes: [KnowledgeNode]?
+
     init(
         id: String,
         title: String,

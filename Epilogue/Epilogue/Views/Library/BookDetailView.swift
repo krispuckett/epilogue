@@ -981,6 +981,14 @@ struct BookDetailView: View {
             // Always show Notes section (persistent)
             notesSection
 
+            // Book connections from knowledge graph
+            BookConnectionsCard(
+                book: book,
+                bookModel: bookModel,
+                accentColor: accentColor,
+                textColor: textColor
+            )
+
             // Content based on reading status
             if book.readingStatus == .currentlyReading {
                 // Currently Reading sections
