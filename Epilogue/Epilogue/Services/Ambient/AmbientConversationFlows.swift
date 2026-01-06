@@ -45,6 +45,7 @@ class AmbientConversationFlows: ObservableObject {
         case readingChallenge  // "create a reading challenge" flow
         case libraryInsights
         case moodBasedRecommendation(mood: String)
+        case vibeBasedRecommendation(bookTitle: String)  // "books like X", "similar vibes to X"
     }
 
     enum FlowState: Equatable {
@@ -65,6 +66,106 @@ class AmbientConversationFlows: ObservableObject {
         static func == (lhs: ClarificationQuestion, rhs: ClarificationQuestion) -> Bool {
             lhs.id == rhs.id
         }
+    }
+
+    // MARK: - Conversation Starters
+
+    /// Quick-tap mood options for finding books
+    enum ReadingMood: String, CaseIterable {
+        case cozy = "Cozy & comforting"
+        case epic = "Epic adventure"
+        case thoughtful = "Thought-provoking"
+        case emotional = "Emotional journey"
+        case funny = "Light & funny"
+        case dark = "Dark & atmospheric"
+        case hopeful = "Hopeful & uplifting"
+        case mindBending = "Mind-bending"
+
+        var emoji: String {
+            switch self {
+            case .cozy: return "blanket"
+            case .epic: return "mountain"
+            case .thoughtful: return "brain"
+            case .emotional: return "heart"
+            case .funny: return "smile"
+            case .dark: return "moon"
+            case .hopeful: return "sunrise"
+            case .mindBending: return "spiral"
+            }
+        }
+
+        var sfSymbol: String {
+            switch self {
+            case .cozy: return "cup.and.saucer.fill"
+            case .epic: return "mountain.2.fill"
+            case .thoughtful: return "brain.head.profile"
+            case .emotional: return "heart.fill"
+            case .funny: return "face.smiling.fill"
+            case .dark: return "moon.stars.fill"
+            case .hopeful: return "sunrise.fill"
+            case .mindBending: return "tornado"
+            }
+        }
+
+        var prompt: String {
+            switch self {
+            case .cozy: return "Find me something cozy - the kind of book that feels like a warm blanket and a cup of tea."
+            case .epic: return "I want an epic adventure - sweeping scope, high stakes, a journey I can get lost in."
+            case .thoughtful: return "Give me something thought-provoking - a book that will stick with me and make me think."
+            case .emotional: return "I'm ready to feel things - find me a book that will move me emotionally."
+            case .funny: return "I need something light and funny - a book that will make me laugh."
+            case .dark: return "I'm in the mood for something dark and atmospheric - moody, immersive, maybe a little unsettling."
+            case .hopeful: return "Find me something hopeful and uplifting - a book that will leave me feeling good about the world."
+            case .mindBending: return "I want something mind-bending - twists, surprises, a book that will keep me guessing."
+            }
+        }
+    }
+
+    /// Contextual suggestions based on library
+    struct ConversationStarter: Identifiable {
+        let id = UUID()
+        let label: String
+        let prompt: String
+        let sfSymbol: String
+    }
+
+    /// Generate personalized conversation starters based on the user's library
+    func getConversationStarters(from books: [Book]) -> [ConversationStarter] {
+        var starters: [ConversationStarter] = []
+
+        // Always include "Surprise me"
+        starters.append(ConversationStarter(
+            label: "Surprise me",
+            prompt: "Surprise me with something I wouldn't expect but will love based on my reading history.",
+            sfSymbol: "sparkle"
+        ))
+
+        // If they have recent reads, offer "More like..."
+        if let recentFavorite = books.filter({ $0.userRating ?? 0 >= 4 }).first {
+            starters.append(ConversationStarter(
+                label: "More like \(recentFavorite.title.prefix(20))...",
+                prompt: "Find me books with a similar vibe to \(recentFavorite.title) by \(recentFavorite.author).",
+                sfSymbol: "arrow.triangle.branch"
+            ))
+        }
+
+        // Offer something different
+        if books.count >= 5 {
+            starters.append(ConversationStarter(
+                label: "Something different",
+                prompt: "I want to try something outside my usual reading patterns - surprise me with a genre or style I haven't explored.",
+                sfSymbol: "arrow.triangle.swap"
+            ))
+        }
+
+        // "I don't know what I want"
+        starters.append(ConversationStarter(
+            label: "I don't know what I want",
+            prompt: "I'm not sure what I'm in the mood for. Can you ask me a few questions to help figure it out?",
+            sfSymbol: "questionmark.bubble"
+        ))
+
+        return starters
     }
 
     enum FlowResult: Equatable {
@@ -190,6 +291,95 @@ class AmbientConversationFlows: ObservableObject {
                 } catch {
                     self.flowState = .error(message: error.localizedDescription)
                     continuation.yield(.error("Couldn't generate recommendations"))
+                }
+
+                continuation.finish()
+            }
+        }
+    }
+
+    // MARK: - Start Vibe-Based Recommendation Flow
+
+    /// Find books with similar emotional resonance to a given book title
+    func startVibeRecommendationFlow(bookTitle: String, library: [Book]) async -> AsyncStream<FlowUpdate> {
+        AsyncStream { continuation in
+            Task { @MainActor in
+                activeFlow = .vibeBasedRecommendation(bookTitle: bookTitle)
+                flowState = .analyzing
+
+                continuation.yield(.status("Finding books with similar vibes to \"\(bookTitle)\"..."))
+
+                // First, try to find the book in the user's library
+                var matchedBook: Book?
+                let normalizedTitle = bookTitle.lowercased()
+
+                for book in library {
+                    if book.title.lowercased().contains(normalizedTitle) ||
+                       normalizedTitle.contains(book.title.lowercased()) {
+                        matchedBook = book
+                        break
+                    }
+                }
+
+                // If not in library, create a minimal Book object for the query
+                let sourceBook = matchedBook ?? Book(
+                    id: UUID().uuidString,
+                    title: bookTitle,
+                    author: "Unknown",
+                    description: nil
+                )
+
+                do {
+                    flowState = .generating
+                    continuation.yield(.status("Analyzing the emotional landscape of \"\(sourceBook.title)\"..."))
+
+                    let vibeRecs = try await recommendationEngine.findSimilarVibes(to: sourceBook, count: 5)
+                    self.recommendations = vibeRecs
+                    self.flowState = .completed(result: .recommendations(vibeRecs))
+
+                    continuation.yield(.recommendations(vibeRecs))
+
+                    #if DEBUG
+                    print("✨ Found \(vibeRecs.count) vibe matches for \(sourceBook.title)")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("❌ Vibe recommendation failed: \(error)")
+                    #endif
+                    self.flowState = .error(message: "Couldn't find similar books")
+                    continuation.yield(.error("I couldn't find books with similar vibes right now. Try again?"))
+                }
+
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Find books for a specific mood using Claude
+    func startMoodRecommendationFlow(mood: String) async -> AsyncStream<FlowUpdate> {
+        AsyncStream { continuation in
+            Task { @MainActor in
+                activeFlow = .moodBasedRecommendation(mood: mood)
+                flowState = .generating
+
+                continuation.yield(.status("Finding books for a \(mood) mood..."))
+
+                do {
+                    let moodRecs = try await recommendationEngine.findBooksForMood(mood)
+                    self.recommendations = moodRecs
+                    self.flowState = .completed(result: .recommendations(moodRecs))
+
+                    continuation.yield(.recommendations(moodRecs))
+
+                    #if DEBUG
+                    print("🎭 Found \(moodRecs.count) books for mood: \(mood)")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("❌ Mood recommendation failed: \(error)")
+                    #endif
+                    self.flowState = .error(message: "Couldn't find books for that mood")
+                    continuation.yield(.error("I couldn't find books for that mood right now. Try being more specific?"))
                 }
 
                 continuation.finish()
@@ -376,6 +566,16 @@ class AmbientConversationFlows: ObservableObject {
             return .libraryInsights
         }
 
+        // Vibe-based recommendation - "books like X", "similar vibes to X"
+        let vibeKeywords = ["similar vibes", "books like", "something like", "feels like", "vibe of", "reminds me of", "in the spirit of"]
+        for keyword in vibeKeywords {
+            if lowercased.contains(keyword) {
+                if let bookTitle = extractBookTitle(from: message, trigger: keyword) {
+                    return .vibeBasedRecommendation(bookTitle: bookTitle)
+                }
+            }
+        }
+
         // Mood-based recommendation
         let moodKeywords = ["in the mood for", "feeling like", "something for a", "rainy day", "beach read", "cozy"]
         for keyword in moodKeywords {
@@ -386,6 +586,37 @@ class AmbientConversationFlows: ObservableObject {
         }
 
         return nil
+    }
+
+    /// Extract book title from a vibe query like "books like The Odyssey"
+    private func extractBookTitle(from message: String, trigger: String) -> String? {
+        let lowercased = message.lowercased()
+        guard let range = lowercased.range(of: trigger) else { return nil }
+
+        // Get the text after the trigger
+        let afterTrigger = String(message[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+
+        // Clean up common suffixes
+        var title = afterTrigger
+        let suffixes = ["?", ".", "!", " please", " thanks", " maybe"]
+        for suffix in suffixes {
+            if title.lowercased().hasSuffix(suffix) {
+                title = String(title.dropLast(suffix.count))
+            }
+        }
+
+        // Remove leading articles for cleaner matching
+        let prefixes = ["the book ", "a book ", "\"", "'"]
+        for prefix in prefixes {
+            if title.lowercased().hasPrefix(prefix) {
+                title = String(title.dropFirst(prefix.count))
+            }
+        }
+
+        // Clean trailing quotes
+        title = title.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+
+        return title.isEmpty ? nil : title.trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: - Private Helpers

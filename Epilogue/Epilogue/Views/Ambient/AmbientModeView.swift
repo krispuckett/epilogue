@@ -357,11 +357,15 @@ struct AmbientModeView: View {
                 .zIndex(200)
             }
 
-            // Recommendation question flow overlay (for generic mode)
+            // Conversational recommendation flow overlay (for generic mode)
             if showRecommendationFlow {
-                RecommendationQuestionFlow(
-                    onComplete: { context in
-                        handleRecommendationFlowComplete(context)
+                ConversationalRecommendationView(
+                    books: libraryViewModel.books,
+                    onMoodSelected: { mood in
+                        handleMoodRecommendation(mood)
+                    },
+                    onStarterSelected: { prompt in
+                        handleConversationStarterSelected(prompt)
                     },
                     onDismiss: {
                         withAnimation(DesignSystem.Animation.springStandard) {
@@ -1084,9 +1088,16 @@ struct AmbientModeView: View {
                             )
                             .opacity(isRecording ? 0.8 : 1.0)
                             .animation(.easeInOut(duration: 0.3), value: isRecording)
+
+                            // Reading insights from knowledge graph
+                            ReadingInsightsCard()
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
+                                .opacity(isRecording ? 0.6 : 1.0)
+                                .animation(.easeInOut(duration: 0.3), value: isRecording)
                         } else if let book = currentBookContext {
-                            // Book-specific ambient mode - intelligent contextual pills
-                            BookSpecificEmptyState(
+                            // Book-specific ambient mode - powered by Reading Companion
+                            CompanionAwareEmptyState(
                                 book: book,
                                 colorPalette: colorPalette,
                                 currentPage: book.currentPage > 0 ? book.currentPage : nil,
@@ -1097,6 +1108,16 @@ struct AmbientModeView: View {
                                 },
                                 onCaptureQuote: {
                                     showVisualIntelligenceCapture = true
+                                },
+                                onCompanionResponse: { question, response in
+                                    // Add companion response as formatted AI message
+                                    let aiMessage = UnifiedChatMessage(
+                                        content: "**\(question)**\n\n\(response)",
+                                        isUser: false,
+                                        timestamp: Date(),
+                                        bookContext: currentBookContext
+                                    )
+                                    messages.append(aiMessage)
                                 }
                             )
                             .opacity(isRecording ? 0.8 : 1.0)
@@ -1293,7 +1314,7 @@ struct AmbientModeView: View {
                     // Bottom spacer for input area - adjusted for keyboard mode
                     // Add more bottom padding to ensure content is scrollable above input
                     Color.clear
-                        .frame(height: inputMode == .textInput ? 80 : 160)
+                        .frame(height: inputMode == .textInput ? 120 : 180)
                         .id("bottom")
                 }
             }
@@ -1305,11 +1326,11 @@ struct AmbientModeView: View {
             }
             .onChange(of: messages.count) { _, _ in
                 // Scroll to new message with delay to ensure layout is complete
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     withAnimation(.easeInOut(duration: 0.5)) {
                         if let lastMessage = messages.last {
-                            // Center the new message in view
-                            proxy.scrollTo(lastMessage.id, anchor: .center)
+                            // Scroll to bottom of new message to show full content
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
                         }
                     }
                 }
@@ -1831,6 +1852,58 @@ struct AmbientModeView: View {
         isGenericModeThinking = true
         Task {
             await getGenericAIResponse(for: enhancedPrompt)
+        }
+    }
+
+    /// Handle mood-based recommendation selection from conversational view
+    private func handleMoodRecommendation(_ mood: AmbientConversationFlows.ReadingMood) {
+        // Hide the recommendation flow
+        withAnimation(DesignSystem.Animation.springStandard) {
+            showRecommendationFlow = false
+        }
+
+        // Use the mood's built-in natural prompt - this is well-crafted for Claude
+        let moodPrompt = mood.prompt
+
+        // Add user message (display a shorter version)
+        let displayMessage = "I'm in the mood for: \(mood.rawValue)"
+        let userMessage = UnifiedChatMessage(
+            content: displayMessage,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        messages.append(userMessage)
+
+        // Use Claude for vibe-based recommendations (not Perplexity)
+        isGenericModeThinking = true
+        Task {
+            await getClaudeRecommendationResponse(for: moodPrompt)
+        }
+    }
+
+    /// Handle conversation starter selection from conversational view
+    private func handleConversationStarterSelected(_ prompt: String) {
+        // Hide the recommendation flow
+        withAnimation(DesignSystem.Animation.springStandard) {
+            showRecommendationFlow = false
+        }
+
+        // Add user message with full prompt (don't truncate)
+        let userMessage = UnifiedChatMessage(
+            content: prompt,
+            isUser: true,
+            timestamp: Date(),
+            bookContext: nil,
+            messageType: .text
+        )
+        messages.append(userMessage)
+
+        // Use Claude for recommendation-related prompts (they're vibe-focused)
+        isGenericModeThinking = true
+        Task {
+            await getClaudeRecommendationResponse(for: prompt)
         }
     }
 
@@ -4007,9 +4080,21 @@ struct AmbientModeView: View {
         let books = libraryViewModel.books
 
         switch flow {
-        case .recommendation, .moodBasedRecommendation:
-            // Start recommendation flow
+        case .recommendation:
+            // Start general recommendation flow
             for await update in await conversationFlows.startRecommendationFlow(books: books) {
+                await handleFlowUpdate(update)
+            }
+
+        case .moodBasedRecommendation(let mood):
+            // Start mood-based recommendation flow
+            for await update in await conversationFlows.startMoodRecommendationFlow(mood: mood) {
+                await handleFlowUpdate(update)
+            }
+
+        case .vibeBasedRecommendation(let bookTitle):
+            // Start vibe-based recommendation flow - find books with similar emotional resonance
+            for await update in await conversationFlows.startVibeRecommendationFlow(bookTitle: bookTitle, library: books) {
                 await handleFlowUpdate(update)
             }
 
@@ -4376,6 +4461,86 @@ struct AmbientModeView: View {
                     bookContext: nil,
                     messageType: .text
                 ))
+            }
+        }
+    }
+
+    /// Get Claude-based recommendation response for mood/vibe queries
+    /// Uses Claude for more thoughtful, literary recommendations
+    private func getClaudeRecommendationResponse(for query: String) async {
+        let libraryContext = buildLibraryContext()
+
+        // Build vibe-focused system prompt
+        let vibePrompt = """
+        You are a literary companion with deep understanding of books' emotional landscapes, themes, and atmospheres.
+
+        Your superpower: Finding books that FEEL the same, even when they look completely different.
+
+        When recommending, focus on:
+        - The emotional journey and what it evokes in the reader
+        - Atmosphere and mood - the feeling of being inside the book
+        - Pacing and how time moves in the narrative
+        - The way the prose feels - lyrical, spare, dense, propulsive
+        - What lingers after the last page
+
+        \(libraryContext)
+
+        FORMAT:
+        Give 4-5 recommendations. For each:
+        1. **Title** by Author
+           [2-3 sentences explaining the VIBE - what emotional experience this book offers and why it fits what they're looking for]
+
+        RULES:
+        - Focus on emotional resonance, not genre matching
+        - Find surprising connections - books that FEEL similar even when they look different
+        - Be warm and conversational, like a friend who knows books
+        - No emojis
+        - End with one gentle follow-up question to understand them better
+        - NEVER recommend books from their library they've already read
+        """
+
+        do {
+            let response = try await ClaudeService.shared.subscriberChat(
+                message: query,
+                systemPrompt: vibePrompt,
+                maxTokens: 1500
+            )
+
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+
+                let aiMessage = UnifiedChatMessage(
+                    content: response,
+                    isUser: false,
+                    timestamp: Date(),
+                    bookContext: nil,
+                    messageType: .text
+                )
+                messages.append(aiMessage)
+
+                // Expand the response
+                withAnimation(DesignSystem.Animation.easeStandard) {
+                    expandedMessageIds.removeAll()
+                    expandedMessageIds.insert(aiMessage.id)
+                }
+            }
+
+        } catch {
+            #if DEBUG
+            print("❌ Claude recommendation error: \(error)")
+            #endif
+
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isGenericModeThinking = false
+                }
+
+                // Fallback to Perplexity
+                Task {
+                    await getGenericAIResponse(for: query)
+                }
             }
         }
     }
@@ -5019,6 +5184,24 @@ struct AmbientModeView: View {
                 isKeyboardFocused = false
                 withAnimation(DesignSystem.Animation.springStandard) {
                     showReadingPlanFlow = .challenge
+                }
+            }
+
+        case .vibeBasedRecommendation(let bookTitle):
+            // Find books with similar emotional resonance
+            updateOrAppendMessage(question: originalText, response: "Finding books with similar vibes to \"\(bookTitle)\"...")
+            let stream = await conversationFlows.startVibeRecommendationFlow(bookTitle: bookTitle, library: libraryViewModel.books)
+            for await update in stream {
+                switch update {
+                case .status(let status):
+                    updateOrAppendMessage(question: originalText, response: status)
+                case .recommendations(let recs):
+                    let recText = recs.map { "**\($0.title)** by \($0.author)\n\($0.reasoning)" }.joined(separator: "\n\n")
+                    updateOrAppendMessage(question: originalText, response: recText.isEmpty ? "Couldn't find books with similar vibes." : "Books with similar vibes to \"\(bookTitle)\":\n\n" + recText)
+                case .error(let error):
+                    updateOrAppendMessage(question: originalText, response: error)
+                default:
+                    break
                 }
             }
         }
@@ -6903,6 +7086,8 @@ struct GenericModeChatBubble: View {
                     Text(message.content)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.white)
+                        .lineLimit(nil) // Allow full text to wrap
+                        .fixedSize(horizontal: false, vertical: true) // Prevent truncation
                         .padding(.horizontal, 18)
                         .padding(.vertical, 14)
                         .background(
@@ -6922,6 +7107,7 @@ struct GenericModeChatBubble: View {
                             isStreaming: streamingText != nil,
                             isExpanded: isExpanded
                         )
+                        .fixedSize(horizontal: false, vertical: true) // Ensure full content shows
 
                         // Expand indicator for long content
                         if !isExpanded && displayContent.count > 300 {
@@ -6935,6 +7121,7 @@ struct GenericModeChatBubble: View {
                             .padding(.top, 4)
                         }
                     }
+                    .fixedSize(horizontal: false, vertical: true) // Allow VStack to grow
                     .padding(.horizontal, 18)
                     .padding(.vertical, 16) // More vertical padding
                     .background(
@@ -7065,7 +7252,8 @@ struct GenericModeMarkdownText: View {
                 renderBlock(block)
             }
         }
-        .lineLimit(isExpanded ? nil : 8)
+        // Always show full content - parent handles collapse state
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var parsedBlocks: [MarkdownBlock] {
@@ -7188,6 +7376,10 @@ struct GenericModeMarkdownText: View {
                 .fixedSize(horizontal: false, vertical: true)
 
         case .numberedItem(let num, let title, let description):
+            // Check if this looks like a book recommendation (contains " by " for author)
+            let looksLikeBookRecommendation = title.contains(" by ") ||
+                                              (description?.contains(" by ") ?? false)
+
             VStack(alignment: .leading, spacing: 8) {
                 // Title line with number integrated
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -7196,45 +7388,49 @@ struct GenericModeMarkdownText: View {
                         .foregroundStyle(amberColor.opacity(0.6))
 
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 16, weight: looksLikeBookRecommendation ? .semibold : .regular))
                         .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Spacer(minLength: 16)
+                    Spacer(minLength: 8)
 
-                    // Minimal action icons - tighter, lighter
-                    HStack(spacing: 16) {
-                        Button {
-                            SensoryFeedback.light()
-                            NotificationCenter.default.post(
-                                name: NSNotification.Name("AddBookToLibrary"),
-                                object: title
-                            )
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.35))
+                    // Only show action icons for actual book recommendations
+                    if looksLikeBookRecommendation {
+                        HStack(spacing: 16) {
+                            Button {
+                                SensoryFeedback.light()
+                                NotificationCenter.default.post(
+                                    name: NSNotification.Name("AddBookToLibrary"),
+                                    object: title
+                                )
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.35))
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                SensoryFeedback.light()
+                                // Use user's preferred bookstore
+                                BookstoreURLBuilder.shared.openBookstore(title: title, author: "")
+                            } label: {
+                                Image(systemName: "cart")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.35))
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            SensoryFeedback.light()
-                            // Use user's preferred bookstore
-                            BookstoreURLBuilder.shared.openBookstore(title: title, author: "")
-                        } label: {
-                            Image(systemName: "cart")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.35))
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
 
-                // Description with author - softer, more space
+                // Description - softer, more space
                 if let desc = description {
                     Text(desc)
                         .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(.white.opacity(0.55))
                         .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.leading, "\(num). ".count > 2 ? 20 : 16) // Align with title
                 }
             }
