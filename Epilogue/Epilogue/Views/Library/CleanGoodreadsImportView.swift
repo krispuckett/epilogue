@@ -158,27 +158,79 @@ struct CleanGoodreadsImportView: View {
             Spacer()
                 .frame(height: 50)
             
+            // Quick action button - opens Goodreads export page directly
+            Button {
+                if let url = URL(string: "https://www.goodreads.com/review/import") {
+                    UIApplication.shared.open(url)
+                }
+                SensoryFeedback.light()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "safari.fill")
+                        .font(.system(size: 20))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Open Goodreads Export Page")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Opens in Safari · Request desktop site if needed")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .foregroundStyle(.white)
+                .padding(16)
+                .frame(maxWidth: .infinity)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.warmAmber.opacity(0.3), lineWidth: 1)
+                }
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .padding(.horizontal, 24)
+
             // Instructions with refined design
             VStack(spacing: 20) {
                 HStack(spacing: 12) {
                     Image(systemName: "info.circle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(Color.warmAmber)
-                    
-                    Text("EXPORT INSTRUCTIONS")
+
+                    Text("HOW IT WORKS")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundStyle(Color.warmAmber)
                         .tracking(1.5)
-                    
+
                     Spacer()
                 }
-                
+
                 VStack(alignment: .leading, spacing: 16) {
-                    instructionRow(number: "1", text: "Visit your Goodreads library", icon: "book.circle")
-                    instructionRow(number: "2", text: "Find 'Import and export'", icon: "square.and.arrow.up.circle")
-                    instructionRow(number: "3", text: "Click 'Export library'", icon: "arrow.down.circle")
-                    instructionRow(number: "4", text: "Select the CSV file here", icon: "doc.circle")
+                    instructionRow(number: "1", text: "Tap the button above to open Goodreads", icon: "hand.tap")
+                    instructionRow(number: "2", text: "Click 'Export Library' on that page", icon: "arrow.down.circle")
+                    instructionRow(number: "3", text: "Wait for the download to complete", icon: "clock")
+                    instructionRow(number: "4", text: "Come back and select the CSV file", icon: "doc.circle")
                 }
+
+                // Mobile tip
+                HStack(spacing: 10) {
+                    Image(systemName: "iphone")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.orange)
+
+                    Text("On iPhone? Tap **ᴬA** in Safari's address bar → **Request Desktop Website**")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .padding(24)
             .glassEffect(in: RoundedRectangle(cornerRadius: 24))
