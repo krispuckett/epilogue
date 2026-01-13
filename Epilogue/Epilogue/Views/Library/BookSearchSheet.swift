@@ -616,6 +616,18 @@ struct BookSearchSheet: View {
             }
         }
 
+        // FALLBACK: Try Open Library if Google Books returned nothing
+        // This helps find obscure books not in Google's index
+        if searchResults.isEmpty {
+            #if DEBUG
+            print("📚 Google Books returned no results, trying Open Library fallback...")
+            #endif
+            searchResults = await OpenLibrarySearchService.shared.searchBooks(query: query)
+            #if DEBUG
+            print("📚 Open Library found \(searchResults.count) results")
+            #endif
+        }
+
         // Check for errors
         if let error = booksService.errorMessage {
             searchError = error
@@ -1310,38 +1322,39 @@ struct SmartBookCoverView: View {
     }
 }
 
-// MARK: - For You Recommendation Row
+// MARK: - For You Recommendation Row (Card Style)
 struct ForYouRecommendationRow: View {
     let recommendation: RecommendationEngine.Recommendation
     let onAdd: () -> Void
 
     @State private var isExpanded = false
+    @State private var isPressed = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Book cover
-            SmartBookCoverView(coverURL: recommendation.coverURL, width: 50, height: 75)
+            // Book cover - larger for card format
+            SmartBookCoverView(coverURL: recommendation.coverURL, width: 80, height: 120)
 
             // Book info with reasoning
             VStack(alignment: .leading, spacing: 6) {
                 Text(recommendation.title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                Text(recommendation.author)
+                Text("by \(recommendation.author)")
                     .font(.system(size: 15))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
 
-                // Reasoning - collapsible
+                // Reasoning as description
                 Text(recommendation.reasoning)
-                    .font(.system(size: 13))
-                    .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.9))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(isExpanded ? nil : 2)
                     .multilineTextAlignment(.leading)
-                    .padding(.top, 4)
+                    .padding(.top, 2)
                     .onTapGesture {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             isExpanded.toggle()
@@ -1350,29 +1363,76 @@ struct ForYouRecommendationRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Add button
-            Button(action: {
-                #if DEBUG
-                print("📚 For You book selected:")
-                #endif
-                #if DEBUG
-                print("   Title: \(recommendation.title)")
-                #endif
-                #if DEBUG
-                print("   Reasoning: \(recommendation.reasoning)")
-                #endif
-                onAdd()
-            }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+            // Action buttons (vertical stack)
+            VStack(spacing: 12) {
+                // Add to library button
+                Button(action: {
+                    SensoryFeedback.success()
+                    onAdd()
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(DesignSystem.Colors.primaryAccent.opacity(0.15))
+                            .frame(width: 40, height: 40)
+                            .glassEffect(.regular, in: Circle())
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.3), lineWidth: 0.5)
+                            }
+
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                // Buy/cart button
+                Button(action: {
+                    // Open book purchase link
+                    let searchQuery = "\(recommendation.title) \(recommendation.author)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                    if let url = URL(string: "https://bookshop.org/search?keywords=\(searchQuery)") {
+                        UIApplication.shared.open(url)
+                    }
+                    SensoryFeedback.light()
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 40, height: 40)
+                            .glassEffect(.regular, in: Circle())
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                            }
+
+                        Image(systemName: "cart")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            .buttonStyle(PlainButtonStyle())
         }
+        .padding(16)
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.white.opacity(isPressed ? 0.2 : 0.1), lineWidth: 0.5)
+        }
+        .scaleEffect(isPressed ? 0.98 : 1.0)
         .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-        .padding(.vertical, 12)
+        .padding(.vertical, 6)
+        .onLongPressGesture(
+            minimumDuration: 0.1,
+            maximumDistance: .infinity,
+            pressing: { pressing in
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = pressing
+                }
+            },
+            perform: {}
+        )
     }
 }
 

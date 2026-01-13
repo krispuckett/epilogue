@@ -20,6 +20,14 @@ final class BookModel {
     // Offline cover image caching
     @Attribute(.externalStorage) var coverImageData: Data?
 
+    // Cover source tracking - "api" (default) or "custom" (user-uploaded)
+    var coverSource: String = "api"
+
+    /// Whether the cover was uploaded by the user (vs from API)
+    var isCustomCover: Bool {
+        coverSource == "custom"
+    }
+
     // Smart enrichment (spoiler-free AI-generated context)
     var smartSynopsis: String?        // 2-3 sentences, NO spoilers
     var keyThemes: [String]?          // ["friendship", "courage", "sacrifice"]
@@ -66,8 +74,18 @@ final class BookModel {
     var journeyBooks: [JourneyBook]?
 
     // Knowledge Graph relationship
-    @Relationship(deleteRule: .nullify)
+    @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.sourceBooks)
     var knowledgeNodes: [KnowledgeNode]?
+
+    // AI Memory relationships
+    @Relationship(deleteRule: .cascade, inverse: \BookInsight.book)
+    var insights: [BookInsight]?
+
+    @Relationship(deleteRule: .cascade, inverse: \ConversationMemoryEntry.book)
+    var memoryEntries: [ConversationMemoryEntry]?
+
+    @Relationship(deleteRule: .cascade, inverse: \MemoryThread.book)
+    var memoryThreads: [MemoryThread]?
 
     init(
         id: String,

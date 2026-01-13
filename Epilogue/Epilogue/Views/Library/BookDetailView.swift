@@ -195,6 +195,9 @@ struct BookDetailView: View {
     // Status picker state
     @State private var showingStatusPicker = false
 
+    // Cover picker state
+    @State private var showingCoverPicker = false
+
     // Reading session state
     @State private var activeSession: ReadingSession?
     @State private var showingEndSession = false
@@ -743,6 +746,23 @@ struct BookDetailView: View {
                 isPresented: $showingNoteCapture
             )
         }
+        .sheet(isPresented: $showingCoverPicker) {
+            if let bookModel = bookModel {
+                CoverPickerSheet(
+                    book: bookModel,
+                    isPresented: $showingCoverPicker,
+                    onCoverChanged: {
+                        // Reload the cover image and re-extract colors
+                        Task {
+                            if let data = bookModel.coverImageData,
+                               let image = UIImage(data: data) {
+                                self.coverImage = image
+                            }
+                        }
+                    }
+                )
+            }
+        }
         .glassToast(isShowing: $showingSessionSavedToast, message: "Quick Session Saved")
         .onAppear {
             // findOrCreateThreadForBook() // DISABLED - ChatThread removed
@@ -825,6 +845,7 @@ struct BookDetailView: View {
             // Book Cover with 3D effect and smooth entrance
             SharedBookCoverView(
                 coverURL: book.coverImageURL,
+                coverData: bookModel?.isCustomCover == true ? bookModel?.coverImageData : nil,
                 width: 180,
                 height: 270,
                 loadFullImage: true,  // Explicitly request full quality
@@ -841,7 +862,10 @@ struct BookDetailView: View {
                     }
                 }
             )
-            .accessibilityLabel("Book cover for \(book.title)")
+            .onTapGesture {
+                showingCoverPicker = true
+            }
+            .accessibilityLabel("Book cover for \(book.title). Tap to change.")
             .blur(radius: coverBlur)
             .opacity(coverOpacity)
             .shadow(color: Color.black.opacity(coverOpacity * 0.3), radius: 20 * coverOpacity, y: 10 * coverOpacity)
@@ -980,6 +1004,11 @@ struct BookDetailView: View {
         VStack(spacing: 32) {
             // Always show Notes section (persistent)
             notesSection
+
+            // Social sharing section (Share + Read Together)
+            if let bookModel = bookModel {
+                BookSocialSharingSection(book: bookModel, accentColor: accentColor)
+            }
 
             // Book connections from knowledge graph
             BookConnectionsCard(
@@ -1266,11 +1295,11 @@ struct BookDetailView: View {
                 .foregroundStyle(.white.opacity(0.8))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
                 .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
         }
-        .padding(DesignSystem.Spacing.listItemPadding)
     }
 
     // MARK: - Contextual Sections for Currently Reading

@@ -52,17 +52,18 @@ class DisplayedImageStore {
 struct SharedBookCoverView: View {
     private let LOG_COVER_DEBUG = false
     let coverURL: String?
+    let coverData: Data?  // Custom cover data (takes priority over URL)
     let width: CGFloat
     let height: CGFloat
     let loadFullImage: Bool
     let isLibraryView: Bool
-    
+
     @State private var thumbnailImage: UIImage?
     @State private var fullImage: UIImage?
     @State private var isLoading = false
     @State private var loadFailed = false
     @State private var currentLoadingURL: String?
-    
+
     // Simple in-memory cache to avoid state recreation
     private static let quickImageCache: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
@@ -71,12 +72,13 @@ struct SharedBookCoverView: View {
         cache.totalCostLimit = 20 * 1024 * 1024 // 20MB max
         return cache
     }()
-    
+
     // Callback to notify when image is loaded
     var onImageLoaded: ((UIImage) -> Void)?
-    
+
     init(
         coverURL: String?,
+        coverData: Data? = nil,  // NEW: Optional custom cover data
         width: CGFloat = 170,
         height: CGFloat = 255,
         loadFullImage: Bool = true,
@@ -111,6 +113,7 @@ struct SharedBookCoverView: View {
             }
         }
         self.coverURL = coverURL
+        self.coverData = coverData
         self.width = width
         self.height = height
         self.loadFullImage = loadFullImage
@@ -152,10 +155,23 @@ struct SharedBookCoverView: View {
     }
     
     private func loadImage() {
-        guard let urlString = coverURL else { 
+        // PRIORITY 1: Use custom cover data if available (user-uploaded covers)
+        if let data = coverData, let image = UIImage(data: data) {
+            if loadFullImage {
+                self.fullImage = image
+            } else {
+                self.thumbnailImage = image
+            }
+            self.isLoading = false
+            self.loadFailed = false
+            self.onImageLoaded?(image)
+            return
+        }
+
+        guard let urlString = coverURL else {
             // No URL provided, mark as failed
             loadFailed = true
-            return 
+            return
         }
         
         // If we're already loading this exact URL, don't start another load

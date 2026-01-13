@@ -2,6 +2,12 @@ import Foundation
 
 @MainActor
 enum DisplayCoverURLResolver {
+    /// Resolution mode - quick for search results, full for imports
+    enum ResolveMode {
+        case full   // All 12 candidates (for imports, detail views)
+        case quick  // Only 3 best candidates (for search results)
+    }
+
     struct Context {
         let googleID: String
         let isbn: String?
@@ -9,10 +15,18 @@ enum DisplayCoverURLResolver {
     }
 
     /// Resolve a canonical, high-quality display URL for a book cover.
-    static func resolveDisplayURL(googleID: String, isbn: String? = nil, thumbnailURL: String? = nil) async -> String? {
+    /// - Parameter mode: Use `.quick` for search results (faster), `.full` for imports (more thorough)
+    static func resolveDisplayURL(
+        googleID: String,
+        isbn: String? = nil,
+        thumbnailURL: String? = nil,
+        mode: ResolveMode = .full
+    ) async -> String? {
         let ctx = Context(googleID: googleID, isbn: isbn, thumbnailURL: thumbnailURL)
-        for candidate in candidates(for: ctx) {
-            if await validateImageURL(candidate) {
+        let candidateList = mode == .quick ? quickCandidates(for: ctx) : candidates(for: ctx)
+
+        for candidate in candidateList {
+            if await validateImageURL(candidate, quickMode: mode == .quick) {
                 return candidate
             }
         }
@@ -20,6 +34,27 @@ enum DisplayCoverURLResolver {
     }
 
     // MARK: - Candidates
+
+    /// Quick candidates for search results - only 3 most reliable URLs
+    private static func quickCandidates(for ctx: Context) -> [String] {
+        var list: [String] = []
+        let id = ctx.googleID
+
+        // 1. Content API with zoom=1 (most reliable)
+        list.append("https://books.google.com/books/content?id=\(id)&printsec=frontcover&img=1&zoom=1&source=gbs_api")
+
+        // 2. Google imageLinks thumbnail (if provided - already validated by Google)
+        if let thumb = ctx.thumbnailURL, URLValidator.isValidURL(thumb) {
+            list.append(thumb.replacingOccurrences(of: "http://", with: "https://"))
+        }
+
+        // 3. Publisher frontcover medium quality
+        list.append("https://books.google.com/books/publisher/content/images/frontcover/\(id)?fife=w800-h1200&source=gbs_api")
+
+        return list
+    }
+
+    /// Full candidates for imports and detail views - all 12 URLs
     private static func candidates(for ctx: Context) -> [String] {
         var list: [String] = []
         let id = ctx.googleID
@@ -58,13 +93,20 @@ enum DisplayCoverURLResolver {
     }
 
     // MARK: - Validation
-    private static func validateImageURL(_ urlString: String) async -> Bool {
+
+    /// Validate that a URL points to a real image with sufficient size
+    /// - Parameter quickMode: If true, uses shorter timeouts (3s/5s vs 8s/10s)
+    private static func validateImageURL(_ urlString: String, quickMode: Bool = false) async -> Bool {
         guard let url = URLValidator.createSafeBookCoverURL(from: urlString) else { return false }
+
+        // Timeouts: quick mode uses shorter timeouts for search responsiveness
+        let headTimeout: TimeInterval = quickMode ? 3 : 8
+        let getTimeout: TimeInterval = quickMode ? 5 : 10
 
         // Prefer HEAD
         var headReq = URLRequest(url: url)
         headReq.httpMethod = "HEAD"
-        headReq.timeoutInterval = 8
+        headReq.timeoutInterval = headTimeout
         do {
             let (_, response) = try await URLSession.shared.data(for: headReq)
             if let http = response as? HTTPURLResponse, http.statusCode == 200 {
@@ -80,7 +122,7 @@ enum DisplayCoverURLResolver {
 
         // Small GET fallback (first 16KB)
         var getReq = URLRequest(url: url)
-        getReq.timeoutInterval = 10
+        getReq.timeoutInterval = getTimeout
         getReq.setValue("bytes=0-16383", forHTTPHeaderField: "Range")
         do {
             let (data, response) = try await URLSession.shared.data(for: getReq)

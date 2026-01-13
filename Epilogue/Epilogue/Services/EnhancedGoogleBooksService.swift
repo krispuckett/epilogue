@@ -164,14 +164,17 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             }
         }
 
-        // Get initial batch of results
-        let results = await fetchEnhancedBatch(
-            query: query,
-            parsedQuery: parsedQuery,
-            preferISBN: preferISBN,
-            publisherHint: publisherHint,
-            lightMode: lightMode
-        )
+        // Get initial batch of results with overall timeout (8 seconds max)
+        // This prevents runaway searches when Google returns many irrelevant results
+        let results = await withSearchTimeout(seconds: 8) {
+            await self.fetchEnhancedBatch(
+                query: query,
+                parsedQuery: parsedQuery,
+                preferISBN: preferISBN,
+                publisherHint: publisherHint,
+                lightMode: lightMode
+            )
+        }
 
         enhancedSearchResults = results
         enhancedStartIndex = results.count
@@ -210,6 +213,31 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         hasMoreEnhancedResults = uniqueNewResults.count > 0
 
         return enhancedSearchResults
+    }
+
+    // MARK: - Timeout Helper
+
+    /// Execute a search operation with a timeout - returns empty array if timeout exceeded
+    private func withSearchTimeout(seconds: Int, operation: @escaping () async -> [Book]) async -> [Book] {
+        await withTaskGroup(of: [Book]?.self) { group in
+            // Main operation task
+            group.addTask {
+                return await operation()
+            }
+
+            // Timeout task
+            group.addTask {
+                try? await Task.sleep(for: .seconds(seconds))
+                return nil // Signal timeout
+            }
+
+            // Return first result (completion or timeout)
+            for await result in group {
+                group.cancelAll()
+                return result ?? []
+            }
+            return []
+        }
     }
 
     // Fetch a batch of enhanced results
@@ -287,6 +315,25 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             guard !seen.contains(item.id) else { return false }
             seen.insert(item.id)
             return true
+        }
+
+        // RELEVANCE CHECK: Fast-fail when no results match the query
+        // This prevents 30+ second delays when Google returns only fuzzy matches (e.g., "The Motern Method" → "Modern Method")
+        let queryWords = Set(query.lowercased().split(separator: " ").filter { $0.count > 2 }.map(String.init))
+        if !queryWords.isEmpty {
+            let hasRelevantResult = uniqueResults.contains { item in
+                let titleWords = Set(item.volumeInfo.title.lowercased().split(separator: " ").map(String.init))
+                let overlap = queryWords.intersection(titleWords)
+                // Require at least half the significant query words to match
+                return overlap.count >= max(1, queryWords.count / 2)
+            }
+
+            if !hasRelevantResult && uniqueResults.count > 0 {
+                #if DEBUG
+                print("🔍 No relevant results found for '\(query)' - all \(uniqueResults.count) results are fuzzy matches, returning empty")
+                #endif
+                return []  // Fast exit - don't waste time on cover resolution for irrelevant results
+            }
         }
 
         // Score and rank the results
@@ -374,41 +421,50 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }.map { $0.book }
 
         #if DEBUG
-        print("📚 Validating cover URLs for \(filteredBooks.count) books (same validation as Goodreads)")
+        print("📚 Validating cover URLs for \(filteredBooks.count) books in PARALLEL")
         #endif
 
-        // CRITICAL FIX: Validate and resolve cover URLs (same as Goodreads import does)
-        // This prevents blank covers from broken/placeholder URLs
-        var validatedBooks: [Book] = []
-        for book in filteredBooks {
-            var validated = book
+        // PERFORMANCE FIX: Parallel cover resolution
+        // Previously sequential: 40 books × ~2 sec each = 80 seconds
+        // Now parallel: all at once with quick mode = ~3-5 seconds total
+        let booksToValidate = Array(filteredBooks.prefix(20)) // Limit to top 20 for search
 
-            // Use DisplayCoverURLResolver to find the best working cover URL
-            // This tries: publisher fife URLs, content API URLs, thumbnail, and Open Library fallback
-            if let resolvedURL = await DisplayCoverURLResolver.resolveDisplayURL(
-                googleID: book.id,
-                isbn: book.isbn,
-                thumbnailURL: book.coverImageURL
-            ) {
-                validated.coverImageURL = resolvedURL
-                #if DEBUG
-                if resolvedURL != book.coverImageURL {
-                    print("✅ Resolved better URL for '\(book.title)'")
-                    print("   Old: \(book.coverImageURL ?? "nil")")
-                    print("   New: \(resolvedURL)")
+        // Use withTaskGroup for parallel processing - all books at once
+        let validatedResults: [(index: Int, book: Book)] = await withTaskGroup(of: (Int, Book?).self) { group in
+            for (index, book) in booksToValidate.enumerated() {
+                group.addTask {
+                    // Use quick mode (3 URLs, shorter timeouts) for search results
+                    if let resolvedURL = await DisplayCoverURLResolver.resolveDisplayURL(
+                        googleID: book.id,
+                        isbn: book.isbn,
+                        thumbnailURL: book.coverImageURL,
+                        mode: .quick
+                    ) {
+                        var validated = book
+                        validated.coverImageURL = resolvedURL
+                        return (index, validated)
+                    }
+                    return (index, nil)
                 }
-                #endif
-                validatedBooks.append(validated)
-            } else {
-                // No valid cover URL found - skip this book to avoid blank covers
-                #if DEBUG
-                print("❌ No valid cover URL found for '\(book.title)' - excluding from results")
-                #endif
             }
+
+            // Collect all results
+            var results: [(Int, Book)] = []
+            for await (idx, book) in group {
+                if let book = book {
+                    results.append((idx, book))
+                }
+            }
+            return results
         }
 
+        // Sort by original index to maintain ranking order
+        let validatedBooks = validatedResults
+            .sorted { $0.index < $1.index }
+            .map { $0.book }
+
         #if DEBUG
-        print("📚 Returning \(validatedBooks.count) books with validated covers (filtered \(filteredBooks.count - validatedBooks.count) blanks)")
+        print("📚 Returning \(validatedBooks.count) books with validated covers (filtered \(booksToValidate.count - validatedBooks.count) blanks)")
         #endif
 
         return validatedBooks
