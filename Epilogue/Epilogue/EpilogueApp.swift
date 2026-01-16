@@ -71,6 +71,20 @@ struct EpilogueApp: App {
                             Task { @MainActor in
                                 updateWidgetData(context: context)
                             }
+
+                            // Clean up orphaned reading plan notifications
+                            Task { @MainActor in
+                                await cleanupOrphanedReadingPlanNotifications(context: context)
+                            }
+
+                            // Auto-enrich any unenriched books after CloudKit sync
+                            // Wait 10 seconds to let CloudKit sync complete first
+                            Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+                                // Create fresh context from container for auto-enrichment
+                                let enrichmentContext = ModelContext(container)
+                                AutoEnrichmentService.shared.autoEnrichBooksIfNeeded(modelContext: enrichmentContext)
+                            }
                         }
                     }
                     .alert("iCloud Sync", isPresented: $showingCloudKitAlert) {
@@ -560,5 +574,39 @@ struct EpilogueApp: App {
 
         // Mark migration as complete
         UserDefaults.standard.set(true, forKey: "didMigrateCachedColorsToBookModel")
+    }
+
+    /// Cleans up orphaned reading plan notifications
+    /// Removes notifications for plans that:
+    /// - No longer exist in the database
+    /// - Are marked as inactive (isActive = false)
+    /// - Are paused (isPaused = true)
+    /// - Are completed (completedAt != nil)
+    /// - Have notifications disabled (notificationsEnabled = false)
+    @MainActor
+    private func cleanupOrphanedReadingPlanNotifications(context: ModelContext) async {
+        #if DEBUG
+        print("🔔 Cleaning up orphaned reading plan notifications...")
+        #endif
+
+        // Fetch all active plans that should have notifications
+        let descriptor = FetchDescriptor<ReadingHabitPlan>(
+            predicate: #Predicate<ReadingHabitPlan> { plan in
+                plan.isActive &&
+                !plan.isPaused &&
+                plan.notificationsEnabled &&
+                plan.completedAt == nil
+            }
+        )
+
+        let activePlans = (try? context.fetch(descriptor)) ?? []
+        let activePlanIds = Set(activePlans.map { $0.id })
+
+        #if DEBUG
+        print("🔔 Found \(activePlans.count) active plans with notifications enabled")
+        #endif
+
+        // Clean up notifications for plans not in the active set
+        await ReadingPlanNotificationService.shared.cleanupOrphanedNotifications(activePlanIds: activePlanIds)
     }
 }

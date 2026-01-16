@@ -28,12 +28,10 @@ class AutoEnrichmentService {
         #endif
         isRunning = true
 
-        // Run in background task
-        Task(priority: .background) {
+        // Run on MainActor to ensure ModelContext safety
+        Task { @MainActor in
             await performBackgroundEnrichment(modelContext: modelContext)
-            await MainActor.run {
-                isRunning = false
-            }
+            isRunning = false
         }
     }
 
