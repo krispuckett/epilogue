@@ -581,16 +581,12 @@ struct BookSelectionRow: View {
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: 16) {
-                // Book cover
-                AsyncImage(url: URL(string: book.coverImageURL ?? "")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.1))
-                }
-                .frame(width: 50, height: 75)
+                // Book cover (cached for offline)
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 50,
+                    height: 75
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
                 VStack(alignment: .leading, spacing: 4) {

@@ -616,28 +616,13 @@ private struct NoteBookPickerSheet: View {
                             dismiss()
                         } label: {
                             HStack(spacing: 12) {
-                                // Book cover thumbnail
-                                if let coverURL = book.coverImageURL, let url = URL(string: coverURL) {
-                                    AsyncImage(url: url) { image in
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Rectangle()
-                                            .fill(.white.opacity(0.1))
-                                    }
-                                    .frame(width: 40, height: 60)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                                } else {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(.white.opacity(0.1))
-                                        .frame(width: 40, height: 60)
-                                        .overlay {
-                                            Image(systemName: "book.closed")
-                                                .font(.system(size: 16))
-                                                .foregroundStyle(.white.opacity(0.3))
-                                        }
-                                }
+                                // Book cover thumbnail (cached for offline)
+                                SharedBookCoverView(
+                                    coverURL: book.coverImageURL,
+                                    width: 40,
+                                    height: 60
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(book.title)

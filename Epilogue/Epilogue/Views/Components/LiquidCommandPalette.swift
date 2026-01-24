@@ -908,23 +908,13 @@ struct LiquidBookSearchRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                // Cover image
-                if let coverURL = book.coverImageURL {
-                    AsyncImage(url: URL(string: coverURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.1))
-                    }
-                    .frame(width: 40, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                } else {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 40, height: 60)
-                }
+                // Cover image (cached for offline)
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 40,
+                    height: 60
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
                 
                 // Book info
                 VStack(alignment: .leading, spacing: 4) {

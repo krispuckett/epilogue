@@ -120,26 +120,15 @@ struct CoverPickerSheet: View {
                     .frame(height: 160)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .shadow(radius: 4)
-            } else if let urlString = book.coverImageURL,
-                      let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(height: 160)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 4)
-                    case .failure:
-                        placeholderCover
-                    case .empty:
-                        ProgressView()
-                            .frame(height: 160)
-                    @unknown default:
-                        placeholderCover
-                    }
-                }
+            } else if book.coverImageURL != nil {
+                // Cover image (cached for offline)
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 107,
+                    height: 160
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(radius: 4)
             } else {
                 placeholderCover
             }
