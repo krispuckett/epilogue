@@ -193,6 +193,7 @@ struct AmbientModeView: View {
     @Namespace private var morphingNamespace  // For smooth morphing animation
     @FocusState private var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    @State private var hasAppearedOnce = false  // Prevent keyboard auto-focus on initial load
     
     // Smooth gradient transitions - start visible
     @State private var gradientOpacity: Double = 1.0  // Start visible immediately
@@ -328,8 +329,8 @@ struct AmbientModeView: View {
             }
             .zIndex(100)  // Ensure it's on top
 
-            // Onboarding text overlay - only show when there's no empty state visible
-            if showOnboarding && onboardingShownCount < 5 && !messages.isEmpty {
+            // Onboarding text overlay - only show when there's no empty state visible and no messages yet
+            if showOnboarding && onboardingShownCount < 5 && messages.isEmpty {
                 VStack(spacing: 0) {
                     Spacer()
 
@@ -576,12 +577,20 @@ struct AmbientModeView: View {
         }
         .onChange(of: inputMode) { _, newMode in
             // Handle focus changes when switching modes
-            if newMode == .textInput {
+            // Skip auto-focus on initial load to let user see content first
+            if newMode == .textInput && hasAppearedOnce {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isKeyboardFocused = true
                 }
-            } else {
+            } else if newMode != .textInput {
                 isKeyboardFocused = false
+            }
+
+            // Mark that we've appeared - future mode changes will auto-focus
+            if !hasAppearedOnce {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    hasAppearedOnce = true
+                }
             }
         }
         // Single unified listener for all content updates
@@ -822,8 +831,12 @@ struct AmbientModeView: View {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
                                 Button("Pause Plan", systemImage: "pause.circle") {
-                                    plan.pause()
-                                    try? modelContext.save()
+                                    Task {
+                                        // Cancel notifications when pausing
+                                        await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                                        plan.pause()
+                                        try? modelContext.save()
+                                    }
                                 }
                                 Divider()
                                 Button("Delete Plan", systemImage: "trash", role: .destructive) {
@@ -1345,6 +1358,16 @@ struct AmbientModeView: View {
                     }
                 }
             }
+            .onChange(of: isGenericModeThinking) { _, isThinking in
+                // Scroll to typing indicator when it appears
+                if isThinking && currentBookContext == nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(DesignSystem.Animation.easeStandard) {
+                            proxy.scrollTo("typing-indicator", anchor: .bottom)
+                        }
+                    }
+                }
+            }
             .scrollBounceBehavior(isRecording ? .automatic : .basedOnSize)
         }
     }
@@ -1696,20 +1719,29 @@ struct AmbientModeView: View {
         }
     }
 
-    /// Ensures an ambient session exists for the current book
+    /// Ensures an ambient session exists (with or without book context)
     private func startAmbientSessionIfNeeded() {
-        guard currentSession == nil, let book = currentBookContext else { return }
+        guard currentSession == nil else { return }
 
         let newSession = AmbientSession()
         newSession.startTime = Date()
-        newSession.bookModel = BookModel(from: book)
+
+        // Set book context if available
+        if let book = currentBookContext {
+            newSession.bookModel = BookModel(from: book)
+        }
+
         modelContext.insert(newSession)
         currentSession = newSession
 
         do {
             try modelContext.save()
             #if DEBUG
-            print("📚 Created ambient session for book: \(book.title)")
+            if let book = currentBookContext {
+                print("📚 Created ambient session for book: \(book.title)")
+            } else {
+                print("📚 Created generic ambient session (no book context)")
+            }
             #endif
         } catch {
             #if DEBUG
@@ -4338,10 +4370,12 @@ struct AmbientModeView: View {
 
             // Streaming complete - finalize message content
             await MainActor.run {
+                let finalResponse = streamingResponses[messageId] ?? fullResponse
+
                 if let index = messages.firstIndex(where: { $0.id == messageId }) {
                     messages[index] = UnifiedChatMessage(
                         id: messageId,
-                        content: streamingResponses[messageId] ?? fullResponse,
+                        content: finalResponse,
                         isUser: false,
                         timestamp: aiMessage.timestamp,
                         bookContext: nil,
@@ -4349,6 +4383,10 @@ struct AmbientModeView: View {
                     )
                     streamingResponses.removeValue(forKey: messageId)
                 }
+
+                // Save to session for session summary
+                startAmbientSessionIfNeeded()
+                saveQuestionToCurrentSession(text, response: finalResponse)
             }
 
         } catch {
@@ -4430,10 +4468,12 @@ struct AmbientModeView: View {
 
             // Streaming complete - finalize message content
             await MainActor.run {
+                let finalResponse = streamingResponses[messageId] ?? fullResponse
+
                 if let index = messages.firstIndex(where: { $0.id == messageId }) {
                     messages[index] = UnifiedChatMessage(
                         id: messageId,
-                        content: streamingResponses[messageId] ?? fullResponse,
+                        content: finalResponse,
                         isUser: false,
                         timestamp: aiMessage.timestamp,
                         bookContext: nil,
@@ -4441,6 +4481,10 @@ struct AmbientModeView: View {
                     )
                     streamingResponses.removeValue(forKey: messageId)
                 }
+
+                // Save to session for session summary
+                startAmbientSessionIfNeeded()
+                saveQuestionToCurrentSession(userQuery, response: finalResponse)
             }
 
         } catch {
@@ -4472,31 +4516,30 @@ struct AmbientModeView: View {
 
         // Build vibe-focused system prompt
         let vibePrompt = """
-        You are a literary companion with deep understanding of books' emotional landscapes, themes, and atmospheres.
-
-        Your superpower: Finding books that FEEL the same, even when they look completely different.
-
-        When recommending, focus on:
-        - The emotional journey and what it evokes in the reader
-        - Atmosphere and mood - the feeling of being inside the book
-        - Pacing and how time moves in the narrative
-        - The way the prose feels - lyrical, spare, dense, propulsive
-        - What lingers after the last page
+        You are a literary companion with deep understanding of books' emotional landscapes.
 
         \(libraryContext)
 
-        FORMAT:
-        Give 4-5 recommendations. For each:
-        1. **Title** by Author
-           [2-3 sentences explaining the VIBE - what emotional experience this book offers and why it fits what they're looking for]
+        IF THE USER IS UNCERTAIN (asking for help figuring out what they want):
+        Ask exactly 2-3 SHORT questions to understand their mood. Format each question on its own line:
+
+        **Question 1?**
+
+        **Question 2?**
+
+        Keep questions brief (one sentence each). No explanations or options after each question.
+
+        IF THE USER KNOWS WHAT THEY WANT:
+        Give 3-4 recommendations:
+        1. **Title** by Author - Why this fits their vibe (1-2 sentences)
+        2. **Title** by Author - Why this fits (1-2 sentences)
+        [etc.]
 
         RULES:
-        - Focus on emotional resonance, not genre matching
-        - Find surprising connections - books that FEEL similar even when they look different
-        - Be warm and conversational, like a friend who knows books
+        - Be concise and conversational
         - No emojis
-        - End with one gentle follow-up question to understand them better
-        - NEVER recommend books from their library they've already read
+        - Never recommend books they already own
+        - End with one brief follow-up question
         """
 
         do {
@@ -4525,6 +4568,10 @@ struct AmbientModeView: View {
                     expandedMessageIds.removeAll()
                     expandedMessageIds.insert(aiMessage.id)
                 }
+
+                // Save to session for session summary
+                startAmbientSessionIfNeeded()
+                saveQuestionToCurrentSession(query, response: response)
             }
 
         } catch {

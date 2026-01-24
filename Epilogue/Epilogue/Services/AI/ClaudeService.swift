@@ -338,7 +338,6 @@ class ClaudeService: ObservableObject {
 
         var fullResponse = ""
         var responseCount = 0
-        let startTime = Date()
 
         for try await response in streamChat(
             message: message,
@@ -348,17 +347,6 @@ class ClaudeService: ObservableObject {
         ) {
             responseCount += 1
             fullResponse = response.text
-
-            let elapsed = Date().timeIntervalSince(startTime)
-
-            // Progressive return thresholds for responsiveness
-            if (fullResponse.count >= 300 && elapsed > 2.0) ||
-               (fullResponse.count >= 600 && elapsed > 3.5) ||
-               (fullResponse.count >= 800 && elapsed > 5.0) ||
-               elapsed > 8.0 {
-                logger.info("Claude returning with \(fullResponse.count) chars after \(String(format: "%.1f", elapsed))s")
-                break
-            }
         }
 
         if fullResponse.isEmpty {

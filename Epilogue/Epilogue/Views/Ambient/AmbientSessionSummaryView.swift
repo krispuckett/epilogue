@@ -48,8 +48,8 @@ struct AmbientSessionSummaryView: View {
                         metricsSection
                             .padding(.bottom, 32)
                         
-                        // Primary content card - show most recent or most relevant question
-                        if let mostRelevantQuestion = findMostRelevantQuestion() {
+                        // Primary content card - show most recent or most relevant question (book sessions only)
+                        if session.bookModel != nil, let mostRelevantQuestion = findMostRelevantQuestion() {
                             primaryInsightCard(question: mostRelevantQuestion)
                                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                                 .padding(.bottom, 24)
@@ -247,58 +247,62 @@ struct AmbientSessionSummaryView: View {
     private var metricsSection: some View {
         HStack(spacing: 24) {
             metricItem(value: formatDuration(session.duration), label: "DURATION")
-            
-            // Page tracking - tappable to edit
-            if editingPage {
-                VStack(spacing: 4) {
-                    TextField("Page", text: $pageText)
-                        .font(.system(size: 24, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .multilineTextAlignment(.center)
-                        .frame(width: 60)
-                        .focused($isPageFocused)
-                        .keyboardType(.numberPad)
-                        .onSubmit {
-                            savePageNumber()
-                        }
-                    
-                    Text("PAGE")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .tracking(1.5)
-                }
-            } else {
-                Button {
-                    if let currentPage = session.currentPage {
-                        pageText = "\(currentPage)"
-                    } else {
-                        pageText = ""
-                    }
-                    editingPage = true
-                    isPageFocused = true
-                } label: {
+
+            // Page tracking - only for book sessions
+            if session.bookModel != nil {
+                if editingPage {
                     VStack(spacing: 4) {
-                        HStack(spacing: 2) {
-                            Text(session.currentPage.map { "\($0)" } ?? "—")
-                                .font(.system(size: 24, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.95))
-                            
-                            Image(systemName: "pencil")
-                                .font(.system(size: 10))
-                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
-                        }
-                        
+                        TextField("Page", text: $pageText)
+                            .font(.system(size: 24, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .multilineTextAlignment(.center)
+                            .frame(width: 60)
+                            .focused($isPageFocused)
+                            .keyboardType(.numberPad)
+                            .onSubmit {
+                                savePageNumber()
+                            }
+
                         Text("PAGE")
                             .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.4))
                             .tracking(1.5)
                     }
+                } else {
+                    Button {
+                        if let currentPage = session.currentPage {
+                            pageText = "\(currentPage)"
+                        } else {
+                            pageText = ""
+                        }
+                        editingPage = true
+                        isPageFocused = true
+                    } label: {
+                        VStack(spacing: 4) {
+                            HStack(spacing: 2) {
+                                Text(session.currentPage.map { "\($0)" } ?? "—")
+                                    .font(.system(size: 24, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.95))
+
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(DesignSystem.Colors.textQuaternary)
+                            }
+
+                            Text("PAGE")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .tracking(1.5)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-            
+
             if (session.capturedQuestions ?? []).count > 0 {
-                metricItem(value: "\((session.capturedQuestions ?? []).count)", label: "QUESTIONS")
+                // Show "MESSAGES" for chat sessions, "QUESTIONS" for book sessions
+                let label = session.bookModel == nil ? "MESSAGES" : "QUESTIONS"
+                metricItem(value: "\((session.capturedQuestions ?? []).count)", label: label)
             }
             if (session.capturedQuotes ?? []).count > 0 {
                 metricItem(value: "\((session.capturedQuotes ?? []).count)", label: "QUOTES")
@@ -437,27 +441,39 @@ struct AmbientSessionSummaryView: View {
                 .foregroundStyle(DesignSystem.Colors.textTertiary)
                 .tracking(1.2)
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-            
-            VStack(spacing: 1) {
-                ForEach(Array((session.capturedQuestions ?? []).enumerated()), id: \.element.id) { index, question in
-                    let questionIdString = question.id?.uuidString ?? UUID().uuidString
-                    MinimalThreadView(
-                        question: question,
-                        index: index,
-                        isExpanded: expandedQuestions.contains(questionIdString),
-                        onToggle: {
-                            withAnimation(DesignSystem.Animation.easeQuick) {
-                                if expandedQuestions.contains(questionIdString) {
-                                    expandedQuestions.remove(questionIdString)
-                                } else {
-                                    expandedQuestions.insert(questionIdString)
+
+            // Use chat-style for generic sessions, Q&A style for book sessions
+            if session.bookModel == nil {
+                // Chat-style layout for generic ambient sessions
+                VStack(spacing: 16) {
+                    ForEach(session.capturedQuestions ?? []) { question in
+                        ChatBubbleConversationView(question: question)
+                    }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            } else {
+                // Q&A style for book sessions
+                VStack(spacing: 1) {
+                    ForEach(Array((session.capturedQuestions ?? []).enumerated()), id: \.element.id) { index, question in
+                        let questionIdString = question.id?.uuidString ?? UUID().uuidString
+                        MinimalThreadView(
+                            question: question,
+                            index: index,
+                            isExpanded: expandedQuestions.contains(questionIdString),
+                            onToggle: {
+                                withAnimation(DesignSystem.Animation.easeQuick) {
+                                    if expandedQuestions.contains(questionIdString) {
+                                        expandedQuestions.remove(questionIdString)
+                                    } else {
+                                        expandedQuestions.insert(questionIdString)
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             }
-            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
     }
     
@@ -1500,5 +1516,63 @@ struct SessionQuickActionsMenu: View {
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isPresented)
+    }
+}
+
+// MARK: - Chat Bubble Conversation View (for generic sessions)
+struct ChatBubbleConversationView: View {
+    let question: CapturedQuestion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // User message bubble
+            HStack {
+                Spacer()
+                Text(question.content ?? "")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.white.opacity(0.15))
+                    )
+                    .frame(maxWidth: 280, alignment: .trailing)
+            }
+
+            // AI response bubble
+            if let answer = question.answer, !answer.isEmpty {
+                HStack {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Split by double newlines to preserve paragraph breaks
+                        let paragraphs = answer.components(separatedBy: "\n\n")
+                        ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                            if !paragraph.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                if let attributed = try? AttributedString(markdown: paragraph) {
+                                    Text(attributed)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                        .lineSpacing(4)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                } else {
+                                    Text(paragraph)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                        .lineSpacing(4)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
     }
 }

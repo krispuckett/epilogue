@@ -12,7 +12,7 @@ struct SessionTimelineCard: View {
     @State private var isPressed = false
     
     private var bookTitle: String {
-        session.bookModel?.title ?? "Unknown Book"
+        session.bookModel?.title ?? "Ambient Chat"
     }
     
     private var keyInsight: String {
