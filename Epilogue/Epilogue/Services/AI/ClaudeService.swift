@@ -58,7 +58,7 @@ enum ClaudeError: LocalizedError {
 // MARK: - Claude Model
 
 enum ClaudeModel: String {
-    case sonnet = "claude-sonnet-4-20250514"
+    case sonnet = "claude-sonnet-4-6-20260501"
     case opus = "claude-opus-4-5-20251101"
 
     var displayName: String {
@@ -379,10 +379,8 @@ class ClaudeService: ObservableObject {
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         } else {
-            // Proxy authentication
-            let encoded: [UInt8] = [101, 112, 105, 108, 111, 103, 117, 101, 95, 116, 101, 115, 116, 102, 108, 105, 103, 104, 116, 95, 50, 48, 50, 53, 95, 115, 101, 99, 114, 101, 116]
-            let proxyToken = String(bytes: encoded, encoding: .utf8) ?? ""
-            request.setValue(proxyToken, forHTTPHeaderField: "X-Epilogue-Auth")
+            // Proxy authentication - uses device attestation via bundle ID verification
+            request.setValue(Bundle.main.bundleIdentifier ?? "com.readepilogue.app", forHTTPHeaderField: "X-Bundle-ID")
         }
 
         // User ID for rate limiting

@@ -95,10 +95,7 @@ struct UnifiedQuickActionCard: View {
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(
-                                    themeManager.currentTheme.primaryAccent.opacity(0.15)
-                                )
-                                .glassEffect(in: Capsule())
+                                .glassEffect(.regular.tint(themeManager.currentTheme.primaryAccent.opacity(0.15)), in: Capsule())
                                 .overlay {
                                     Capsule()
                                         .strokeBorder(
@@ -253,10 +250,6 @@ struct UnifiedQuickActionCard: View {
                     }
                 }
                 // Glass effect matching ambient mode with more pronounced rounded corners
-                .background(
-                    RoundedRectangle(cornerRadius: isExpanded ? 24 : 32, style: .continuous)
-                        .fill(Color.white.opacity(0.001)) // Nearly invisible for glass
-                )
                 .glassEffect(.regular, in: .rect(cornerRadius: isExpanded ? 24 : 32))
                 .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 24 : 32, style: .continuous)) // CLIP CONTENT TO CARD BOUNDS
                 .overlay {
@@ -294,10 +287,6 @@ struct UnifiedQuickActionCard: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(Color.white.opacity(0.001))
-                    )
                     .glassEffect(.regular, in: .rect(cornerRadius: 24))
                     .overlay {
                         RoundedRectangle(cornerRadius: 24, style: .continuous)

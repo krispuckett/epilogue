@@ -89,7 +89,7 @@ struct WhatsNewView: View {
                 Spacer()
             }
 
-            Text("Advanced camera quote capture with intelligent multi-column text detection. Perfect for capturing quotes from two-column layouts and complex book pages.")
+            Text("Smarter conversations powered by Claude, thematic connections across your library, and a more polished experience throughout.")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.95))
                 .multilineTextAlignment(.leading)
@@ -117,30 +117,30 @@ struct WhatsNewView: View {
             VStack(spacing: 1) {
                 FeatureRow(
                     number: 1,
-                    title: "Camera Quote Capture",
-                    description: "Point your camera at any book page and instantly select text from individual columns. Multi-column detection works with textbooks, magazines, and reference books. Live text recognition with glass overlay highlights shows exactly what will be captured.",
-                    detail: "Access from Developer Options > Experimental Quote Capture"
+                    title: "Smarter Intelligence",
+                    description: "Epilogue now uses Claude for all AI conversations. Expect more thoughtful responses, better book recommendations, and more natural dialogue during ambient sessions.",
+                    detail: "Just start a conversation—you'll notice the difference"
                 )
 
                 FeatureRow(
                     number: 2,
-                    title: "Siri & Shortcuts Integration",
-                    description: "Complete voice control with 10+ App Intents. Ask Siri to continue reading, save quotes, add notes, update book status, log pages, rate books, search your library, export notes, and more. Works from anywhere in iOS.",
-                    detail: "Try: 'Hey Siri, continue reading Meditations' or 'Save this quote to Epilogue'"
+                    title: "Discover Connections",
+                    description: "A new recommendation flow helps you discover books based on your mood. Tell Epilogue what you're in the mood for and get personalized suggestions drawn from your reading patterns.",
+                    detail: "Tap the recommendation prompt in any session"
                 )
 
                 FeatureRow(
                     number: 3,
-                    title: "Siri Examples",
-                    description: "'Continue reading The Odyssey' jumps into Ambient Mode. 'Add a quote to Epilogue' saves text with Siri dictation. 'Log 25 pages in Meditations' updates reading progress hands-free.",
-                    detail: "All intents work system-wide from Siri, Shortcuts, and Spotlight"
+                    title: "Thematic Connections",
+                    description: "Epilogue now maps themes, characters, and ideas across your entire library. See how your books connect to each other through shared threads you might not have noticed.",
+                    detail: "Look for connection cards on book detail pages"
                 )
 
                 FeatureRow(
                     number: 4,
-                    title: "Enhanced Google Books Search",
-                    description: "Infinite scrolling and ISBN-based search for better book discovery. Improved cover quality and metadata accuracy.",
-                    detail: "Search when adding books to your library"
+                    title: "Custom Book Covers",
+                    description: "Upload your own cover images for any book in your library. Perfect for editions with covers that don't match, self-published books, or ARCs.",
+                    detail: "Edit any book → tap the cover image"
                 )
             }
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
@@ -157,11 +157,10 @@ struct WhatsNewView: View {
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
 
             VStack(spacing: 12) {
-                ImprovementItem(text: "Multi-column OCR with 15% gap detection algorithm")
-                ImprovementItem(text: "Live text recognition with liquid glass overlays")
-                ImprovementItem(text: "iOS 26 App Intents with system-wide Siri access")
-                ImprovementItem(text: "Intelligent column sorting prevents text mixing")
-                ImprovementItem(text: "Spotlight integration for voice-activated search")
+                ImprovementItem(text: "Offline book covers — cached for when you're without signal")
+                ImprovementItem(text: "Books auto-enrich after iCloud sync")
+                ImprovementItem(text: "Improved Goodreads import with direct export link")
+                ImprovementItem(text: "Crash fixes and performance improvements")
             }
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }

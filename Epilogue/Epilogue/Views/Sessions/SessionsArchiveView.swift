@@ -192,17 +192,12 @@ struct SessionsArchiveView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     // Book header
                     HStack(spacing: 12) {
-                        if let coverURL = bookGroup.book.coverImageURL,
-                           let url = URL(string: coverURL) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            } placeholder: {
-                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                                    .fill(Color.gray.opacity(0.3))
-                            }
-                            .frame(width: 40, height: 60)
+                        if let coverURL = bookGroup.book.coverImageURL {
+                            SharedBookCoverView(
+                                coverURL: coverURL,
+                                width: 40,
+                                height: 60
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
                         }
                         
@@ -314,18 +309,34 @@ struct SessionsArchiveView: View {
     }
     
     private func loadColorPalettes() {
-        for session in sessions {
-            if let book = convertBookModelToBook(session.bookModel),
-               let coverURL = book.coverImageURL,
-               let url = URL(string: coverURL) {
-                Task {
-                    // Download image from URL
-                    if let (data, _) = try? await URLSession.shared.data(from: url),
-                       let uiImage = UIImage(data: data) {
-                        let extractor = OKLABColorExtractor()
-                        if let palette = try? await extractor.extractPalette(from: uiImage) {
-                            await MainActor.run {
-                                colorPalettes[session.id ?? UUID()] = palette
+        // Limit concurrent extractions to avoid unbounded network + CPU usage
+        let sessionsToProcess = sessions.prefix(10)
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                var launched = 0
+                for session in sessionsToProcess {
+                    guard let book = convertBookModelToBook(session.bookModel),
+                          let coverURL = book.coverImageURL,
+                          let url = URL(string: coverURL),
+                          let sessionId = session.id else { continue }
+
+                    // Skip if already cached
+                    if colorPalettes[sessionId] != nil { continue }
+
+                    // Limit to 3 concurrent extractions
+                    if launched >= 3 {
+                        await group.next()
+                    }
+                    launched += 1
+
+                    group.addTask {
+                        if let (data, _) = try? await URLSession.shared.data(from: url),
+                           let uiImage = UIImage(data: data) {
+                            let extractor = OKLABColorExtractor()
+                            if let palette = try? await extractor.extractPalette(from: uiImage) {
+                                await MainActor.run {
+                                    colorPalettes[sessionId] = palette
+                                }
                             }
                         }
                     }

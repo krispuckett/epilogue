@@ -122,6 +122,7 @@ struct BookDetailView: View {
     // Settings
     @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
     @AppStorage("enableAnimations") private var enableAnimations = true
+    @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
     
     // Fixed colors for Claude voice mode style (always white text on dark background)
     private var textColor: Color {
@@ -228,7 +229,6 @@ struct BookDetailView: View {
         .foregroundColor(.white)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.001)))
         .glassEffect(.regular, in: .rect(cornerRadius: 16))
         .overlay {
             RoundedRectangle(cornerRadius: 16)
@@ -1006,7 +1006,8 @@ struct BookDetailView: View {
             notesSection
 
             // Social sharing section (Share + Read Together)
-            if let bookModel = bookModel {
+            // Feature flagged - enable in Developer Options
+            if socialFeaturesEnabled, let bookModel = bookModel {
                 BookSocialSharingSection(book: bookModel, accentColor: accentColor)
             }
 

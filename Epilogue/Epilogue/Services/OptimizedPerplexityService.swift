@@ -3,6 +3,11 @@ import Combine
 import OSLog
 import SQLite3
 
+// MARK: - SQLite Transient Destructor
+// Swift doesn't import SQLITE_TRANSIENT from C; define it manually.
+// This tells SQLite to make its own copy of the string data immediately.
+nonisolated(unsafe) private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 // MARK: - Citation Model
 struct Citation: Codable, Identifiable {
     let id = UUID()
@@ -138,7 +143,8 @@ class OptimizedPerplexityService: ObservableObject {
         userQuotes: [(text: String, page: Int?, notes: String?)]? = nil,
         userQuestions: [(question: String, page: Int?, answer: String?)]? = nil,
         currentPage: Int? = nil,
-        customSystemPrompt: String? = nil
+        customSystemPrompt: String? = nil,
+        skipQuota: Bool = false  // System requests (enrichment) bypass quota
     ) -> AsyncThrowingStream<PerplexityResponse, Error> {
         AsyncThrowingStream { continuation in
             Task { [weak self] in
@@ -163,25 +169,29 @@ class OptimizedPerplexityService: ObservableObject {
                         return
                     }
 
-                    // Check daily quota for TestFlight
-                    if !PerplexityQuotaManager.shared.canAskQuestion {
-                        logger.warning("⚠️ Daily quota exceeded")
-                        await MainActor.run {
-                            PerplexityQuotaManager.shared.showQuotaExceededSheet = true
+                    // Check daily quota for TestFlight (skip for system requests like enrichment)
+                    if !skipQuota {
+                        if !PerplexityQuotaManager.shared.canAskQuestion {
+                            logger.warning("⚠️ Daily quota exceeded")
+                            await MainActor.run {
+                                PerplexityQuotaManager.shared.showQuotaExceededSheet = true
+                            }
+                            throw PerplexityError.rateLimitExceeded(
+                                remaining: 0,
+                                resetTime: PerplexityQuotaManager.shared.nextResetTime
+                            )
                         }
-                        throw PerplexityError.rateLimitExceeded(
-                            remaining: 0,
-                            resetTime: PerplexityQuotaManager.shared.nextResetTime
-                        )
-                    }
 
-                    // Track question usage
-                    let quotaAllowed = PerplexityQuotaManager.shared.trackQuestionUsage()
-                    if !quotaAllowed {
-                        throw PerplexityError.rateLimitExceeded(
-                            remaining: 0,
-                            resetTime: PerplexityQuotaManager.shared.nextResetTime
-                        )
+                        // Track question usage
+                        let quotaAllowed = PerplexityQuotaManager.shared.trackQuestionUsage()
+                        if !quotaAllowed {
+                            throw PerplexityError.rateLimitExceeded(
+                                remaining: 0,
+                                resetTime: PerplexityQuotaManager.shared.nextResetTime
+                            )
+                        }
+                    } else {
+                        logger.info("🔧 System request - bypassing quota check")
                     }
 
                     // Check rate limits
@@ -683,8 +693,12 @@ class OptimizedPerplexityService: ObservableObject {
     
     private func generateCacheKey(query: String, bookContext: Book?) -> String {
         let bookPart = bookContext?.title ?? "general"
-        let queryHash = query.hashValue
-        return "\(bookPart)_\(queryHash)"
+        // Use a stable hash instead of hashValue (which changes every launch due to hash randomization)
+        let data = Data(query.utf8)
+        let stableHash = data.reduce(into: UInt64(5381)) { result, byte in
+            result = ((result << 5) &+ result) &+ UInt64(byte)
+        }
+        return "\(bookPart)_\(stableHash)"
     }
     
     // MARK: - Rate Limiting
@@ -767,10 +781,8 @@ class OptimizedPerplexityService: ObservableObject {
             // Direct API authentication with user's key
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         } else {
-            // Proxy authentication - use same obfuscated secret as SecureAPIManager
-            let encoded: [UInt8] = [101, 112, 105, 108, 111, 103, 117, 101, 95, 116, 101, 115, 116, 102, 108, 105, 103, 104, 116, 95, 50, 48, 50, 53, 95, 115, 101, 99, 114, 101, 116]
-            let proxyToken = String(bytes: encoded, encoding: .utf8) ?? ""
-            request.setValue(proxyToken, forHTTPHeaderField: "X-Epilogue-Auth")
+            // Proxy auth handled server-side via API key configuration
+            request.setValue("", forHTTPHeaderField: "X-Epilogue-Auth")
         }
         
         // Get or create userId
@@ -891,13 +903,16 @@ class OptimizedPerplexityService: ObservableObject {
     
     // MARK: - Public Methods
     
-    func chat(message: String, bookContext: Book?) async throws -> String {
+    func chat(message: String, bookContext: Book?, skipQuota: Bool = false) async throws -> String {
         // Detect if this is a JSON request (enrichment) - needs full response
         let needsFullResponse = message.contains("JSON") || message.contains("json")
 
         logger.info("🚀 Starting chat request: \(message.prefix(100))...")
         if needsFullResponse {
             logger.info("📊 JSON response required - waiting for complete response")
+        }
+        if skipQuota {
+            logger.info("🔧 System request - quota bypassed")
         }
         if let book = bookContext {
             logger.info("📚 Book context: \(book.title) by \(book.author)")
@@ -907,7 +922,7 @@ class OptimizedPerplexityService: ObservableObject {
         let startTime = Date()
 
         do {
-            for try await response in streamSonarResponse(message, bookContext: bookContext) {
+            for try await response in streamSonarResponse(message, bookContext: bookContext, skipQuota: skipQuota) {
                 responseCount += 1
                 fullResponse = response.text
 
@@ -1371,8 +1386,14 @@ private actor PerplexityResponseCache {
                     expiration REAL
                 );
             """
-            
+
             sqlite3_exec(db, createTable, nil, nil, nil)
+        } else {
+            // Even on failure, sqlite3_open may allocate a handle that must be closed
+            if db != nil {
+                sqlite3_close(db)
+                db = nil
+            }
         }
     }
     
@@ -1452,10 +1473,10 @@ private actor PerplexityResponseCache {
         
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, insert, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, key, -1, nil)
-            sqlite3_bind_text(statement, 2, response.text, -1, nil)
-            sqlite3_bind_text(statement, 3, citationsString, -1, nil)
-            sqlite3_bind_text(statement, 4, response.model, -1, nil)
+            sqlite3_bind_text(statement, 1, key, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, response.text, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, citationsString, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, response.model, -1, SQLITE_TRANSIENT)
             sqlite3_bind_double(statement, 5, response.confidence)
             sqlite3_bind_double(statement, 6, expiration.timeIntervalSince1970)
             
@@ -1471,7 +1492,7 @@ private actor PerplexityResponseCache {
         var statement: OpaquePointer?
         
         if sqlite3_prepare_v2(db, delete, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, key, -1, nil)
+            sqlite3_bind_text(statement, 1, key, -1, SQLITE_TRANSIENT)
             sqlite3_step(statement)
         }
         sqlite3_finalize(statement)

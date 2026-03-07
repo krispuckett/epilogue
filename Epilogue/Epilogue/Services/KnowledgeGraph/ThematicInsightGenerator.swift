@@ -86,6 +86,8 @@ final class ThematicInsightGenerator: ObservableObject {
 
     private var insightCache: [ThematicInsight] = []
     private let insightCacheKey = "com.epilogue.thematicInsights"
+    private let insightCacheVersionKey = "com.epilogue.thematicInsightsVersion"
+    private let currentCacheVersion = 2  // Bump this to invalidate old cached insights
 
     // MARK: - Initialization
 
@@ -113,6 +115,13 @@ final class ThematicInsightGenerator: ObservableObject {
                 2. MEANINGFUL - Reveal something the reader might not have noticed
                 3. ACTIONABLE - Suggest what to explore next
                 4. PERSONAL - Connect to the reader's demonstrated interests
+
+                CRITICAL RULES:
+                - NEVER guess or invent book genres or categories
+                - NEVER classify books as "fiction" or "non-fiction" unless explicitly told
+                - Focus ONLY on the specific themes provided in the prompt
+                - Do not make assumptions about what type of book something is
+                - Reference books by title only, never by assumed genre
 
                 Avoid generic observations. Every insight should feel like a discovery.
                 """
@@ -182,7 +191,7 @@ final class ThematicInsightGenerator: ObservableObject {
             return nil
         }
 
-        let bookTitles = primaryTheme.sourceBooks.map { $0.title }
+        let bookTitles = primaryTheme.safeSourceBooks.map { $0.title }
         guard bookTitles.count >= 2 else { return nil }
 
         #if canImport(FoundationModels)
@@ -193,14 +202,17 @@ final class ThematicInsightGenerator: ObservableObject {
         let prompt = """
         Generate an insight about this reading pattern:
 
-        Theme: \(primaryTheme.label)
-        Appears in \(bookTitles.count) books: \(bookTitles.joined(separator: ", "))
-        Mentioned \(primaryTheme.mentionCount) times in notes/quotes
+        Theme from user's notes: \(primaryTheme.label)
+        Books where this theme appears: \(bookTitles.joined(separator: ", "))
+        Times mentioned in user's notes/quotes: \(primaryTheme.mentionCount)
 
         Write a 2-3 sentence insight that:
-        1. Acknowledges the reader's interest in this theme
-        2. Highlights an interesting connection between the books
+        1. Acknowledges the reader's interest in this specific theme
+        2. Notes that they've explored this theme across these specific books
         3. Suggests what this pattern might reveal about their reading journey
+
+        IMPORTANT: Do NOT guess book genres or categorize books as fiction/non-fiction.
+        Only reference the specific theme provided and the book titles.
         """
 
         do {
@@ -248,12 +260,14 @@ final class ThematicInsightGenerator: ObservableObject {
         guard stats.nodesByType[.book] ?? 0 >= 2 else { return nil }
 
         let themes = try graphService.getTopThemes(limit: 10)
-        let sharedTheme = themes.first { $0.sourceBooks.count >= 2 }
+        let sharedTheme = themes.first { $0.safeSourceBooks.count >= 2 }
 
         guard let theme = sharedTheme else { return nil }
 
-        let books = theme.sourceBooks.prefix(3)
+        let books = theme.safeSourceBooks.prefix(3)
         let bookTitles = books.map { $0.title }
+
+        guard !bookTitles.isEmpty else { return nil }
 
         return ThematicInsight(
             id: UUID(),
@@ -276,7 +290,7 @@ final class ThematicInsightGenerator: ObservableObject {
         let themes = try graphService.getTopThemes(limit: 5)
 
         for theme in themes {
-            let quotes = theme.sourceQuotes
+            let quotes = theme.safeSourceQuotes
             guard quotes.count >= 2 else { continue }
 
             let quoteTexts = quotes.compactMap { $0.text }.prefix(3)
@@ -288,13 +302,15 @@ final class ThematicInsightGenerator: ObservableObject {
             guard let session = session else { continue }
 
             let prompt = """
-            These quotes from different books share a common theme (\(theme.label)):
+            These quotes from the user's reading share a common theme (\(theme.label)):
 
             1. "\(quoteTexts[0].prefix(200))..."
             2. "\(quoteTexts.count > 1 ? String(quoteTexts[1].prefix(200)) : "")..."
 
             Write a 2-sentence insight that synthesizes what these quotes say together.
             Focus on what the combination reveals that neither quote says alone.
+
+            IMPORTANT: Do NOT guess book genres. Focus only on the actual quote content and theme.
             """
 
             do {
@@ -333,8 +349,8 @@ final class ThematicInsightGenerator: ObservableObject {
                 let char2 = characters[j]
 
                 // Skip characters from the same book
-                let books1 = Set(char1.sourceBooks.map { $0.id })
-                let books2 = Set(char2.sourceBooks.map { $0.id })
+                let books1 = Set(char1.safeSourceBooks.map { $0.id })
+                let books2 = Set(char2.safeSourceBooks.map { $0.id })
                 guard books1.isDisjoint(with: books2) else { continue }
 
                 // Check if they share themes via edges
@@ -347,8 +363,8 @@ final class ThematicInsightGenerator: ObservableObject {
                 let sharedThemes = themes1.intersection(themes2)
                 guard !sharedThemes.isEmpty else { continue }
 
-                let book1 = char1.sourceBooks.first?.title ?? "Unknown"
-                let book2 = char2.sourceBooks.first?.title ?? "Unknown"
+                let book1 = char1.safeSourceBooks.first?.title ?? "Unknown"
+                let book2 = char2.safeSourceBooks.first?.title ?? "Unknown"
 
                 return ThematicInsight(
                     id: UUID(),
@@ -386,7 +402,7 @@ final class ThematicInsightGenerator: ObservableObject {
 
         guard let node = emerging, node.mentionCount >= 2 else { return nil }
 
-        let bookTitles = node.sourceBooks.map { $0.title }
+        let bookTitles = node.safeSourceBooks.map { $0.title }
 
         return ThematicInsight(
             id: UUID(),
@@ -410,7 +426,7 @@ final class ThematicInsightGenerator: ObservableObject {
         let bookId = book.id
         let allNodes = try graphService.findNodes(matching: "", type: .theme, limit: 50)
         let bookThemes = allNodes.filter { node in
-            node.sourceBooks.contains { $0.id == bookId }
+            node.safeSourceBooks.contains { $0.id == bookId }
         }
 
         guard !bookThemes.isEmpty else { return nil }
@@ -418,7 +434,7 @@ final class ThematicInsightGenerator: ObservableObject {
         // Find other books sharing these themes
         var relatedBooks: Set<String> = []
         for theme in bookThemes {
-            for relatedBook in theme.sourceBooks where relatedBook.id != bookId {
+            for relatedBook in theme.safeSourceBooks where relatedBook.id != bookId {
                 relatedBooks.insert(relatedBook.title)
             }
         }
@@ -444,6 +460,15 @@ final class ThematicInsightGenerator: ObservableObject {
     // MARK: - Cache Management
 
     private func loadCachedInsights() {
+        // Check cache version - invalidate if prompts have been updated
+        let savedVersion = UserDefaults.standard.integer(forKey: insightCacheVersionKey)
+        if savedVersion < currentCacheVersion {
+            logger.info("🔄 Insight cache version outdated (\(savedVersion) < \(self.currentCacheVersion)), clearing cache")
+            clearCache()
+            UserDefaults.standard.set(currentCacheVersion, forKey: insightCacheVersionKey)
+            return
+        }
+
         guard let data = UserDefaults.standard.data(forKey: insightCacheKey),
               let cached = try? JSONDecoder().decode([ThematicInsight].self, from: data) else {
             return

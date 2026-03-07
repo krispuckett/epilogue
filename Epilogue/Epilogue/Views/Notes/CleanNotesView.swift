@@ -63,6 +63,11 @@ struct CleanNotesView: View {
     @State private var creatingNewRichTextNote = false
     @State private var showingRichTextNoteSheet = false
 
+    // Full-screen note editor state
+    @State private var showingNoteEditor = false
+    @State private var noteEditorMode: NoteEditorView.Mode = .createNote()
+    @State private var selectedTagFilter: String? = nil
+
     enum FilterType: String, CaseIterable {
         case all = "All"
         case favorites = "Favorites"
@@ -107,6 +112,12 @@ struct CleanNotesView: View {
             source: "manual",
             contentFormat: "markdown"
         )
+    }
+
+    // All unique tags from notes
+    private var allTags: [String] {
+        let noteTags = capturedNotes.flatMap { $0.tags ?? [] }
+        return Array(Set(noteTags)).sorted()
     }
 
     // Combined items (unfiltered)
@@ -167,7 +178,21 @@ struct CleanNotesView: View {
                 return false
             }
         }
-        
+
+        // Apply tag filter
+        if let tagFilter = selectedTagFilter {
+            items = items.filter { item in
+                if let note = item.note {
+                    // Find the captured note and check its tags
+                    if let capturedNote = capturedNotes.first(where: { $0.id == note.id }) {
+                        return capturedNote.tags?.contains(tagFilter) ?? false
+                    }
+                }
+                // Quotes don't have tags, so they're filtered out when a tag is selected
+                return false
+            }
+        }
+
         return items
     }
     
@@ -285,10 +310,66 @@ struct CleanNotesView: View {
                 insertion: .move(edge: .top).combined(with: .opacity),
                 removal: .move(edge: .top).combined(with: .opacity)
             ))
-            .padding(.bottom, 20)
+            .padding(.bottom, 8)
         }
     }
-    
+
+    @ViewBuilder
+    private var tagFilterChips: some View {
+        if !allTags.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    // "All" chip to clear tag filter
+                    if selectedTagFilter != nil {
+                        Button {
+                            withAnimation(DesignSystem.Animation.springStandard) {
+                                selectedTagFilter = nil
+                            }
+                            SensoryFeedback.light()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text("Clear")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundStyle(.white.opacity(0.7))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(.white.opacity(0.1))
+                            .clipShape(Capsule())
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Tag chips
+                    ForEach(allTags, id: \.self) { tag in
+                        TagFilterChip(
+                            text: tag,
+                            isSelected: selectedTagFilter == tag,
+                            onTap: {
+                                withAnimation(DesignSystem.Animation.springStandard) {
+                                    if selectedTagFilter == tag {
+                                        selectedTagFilter = nil
+                                    } else {
+                                        selectedTagFilter = tag
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            }
+            .padding(.bottom, 12)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
     var body: some View {
         navigationContent
             .sheet(isPresented: $showEditSheet, onDismiss: { notesViewModel.isEditingNote = false }) {
@@ -308,6 +389,9 @@ struct CleanNotesView: View {
             .sheet(isPresented: $showingRichTextNoteSheet) { richTextNoteSheet }
             .onChange(of: showingRichTextNoteSheet) { _, newValue in
                 if !newValue { creatingNewRichTextNote = false }
+            }
+            .fullScreenCover(isPresented: $showingNoteEditor) {
+                NoteEditorView(mode: noteEditorMode)
             }
             .liquidCommandPalette(isPresented: $showingCommandPalette, context: .notes, onComplete: handleCommandPaletteResult)
             .onReceive(navigationCoordinator.$highlightedNoteID) { handleHighlightedNote($0) }
@@ -389,6 +473,9 @@ struct CleanNotesView: View {
                     // Progressive Search Bar
                     searchBarView
 
+                    // Tag filter chips
+                    tagFilterChips
+
                     // Content
                     if filteredItems.isEmpty {
                         emptyState
@@ -401,6 +488,7 @@ struct CleanNotesView: View {
 
             // Toast overlay
             toastOverlay
+
         }
     }
 
@@ -551,6 +639,32 @@ struct CleanNotesView: View {
         ToolbarItem {
             filterMenu
         }
+
+        // New note button
+        ToolbarItem {
+            Menu {
+                Button {
+                    noteEditorMode = .createNote()
+                    showingNoteEditor = true
+                    SensoryFeedback.medium()
+                } label: {
+                    Label("New Note", systemImage: "note.text")
+                }
+
+                Button {
+                    noteEditorMode = .createQuote()
+                    showingNoteEditor = true
+                    SensoryFeedback.medium()
+                } label: {
+                    Label("New Quote", systemImage: "quote.opening")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .accessibilityLabel("Create new note or quote")
+        }
     }
 
     private var filterMenu: some View {
@@ -689,7 +803,7 @@ struct CleanNotesView: View {
         let capturedNote = capturedNotes.first { $0.id == note.id }
         let isSelected = selectedItems.contains(note.id)
 
-        return NoteCardView(note: note, capturedNote: capturedNote)
+        return NoteCardView(note: note, capturedNote: capturedNote, searchQuery: searchText)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Note: \(note.content)")
             .accessibilityHint(isSelectionMode ? (isSelected ? "Selected, double tap to deselect" : "Double tap to select") : "Tap to show timestamp, long press for options")
@@ -819,10 +933,12 @@ struct CleanNotesView: View {
             id: quote.id ?? UUID()
         )
 
-        let isSelected = selectedItems.contains(quote.id ?? UUID())
+        // Use a stable ID for selection — avoid UUID() which generates a new random value each call
+        let stableId = quote.id ?? note.id
+        let isSelected = selectedItems.contains(stableId)
         let accessibilityText = "\(quote.text ?? ""), \(quote.author.map { "by \($0)" } ?? "")"
 
-        return SimpleQuoteCard(note: note, capturedQuote: quote)
+        return SimpleQuoteCard(note: note, capturedQuote: quote, searchQuery: searchText)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Quote: \(accessibilityText)")
             .accessibilityHint(isSelectionMode ? (isSelected ? "Selected, double tap to deselect" : "Double tap to select") : "Tap to show timestamp, long press for options")
@@ -835,7 +951,7 @@ struct CleanNotesView: View {
                             .fill(isSelected ? DesignSystem.Colors.primaryAccent.opacity(0.15) : Color.white.opacity(0.001))
                             .frame(width: 28, height: 28)
                             .glassEffect(.regular, in: .circle)
-                        
+
                         // Checkmark icon
                         if isSelected {
                             Image(systemName: "checkmark")
@@ -848,9 +964,9 @@ struct CleanNotesView: View {
                     .onTapGesture {
                         withAnimation(DesignSystem.Animation.springQuick) {
                             if isSelected {
-                                selectedItems.remove(quote.id ?? UUID())
+                                selectedItems.remove(stableId)
                             } else {
-                                selectedItems.insert(quote.id ?? UUID())
+                                selectedItems.insert(stableId)
                             }
                         }
                         SensoryFeedback.light()
@@ -864,9 +980,9 @@ struct CleanNotesView: View {
                 if isSelectionMode {
                     withAnimation(DesignSystem.Animation.springQuick) {
                         if isSelected {
-                            selectedItems.remove(quote.id ?? UUID())
+                            selectedItems.remove(stableId)
                         } else {
-                            selectedItems.insert(quote.id ?? UUID())
+                            selectedItems.insert(stableId)
                         }
                     }
                     SensoryFeedback.light()
@@ -876,7 +992,7 @@ struct CleanNotesView: View {
                 if !isSelectionMode {
                     withAnimation(DesignSystem.Animation.springStandard) {
                         isSelectionMode = true
-                        selectedItems.insert(quote.id ?? UUID())
+                        selectedItems.insert(stableId)
                     }
                     SensoryFeedback.medium()
                 }
@@ -979,32 +1095,14 @@ struct CleanNotesView: View {
     // MARK: - Edit Actions
     
     private func startEdit(note: CapturedNote) {
-        editingNote = note
-        editingQuote = nil
-        editedText = note.content ?? ""
-        notesViewModel.isEditingNote = true
-        showEditSheet = true
+        noteEditorMode = .editNote(note)
+        showingNoteEditor = true
         SensoryFeedback.light()
     }
-    
+
     private func startEdit(quote: CapturedQuote) {
-        editingQuote = quote
-        editingNote = nil
-
-        // Build editable text with quote + attribution
-        var text = quote.text ?? ""
-        if let author = quote.author {
-            text += " by \(author)"
-            if let bookTitle = quote.book?.title {
-                text += ", \(bookTitle)"
-            }
-        } else if let bookTitle = quote.book?.title {
-            text += " from \(bookTitle)"
-        }
-
-        editedText = text
-        notesViewModel.isEditingNote = true
-        showEditSheet = true
+        noteEditorMode = .editQuote(quote)
+        showingNoteEditor = true
         SensoryFeedback.light()
     }
     
@@ -1600,6 +1698,7 @@ private struct NoteScrollOffsetPreferenceKey: PreferenceKey {
 private struct NoteCardView: View {
     let note: Note
     let capturedNote: CapturedNote?
+    var searchQuery: String = ""
 
     // MARK: - State Management
     @State private var isExpanded = false
@@ -1723,19 +1822,24 @@ private struct NoteCardView: View {
     }
 
     // MARK: - Content Text with Character-Based Measurement
+    @ViewBuilder
     private var contentText: some View {
-        FormattedNoteText(
-            markdown: note.content,
-            fontSize: 16,
-            lineSpacing: 6
-        )
-        .lineLimit(isExpanded ? nil : previewLineLimit)
-        .foregroundStyle(.white.opacity(0.95))
-        .onAppear {
-            estimateContentHeight()
-        }
-        .onChange(of: note.content) { _, _ in
-            estimateContentHeight()
+        if searchQuery.isEmpty {
+            FormattedNoteText(
+                markdown: note.content,
+                fontSize: 16,
+                lineSpacing: 6
+            )
+            .lineLimit(isExpanded ? nil : previewLineLimit)
+            .foregroundStyle(.white.opacity(0.95))
+        } else {
+            HighlightedText(
+                text: note.content,
+                query: searchQuery,
+                baseColor: .white.opacity(0.95),
+                font: .system(size: 16)
+            )
+            .lineLimit(isExpanded ? nil : previewLineLimit)
         }
     }
 
@@ -1854,24 +1958,14 @@ private struct NoteCardView: View {
         .padding(.horizontal, 16)  // Tighter horizontal for more text width
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                .fill(Color.white.opacity(0.05))
+        .glassEffect(
+            .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.15)),
+            in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
         )
-        .overlay(
+        .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.10),
-                            Color.white.opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
-        )
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
+        }
         .overlay(alignment: .leading) {
             // Golden favorite indicator
             if capturedNote?.isFavorite == true {
@@ -1881,6 +1975,12 @@ private struct NoteCardView: View {
                     .padding(.vertical, 1)
                     .padding(.leading, 1)
             }
+        }
+        .onAppear {
+            estimateContentHeight()
+        }
+        .onChange(of: note.content) { _, _ in
+            estimateContentHeight()
         }
         .animation(.easeInOut(duration: 0.3), value: isExpanded)
         .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)

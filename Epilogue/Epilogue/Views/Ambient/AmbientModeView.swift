@@ -1088,8 +1088,11 @@ struct AmbientModeView: View {
                     let hasRealContent = messages.contains { msg in
                         !msg.content.contains("[Transcribing]")
                     }
-                    
-                    if !hasRealContent && !showRecommendationFlow && showReadingPlanFlow == nil {
+
+                    // Don't show empty state pills when onboarding overlay is visible
+                    let isOnboardingVisible = showOnboarding && onboardingShownCount < 5 && messages.isEmpty
+
+                    if !hasRealContent && !showRecommendationFlow && showReadingPlanFlow == nil && !isOnboardingVisible {
                         if currentBookContext == nil {
                             // Generic ambient mode - beautiful liquid glass pills
                             GenericAmbientEmptyState(

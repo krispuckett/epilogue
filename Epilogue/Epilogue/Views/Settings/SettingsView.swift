@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage("realTimeQuestions") private var realTimeQuestions = true
     @AppStorage("audioFeedback") private var audioFeedback = false
     @AppStorage("alwaysShowInput") private var alwaysShowInput = false
+    @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -28,6 +29,7 @@ struct SettingsView: View {
     // Hidden developer mode activation
     @State private var developerModeUnlocked = false
     @State private var versionTapCount = 0
+    @State private var versionTapTimer: Timer?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -187,7 +189,7 @@ struct SettingsView: View {
                             .padding(.top, 4)
                         }
 
-                        // Enrich button
+                        // Enrich button (only shows if there are pending books)
                         if stats.pending > 0 {
                             Button {
                                 enrichAllBooks()
@@ -211,12 +213,37 @@ struct SettingsView: View {
                             .tint(ThemeManager.shared.currentTheme.primaryAccent)
                             .padding(.top, 8)
                         }
+
+                        // Re-enrich button (always available if there are books)
+                        if stats.total > 0 {
+                            Button {
+                                reEnrichAllBooks()
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if isEnriching {
+                                        ProgressView()
+                                            .tint(.orange)
+                                        Text("Re-enriching...")
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Text("Re-enrich All Books")
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .disabled(isEnriching)
+                            .buttonStyle(.bordered)
+                            .tint(.orange)
+                            .padding(.top, 4)
+                        }
                     }
                     .padding(.vertical, 4)
                 } header: {
                     Text("Data & Enrichment")
                 } footer: {
-                    Text("AI-generated summaries provide spoiler-free context, themes, and character info for your books. New books are enriched automatically in the background.")
+                    Text("AI-generated summaries provide spoiler-free context, themes, and character info for your books. Use \"Re-enrich\" to refresh data if book info seems incorrect.")
                 }
 
                 // MARK: - Ambient Mode
@@ -299,6 +326,21 @@ struct SettingsView: View {
                             .padding(.vertical, 4)
                         }
 
+                        Toggle(isOn: $socialFeaturesEnabled) {
+                            HStack {
+                                Image(systemName: "figure.2")
+                                    .foregroundColor(.orange)
+                                VStack(alignment: .leading) {
+                                    Text("Social Features")
+                                        .foregroundColor(.orange)
+                                    Text("Share, Read Together, Companions")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .tint(.orange)
+
                         Button {
                             Task { @MainActor in
                                 // Safety check before migration
@@ -338,7 +380,7 @@ struct SettingsView: View {
                             showingWhatsNew = true
                             SensoryFeedback.light()
                         } label: {
-                            Label("Preview What's New", systemImage: "sparkles")
+                            Label("Preview What's New", systemImage: "star.circle")
                                 .foregroundStyle(.cyan)
                         }
 
@@ -360,8 +402,40 @@ struct SettingsView: View {
                         NavigationLink {
                             WelcomeBackCardExperiment()
                         } label: {
-                            Label("Welcome Back Card", systemImage: "hand.wave.fill")
+                            Label("Welcome Back Experiment", systemImage: "flask.fill")
+                                .foregroundStyle(.purple)
+                        }
+
+                        Button {
+                            dismiss()
+                            // Post notification to trigger modal overlay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                NotificationCenter.default.post(name: Notification.Name("ShowReturnCard"), object: nil)
+                            }
+                        } label: {
+                            Label("Test Modal (Full Card)", systemImage: "rectangle.portrait.inset.filled")
                                 .foregroundStyle(.mint)
+                        }
+
+                        Button {
+                            dismiss()
+                            // Post notification to trigger Dynamic Island toast
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                ReturnCardManager.shared.forceShowToast()
+                            }
+                        } label: {
+                            Label("Test Toast (Compact)", systemImage: "capsule.portrait.topthird.filled")
+                                .foregroundStyle(.cyan)
+                        }
+
+                        Button {
+                            ReturnCardManager.shared.forceShowInline()
+                            dismiss()
+                            // Post notification to trigger inline card in library
+                            NotificationCenter.default.post(name: Notification.Name("ForceShowInlineActivityCard"), object: nil)
+                        } label: {
+                            Label("Test Inline Card", systemImage: "rectangle.topthird.inset.filled")
+                                .foregroundStyle(.teal)
                         }
 
                         NavigationLink {
@@ -390,6 +464,13 @@ struct SettingsView: View {
                         } label: {
                             Label("Touch Ripple Shader", systemImage: "water.waves")
                                 .foregroundStyle(.blue)
+                        }
+
+                        NavigationLink {
+                            ShaderLabView()
+                        } label: {
+                            Label("Shader Lab", systemImage: "cube.transparent")
+                                .foregroundStyle(.cyan)
                         }
 
                         Button {
@@ -607,8 +688,10 @@ struct SettingsView: View {
     private func handleVersionTap() {
         versionTapCount += 1
 
-        // Reset counter after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        // Cancel any existing timer and start a fresh one
+        versionTapTimer?.invalidate()
+        versionTapTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
+            // Only reset if we haven't reached 7 yet
             if versionTapCount < 7 {
                 versionTapCount = 0
             }
@@ -616,6 +699,8 @@ struct SettingsView: View {
 
         // Unlock developer mode after 7 taps
         if versionTapCount == 7 {
+            versionTapTimer?.invalidate()
+            versionTapTimer = nil
             developerModeUnlocked = true
             versionTapCount = 0
 
@@ -864,6 +949,35 @@ struct SettingsView: View {
             }
         }
     }
+
+    private func reEnrichAllBooks() {
+        guard !isEnriching else { return }
+
+        #if DEBUG
+        print("🔄 [SETTINGS] Starting FORCE re-enrichment...")
+        #endif
+        isEnriching = true
+        enrichmentProgress = nil
+
+        Task {
+            await BatchEnrichmentService.shared.reEnrichAllBooks(
+                modelContext: modelContext,
+                progressHandler: { current, total, title in
+                    enrichmentProgress = (current, total, title)
+                }
+            )
+
+            await MainActor.run {
+                isEnriching = false
+                enrichmentProgress = nil
+                toastMessage = "All books re-enriched with fresh data!"
+                showingCacheClearedToast = true
+                #if DEBUG
+                print("✅ [SETTINGS] Force re-enrichment complete")
+                #endif
+            }
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -953,18 +1067,14 @@ struct EpiloguePlusUpsellCard: View {
                         Spacer()
                     }
                     .padding(.vertical, 14)
-                    .background(
+                    .glassEffect(.regular.tint(themeManager.currentTheme.primaryAccent.opacity(0.15)), in: .rect(cornerRadius: 14))
+                    .overlay {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(themeManager.currentTheme.primaryAccent.opacity(0.15))
-                            .glassEffect(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(
-                                        themeManager.currentTheme.primaryAccent.opacity(0.3),
-                                        lineWidth: 1
-                                    )
-                            }
-                    )
+                            .strokeBorder(
+                                themeManager.currentTheme.primaryAccent.opacity(0.3),
+                                lineWidth: 1
+                            )
+                    }
                 }
                 .padding(22)
             }
