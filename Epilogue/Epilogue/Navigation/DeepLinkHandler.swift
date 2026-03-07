@@ -1,21 +1,23 @@
 import SwiftUI
 import Combine
+import Observation
 import OSLog
 
 private let logger = Logger(subsystem: "com.epilogue", category: "DeepLink")
 
 /// Handles deep linking and notification-based navigation
 @MainActor
-final class DeepLinkHandler: ObservableObject {
+@Observable
+final class DeepLinkHandler {
     static let shared = DeepLinkHandler()
 
-    @Published var highlightedBookId: UUID?
-    @Published var scrollToBookId: UUID?
-    @Published var pendingCompanionToken: String?  // For companion invitation deep links
+    var highlightedBookId: UUID?
+    var scrollToBookId: UUID?
+    var pendingCompanionToken: String?  // For companion invitation deep links
 
-    weak var navigationCoordinator: NavigationCoordinator?
+    @ObservationIgnored weak var navigationCoordinator: NavigationCoordinator?
 
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
     private init() {
         setupNotificationObservers()

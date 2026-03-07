@@ -2,10 +2,10 @@ import SwiftUI
 import SwiftData
 
 struct CleanNotesView: View {
-    @EnvironmentObject private var notesViewModel: NotesViewModel
-    @EnvironmentObject private var libraryViewModel: LibraryViewModel
+    @Environment(NotesViewModel.self) private var notesViewModel
+    @Environment(LibraryViewModel.self) private var libraryViewModel
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
+    @State private var navigationCoordinator = NavigationCoordinator.shared
 
     @Query(sort: \CapturedNote.timestamp, order: .reverse) private var capturedNotes: [CapturedNote]
     @Query(sort: \CapturedQuote.timestamp, order: .reverse) private var capturedQuotes: [CapturedQuote]
@@ -394,8 +394,8 @@ struct CleanNotesView: View {
                 NoteEditorView(mode: noteEditorMode)
             }
             .liquidCommandPalette(isPresented: $showingCommandPalette, context: .notes, onComplete: handleCommandPaletteResult)
-            .onReceive(navigationCoordinator.$highlightedNoteID) { handleHighlightedNote($0) }
-            .onReceive(navigationCoordinator.$highlightedQuoteID) { handleHighlightedQuote($0) }
+            .onChange(of: navigationCoordinator.highlightedNoteID) { _, newValue in handleHighlightedNote(newValue) }
+            .onChange(of: navigationCoordinator.highlightedQuoteID) { _, newValue in handleHighlightedQuote(newValue) }
             // Note: CreateNewNote and SaveQuote are handled globally in ContentView
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowToastMessage"))) { handleShowToast($0) }
     }
@@ -417,10 +417,10 @@ struct CleanNotesView: View {
     private var editSheet: some View {
         if let note = editingNote {
             NoteEditSheet(note: note.toNote())
-                .environmentObject(notesViewModel)
+                .environment(notesViewModel)
         } else if let quote = editingQuote {
             NoteEditSheet(note: quote.toNote())
-                .environmentObject(notesViewModel)
+                .environment(notesViewModel)
         }
     }
 
@@ -449,7 +449,7 @@ struct CleanNotesView: View {
     private var richTextNoteSheet: some View {
         if let note = noteToEdit {
             NoteEditSheet(note: note)
-                .environmentObject(notesViewModel)
+                .environment(notesViewModel)
         }
     }
 

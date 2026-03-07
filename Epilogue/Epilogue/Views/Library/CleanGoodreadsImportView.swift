@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 struct CleanGoodreadsImportView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     @StateObject private var importer = GoodreadsCleanImporter()
     @State private var showingFilePicker = false
     @State private var importState: ImportState = .ready

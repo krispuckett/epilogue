@@ -96,7 +96,7 @@ struct DragPreview: View {
     
     var body: some View {
         BookCard(book: book)
-            .environmentObject(viewModel)
+            .environment(viewModel)
             .frame(width: 150, height: 225)
             .scaleEffect(1.1)
             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
@@ -140,11 +140,11 @@ struct OptimizedGridItem: View {
     @StateObject private var microInteractionManager = MicroInteractionManager.shared
 
     var body: some View {
-        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+        NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {
             ZStack {
                 // Always show BookCard - no skeleton loading
                 BookCard(book: book)
-                    .environmentObject(viewModel)
+                    .environment(viewModel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Highlight overlay - disabled to prevent orange border bug

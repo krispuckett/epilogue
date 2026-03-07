@@ -5,7 +5,7 @@ struct CreditsView: View {
     @State private var player: AVPlayer?
     @State private var isVideoLoaded = false
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
 
     // Animation states
     @State private var contentOpacity: Double = 0

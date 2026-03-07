@@ -6,10 +6,10 @@ private let logger = Logger(subsystem: "com.epilogue", category: "Navigation")
 /// Focused component for tab bar navigation
 struct NavigationContainer: View {
     @Binding var selectedTab: Int
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
-    @EnvironmentObject var navigationCoordinator: NavigationCoordinator
-    @StateObject private var themeManager = ThemeManager.shared
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
+    @Environment(NavigationCoordinator.self) var navigationCoordinator
+    @State private var themeManager = ThemeManager.shared
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -59,9 +59,9 @@ struct NavigationContainer: View {
             // Restore original tab bar with proper glass effect
             setupTabBarAppearance()
         }
-        .environmentObject(libraryViewModel)
-        .environmentObject(notesViewModel)
-        .environmentObject(navigationCoordinator)
+        .environment(libraryViewModel)
+        .environment(notesViewModel)
+        .environment(navigationCoordinator)
         .sensoryFeedback(.selection, trigger: selectedTab)
         .onChange(of: selectedTab) { oldValue, newValue in
             logger.debug("Tab changed from \(oldValue) to \(newValue)")

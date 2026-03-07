@@ -7,16 +7,16 @@ private let logger = Logger(subsystem: "com.epilogue", category: "ContentView")
 /// Main content view - Refactored to under 100 lines
 /// Delegates all responsibilities to specialized coordinators
 struct ContentView: View {
-    // MARK: - State Objects
-    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
-    @StateObject private var ambientCoordinator = EpilogueAmbientCoordinator.shared
-    @StateObject private var appStateCoordinator = AppStateCoordinator()
-    @StateObject private var deepLinkHandler = DeepLinkHandler.shared
-    @StateObject private var onboardingCoordinator = OnboardingCoordinator()
-    @StateObject private var libraryViewModel = LibraryViewModel()
-    @StateObject private var notesViewModel = NotesViewModel()
-    @StateObject private var themeManager = ThemeManager.shared
-    @StateObject private var whatsNewManager = WhatsNewManager.shared
+    // MARK: - State
+    @State private var navigationCoordinator = NavigationCoordinator.shared
+    @State private var ambientCoordinator = EpilogueAmbientCoordinator.shared
+    @State private var appStateCoordinator = AppStateCoordinator()
+    @State private var deepLinkHandler = DeepLinkHandler.shared
+    @State private var onboardingCoordinator = OnboardingCoordinator()
+    @State private var libraryViewModel = LibraryViewModel()
+    @State private var notesViewModel = NotesViewModel()
+    @State private var themeManager = ThemeManager.shared
+    @State private var whatsNewManager = WhatsNewManager.shared
 
     // MARK: - State
     @State private var selectedTab = 0
@@ -43,11 +43,11 @@ struct ContentView: View {
             .preferredColorScheme(.dark)
             .withErrorHandling()
             .withOnboarding()
-            .environmentObject(libraryViewModel)
-            .environmentObject(notesViewModel)
-            .environmentObject(navigationCoordinator)
-            .environmentObject(appStateCoordinator)
-            .environmentObject(deepLinkHandler)
+            .environment(libraryViewModel)
+            .environment(notesViewModel)
+            .environment(navigationCoordinator)
+            .environment(appStateCoordinator)
+            .environment(deepLinkHandler)
             .setupAppearanceConfiguration()
             .setupSheetPresentations()
             .setupAmbientMode(libraryViewModel: libraryViewModel, notesViewModel: notesViewModel, appStateCoordinator: appStateCoordinator)
@@ -144,7 +144,7 @@ struct ContentView: View {
         .overlay(alignment: .bottom) {
             if !showQuickActionCard && !notesViewModel.isEditingNote {
                 SimpleActionBar(showCard: $showQuickActionCard)
-                    .environmentObject(libraryViewModel)
+                    .environment(libraryViewModel)
                     .padding(.bottom, 54)
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -156,8 +156,8 @@ struct ContentView: View {
         .overlay(alignment: .bottom) {
             if showQuickActionCard {
                 UnifiedQuickActionCard(isPresented: $showQuickActionCard)
-                    .environmentObject(libraryViewModel)
-                    .environmentObject(notesViewModel)
+                    .environment(libraryViewModel)
+                    .environment(notesViewModel)
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
                         removal: .move(edge: .bottom).combined(with: .opacity)

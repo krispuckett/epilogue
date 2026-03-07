@@ -2,8 +2,8 @@ import SwiftUI
 
 struct LiquidSearchResultsView: View {
     let searchText: String
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @StateObject private var historyManager = CommandHistoryManager.shared
     
     @State private var detectedBook: Book?
@@ -318,8 +318,8 @@ struct NoteResultCard: View {
         
         VStack {
             LiquidSearchResultsView(searchText: "")
-                .environmentObject(LibraryViewModel())
-                .environmentObject(NotesViewModel())
+                .environment(LibraryViewModel())
+                .environment(NotesViewModel())
                 .padding()
         }
     }

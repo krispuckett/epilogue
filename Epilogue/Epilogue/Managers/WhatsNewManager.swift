@@ -1,16 +1,17 @@
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 // MARK: - What's New Manager
 @MainActor
-class WhatsNewManager: ObservableObject {
+@Observable
+class WhatsNewManager {
     static let shared = WhatsNewManager()
 
     private let currentVersion = "1.9.0" // Update this with each release
-    private let maxShowCount = 2
+    @ObservationIgnored private let maxShowCount = 2
 
-    @Published var shouldShow = false
+    var shouldShow = false
 
     private init() {
         checkShouldShow()

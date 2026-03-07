@@ -8,8 +8,8 @@ struct AdvancedCommandIntent: View {
     @State private var showRealInput = false
     @FocusState private var isInputFocused: Bool
 
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
 
     private let warmAmber = Color(red: 1.0, green: 0.75, blue: 0.35)
 

@@ -5,9 +5,9 @@ import SwiftData
 
 struct SwiftDataNotesView: View {
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
-    @EnvironmentObject private var libraryViewModel: LibraryViewModel
-    @EnvironmentObject private var notesViewModel: NotesViewModel
+    @Environment(NavigationCoordinator.self) private var navigationCoordinator
+    @Environment(LibraryViewModel.self) private var libraryViewModel
+    @Environment(NotesViewModel.self) private var notesViewModel
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
     
     // Queries
@@ -261,7 +261,7 @@ struct SwiftDataNotesView: View {
             openOptionsNoteId: $openOptionsNoteId,
             onContextMenuRequest: { _, _ in }  // No longer using custom overlay
         )
-        .environmentObject(notesViewModel)
+        .environment(notesViewModel)
         .id(note.id)
         .overlay(highlightOverlay(for: note))
         .transition(.asymmetric(
@@ -377,7 +377,7 @@ struct SwiftDataNotesView: View {
             }
             .sheet(item: $editingNote) { note in
                 NoteEditSheet(note: note)
-                    .environmentObject(notesViewModel)
+                    .environment(notesViewModel)
             }
             .overlay {
                 if selectionManager.showingDeleteConfirmation {

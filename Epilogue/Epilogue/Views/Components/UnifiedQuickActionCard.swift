@@ -9,10 +9,10 @@ struct UnifiedQuickActionCard: View {
     @State private var isExpanded = false
     @FocusState private var isFocused: Bool
 
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
-    @StateObject private var themeManager = ThemeManager.shared
-    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
+    @State private var themeManager = ThemeManager.shared
+    @State private var navigationCoordinator = NavigationCoordinator.shared
     @Environment(\.modelContext) private var modelContext
 
     // For sheets
@@ -409,7 +409,7 @@ struct UnifiedQuickActionCard: View {
                 }
             } else {
                 BookScannerView()
-                    .environmentObject(libraryViewModel)
+                    .environment(libraryViewModel)
                     .onAppear {
                         #if DEBUG
                         print("⚠️ UnifiedQuickActionCard: OLD SCANNER (iOS < 16)")
@@ -454,7 +454,7 @@ struct UnifiedQuickActionCard: View {
                 isFocused = true
                 showRecentBooks = false
             }
-            .environmentObject(libraryViewModel)
+            .environment(libraryViewModel)
         }
         .sheet(isPresented: $showRichTextEditor, onDismiss: {
             // Clear state when sheet is dismissed
@@ -485,7 +485,7 @@ struct UnifiedQuickActionCard: View {
                     contentFormat: "markdown"
                 )
             )
-            .environmentObject(notesViewModel)
+            .environment(notesViewModel)
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
             .interactiveDismissDisabled(false)
@@ -1129,7 +1129,7 @@ struct QuickActionRow: View {
         Color.black.ignoresSafeArea()
 
         UnifiedQuickActionCard(isPresented: .constant(true))
-            .environmentObject(LibraryViewModel())
-            .environmentObject(NotesViewModel())
+            .environment(LibraryViewModel())
+            .environment(NotesViewModel())
     }
 }

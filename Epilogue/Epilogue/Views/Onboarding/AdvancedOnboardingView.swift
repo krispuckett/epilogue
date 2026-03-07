@@ -14,7 +14,7 @@ struct AdvancedOnboardingView: View {
     @State private var pageTransition: Bool = false
     @State private var pageVisibility: [Int: Bool] = [:]
     @State private var viewBlur: CGFloat = 0
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
 
     private let pages = [
         OnboardingPage(

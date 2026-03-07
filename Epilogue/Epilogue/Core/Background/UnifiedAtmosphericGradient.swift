@@ -330,7 +330,7 @@ struct UnifiedVoiceBottomGradient: View {
 /// Replaces AmbientChatGradientView from ChatSharedTypes
 struct UnifiedAmbientChatGradient: View {
     let palette: DisplayPalette?
-    @ObservedObject private var themeManager = ThemeManager.shared
+    private var themeManager = ThemeManager.shared
 
     private var colors: [Color] {
         if let palette = palette {

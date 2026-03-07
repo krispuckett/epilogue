@@ -67,8 +67,8 @@ struct MinimalSessionsView: View {
     @State private var showingNewChat = false
 
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
 
     private var allSessions: [SessionType] {
         var sessions: [SessionType] = []
@@ -247,7 +247,7 @@ struct MinimalSessionCard: View {
     let sessionType: SessionType
     @State private var isPressed = false
     @State private var showingDetail = false
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
 
     private var book: Book? {
         guard let bookModel = sessionType.bookModel else { return nil }

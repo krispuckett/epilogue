@@ -8,8 +8,8 @@ struct ImprovedCommandPalette: View {
     @State private var selectedCategory: CommandCategory = .all
     @FocusState private var isSearchFocused: Bool
 
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
 
     // Command categories for better organization
     enum CommandCategory: String, CaseIterable {

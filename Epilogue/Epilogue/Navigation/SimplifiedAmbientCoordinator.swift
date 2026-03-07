@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Observation
 import OSLog
 
 // MARK: - Ambient Mode Type
@@ -24,15 +25,16 @@ enum AmbientModeType: Equatable {
 
 /// Enhanced coordinator for Epilogue ambient mode
 @MainActor
-public class EpilogueAmbientCoordinator: ObservableObject {
+@Observable
+public class EpilogueAmbientCoordinator {
     static let shared = EpilogueAmbientCoordinator()
 
-    @Published var isActive = false
-    @Published var preSelectedBook: Book?
-    @Published var initialBook: Book?  // Book to start with when launched from BookDetailView
-    @Published var initialQuestion: String?  // Initial question to ask when launching
-    @Published var existingSession: AmbientSession?  // Existing session to continue from
-    @Published var ambientMode: AmbientModeType = .generic  // Track which mode we're in
+    var isActive = false
+    var preSelectedBook: Book?
+    var initialBook: Book?  // Book to start with when launched from BookDetailView
+    var initialQuestion: String?  // Initial question to ask when launching
+    var existingSession: AmbientSession?  // Existing session to continue from
+    var ambientMode: AmbientModeType = .generic  // Track which mode we're in
 
     private init() {}
 
@@ -138,21 +140,22 @@ public class EpilogueAmbientCoordinator: ObservableObject {
 
 /// Simplified coordinator for ambient reading mode - voice-first, no book pre-selection
 @MainActor
-final class SimplifiedAmbientCoordinator: ObservableObject {
-    
+@Observable
+final class SimplifiedAmbientCoordinator {
+
     // MARK: - Singleton
-    
+
     static let shared = SimplifiedAmbientCoordinator()
-    
-    // MARK: - Published State
-    
-    @Published var isPresented = false
-    @Published var currentBook: Book?
-    @Published var existingSession: AmbientSession?
+
+    // MARK: - State
+
+    var isPresented = false
+    var currentBook: Book?
+    var existingSession: AmbientSession?
 
     // MARK: - Private Properties
 
-    private let logger = Logger(subsystem: "com.epilogue.app", category: "SimplifiedAmbient")
+    @ObservationIgnored private let logger = Logger(subsystem: "com.epilogue.app", category: "SimplifiedAmbient")
     
     // MARK: - Initialization
     

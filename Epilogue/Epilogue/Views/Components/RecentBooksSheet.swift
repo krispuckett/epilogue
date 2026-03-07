@@ -5,8 +5,8 @@ struct RecentBooksSheet: View {
     @Binding var isPresented: Bool
     let onBookSelected: (Book) -> Void
 
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @State private var themeManager = ThemeManager.shared
 
     var body: some View {
         NavigationStack {
@@ -64,7 +64,7 @@ struct RecentBooksSheet: View {
 private struct BookRow: View {
     let book: Book
     let action: () -> Void
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
 
     var body: some View {
         Button(action: action) {
@@ -131,5 +131,5 @@ private struct BookRow: View {
         print("Selected: \(book.title)")
         #endif
     }
-    .environmentObject(LibraryViewModel())
+    .environment(LibraryViewModel())
 }

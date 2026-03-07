@@ -3,7 +3,7 @@ import SwiftUI
 struct BookCompletionSheet: View {
     @Binding var book: Book
     @Binding var isPresented: Bool
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     
     // State for the form
     @State private var rating: Double = 0.0  // Supports half-star ratings (0.5 increments)

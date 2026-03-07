@@ -1,14 +1,18 @@
 import SwiftUI
-import Combine
+import Observation
 import OSLog
 
 private let logger = Logger(subsystem: "com.epilogue", category: "Onboarding")
 
 /// Manages onboarding flow and first launch experience
 @MainActor
-final class OnboardingCoordinator: ObservableObject {
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @Published var showOnboarding = false
+@Observable
+final class OnboardingCoordinator {
+    @ObservationIgnored private var hasCompletedOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
+    }
+    var showOnboarding = false
 
     init() {
         checkOnboardingStatus()
@@ -111,7 +115,7 @@ final class OnboardingCoordinator: ObservableObject {
 // MARK: - Onboarding View Wrapper
 
 struct OnboardingWrapper: ViewModifier {
-    @StateObject private var coordinator = OnboardingCoordinator()
+    @State private var coordinator = OnboardingCoordinator()
     @State private var showContent = false
     @State private var contentBlur: CGFloat = 10
 

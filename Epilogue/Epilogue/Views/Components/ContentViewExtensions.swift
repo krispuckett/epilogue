@@ -7,7 +7,7 @@ private let logger = Logger(subsystem: "com.epilogue", category: "ContentViewExt
 // MARK: - Command Input Overlay
 
 struct CommandInputOverlay: View {
-    @ObservedObject var appStateCoordinator: AppStateCoordinator
+    @Bindable var appStateCoordinator: AppStateCoordinator
     let libraryViewModel: LibraryViewModel
     let notesViewModel: NotesViewModel
     let modelContext: ModelContext
@@ -42,8 +42,8 @@ struct CommandInputOverlay: View {
                             isPresented: $appStateCoordinator.showingLibraryCommandPalette,
                             commandText: $appStateCoordinator.commandText
                         )
-                        .environmentObject(libraryViewModel)
-                        .environmentObject(notesViewModel)
+                        .environment(libraryViewModel)
+                        .environment(notesViewModel)
                         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                         .padding(.bottom, 16)
                         .transition(.asymmetric(
@@ -203,9 +203,9 @@ extension View {
             set: { _ in }
         )) {
             AmbientModeView()
-                .environmentObject(libraryViewModel)
-                .environmentObject(notesViewModel)
-                .environmentObject(appStateCoordinator)
+                .environment(libraryViewModel)
+                .environment(notesViewModel)
+                .environment(appStateCoordinator)
                 .preferredColorScheme(.dark)
                 .statusBarHidden(true)
                 .interactiveDismissDisabled()

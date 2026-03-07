@@ -87,7 +87,7 @@ struct ConversationalResponseParsed {
 // Beautiful theme-aware gradient background for ambient mode
 
 struct AmbientChatGradientView: View {
-    @ObservedObject private var themeManager = ThemeManager.shared
+    private var themeManager = ThemeManager.shared
 
     var body: some View {
         ZStack {

@@ -3,7 +3,7 @@ import SwiftUI
 struct BookCard: View {
     let book: Book
     @State private var isPressed = false
-    @EnvironmentObject var viewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var viewModel
     @Environment(\.sizeCategory) var sizeCategory
     
     // Normalize author spacing to be consistent (J.R.R. instead of J. R. R.)
@@ -366,7 +366,7 @@ struct CurrentlyReadingBadge: View {
                 localId: UUID()
             )
         )
-        .environmentObject(LibraryViewModel())
+        .environment(LibraryViewModel())
         .padding()
     }
 }

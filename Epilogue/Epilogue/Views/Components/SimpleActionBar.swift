@@ -3,8 +3,8 @@ import SwiftUI
 // MARK: - Simple Action Bar (Plus + Orb only)
 struct SimpleActionBar: View {
     @Binding var showCard: Bool
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @State private var themeManager = ThemeManager.shared
 
     var body: some View {
         HStack(spacing: 0) {

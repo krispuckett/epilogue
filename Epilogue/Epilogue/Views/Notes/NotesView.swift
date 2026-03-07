@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct NotesView: View {
-    @EnvironmentObject var notesViewModel: NotesViewModel
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
+    @Environment(NotesViewModel.self) var notesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @State private var navigationCoordinator = NavigationCoordinator.shared
     
     @State private var selectedFilter: NoteType? = nil
     @State private var showingAddNote = false
@@ -188,7 +188,7 @@ struct NotesView: View {
                 contextMenuSourceRect = rect
             }
         )
-        .environmentObject(notesViewModel)
+        .environment(notesViewModel)
         .matchedTransitionSource(id: note.id, in: noteTransition)
         .id(note.id)
         .overlay(highlightOverlay(for: note))
@@ -214,8 +214,8 @@ struct NotesView: View {
     var body: some View {
         // Use the clean notes view for now
         CleanNotesView()
-            .environmentObject(notesViewModel)
-            .environmentObject(libraryViewModel)
+            .environment(notesViewModel)
+            .environment(libraryViewModel)
     }
     
     // MARK: - Filter Pills Header
@@ -332,7 +332,7 @@ struct NotesView: View {
                     set: { if !$0 { self.contextMenuNote = nil } }
                 )
             )
-            .environmentObject(notesViewModel)
+            .environment(notesViewModel)
             .zIndex(1000)
         }
     }
@@ -420,7 +420,7 @@ struct NotesView: View {
         }
         .sheet(item: $editingNote) { note in
             NoteEditSheet(note: note)
-                .environmentObject(notesViewModel)
+                .environment(notesViewModel)
         }
         .sensoryFeedback(.impact, trigger: editingNote)
     }

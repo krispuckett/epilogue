@@ -6,7 +6,7 @@ struct EmbeddedAmbientProgress: View {
     let width: CGFloat
     var colorPalette: ColorPalette? = nil
     
-    @EnvironmentObject var viewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var viewModel
     @State private var currentPage: Int
     @State private var isDragging = false
     @State private var dragProgress: Double = 0
@@ -352,7 +352,7 @@ struct EmbeddedAmbientProgress: View {
                 }(),
                 width: 350
             )
-            .environmentObject(LibraryViewModel())
+            .environment(LibraryViewModel())
         }
         .padding()
     }

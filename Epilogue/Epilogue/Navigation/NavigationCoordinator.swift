@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Observation
 import OSLog
 
 private let logger = Logger(subsystem: "com.epilogue", category: "NavigationCoordinator")
@@ -7,22 +8,23 @@ private let logger = Logger(subsystem: "com.epilogue", category: "NavigationCoor
 // MARK: - Navigation Coordinator
 
 @MainActor
-final class NavigationCoordinator: ObservableObject {
+@Observable
+final class NavigationCoordinator {
     static let shared = NavigationCoordinator()
 
     // Tab selection
-    @Published var selectedTab: TabItem = .library
+    var selectedTab: TabItem = .library
 
     // Deep linking IDs
-    @Published var highlightedNoteID: UUID?
-    @Published var highlightedQuoteID: UUID?
-    @Published var scrollToBookID: String?
+    var highlightedNoteID: UUID?
+    var highlightedQuoteID: UUID?
+    var scrollToBookID: String?
 
     // Navigation flags
-    @Published var shouldNavigateToNotes = false
-    @Published var shouldNavigateToLibrary = false
+    var shouldNavigateToNotes = false
+    var shouldNavigateToLibrary = false
 
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
     private init() {
         setupNotificationObservers()

@@ -70,8 +70,8 @@ extension Color {
 
 struct BookDetailView: View {
     let book: Book
-    @EnvironmentObject var notesViewModel: NotesViewModel
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     @State private var selectedSection: BookSection = .notes
     @Namespace private var sectionAnimation
 
@@ -691,7 +691,7 @@ struct BookDetailView: View {
                 ),
                 isPresented: $showingCompletionSheet
             )
-            .environmentObject(libraryViewModel)
+            .environment(libraryViewModel)
         }
         .sheet(isPresented: $showingEndSession, onDismiss: {
             // If user cancelled (activeSession still exists), resume the timer
@@ -1195,7 +1195,7 @@ struct BookDetailView: View {
                     colorPalette: colorPalette,
                     showCompletionSheet: $showingCompletionSheet
                 )
-                .environmentObject(libraryViewModel)
+                .environment(libraryViewModel)
             } else {
                 // Missing page count prompt
                 VStack(spacing: 12) {
@@ -2779,8 +2779,8 @@ struct BookDetailView_Previews: PreviewProvider {
             )
         }
         .preferredColorScheme(.dark)
-        .environmentObject(NotesViewModel())
-        .environmentObject(LibraryViewModel())
+        .environment(NotesViewModel())
+        .environment(LibraryViewModel())
         // .modelContainer(for: [ChatThread.self]) // DISABLED - ChatThread removed
     }
 }
@@ -2935,7 +2935,7 @@ struct CompactSessionHUD: View {
 struct EndSessionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
 
     @Bindable var session: ReadingSession
     let book: Book

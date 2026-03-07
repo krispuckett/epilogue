@@ -22,7 +22,7 @@ struct AmbientReadingProgressView: View {
     @State private var celebrationStartTime: Date?
     @State private var isCelebrating: Bool = false
 
-    @EnvironmentObject var viewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var viewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.modelContext) private var modelContext
 
@@ -586,7 +586,7 @@ struct AmbientReadingProgressDemo: View {
                 .padding(40)
             }
         }
-        .environmentObject(LibraryViewModel())
+        .environment(LibraryViewModel())
     }
     
     // Extract complex views into computed properties

@@ -10,7 +10,7 @@ struct BookScannerView: View {
     @StateObject private var scanner = BookScannerService.shared
     @StateObject private var cameraManager = BookCameraManager()
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     @State private var countdownTimer: Timer?
     
     @State private var scanState: ScanState = .scanning

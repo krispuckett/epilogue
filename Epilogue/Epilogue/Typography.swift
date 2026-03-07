@@ -300,16 +300,10 @@ struct Note: Identifiable, Codable, Equatable {
 
 // MARK: - Notes View Model
 @MainActor
-class NotesViewModel: ObservableObject {
-    @Published var notes: [Note] = [] {
-        didSet {
-            #if DEBUG
-            print("📝 DEBUG: notes array didSet - count: \(notes.count)")
-            #endif
-            objectWillChange.send()
-        }
-    }
-    @Published var isEditingNote: Bool = false
+@Observable
+class NotesViewModel {
+    var notes: [Note] = []
+    var isEditingNote: Bool = false
     
     private let userDefaults = UserDefaults.standard
     private let notesKey = "com.epilogue.savedNotes"

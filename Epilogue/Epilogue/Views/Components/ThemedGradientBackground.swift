@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Themed Gradient Background
 /// Ultra-premium gradient background that responds to theme selection
 struct ThemedGradientBackground: View {
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @State private var breathe = false
     @State private var morph = false
     @State private var pulse = false

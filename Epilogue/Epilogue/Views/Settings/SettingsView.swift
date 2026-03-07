@@ -33,7 +33,7 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
 
     // Get app version
     private var appVersion: String {
@@ -89,7 +89,7 @@ struct SettingsView: View {
                 Section {
                     NavigationLink {
                         CleanGoodreadsImportView()
-                            .environmentObject(libraryViewModel)
+                            .environment(libraryViewModel)
                     } label: {
                         Label(L10n.Settings.importFromGoodreads, systemImage: "books.vertical.fill")
                             .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
@@ -987,7 +987,7 @@ struct SettingsView: View {
 // MARK: - Epilogue+ Upsell Card
 struct EpiloguePlusUpsellCard: View {
     @StateObject private var storeKit = SimplifiedStoreKitManager.shared
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @State private var showingPaywall = false
 
     var body: some View {

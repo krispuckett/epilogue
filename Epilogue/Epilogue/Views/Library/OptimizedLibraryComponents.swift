@@ -12,9 +12,9 @@ struct OptimizedLibraryGridItem: View {
     @Environment(\.isScrolling) private var isScrolling
     
     var body: some View {
-        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+        NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {
             BookCard(book: book)
-                .environmentObject(viewModel)
+                .environment(viewModel)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(highlightOverlay)
                 .skeleton(isLoading: colorPalette == nil && isLoadingPalette)
@@ -138,7 +138,7 @@ struct OptimizedBookListRow: View {
     }
     
     var body: some View {
-        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+        NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {
             rowContent
                 .scaleEffect(isPressed ? 0.98 : 1.0)
                 .animation(DesignSystem.Animation.springStandard, value: isPressed)

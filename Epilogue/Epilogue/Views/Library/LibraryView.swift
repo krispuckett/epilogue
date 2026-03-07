@@ -6,7 +6,7 @@ import Combine
 
 
 struct LibraryView: View {
-    @EnvironmentObject var viewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var viewModel
     @StateObject private var appState = AppStateManager.shared
     @State private var searchText = ""
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
@@ -26,7 +26,7 @@ struct LibraryView: View {
     @StateObject private var performanceMonitor = PerformanceMonitor.shared
     @Environment(\.modelContext) private var modelContext
     @StateObject private var googleBooksService = GoogleBooksService()
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @State private var isRefreshing = false
     @Namespace private var settingsTransition
     @State private var showingBookAddedToast = false
@@ -687,7 +687,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var goodreadsImportSheet: some View {
         CleanGoodreadsImportView()
-            .environmentObject(viewModel)
+            .environment(viewModel)
     }
     
     // Find the book from the most recent reading session (not just most recently added)
@@ -880,9 +880,9 @@ struct LibraryGridItem: View {
     @State private var isVisible = false
     
     var body: some View {
-        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+        NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {
             BookCard(book: book)
-                .environmentObject(viewModel)
+                .environment(viewModel)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(highlightOverlay)
         }
@@ -967,7 +967,7 @@ struct LibraryListItemWrapper: View {
     @State private var isVisible = false
     
     var body: some View {
-        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+        NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {
             LibraryBookListItem(book: book, viewModel: viewModel, onChangeCover: onChangeCover)
                 .overlay(highlightOverlay)
         }
@@ -1535,7 +1535,7 @@ private func filterIcon(for filter: LibraryView.ReadFilter) -> String {
 #Preview {
     NavigationStack {
         LibraryView()
-            .environmentObject(LibraryViewModel())
+            .environment(LibraryViewModel())
     }
 }
 
@@ -1660,7 +1660,7 @@ struct LibraryBookListRow: View {
     }
     
     var body: some View {
-        NavigationLink(destination: BookDetailView(book: book).environmentObject(viewModel)) {
+        NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {
             ZStack {
                 // Background with edge-to-edge gradient
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
@@ -1808,14 +1808,15 @@ struct LibraryBookListRow: View {
 
 // MARK: - Library View Model
 @MainActor
-class LibraryViewModel: ObservableObject {
-    @Published var books: [Book] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var currentDetailBook: Book? = nil  // Track which book is being viewed in detail
-    @Published var isReorderMode = false  // Track if we're in reorder mode
-    
-    private let googleBooksService = GoogleBooksService()
+@Observable
+class LibraryViewModel {
+    var books: [Book] = []
+    var isLoading = false
+    var errorMessage: String?
+    var currentDetailBook: Book? = nil  // Track which book is being viewed in detail
+    var isReorderMode = false  // Track if we're in reorder mode
+
+    @ObservationIgnored private let googleBooksService = GoogleBooksService()
     private let userDefaults = UserDefaults.standard
     private let booksKey = "com.epilogue.savedBooks"
     private let bookOrderKey = "com.epilogue.bookOrder"
@@ -1944,7 +1945,7 @@ class LibraryViewModel: ObservableObject {
         
         saveBookOrder()
         saveBooks()
-        objectWillChange.send()
+
     }
     
     private func saveBooks() {
@@ -2182,7 +2183,7 @@ class LibraryViewModel: ObservableObject {
         if countBefore != countAfter {
             saveBooks()
             // Force UI update
-            objectWillChange.send()
+    
             #if DEBUG
             print("  ✅ Book removed successfully")
             #endif
@@ -2212,7 +2213,7 @@ class LibraryViewModel: ObservableObject {
                 _ = books[index]
                 books.remove(at: index)
                 saveBooks()
-                objectWillChange.send()
+        
                 #if DEBUG
                 print("  ✅ Book removed successfully by localId")
                 #endif
@@ -2248,7 +2249,7 @@ class LibraryViewModel: ObservableObject {
         saveBooks()
 
         // Force UI update
-        objectWillChange.send()
+
 
         // Reload to ensure consistency
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in

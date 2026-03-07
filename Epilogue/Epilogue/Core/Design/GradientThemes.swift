@@ -271,10 +271,11 @@ public enum GradientTheme: String, CaseIterable, Codable {
 
 // MARK: - Theme Manager
 @MainActor
-public class ThemeManager: ObservableObject {
+@Observable
+public class ThemeManager {
     static let shared = ThemeManager()
 
-    @Published var currentTheme: GradientTheme {
+    var currentTheme: GradientTheme {
         didSet {
             UserDefaults.standard.set(currentTheme.rawValue, forKey: "selectedGradientTheme")
         }

@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Subtle Themed Background
 /// Matches the original amber gradient's subtlety - just a gentle glow at the bottom
 struct SubtleThemedBackground: View {
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @State private var breathe = false
 
     var body: some View {

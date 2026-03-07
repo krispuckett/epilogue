@@ -116,7 +116,7 @@ struct NoteCard: View {
         }
     }
 
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
 }
 
 // MARK: - Quote Card (Literary Design)
@@ -125,7 +125,7 @@ struct QuoteCard: View {
     @Binding var isPressed: Bool
     @Binding var showingOptions: Bool
     let ambientSession: AmbientSession?
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @Environment(\.sizeCategory) var sizeCategory
     @State private var showDate = false
     @State private var tapCount = 0
@@ -374,7 +374,7 @@ struct RegularNoteCard: View {
     @Binding var isPressed: Bool
     @Binding var showingOptions: Bool
     let ambientSession: AmbientSession?
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @State private var showingSessionSummary = false
     
     var body: some View {

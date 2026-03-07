@@ -6,8 +6,8 @@ struct SimpleCommandIntent: View {
     @State private var inputText = ""
     @FocusState private var isInputFocused: Bool
 
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
 
     // Quick action suggestions
     struct QuickAction: Identifiable {

@@ -4,7 +4,7 @@ import SwiftUI
 struct AmbientChatBackground: View {
     @Binding var audioLevel: Float
     @Binding var isListening: Bool
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @State private var breathe = false
     @State private var morph = false
 

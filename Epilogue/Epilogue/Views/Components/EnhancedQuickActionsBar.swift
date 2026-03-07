@@ -2,8 +2,8 @@ import SwiftUI
 
 // MARK: - Enhanced Quick Actions Bar with Advanced Gestures
 struct EnhancedQuickActionsBar: View {
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @ObservedObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var microInteractionManager = MicroInteractionManager.shared
 
@@ -79,8 +79,8 @@ struct EnhancedQuickActionsBar: View {
             ) { result in
                 handleCommandResult(result)
             }
-            .environmentObject(libraryViewModel)
-            .environmentObject(notesViewModel)
+            .environment(libraryViewModel)
+            .environment(notesViewModel)
             .presentationBackground(Color.clear)
         }
         .onReceive(voiceManager.$currentAmplitude) { amplitude in
@@ -533,8 +533,8 @@ extension EnhancedQuickActionsBar {
         VStack {
             Spacer()
             EnhancedQuickActionsBar()
-                .environmentObject(LibraryViewModel())
-                .environmentObject(NotesViewModel())
+                .environment(LibraryViewModel())
+                .environment(NotesViewModel())
                 .padding(.bottom, 100)
         }
     }

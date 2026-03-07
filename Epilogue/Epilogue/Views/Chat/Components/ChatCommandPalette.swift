@@ -9,7 +9,7 @@ struct ChatCommandPalette: View {
     @State private var dragOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
     
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     @Environment(\.colorScheme) var colorScheme
     
     // Book-focused commands
@@ -311,7 +311,7 @@ struct ChatCommandPalette: View {
                 selectedBook: .constant(nil),
                 commandText: .constant("")
             )
-            .environmentObject(LibraryViewModel())
+            .environment(LibraryViewModel())
             .padding()
         }
     }

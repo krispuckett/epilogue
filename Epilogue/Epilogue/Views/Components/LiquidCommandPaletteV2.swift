@@ -17,8 +17,8 @@ struct LiquidCommandPaletteV2: View {
     @State private var recentCommands: [String] = []
     
     // Environment
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     
     // Context
     let context: CommandContext
@@ -535,8 +535,8 @@ extension View {
                     context: context,
                     onComplete: onComplete
                 )
-                .environmentObject(LibraryViewModel())
-                .environmentObject(NotesViewModel())
+                .environment(LibraryViewModel())
+                .environment(NotesViewModel())
                 .transition(.opacity)
             }
         }

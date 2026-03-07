@@ -5,7 +5,7 @@ import UIKit
 struct BookScannerSheet: UIViewControllerRepresentable {
     @Binding var isPresented: Bool
     @StateObject private var scanner = BookScannerService.shared
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     let onCompletion: () -> Void
     
     func makeUIViewController(context: Context) -> UIViewController {
@@ -98,13 +98,13 @@ struct BookScannerSheet: UIViewControllerRepresentable {
 
 struct BookScannerPresentationView: View {
     @StateObject private var scanner = BookScannerService.shared
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
             BookScannerView()
-                .environmentObject(libraryViewModel)
+                .environment(libraryViewModel)
                 .navigationBarHidden(true)
         }
         .presentationBackground(.clear)
@@ -138,7 +138,7 @@ struct BookScannerWrapper: View {
 struct BookSearchResultsView: View {
     let books: [Book]
     let searchQuery: String
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     @Environment(\.dismiss) var dismiss
     
     var body: some View {

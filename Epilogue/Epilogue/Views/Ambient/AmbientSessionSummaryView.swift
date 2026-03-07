@@ -29,7 +29,7 @@ struct AmbientSessionSummaryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     
     var body: some View {
         NavigationStack {
@@ -141,7 +141,7 @@ struct AmbientSessionSummaryView: View {
             .fullScreenCover(isPresented: $showingAmbientMode) {
                 NavigationStack {
                     AmbientModeView()
-                        .environmentObject(libraryViewModel)
+                        .environment(libraryViewModel)
                 }
             }
         }
@@ -1426,8 +1426,8 @@ struct MinimalMessageView: View {
 struct SessionQuickActionsMenu: View {
     @Binding var isPresented: Bool
     let onTextSubmit: (String) -> Void
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @State private var themeManager = ThemeManager.shared
 
     var body: some View {
         VStack {

@@ -5,7 +5,7 @@ struct ReadwiseSyncView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @StateObject private var readwise = ReadwiseService.shared
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     
     @State private var apiToken = ""
     @State private var showingTokenInput = false
@@ -463,7 +463,7 @@ struct TokenInputSheet: View {
     let onSave: (String) -> Void
     
     @State private var isValidating = false
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     
     var body: some View {
         NavigationStack {

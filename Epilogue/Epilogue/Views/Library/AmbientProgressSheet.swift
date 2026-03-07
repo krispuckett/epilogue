@@ -3,7 +3,7 @@ import SwiftUI
 struct AmbientProgressSheet: View {
     let book: Book
     @Binding var isPresented: Bool
-    @EnvironmentObject var viewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var viewModel
     var colorPalette: ColorPalette? = nil
     
     @State private var currentPage: Int
@@ -402,5 +402,5 @@ struct AmbientProgressSheet: View {
         isPresented: .constant(true),
         colorPalette: nil
     )
-    .environmentObject(LibraryViewModel())
+    .environment(LibraryViewModel())
 }

@@ -10,7 +10,7 @@ struct NoteEditSheet: View {
     @FocusState private var isTextFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
 
     init(note: Note) {
         self.note = note

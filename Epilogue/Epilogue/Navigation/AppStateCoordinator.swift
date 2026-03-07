@@ -1,36 +1,38 @@
 import SwiftUI
 import Combine
+import Observation
 import OSLog
 
 private let logger = Logger(subsystem: "com.epilogue", category: "AppState")
 
 /// Coordinates app-wide state and sheet presentations
 @MainActor
-final class AppStateCoordinator: ObservableObject {
+@Observable
+final class AppStateCoordinator {
     // MARK: - Sheet Presentations
-    @Published var showingBookSearch = false
-    @Published var showingBatchBookSearch = false
-    @Published var showingBookScanner = false
-    @Published var showingCommandInput = false
-    @Published var showingLibraryCommandPalette = false
-    @Published var showingPrivacySettings = false
-    @Published var showingGlassToast = false
-    @Published var toastMessage = ""
+    var showingBookSearch = false
+    var showingBatchBookSearch = false
+    var showingBookScanner = false
+    var showingCommandInput = false
+    var showingLibraryCommandPalette = false
+    var showingPrivacySettings = false
+    var showingGlassToast = false
+    var toastMessage = ""
 
     // MARK: - Book Search State
-    @Published var bookSearchQuery = ""
-    @Published var batchBookTitles: [String] = []
-    @Published var pendingBookSearch = false
+    var bookSearchQuery = ""
+    var batchBookTitles: [String] = []
+    var pendingBookSearch = false
 
     // MARK: - Command Input State
-    @Published var commandText = ""
-    @Published var isBookNoteContext = false  // Track if we're opening input for book notes
+    var commandText = ""
+    var isBookNoteContext = false  // Track if we're opening input for book notes
 
     // MARK: - Weak References to Prevent Cycles
-    weak var libraryViewModel: LibraryViewModel?
-    weak var notesViewModel: NotesViewModel?
+    @ObservationIgnored weak var libraryViewModel: LibraryViewModel?
+    @ObservationIgnored weak var notesViewModel: NotesViewModel?
 
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
     init() {
         setupNotificationObservers()

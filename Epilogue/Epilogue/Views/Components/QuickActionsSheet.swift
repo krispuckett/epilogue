@@ -27,8 +27,8 @@ struct QuickActionsSheet: View {
     @State private var dragOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
     
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @State private var showBookScanner = false
     
     // Command structure matching ChatCommandPalette
@@ -273,7 +273,7 @@ struct QuickActionsSheet: View {
                 }
             } else {
                 BookScannerView()
-                    .environmentObject(libraryViewModel)
+                    .environment(libraryViewModel)
                     .onAppear {
                         #if DEBUG
                         print("⚠️ QuickActionsSheet: Loading OLD SCANNER")
@@ -473,6 +473,6 @@ struct QuickActionsSheet: View {
                 #endif
             }
         )
-        .environmentObject(LibraryViewModel())
+        .environment(LibraryViewModel())
     }
 }

@@ -7,7 +7,7 @@ struct SessionContentCardsView: View {
     let bookAuthor: String?
     
     @StateObject private var processor = TrueAmbientProcessor.shared
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     
     @State private var editingQuote: ExtractedQuote?
     @State private var editingNote: ExtractedNote?

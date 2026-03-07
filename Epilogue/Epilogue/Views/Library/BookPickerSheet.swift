@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BookPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
     let onBookSelected: (Book) -> Void
     @State private var searchText = ""
     

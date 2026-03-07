@@ -24,8 +24,8 @@ struct LiquidCommandPalette: View {
     @State private var showingGoogleResults = false
     
     // MARK: - Environment
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var capturedNotes: [CapturedNote]
@@ -156,8 +156,8 @@ struct LiquidCommandPalette: View {
                         else if !showQuickActions && (commandText.count >= 3 || commandText.isEmpty) {
                             ScrollView {
                                 LiquidSearchResultsView(searchText: commandText)
-                                    .environmentObject(libraryViewModel)
-                                    .environmentObject(notesViewModel)
+                                    .environment(libraryViewModel)
+                                    .environment(notesViewModel)
                             }
                             .frame(maxHeight: 300)
                             .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
@@ -173,8 +173,8 @@ struct LiquidCommandPalette: View {
                                     handleQuickAction(action)
                                 }
                             )
-                            .environmentObject(libraryViewModel)
-                            .environmentObject(notesViewModel)
+                            .environment(libraryViewModel)
+                            .environment(notesViewModel)
                             .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
                             .padding(.bottom, 16) // Above input bar
                             .transition(.glassAppear)

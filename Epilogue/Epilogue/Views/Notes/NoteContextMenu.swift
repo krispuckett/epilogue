@@ -5,7 +5,7 @@ struct NoteContextMenu: View {
     let note: Note
     let sourceRect: CGRect
     @Binding var isPresented: Bool
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     @State private var containerOpacity: Double = 0
     @State private var containerScale: CGFloat = 0.8
     

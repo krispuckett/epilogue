@@ -7,7 +7,7 @@ struct CloudKitStatusView: View {
     @State private var isChecking = true
     @State private var syncStatus: SyncStatus = .checking
     @AppStorage("isUsingCloudKit") private var isUsingCloudKit = false
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @State private var isExpanded = false
     
     enum SyncStatus: Equatable {

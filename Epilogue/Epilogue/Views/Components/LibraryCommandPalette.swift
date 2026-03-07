@@ -8,8 +8,8 @@ struct LibraryCommandPalette: View {
     @State private var dragOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
     
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
     
     // Library/Notes focused commands
     struct Command {

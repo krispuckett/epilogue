@@ -116,7 +116,7 @@ struct AmbientModeView: View {
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var bookDetector = AmbientBookDetector.shared
     @StateObject private var microInteractionManager = MicroInteractionManager.shared
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @StateObject private var storeKit = SimplifiedStoreKitManager.shared
 
     // Namespace for matched geometry morphing animation
@@ -213,9 +213,9 @@ struct AmbientModeView: View {
     @State private var isPresentedModally = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    @EnvironmentObject var libraryViewModel: LibraryViewModel
-    @EnvironmentObject var notesViewModel: NotesViewModel
-    @EnvironmentObject var appStateCoordinator: AppStateCoordinator
+    @Environment(LibraryViewModel.self) var libraryViewModel
+    @Environment(NotesViewModel.self) var notesViewModel
+    @Environment(AppStateCoordinator.self) var appStateCoordinator
     
     // Settings
     @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
@@ -461,8 +461,8 @@ struct AmbientModeView: View {
                     }
                 )
                 .environment(\.modelContext, modelContext)
-                .environmentObject(libraryViewModel)
-                .environmentObject(notesViewModel)
+                .environment(libraryViewModel)
+                .environment(notesViewModel)
             }
         }
         .onAppear {

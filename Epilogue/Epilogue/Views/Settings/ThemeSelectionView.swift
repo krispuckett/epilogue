@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Theme Selection View
 /// Ultra-premium theme selection interface
 struct ThemeSelectionView: View {
-    @StateObject private var themeManager = ThemeManager.shared
+    @State private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTheme: GradientTheme
     @State private var showingPreview = false
