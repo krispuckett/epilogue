@@ -23,7 +23,6 @@ final class PerformanceMonitor: ObservableObject {
     
     // Performance tracking
     private var performanceMetrics: [String: PerformanceMetric] = [:]
-    private let metricsQueue = DispatchQueue(label: "com.epilogue.performance", qos: .utility)
     
     private init() {
         setupDisplayLink()
@@ -69,18 +68,14 @@ final class PerformanceMonitor: ObservableObject {
     }
     
     func logPerformanceReport() {
-        metricsQueue.async { [weak self] in
-            guard let self = self else { return }
-            
-            logger.info("=== Performance Report ===")
-            logger.info("Current FPS: \\(self.fps, format: .fixed(precision: 1))")
-            logger.info("Frame Drops: \\(self.frameDrops)")
-            logger.info("Main Thread Blocks: \\(self.mainThreadBlocks)")
-            
-            for (operation, metric) in self.performanceMetrics.sorted(by: { $0.key < $1.key }) {
-                let avg = metric.totalDuration / Double(metric.count)
-                logger.info("\\(operation): avg=\\(avg * 1000, format: .fixed(precision: 2))ms, count=\\(metric.count)")
-            }
+        logger.info("=== Performance Report ===")
+        logger.info("Current FPS: \\(self.fps, format: .fixed(precision: 1))")
+        logger.info("Frame Drops: \\(self.frameDrops)")
+        logger.info("Main Thread Blocks: \\(self.mainThreadBlocks)")
+
+        for (name, metric) in performanceMetrics.sorted(by: { $0.key < $1.key }) {
+            let avgMs = metric.totalDuration / Double(metric.count) * 1000
+            logger.info("\(name, privacy: .public): avg=\(avgMs, format: .fixed(precision: 2))ms, count=\(metric.count)")
         }
     }
     
@@ -119,23 +114,21 @@ final class PerformanceMonitor: ObservableObject {
     }
     
     private func recordMetric(operation: String, duration: CFTimeInterval) {
-        metricsQueue.async { [weak self] in
-            if let existing = self?.performanceMetrics[operation] {
-                self?.performanceMetrics[operation] = PerformanceMetric(
-                    count: existing.count + 1,
-                    totalDuration: existing.totalDuration + duration
-                )
-            } else {
-                self?.performanceMetrics[operation] = PerformanceMetric(
-                    count: 1,
-                    totalDuration: duration
-                )
-            }
-            
-            // Log slow operations
-            if duration > 0.1 { // 100ms
-                self?.logger.warning("Slow operation '\\(operation)': \\(duration * 1000, format: .fixed(precision: 2))ms")
-            }
+        if let existing = performanceMetrics[operation] {
+            performanceMetrics[operation] = PerformanceMetric(
+                count: existing.count + 1,
+                totalDuration: existing.totalDuration + duration
+            )
+        } else {
+            performanceMetrics[operation] = PerformanceMetric(
+                count: 1,
+                totalDuration: duration
+            )
+        }
+
+        // Log slow operations
+        if duration > 0.1 { // 100ms
+            logger.warning("Slow operation '\\(operation)': \\(duration * 1000, format: .fixed(precision: 2))ms")
         }
     }
 }

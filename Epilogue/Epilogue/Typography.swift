@@ -332,13 +332,7 @@ class NotesViewModel: ObservableObject {
         
         loadNotes()
         
-        // Ensure we have some data
-        if notes.isEmpty {
-            #if DEBUG
-            print("⚠️ DEBUG: No notes after loadNotes(), forcing sample data")
-            #endif
-            loadSampleData()
-        }
+        // No sample data — empty library is a valid state
         
         // Listen for book replacements
         NotificationCenter.default.addObserver(
@@ -381,19 +375,15 @@ class NotesViewModel: ObservableObject {
             } catch {
                 #if DEBUG
                 print("❌ DEBUG: Failed to decode notes: \(error)")
-                #if DEBUG
                 print("❌ DEBUG: Error details: \(error.localizedDescription)")
                 #endif
-                #endif
-                // Load sample data on decode error
-                loadSampleData()
+                self.notes = []
             }
         } else {
             #if DEBUG
             print("🔍 DEBUG: No data found in UserDefaults for key: \(notesKey)")
             #endif
-            // Load sample data only on first launch
-            loadSampleData()
+            self.notes = []
         }
         
         #if DEBUG
@@ -694,51 +684,4 @@ class NotesViewModel: ObservableObject {
     }
     #endif
     
-    private func loadSampleData() {
-        #if DEBUG
-        print("📚 DEBUG: loadSampleData() called - Loading sample notes")
-        #endif
-        
-        notes = [
-            Note(
-                type: .quote,
-                content: "It is during our darkest moments that we must focus to see the light.",
-                bookTitle: "The Collected Wisdom",
-                author: "Aristotle",
-                pageNumber: 47,
-                dateCreated: Calendar.current.date(byAdding: .hour, value: -2, to: Date()) ?? Date()
-            ),
-            Note(
-                type: .note,
-                content: "The character development in this chapter really shows how the author builds tension through small details and seemingly insignificant conversations.",
-                bookTitle: "The Great Gatsby",
-                author: "F. Scott Fitzgerald",
-                pageNumber: 89,
-                dateCreated: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-            ),
-            Note(
-                type: .quote,
-                content: "In three words I can sum up everything I've learned about life: it goes on.",
-                bookTitle: "Selected Poems",
-                author: "Robert Frost",
-                pageNumber: 156,
-                dateCreated: Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? Date()
-            ),
-            Note(
-                type: .note,
-                content: "Need to research more about the historical context of this period. The author mentions several events that seem crucial to understanding the protagonist's motivations.",
-                bookTitle: nil,
-                author: nil,
-                pageNumber: nil,
-                dateCreated: Calendar.current.date(byAdding: .day, value: -5, to: Date()) ?? Date()
-            )
-        ]
-        
-        #if DEBUG
-        print("📚 DEBUG: Created \(notes.count) sample notes")
-        #endif
-        
-        // Save the sample data
-        saveNotes()
-    }
 }

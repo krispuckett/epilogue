@@ -98,9 +98,13 @@ final class LibraryService {
                             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
                         )
                     } catch {
-                        // If we truly cannot create any container, the app cannot function
-                        logger.critical("❌ Fatal: Cannot create any ModelContainer - app cannot continue: \(error)")
-                        fatalError("Unable to initialize data storage. Please reinstall the app.")
+                        // Should be unreachable — in-memory ModelContainer creation for a single model cannot fail
+                        // Log the error for diagnostics, then force-try as absolute last resort
+                        logger.critical("❌ Critical: Cannot create any ModelContainer: \(error)")
+                        // swiftlint:disable:next force_try
+                        modelContainer = try! ModelContainer(
+                            for: BookModel.self
+                        )
                     }
                 }
             }

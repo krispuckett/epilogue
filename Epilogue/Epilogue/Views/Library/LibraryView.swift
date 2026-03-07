@@ -8,7 +8,7 @@ import Combine
 struct LibraryView: View {
     @EnvironmentObject var viewModel: LibraryViewModel
     @StateObject private var appState = AppStateManager.shared
-    // Removed searchText - no longer needed
+    @State private var searchText = ""
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @AppStorage("libraryReadFilter") private var readFilter: ReadFilter = .all
     @Namespace private var viewModeAnimation
@@ -71,9 +71,18 @@ struct LibraryView: View {
         }
     }
     
-    // Filter books based on read status and prioritize currently reading
+    // Filter books based on search text, read status, and prioritize currently reading
     private var filteredBooks: [Book] {
         var books = viewModel.books
+
+        // Apply search filter
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            books = books.filter {
+                $0.title.lowercased().contains(query) ||
+                $0.author.lowercased().contains(query)
+            }
+        }
 
         // Apply read status filter
         switch readFilter {
@@ -191,11 +200,25 @@ struct LibraryView: View {
         )
         SensoryFeedback.success()
 
-        // 2. Create/update BookModel in SwiftData + enrich
+        // 2. Resolve high-quality cover + create/update BookModel in SwiftData + enrich
         #if DEBUG
         print("2️⃣ Starting SwiftData Task...")
         #endif
         Task { @MainActor in
+            // Resolve best cover URL for gradient quality (runs in background after add)
+            if let resolvedURL = await DisplayCoverURLResolver.resolveDisplayURL(
+                googleID: book.id,
+                isbn: book.isbn,
+                thumbnailURL: book.coverImageURL
+            ), resolvedURL != book.coverImageURL {
+                #if DEBUG
+                print("🖼️ Resolved better cover for '\(book.title)': \(resolvedURL)")
+                #endif
+                viewModel.updateBookCover(book, newCoverURL: resolvedURL)
+                // Pre-cache the high-quality image for gradient extraction
+                _ = await SharedBookCoverManager.shared.loadFullImage(from: resolvedURL)
+            }
+
             #if DEBUG
             print("   🔹 Task started on MainActor")
             #endif
@@ -356,34 +379,30 @@ struct LibraryView: View {
     private func preloadAllBookCovers() async {
         // Collect all cover URLs
         let coverURLs = viewModel.books.compactMap { $0.coverImageURL }
-        
+
         guard !coverURLs.isEmpty else { return }
-        
+
         #if DEBUG
         print("📚 Preloading \(coverURLs.count) book covers...")
         #endif
-        
+
         // Use the batch preload method with throttling
         await SharedBookCoverManager.shared.preloadCovers(coverURLs)
-        
+
         #if DEBUG
         print("✅ Finished preloading covers")
         #endif
-        
-        // Also ensure high-quality images are loaded for visible books
-        let visibleBooks = Array(viewModel.books.prefix(20))
+
+        // Load high-quality images for first 6 visible books only (limit memory pressure)
+        let visibleBooks = Array(viewModel.books.prefix(6))
         for book in visibleBooks {
             if let coverURL = book.coverImageURL {
-                // Load full image to ensure high quality in library view
                 _ = await SharedBookCoverManager.shared.loadFullImage(from: coverURL)
             }
         }
         #if DEBUG
-        print("✅ Loaded high-quality covers for visible books")
+        print("✅ Loaded high-quality covers for \(visibleBooks.count) visible books")
         #endif
-        
-        // Don't pre-warm color cache - let BookDetailView handle color extraction
-        // This ensures all books use the same color extraction path from displayed images
     }
     
     @ViewBuilder
@@ -772,6 +791,7 @@ struct LibraryView: View {
             .toolbar {
                 toolbarContent
             }
+            .searchable(text: $searchText, prompt: "Search by title or author")
         }
         .animation(DesignSystem.Animation.easeQuick, value: viewMode)
         .sheet(isPresented: $showingCoverPicker) {

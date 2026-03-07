@@ -72,18 +72,6 @@ extension EmptyStateView {
         )
     }
     
-    static var noBooks: EmptyStateView {
-        EmptyStateView(
-            icon: "books.vertical",
-            title: "Your Library is Empty",
-            message: "Add your first book to start tracking your reading journey.",
-            buttonTitle: "Add Book",
-            buttonAction: {
-                // This will be connected to the actual add book action
-            }
-        )
-    }
-    
     static var noSearchResults: EmptyStateView {
         EmptyStateView(
             icon: "magnifyingglass",

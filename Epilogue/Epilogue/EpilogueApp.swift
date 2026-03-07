@@ -19,72 +19,60 @@ struct EpilogueApp: App {
                     .modelContainer(container)
                     // .runSwiftDataMigrations() // DISABLED - causing data loss
                     .task {
-                        // Load StoreKit products and check subscription status on app start
+                        // === Phase 1: Critical (immediate) ===
+                        // StoreKit and permissions — required before user interacts
                         await storeKit.loadProducts()
                         await storeKit.checkSubscriptionStatus()
                     }
                     .onAppear {
-                        // API key is now built-in, no setup needed
-
-                        // Clear command history on app launch to prevent artifacts
-                        Task { @MainActor in
-                            CommandHistoryManager.shared.clearHistory()
-                        }
-
-                        // Request notification permissions
+                        // Phase 1 continued: permissions and status checks
                         requestNotificationPermissions()
-
-                        // Check CloudKit status and show alert if needed
                         checkCloudKitStatus()
 
-                        // Schedule background refresh for trending books
-                        EnhancedTrendingBooksService.shared.scheduleBackgroundRefresh()
+                        guard let container = modelContainer else { return }
+                        let context = ModelContext(container)
 
-                        // Initialize offline services
-                        if let container = modelContainer {
-                            let context = ModelContext(container)
+                        // === Phase 2: UI-ready (after 1s) ===
+                        // Services the UI needs soon — widgets, offline data, knowledge graph
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+                            // Configure offline services
                             OfflineQueueManager.shared.configure(with: context)
                             OfflineCoverCacheService.shared.configure(with: context)
 
-                            // Initialize AI Memory services (for persistent conversation context)
+                            // AI Memory services
                             MemoryPersistenceService.shared.configure(with: context)
                             MemoryRetrievalService.shared.configure(with: context)
 
-                            // Initialize Knowledge Graph services
-                            Task { @MainActor in
-                                await KnowledgeGraphIndexer.shared.configure(with: context)
+                            // Widget data and color migration
+                            await migrateCachedColorsToBookModel(context: context)
+                            updateWidgetData(context: context)
+
+                            // Knowledge graph
+                            await KnowledgeGraphIndexer.shared.configure(with: context)
+
+                            // Notification cleanup
+                            await cleanupOrphanedReadingPlanNotifications(context: context)
+                        }
+
+                        // === Phase 3: Background (after 5s) ===
+                        // Non-urgent tasks that can wait
+                        Task(priority: .background) {
+                            try? await Task.sleep(nanoseconds: 5_000_000_000)
+
+                            // Cache covers for offline use
+                            await OfflineCoverCacheService.shared.cacheAllLibraryCovers()
+
+                            // Schedule background refresh for trending books
+                            await MainActor.run {
+                                EnhancedTrendingBooksService.shared.scheduleBackgroundRefresh()
                             }
 
-                            // Background task: Cache all library covers for offline use
-                            Task.detached(priority: .background) { @MainActor in
-                                // Wait 5 seconds after launch to avoid competing for resources
-                                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                                await OfflineCoverCacheService.shared.cacheAllLibraryCovers()
-                            }
-
-                            // Migrate cached colors to BookModel for widgets (one-time)
-                            Task { @MainActor in
-                                await migrateCachedColorsToBookModel(context: context)
-                            }
-
-                            // Update widgets with current book data
-                            Task { @MainActor in
-                                updateWidgetData(context: context)
-                            }
-
-                            // Clean up orphaned reading plan notifications
-                            Task { @MainActor in
-                                await cleanupOrphanedReadingPlanNotifications(context: context)
-                            }
-
-                            // Auto-enrich any unenriched books after CloudKit sync
-                            // Wait 10 seconds to let CloudKit sync complete first
-                            Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
-                                // Create fresh context from container for auto-enrichment
-                                let enrichmentContext = ModelContext(container)
-                                AutoEnrichmentService.shared.autoEnrichBooksIfNeeded(modelContext: enrichmentContext)
-                            }
+                            // Auto-enrich unenriched books (wait for CloudKit sync)
+                            try? await Task.sleep(nanoseconds: 5_000_000_000) // +5s = 10s total
+                            let enrichmentContext = ModelContext(container)
+                            AutoEnrichmentService.shared.autoEnrichBooksIfNeeded(modelContext: enrichmentContext)
                         }
                     }
                     .alert("iCloud Sync", isPresented: $showingCloudKitAlert) {
@@ -136,9 +124,6 @@ struct EpilogueApp: App {
     
     @MainActor
     private func setupModelContainer() async {
-        // Clear image caches on app launch (temporary for debugging)
-        DisplayedImageStore.clearAllCaches()
-
         // Create Application Support directory if it doesn't exist to prevent CoreData warnings
         createApplicationSupportDirectoryIfNeeded()
 
