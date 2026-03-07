@@ -140,7 +140,7 @@ final class MemoryPruningService {
 
         for thread in threads {
             // Skip threads with no entries
-            if thread.entries.isEmpty {
+            if (thread.entries ?? []).isEmpty {
                 continue
             }
 
@@ -152,7 +152,7 @@ final class MemoryPruningService {
                 thread.isActive = false
 
                 // Mark all entries as summarized
-                for entry in thread.entries {
+                for entry in thread.entries ?? [] {
                     entry.hasBeenSummarized = true
                 }
 
@@ -165,7 +165,7 @@ final class MemoryPruningService {
 
     private func generateThreadSummary(_ thread: MemoryThread) async -> String {
         // Build content from entries
-        let entryContent = thread.entries.prefix(10).map { entry in
+        let entryContent = (thread.entries ?? []).prefix(10).map { entry in
             "Q: \(entry.userText.prefix(100))\nA: \(entry.aiResponse.prefix(150))"
         }.joined(separator: "\n---\n")
 

@@ -255,7 +255,7 @@ struct IntelligentSectionView: View {
     private var insightsFooter: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "sparkles")
+                Image(systemName: "wand.and.stars")
                     .font(.system(size: 12))
                     .foregroundStyle(section.color)
                 

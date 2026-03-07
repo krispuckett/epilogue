@@ -22,6 +22,10 @@ final class CapturedNote {
     @Relationship(inverse: \AmbientSession.capturedNotes)
     var ambientSession: AmbientSession?
 
+    // Knowledge Graph relationship
+    @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.sourceNotes)
+    var knowledgeNodes: [KnowledgeNode]?
+
     // Computed property for CaptureSource
     var captureSource: CaptureSource {
         CaptureSource(rawValue: source ?? CaptureSource.manual.rawValue) ?? .manual
@@ -78,15 +82,19 @@ final class CapturedQuote {
     // Relationships
     @Relationship(deleteRule: .nullify)
     var book: BookModel?
-    
+
     @Relationship(inverse: \AmbientSession.capturedQuotes)
     var ambientSession: AmbientSession?
-    
+
+    // Knowledge Graph relationship
+    @Relationship(deleteRule: .nullify, inverse: \KnowledgeNode.sourceQuotes)
+    var knowledgeNodes: [KnowledgeNode]?
+
     // Computed property for CaptureSource
     var captureSource: CaptureSource {
         CaptureSource(rawValue: source ?? CaptureSource.manual.rawValue) ?? .manual
     }
-    
+
     init(
         text: String,
         book: BookModel? = nil,

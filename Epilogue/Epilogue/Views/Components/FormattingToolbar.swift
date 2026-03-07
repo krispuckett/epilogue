@@ -12,8 +12,8 @@ struct FormattingToolbar: View {
     @State private var showingPreview = false
 
     var body: some View {
-        // Compact centered liquid glass pill
-        HStack(spacing: 16) {
+        // Compact centered liquid glass pill - only universally understood formatting
+        HStack(spacing: 20) {
             FormatButton(icon: MarkdownSyntax.bold.systemIcon, syntax: .bold) {
                 insertMarkdown(.bold)
             }
@@ -25,16 +25,8 @@ struct FormattingToolbar: View {
             FormatButton(icon: MarkdownSyntax.highlight.systemIcon, syntax: .highlight) {
                 insertMarkdown(.highlight)
             }
-
-            FormatButton(icon: MarkdownSyntax.blockquote.systemIcon, syntax: .blockquote) {
-                insertMarkdown(.blockquote)
-            }
-
-            FormatButton(icon: MarkdownSyntax.bulletList.systemIcon, syntax: .bulletList) {
-                insertMarkdown(.bulletList)
-            }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24)
         .padding(.vertical, 12)
         .glassEffect(.regular, in: .capsule)
     }
@@ -64,7 +56,7 @@ struct CompactFormattingToolbar: View {
     @ObservedObject var cursorTracker: TextEditorCursorTracker
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             // Essential formatting only
             FormatButton(icon: MarkdownSyntax.bold.systemIcon, syntax: .bold) {
                 insertMarkdown(.bold)
@@ -74,12 +66,8 @@ struct CompactFormattingToolbar: View {
                 insertMarkdown(.italic)
             }
 
-            FormatButton(icon: MarkdownSyntax.blockquote.systemIcon, syntax: .blockquote) {
-                insertMarkdown(.blockquote)
-            }
-
-            FormatButton(icon: MarkdownSyntax.bulletList.systemIcon, syntax: .bulletList) {
-                insertMarkdown(.bulletList)
+            FormatButton(icon: MarkdownSyntax.highlight.systemIcon, syntax: .highlight) {
+                insertMarkdown(.highlight)
             }
 
             Spacer()

@@ -411,8 +411,7 @@ struct GoodreadsImportView: View {
                     .toggleStyle(SwitchToggleStyle(tint: .orange))
                     .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.05))
-                    .glassEffect(in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .glassEffect(.regular.tint(Color.white.opacity(0.08)), in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
@@ -1684,33 +1683,12 @@ struct BookMatchRow: View {
             onSelect()
         } label: {
             HStack(spacing: 12) {
-                // Cover with async loading
-                ZStack {
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                        .fill(Color.white.opacity(0.05))
-                        .frame(width: 60, height: 90)
-                    
-                    AsyncImage(url: URL(string: book.coverImageURL ?? "")) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 60, height: 90)
-                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-                        case .failure(_):
-                            Image(systemName: "book.fill")
-                                .font(.title2)
-                                .foregroundColor(.white.opacity(0.2))
-                        case .empty:
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: DesignSystem.Colors.textQuaternary))
-                                .scaleEffect(0.6)
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                }
+                // Cover (cached for offline)
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 60,
+                    height: 90
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
                         .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 2)
@@ -1800,22 +1778,13 @@ struct BookSearchRow: View {
             onSelect()
         } label: {
             HStack(spacing: 12) {
-                // Cover placeholder
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 50, height: 75)
-                    .overlay(
-                        AsyncImage(url: URL(string: book.coverImageURL ?? "")) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Image(systemName: "book.fill")
-                                .font(.caption)
-                                .foregroundColor(DesignSystem.Colors.textQuaternary)
-                        }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                // Cover (cached for offline)
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 50,
+                    height: 75
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(book.title)

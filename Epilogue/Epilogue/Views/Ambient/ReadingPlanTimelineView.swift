@@ -63,34 +63,15 @@ struct ReadingPlanTimelineView: View {
         VStack(spacing: 12) {
             // Icon and title
             HStack(spacing: 12) {
-                // Show mini book cover if available, otherwise show type icon
-                if let coverURLString = plan.bookCoverURL,
-                   let coverURL = URL(string: coverURLString) {
-                    AsyncImage(url: coverURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 28, height: 42)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                        case .failure:
-                            // Fallback to icon on failure
-                            Image(systemName: plan.type.icon)
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
-                        case .empty:
-                            // Loading placeholder
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.white.opacity(0.1))
-                                .frame(width: 28, height: 42)
-                        @unknown default:
-                            Image(systemName: plan.type.icon)
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(Color(red: 1.0, green: 0.549, blue: 0.259))
-                        }
-                    }
+                // Show mini book cover if available, otherwise show type icon (cached for offline)
+                if let coverURLString = plan.bookCoverURL {
+                    SharedBookCoverView(
+                        coverURL: coverURLString,
+                        width: 28,
+                        height: 42
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                 } else {
                     Image(systemName: plan.type.icon)
                         .font(.system(size: 20, weight: .medium))

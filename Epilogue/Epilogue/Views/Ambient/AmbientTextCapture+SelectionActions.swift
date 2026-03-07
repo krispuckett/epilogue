@@ -38,7 +38,7 @@ struct SelectionPillsOverlay: View {
 
                 // Ask AI Pill
                 ActionPill(
-                    icon: "sparkles",
+                    icon: "wand.and.stars",
                     title: "Ask AI",
                     color: .purple,
                     action: {

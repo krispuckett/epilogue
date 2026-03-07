@@ -340,7 +340,7 @@ struct LiquidCommandPaletteV2: View {
                 type: .command,
                 title: "Ask Epilogue",
                 subtitle: "Recommendations, reading plans, insights",
-                icon: "sparkles",
+                icon: "wand.and.stars",
                 action: { launchGenericAmbient() }
             ))
         }

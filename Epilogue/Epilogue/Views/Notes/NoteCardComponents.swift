@@ -161,24 +161,24 @@ struct QuoteCard: View {
                 )
                 .padding(.top, 16)
             } else {
-                // Standard quotes: drop cap layout
+                // Standard quotes: drop cap layout (18px body for better readability)
                 HStack(alignment: .top, spacing: 0) {
-                    // Drop cap
+                    // Drop cap (proportionally smaller)
                     Text(firstLetter)
-                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 70 : 56))
+                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 56 : 44))
                         .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                         .padding(.trailing, 4)
-                        .offset(y: -8)
+                        .offset(y: -6)
 
                     // Rest of quote
                     Text(restOfContent)
-                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 30 : 24))
+                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 24 : 18))
                         .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                        .lineSpacing(sizeCategory.isAccessibilitySize ? 14 : 11)
+                        .lineSpacing(sizeCategory.isAccessibilitySize ? 10 : 6)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
+                        .padding(.top, 6)
                 }
-                .padding(.top, 20)
+                .padding(.top, 16)
             }
 
             // Attribution section
@@ -248,11 +248,14 @@ struct QuoteCard: View {
         }
         .padding(.horizontal, 20)  // Tighter horizontal for more text width
         .padding(.vertical, note.isBibleQuote ? 20 : 28)
-        .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium)
-                .fill(DesignSystem.Colors.surfaceBackground)
+        .glassEffect(
+            .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.15)),
+            in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
         )
-        .shadow(color: Color(red: 0.8, green: 0.7, blue: 0.6).opacity(0.15), radius: 12, x: 0, y: 4)
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
+        }
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(DesignSystem.Animation.springStandard, value: isPressed)
         .animation(DesignSystem.Animation.easeStandard, value: showDate)

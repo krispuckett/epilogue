@@ -8,6 +8,8 @@
 	</array>
 	<key>NSAppIntentsVisualIntelligenceSupported</key>
 	<true/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
 	<key>NSVisualIntelligenceUsageDescription</key>

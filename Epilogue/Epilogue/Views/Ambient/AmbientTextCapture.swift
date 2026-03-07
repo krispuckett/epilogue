@@ -411,7 +411,7 @@ class AskAIActivity: UIActivity {
     }
 
     override var activityImage: UIImage? {
-        return UIImage(systemName: "sparkles")
+        return UIImage(systemName: "wand.and.stars")
     }
 
     override func canPerform(withActivityItems activityItems: [Any]) -> Bool {

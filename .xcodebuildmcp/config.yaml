@@ -1,0 +1,5 @@
+schemaVersion: 1
+sessionDefaults:
+  scheme: Epilogue
+  configuration: Debug
+  simulatorName: iPhone 17 Pro

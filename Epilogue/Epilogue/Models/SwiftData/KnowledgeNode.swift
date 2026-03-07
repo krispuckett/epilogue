@@ -59,24 +59,24 @@ final class KnowledgeNode {
     // MARK: - Relationships
 
     /// Books where this entity appears
-    @Relationship(deleteRule: .nullify, inverse: \BookModel.knowledgeNodes)
-    var sourceBooks: [BookModel]
+    @Relationship(deleteRule: .nullify)
+    var sourceBooks: [BookModel]?
 
     /// Notes that mention this entity
     @Relationship(deleteRule: .nullify)
-    var sourceNotes: [CapturedNote]
+    var sourceNotes: [CapturedNote]?
 
     /// Quotes that mention this entity
     @Relationship(deleteRule: .nullify)
-    var sourceQuotes: [CapturedQuote]
+    var sourceQuotes: [CapturedQuote]?
 
     /// Outgoing edges from this node
     @Relationship(deleteRule: .cascade, inverse: \KnowledgeEdge.sourceNode)
-    var outgoingEdges: [KnowledgeEdge]
+    var outgoingEdges: [KnowledgeEdge]?
 
     /// Incoming edges to this node
     @Relationship(deleteRule: .cascade, inverse: \KnowledgeEdge.targetNode)
-    var incomingEdges: [KnowledgeEdge]
+    var incomingEdges: [KnowledgeEdge]?
 
     // MARK: - Initialization
 
@@ -134,15 +134,15 @@ final class KnowledgeNode {
 
     /// All connected nodes (both directions)
     var connectedNodes: [KnowledgeNode] {
-        let outgoing = outgoingEdges.compactMap { $0.targetNode }
-        let incoming = incomingEdges.compactMap { $0.sourceNode }
+        let outgoing = (outgoingEdges ?? []).compactMap { $0.targetNode }
+        let incoming = (incomingEdges ?? []).compactMap { $0.sourceNode }
         return Array(Set(outgoing + incoming))
     }
 
     /// Total engagement score for ranking
     var engagementScore: Double {
-        let favoriteNotes = sourceNotes.filter { $0.isFavorite == true }.count
-        let favoriteQuotes = sourceQuotes.filter { $0.isFavorite == true }.count
+        let favoriteNotes = (sourceNotes ?? []).filter { $0.isFavorite == true }.count
+        let favoriteQuotes = (sourceQuotes ?? []).filter { $0.isFavorite == true }.count
         let favoriteBonus = Double(favoriteNotes + favoriteQuotes) * 2.0
         let highlightBonus = isUserHighlighted ? 5.0 : 0.0
 
@@ -173,6 +173,46 @@ final class KnowledgeNode {
         let normalizedQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return normalizedLabel.contains(normalizedQuery)
     }
+
+    // MARK: - Safe Relationship Helpers (for CloudKit optional arrays)
+
+    /// Add a book to sourceBooks if not already present
+    func addSourceBook(_ book: BookModel) {
+        if sourceBooks == nil { sourceBooks = [] }
+        if !(sourceBooks ?? []).contains(where: { $0.id == book.id }) {
+            sourceBooks?.append(book)
+        }
+    }
+
+    /// Add a note to sourceNotes if not already present
+    func addSourceNote(_ note: CapturedNote) {
+        if sourceNotes == nil { sourceNotes = [] }
+        if !(sourceNotes ?? []).contains(where: { $0.id == note.id }) {
+            sourceNotes?.append(note)
+        }
+    }
+
+    /// Add a quote to sourceQuotes if not already present
+    func addSourceQuote(_ quote: CapturedQuote) {
+        if sourceQuotes == nil { sourceQuotes = [] }
+        if !(sourceQuotes ?? []).contains(where: { $0.id == quote.id }) {
+            sourceQuotes?.append(quote)
+        }
+    }
+
+    /// Check if this node has a specific book
+    func hasSourceBook(_ book: BookModel) -> Bool {
+        (sourceBooks ?? []).contains(where: { $0.id == book.id })
+    }
+
+    /// Get source books safely
+    var safeSourceBooks: [BookModel] { sourceBooks ?? [] }
+
+    /// Get source notes safely
+    var safeSourceNotes: [CapturedNote] { sourceNotes ?? [] }
+
+    /// Get source quotes safely
+    var safeSourceQuotes: [CapturedQuote] { sourceQuotes ?? [] }
 }
 
 // MARK: - Node Type

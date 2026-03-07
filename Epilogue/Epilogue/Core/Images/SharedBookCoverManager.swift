@@ -535,7 +535,7 @@ public class SharedBookCoverManager: ObservableObject {
                 options: [.skipsHiddenFiles]
             ) else { return }
             
-            let maxAge: TimeInterval = 7 * 24 * 60 * 60 // 7 days
+            let maxAge: TimeInterval = 30 * 24 * 60 * 60 // 30 days for reliable offline
             let maxSize: Int64 = 100 * 1024 * 1024 // 100MB total
             var totalSize: Int64 = 0
             var filesToDelete: [(URL, Date)] = []

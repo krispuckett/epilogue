@@ -88,7 +88,7 @@ struct GraphQueryTool: Tool {
         var result = "Found \(nodes.count) entities related to '\(query)':\n\n"
 
         for node in nodes {
-            let bookTitles = node.sourceBooks.map { $0.title }
+            let bookTitles = node.safeSourceBooks.map { $0.title }
             result += "• \(node.type.displayName): \(node.label)"
             if !bookTitles.isEmpty {
                 result += " (in: \(bookTitles.prefix(2).joined(separator: ", ")))"
@@ -202,7 +202,7 @@ struct GetReadingPatternsTool: Tool {
 
         result += "Top Themes:\n"
         for theme in topThemes {
-            result += "• \(theme.label) - \(theme.mentionCount) mentions across \(theme.sourceBooks.count) books\n"
+            result += "• \(theme.label) - \(theme.mentionCount) mentions across \(theme.safeSourceBooks.count) books\n"
         }
 
         if let stats = stats {

@@ -229,8 +229,7 @@ struct ProcessedResponseRow: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.green.opacity(0.05))
-        .glassEffect()
+        .glassEffect(.regular.tint(Color.green.opacity(0.1)), in: RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(.green.opacity(0.2), lineWidth: 0.5)

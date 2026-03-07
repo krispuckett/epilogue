@@ -158,7 +158,7 @@ struct NotesMicroInteractions {
                     .frame(width: 30, height: 30)
                     .rotationEffect(.degrees(rotation))
                 
-                Image(systemName: "sparkles")
+                Image(systemName: "wand.and.stars")
                     .font(.system(size: 14))
                     .foregroundStyle(DesignSystem.Colors.primaryAccent)
                     .scaleEffect(progress)

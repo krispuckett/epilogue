@@ -22,7 +22,16 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var showQuickActionCard = false
     @State private var showReturnCard = false
+    @State private var showDynamicIslandToast = false
+    @State private var showingCompanionInvitation = false
+    @State private var pendingCompanionToken: String?
     @FocusState private var isInputFocused: Bool
+
+    // Query for currently reading books (for toast)
+    @Query(
+        filter: #Predicate<BookModel> { $0.readingStatus == "Currently Reading" },
+        sort: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
+    ) private var currentlyReadingBooks: [BookModel]
 
     // MARK: - Environment
     @Environment(\.modelContext) private var modelContext
@@ -80,6 +89,37 @@ struct ContentView: View {
                 // Developer trigger from Gandalf Mode
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     showReturnCard = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ForceShowDynamicIslandToast"))) { _ in
+                // Developer trigger for Dynamic Island Toast
+                showDynamicIslandToast = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowCompanionInvitation"))) { notification in
+                // Deep link for reading companion invitation
+                if let token = notification.object as? String {
+                    pendingCompanionToken = token
+                    showingCompanionInvitation = true
+                }
+            }
+            .sheet(isPresented: $showingCompanionInvitation) {
+                if let token = pendingCompanionToken {
+                    CompanionInvitationAcceptSheet(
+                        token: token,
+                        onAccept: { companionship in
+                            showingCompanionInvitation = false
+                            pendingCompanionToken = nil
+                            deepLinkHandler.pendingCompanionToken = nil
+                            // Show success toast
+                            appStateCoordinator.toastMessage = "Joined \(companionship.ownerDisplayName)'s reading of \(companionship.bookTitle)"
+                            withAnimation { appStateCoordinator.showingGlassToast = true }
+                        },
+                        onDismiss: {
+                            showingCompanionInvitation = false
+                            pendingCompanionToken = nil
+                            deepLinkHandler.pendingCompanionToken = nil
+                        }
+                    )
                 }
             }
             .sheet(isPresented: $whatsNewManager.shouldShow) {
@@ -143,6 +183,37 @@ struct ContentView: View {
                     }
                     ReturnCardManager.shared.markCardShown()
                 }
+            }
+        }
+        // Dynamic Island Toast - taller format for quick returns
+        .dynamicIslandToast(isPresented: $showDynamicIslandToast) {
+            if let book = currentlyReadingBooks.first(where: { $0.coverImageData != nil }) {
+                WelcomeBackToast(isPresented: $showDynamicIslandToast, book: book)
+            } else {
+                // Fallback content when no book with cover
+                HStack(spacing: 16) {
+                    Image(systemName: "book.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Welcome back")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("No book currently being read")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.5), .blue.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             }
         }
     }

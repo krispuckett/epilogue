@@ -98,8 +98,7 @@ struct ReadingInsightsCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.white.opacity(0.1)))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .contentShape(Rectangle())
         .onTapGesture {
             // Cycle through insights
@@ -181,8 +180,7 @@ struct CompactInsightPill: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .glassEffect(.regular.tint(Color.white.opacity(0.08)))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }
 

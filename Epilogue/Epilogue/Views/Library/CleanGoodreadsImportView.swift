@@ -229,8 +229,7 @@ struct CleanGoodreadsImportView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .glassEffect(.regular.tint(Color.orange.opacity(0.15)), in: RoundedRectangle(cornerRadius: 12))
             }
             .padding(24)
             .glassEffect(in: RoundedRectangle(cornerRadius: 24))

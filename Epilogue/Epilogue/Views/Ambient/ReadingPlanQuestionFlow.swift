@@ -461,22 +461,14 @@ private struct PlanBookSelectionRow: View {
             action()
         } label: {
             HStack(spacing: 14) {
-                // Book cover
-                if let coverURL = book.coverImageURL {
-                    AsyncImage(url: URL(string: coverURL)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 50, height: 75)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        case .failure, .empty:
-                            bookPlaceholder
-                        @unknown default:
-                            bookPlaceholder
-                        }
-                    }
+                // Book cover (cached for offline)
+                if book.coverImageURL != nil {
+                    SharedBookCoverView(
+                        coverURL: book.coverImageURL,
+                        width: 50,
+                        height: 75
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
                     bookPlaceholder
                 }

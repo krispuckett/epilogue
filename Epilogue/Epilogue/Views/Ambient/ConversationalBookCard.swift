@@ -14,28 +14,13 @@ struct ConversationalBookCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Book cover or placeholder
-            AsyncImage(url: URL(string: recommendation.coverURL ?? "")) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 90)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                case .failure, .empty:
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 60, height: 90)
-                        .overlay {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.white.opacity(0.4))
-                        }
-                @unknown default:
-                    EmptyView()
-                }
-            }
+            // Book cover (cached for offline)
+            SharedBookCoverView(
+                coverURL: recommendation.coverURL,
+                width: 60,
+                height: 90
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
 
             // Book info
             VStack(alignment: .leading, spacing: 6) {

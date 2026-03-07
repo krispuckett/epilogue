@@ -145,6 +145,57 @@ final class ReadingPlanNotificationService {
         #endif
     }
 
+    /// Cancel reminders by plan ID (for when plan object is unavailable)
+    func cancelReminders(forPlanId planId: UUID) async {
+        let identifiersToRemove = (1...7).map { day in
+            "\(readingReminderPrefix)\(planId.uuidString)_day\(day)"
+        }
+
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: identifiersToRemove)
+
+        #if DEBUG
+        print("🔔 Cancelled reminders for plan ID: \(planId)")
+        #endif
+    }
+
+    /// Cleanup orphaned notifications - removes notifications for plans that no longer exist or are inactive
+    /// Call this on app launch to ensure no stale notifications
+    func cleanupOrphanedNotifications(activePlanIds: Set<UUID>) async {
+        let pending = await notificationCenter.pendingNotificationRequests()
+        let readingReminders = pending.filter { $0.identifier.hasPrefix(readingReminderPrefix) }
+
+        var orphanedIdentifiers: [String] = []
+
+        for reminder in readingReminders {
+            // Extract plan ID from identifier format: "readingPlanReminder_<UUID>_day<N>"
+            let idString = reminder.identifier
+                .replacingOccurrences(of: readingReminderPrefix, with: "")
+                .components(separatedBy: "_day")
+                .first ?? ""
+
+            if let planId = UUID(uuidString: idString) {
+                // If plan ID is not in active plans, mark for removal
+                if !activePlanIds.contains(planId) {
+                    orphanedIdentifiers.append(reminder.identifier)
+                }
+            } else {
+                // Invalid format, remove it
+                orphanedIdentifiers.append(reminder.identifier)
+            }
+        }
+
+        if !orphanedIdentifiers.isEmpty {
+            notificationCenter.removePendingNotificationRequests(withIdentifiers: orphanedIdentifiers)
+            #if DEBUG
+            print("🔔 Cleaned up \(orphanedIdentifiers.count) orphaned reading plan notifications")
+            #endif
+        } else {
+            #if DEBUG
+            print("🔔 No orphaned notifications found")
+            #endif
+        }
+    }
+
     // MARK: - Helpers
 
     /// Generate default reminder time based on plan preferences

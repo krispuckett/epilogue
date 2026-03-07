@@ -29,18 +29,17 @@ struct CachedResponse: Codable {
 }
 
 // MARK: - Response Cache Manager
-actor ResponseCache {
+@MainActor
+final class ResponseCache {
     static let shared = ResponseCache()
-    
+
     private let cacheKey = "com.epilogue.responseCache"
     private var cache: [String: CachedResponse] = [:]
     private let logger = Logger(subsystem: "com.epilogue", category: "ResponseCache")
-    
+
     private init() {
-        Task {
-            await loadCache()
-            await cleanExpiredEntries()
-        }
+        loadCache()
+        cleanExpiredEntries()
     }
     
     // MARK: - Public Methods
@@ -188,26 +187,27 @@ actor ResponseCache {
 
 // MARK: - OptimizedPerplexityService Extension
 extension OptimizedPerplexityService {
+    @MainActor
     static func cachedChat(message: String, bookContext: Book? = nil) async throws -> String {
         let bookTitle = bookContext?.title
-        
+
         // Check cache first
-        if let cachedResponse = await ResponseCache.shared.getResponse(for: message, bookTitle: bookTitle) {
+        if let cachedResponse = ResponseCache.shared.getResponse(for: message, bookTitle: bookTitle) {
             #if DEBUG
             print("📦 Using cached response for: \(message)")
             #endif
             return cachedResponse
         }
-        
+
         // Generate new response
         #if DEBUG
         print("🔄 Generating new response for: \(message)")
         #endif
         let response = try await shared.chat(message: message, bookContext: bookContext)
-        
+
         // Cache the response
-        await ResponseCache.shared.cacheResponse(response, for: message, bookTitle: bookTitle)
-        
+        ResponseCache.shared.cacheResponse(response, for: message, bookTitle: bookTitle)
+
         return response
     }
 }

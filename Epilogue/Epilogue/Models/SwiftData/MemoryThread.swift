@@ -34,8 +34,11 @@ final class MemoryThread {
     var entryCount: Int = 0
 
     // MARK: - Relationships
-    @Relationship var entries: [ConversationMemoryEntry] = []
-    @Relationship var book: BookModel?
+    @Relationship(deleteRule: .cascade, inverse: \ConversationMemoryEntry.thread)
+    var entries: [ConversationMemoryEntry]?
+
+    @Relationship(deleteRule: .nullify)
+    var book: BookModel?
 
     // MARK: - Initialization
 
@@ -70,10 +73,13 @@ final class MemoryThread {
 
     /// Add an entry to this thread
     func addEntry(_ entry: ConversationMemoryEntry) {
-        entries.append(entry)
+        if entries == nil {
+            entries = []
+        }
+        entries?.append(entry)
         entry.thread = self
         lastUpdateTime = Date()
-        entryCount = entries.count
+        entryCount = entries?.count ?? 0
 
         // Update primary entities
         var allEntities = Set(primaryEntities)
@@ -88,7 +94,7 @@ final class MemoryThread {
         }
 
         // Build from recent entries
-        let recentEntries = entries.suffix(5)
+        let recentEntries = (entries ?? []).suffix(5)
         if recentEntries.isEmpty { return "" }
 
         let entryStrings = recentEntries.map { entry in

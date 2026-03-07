@@ -101,8 +101,8 @@ struct SimpleRichTextEditor: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
-                // Compact centered liquid glass pill
-                HStack(spacing: 12) {
+                // Compact centered liquid glass pill - essential formatting only
+                HStack(spacing: 16) {
                     FormatButton(icon: MarkdownSyntax.bold.systemIcon, syntax: .bold) {
                         insertAtEnd(.bold)
                     }
@@ -114,16 +114,8 @@ struct SimpleRichTextEditor: View {
                     FormatButton(icon: MarkdownSyntax.highlight.systemIcon, syntax: .highlight) {
                         insertAtEnd(.highlight)
                     }
-
-                    FormatButton(icon: MarkdownSyntax.blockquote.systemIcon, syntax: .blockquote) {
-                        insertAtEnd(.blockquote)
-                    }
-
-                    FormatButton(icon: MarkdownSyntax.bulletList.systemIcon, syntax: .bulletList) {
-                        insertAtEnd(.bulletList)
-                    }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.vertical, 10)
                 .glassEffect(.regular, in: .capsule)
             }

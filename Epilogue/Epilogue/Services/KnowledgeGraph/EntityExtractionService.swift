@@ -269,7 +269,7 @@ final class EntityExtractionService {
                     type: .theme,
                     originBookId: book.id
                 )
-                themeNode.sourceBooks.append(book)
+                themeNode.addSourceBook(book)
 
                 _ = try graphService.createEdge(
                     from: bookNode,
@@ -289,7 +289,7 @@ final class EntityExtractionService {
                     type: .character,
                     originBookId: book.id
                 )
-                characterNode.sourceBooks.append(book)
+                characterNode.addSourceBook(book)
 
                 _ = try graphService.createEdge(
                     from: bookNode,
@@ -308,7 +308,7 @@ final class EntityExtractionService {
                 type: .location,
                 originBookId: book.id
             )
-            locationNode.sourceBooks.append(book)
+            locationNode.addSourceBook(book)
         }
 
         logger.info("✅ Indexed book: \(book.title)")
@@ -423,17 +423,13 @@ final class EntityExtractionService {
 
             switch source {
             case .note(let note):
-                if !node.sourceNotes.contains(where: { $0.id == note.id }) {
-                    node.sourceNotes.append(note)
-                }
+                node.addSourceNote(note)
             case .quote(let quote):
-                if !node.sourceQuotes.contains(where: { $0.id == quote.id }) {
-                    node.sourceQuotes.append(quote)
-                }
+                node.addSourceQuote(quote)
             }
 
-            if let book = book, !node.sourceBooks.contains(where: { $0.id == book.id }) {
-                node.sourceBooks.append(book)
+            if let book = book {
+                node.addSourceBook(book)
             }
         }
 
@@ -449,17 +445,13 @@ final class EntityExtractionService {
 
             switch source {
             case .note(let note):
-                if !node.sourceNotes.contains(where: { $0.id == note.id }) {
-                    node.sourceNotes.append(note)
-                }
+                node.addSourceNote(note)
             case .quote(let quote):
-                if !node.sourceQuotes.contains(where: { $0.id == quote.id }) {
-                    node.sourceQuotes.append(quote)
-                }
+                node.addSourceQuote(quote)
             }
 
-            if let book = book, !node.sourceBooks.contains(where: { $0.id == book.id }) {
-                node.sourceBooks.append(book)
+            if let book = book {
+                node.addSourceBook(book)
             }
         }
 
@@ -474,17 +466,13 @@ final class EntityExtractionService {
 
             switch source {
             case .note(let note):
-                if !node.sourceNotes.contains(where: { $0.id == note.id }) {
-                    node.sourceNotes.append(note)
-                }
+                node.addSourceNote(note)
             case .quote(let quote):
-                if !node.sourceQuotes.contains(where: { $0.id == quote.id }) {
-                    node.sourceQuotes.append(quote)
-                }
+                node.addSourceQuote(quote)
             }
 
-            if let book = book, !node.sourceBooks.contains(where: { $0.id == book.id }) {
-                node.sourceBooks.append(book)
+            if let book = book {
+                node.addSourceBook(book)
             }
         }
 
@@ -496,8 +484,8 @@ final class EntityExtractionService {
                 originBookId: bookId
             )
 
-            if let book = book, !node.sourceBooks.contains(where: { $0.id == book.id }) {
-                node.sourceBooks.append(book)
+            if let book = book {
+                node.addSourceBook(book)
             }
         }
 
@@ -512,17 +500,13 @@ final class EntityExtractionService {
 
             switch source {
             case .note(let note):
-                if !node.sourceNotes.contains(where: { $0.id == note.id }) {
-                    node.sourceNotes.append(note)
-                }
+                node.addSourceNote(note)
             case .quote(let quote):
-                if !node.sourceQuotes.contains(where: { $0.id == quote.id }) {
-                    node.sourceQuotes.append(quote)
-                }
+                node.addSourceQuote(quote)
             }
 
-            if let book = book, !node.sourceBooks.contains(where: { $0.id == book.id }) {
-                node.sourceBooks.append(book)
+            if let book = book {
+                node.addSourceBook(book)
             }
         }
 
@@ -576,8 +560,8 @@ final class EntityExtractionService {
                 ).first else { continue }
 
                 // Check if they share a book context
-                let sharedBooks = Set(node1.sourceBooks.map { $0.id })
-                    .intersection(Set(node2.sourceBooks.map { $0.id }))
+                let sharedBooks = Set(node1.safeSourceBooks.map { $0.id })
+                    .intersection(Set(node2.safeSourceBooks.map { $0.id }))
 
                 if !sharedBooks.isEmpty {
                     _ = try graphService.createEdge(

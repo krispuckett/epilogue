@@ -181,17 +181,13 @@ struct BookMentionSuggestionsView: View {
                     onSelect(book)
                 } label: {
                     HStack {
-                        // Book cover or placeholder
-                        if let coverURL = book.coverImageURL, let url = URL(string: coverURL) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            } placeholder: {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(DesignSystem.Colors.primaryAccent.opacity(0.2))
-                            }
-                            .frame(width: 30, height: 45)
+                        // Book cover (cached for offline)
+                        if book.coverImageURL != nil {
+                            SharedBookCoverView(
+                                coverURL: book.coverImageURL,
+                                width: 30,
+                                height: 45
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                         } else {
                             RoundedRectangle(cornerRadius: 4)

@@ -146,9 +146,11 @@ class BookEnrichmentService {
         let prompt = buildSpoilerFreePrompt(title: book.title, author: book.author)
 
         // Use OptimizedPerplexityService for the actual API call
+        // skipQuota: true - enrichment is a system operation, not user interaction
         let response = try await OptimizedPerplexityService.shared.chat(
             message: prompt,
-            bookContext: nil as Book?
+            bookContext: nil as Book?,
+            skipQuota: true
         )
 
         // Parse the response
@@ -248,7 +250,7 @@ class BookEnrichmentService {
         let synopsis = extractField(from: response, fieldName: "synopsis") ?? "No synopsis available."
 
         // Extract themes (look for array)
-        let themes = extractArrayField(from: response, fieldName: "themes") ?? ["literary fiction"]
+        let themes = extractArrayField(from: response, fieldName: "themes") ?? []
 
         // Extract characters
         let characters = extractArrayField(from: response, fieldName: "characters") ?? []
@@ -260,7 +262,7 @@ class BookEnrichmentService {
         let tone = extractArrayField(from: response, fieldName: "tone") ?? ["thoughtful"]
 
         // Extract style
-        let style = extractField(from: response, fieldName: "style") ?? "Literary fiction"
+        let style = extractField(from: response, fieldName: "style") ?? ""
 
         // Extract series metadata
         let seriesName = extractField(from: response, fieldName: "seriesName")
@@ -339,9 +341,11 @@ class BookEnrichmentService {
             If you cannot find the exact page count, respond with your best estimate based on the standard edition.
             """
 
+            // skipQuota: true - page count lookup is a system operation
             let response = try await OptimizedPerplexityService.shared.chat(
                 message: prompt,
-                bookContext: nil
+                bookContext: nil,
+                skipQuota: true
             )
 
             // Extract number from response

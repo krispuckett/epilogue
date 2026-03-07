@@ -155,7 +155,7 @@ struct PatternIndicator: View {
         case .analyzing: return "chart.xyaxis.line"
         case .synthesizing: return "square.stack.3d.up"
         case .evaluating: return "checkmark.seal"
-        case .creating: return "sparkles"
+        case .creating: return "paintbrush.pointed"
         }
     }
 }
@@ -341,7 +341,7 @@ struct RealTimePatternDisplay: View {
         case .analyzing: return "chart.xyaxis.line"
         case .synthesizing: return "square.stack.3d.up"
         case .evaluating: return "checkmark.seal"
-        case .creating: return "sparkles"
+        case .creating: return "paintbrush.pointed"
         }
     }
     

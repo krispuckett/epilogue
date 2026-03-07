@@ -226,48 +226,13 @@ struct CurrentBookRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Book cover
-            Group {
-                if let coverURL = book.coverImageURL {
-                    let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
-                    if let url = URL(string: enhancedURL.replacingOccurrences(of: "http://", with: "https://")) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                                .fill(Color.gray.opacity(0.2))
-                                .overlay {
-                                    ProgressView()
-                                        .tint(DesignSystem.Colors.textTertiary)
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-                        case .failure(_):
-                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                                .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                                .overlay {
-                                    Image(systemName: "book.closed.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                        .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                        .overlay {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
-                        }
-                }
-            }
+            // Book cover (cached for offline)
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 60,
+                height: 90
+            )
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             .frame(width: 60, height: 90)
             .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             
@@ -346,48 +311,13 @@ struct EditBookResultRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Book cover
-            Group {
-                if let coverURL = book.coverImageURL {
-                    let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
-                    if let url = URL(string: enhancedURL.replacingOccurrences(of: "http://", with: "https://")) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                                .fill(Color.gray.opacity(0.2))
-                                .overlay {
-                                    ProgressView()
-                                        .tint(DesignSystem.Colors.textTertiary)
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
-                        case .failure(_):
-                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                                .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                                .overlay {
-                                    Image(systemName: "book.closed.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundStyle(DesignSystem.Colors.textQuaternary)
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                        .fill(Color(red: 0.2, green: 0.2, blue: 0.25))
-                        .overlay {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(DesignSystem.Colors.textQuaternary)
-                        }
-                }
-            }
+            // Book cover (cached for offline)
+            SharedBookCoverView(
+                coverURL: book.coverImageURL,
+                width: 60,
+                height: 90
+            )
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             .frame(width: 60, height: 90)
             .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
             

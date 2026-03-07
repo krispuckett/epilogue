@@ -431,21 +431,13 @@ private struct PlanHubCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                // Book cover or progress circle
-                if let coverURL = plan.bookCoverURL, let url = URL(string: coverURL) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure, .empty:
-                            progressCircle
-                        @unknown default:
-                            progressCircle
-                        }
-                    }
-                    .frame(width: 44, height: 66)
+                // Book cover or progress circle (cached for offline)
+                if let coverURL = plan.bookCoverURL {
+                    SharedBookCoverView(
+                        coverURL: coverURL,
+                        width: 44,
+                        height: 66
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
                     progressCircle
@@ -803,11 +795,21 @@ private struct PlanDetailSheet: View {
                 Button("Resume Plan", systemImage: "play.circle") {
                     plan.resume()
                     try? modelContext.save()
+                    // Re-schedule notifications if they were enabled
+                    if plan.notificationsEnabled {
+                        Task {
+                            await ReadingPlanNotificationService.shared.scheduleReminders(for: plan)
+                        }
+                    }
                 }
             } else {
                 Button("Pause Plan", systemImage: "pause.circle") {
-                    plan.pause()
-                    try? modelContext.save()
+                    Task {
+                        // Cancel notifications when pausing
+                        await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                        plan.pause()
+                        try? modelContext.save()
+                    }
                 }
             }
 

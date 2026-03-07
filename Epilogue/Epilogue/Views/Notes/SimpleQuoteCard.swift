@@ -4,6 +4,7 @@ import SwiftUI
 struct SimpleQuoteCard: View {
     let note: Note
     let capturedQuote: CapturedQuote?
+    var searchQuery: String = ""
     @Environment(\.sizeCategory) var sizeCategory
     @State private var isPressed = false
     @State private var showDate = false
@@ -11,9 +12,10 @@ struct SimpleQuoteCard: View {
     @State private var showingReaderMode = false
 
     // Convenience initializer for backward compatibility
-    init(note: Note, capturedQuote: CapturedQuote? = nil) {
+    init(note: Note, capturedQuote: CapturedQuote? = nil, searchQuery: String = "") {
         self.note = note
         self.capturedQuote = capturedQuote
+        self.searchQuery = searchQuery
     }
 
     // MARK: - Content Detection
@@ -96,22 +98,43 @@ struct SimpleQuoteCard: View {
             
             // Quote content with drop cap
             HStack(alignment: .top, spacing: 0) {
-                // Drop cap
-                Text(firstLetter)
-                    .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 70 : 56))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                // Drop cap (proportionally smaller)
+                if searchQuery.isEmpty {
+                    Text(firstLetter)
+                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 56 : 44))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        .padding(.trailing, 4)
+                        .offset(y: -6)
+                } else {
+                    GeorgiaHighlightedText(
+                        text: firstLetter,
+                        query: searchQuery,
+                        fontSize: sizeCategory.isAccessibilitySize ? 56 : 44
+                    )
                     .padding(.trailing, 4)
-                    .offset(y: -8)
-                
-                // Rest of quote
-                Text(restOfContent)
-                    .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 30 : 24))
-                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                    .lineSpacing(sizeCategory.isAccessibilitySize ? 14 : 11) // Line height 1.5
+                    .offset(y: -6)
+                }
+
+                // Rest of quote (18px body for better readability)
+                if searchQuery.isEmpty {
+                    Text(restOfContent)
+                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 24 : 18))
+                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                        .lineSpacing(sizeCategory.isAccessibilitySize ? 10 : 6)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 6)
+                } else {
+                    GeorgiaHighlightedText(
+                        text: restOfContent,
+                        query: searchQuery,
+                        fontSize: sizeCategory.isAccessibilitySize ? 24 : 18,
+                        lineSpacing: sizeCategory.isAccessibilitySize ? 10 : 6
+                    )
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
+                    .padding(.top, 6)
+                }
             }
-            .padding(.top, 20)
+            .padding(.top, 16)
 
             // "Continue Reading" button for very long quotes
             if isVeryLongQuote {
@@ -185,14 +208,14 @@ struct SimpleQuoteCard: View {
             }
         }
         .padding(32) // Generous padding
-        .background(
-            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                .fill(Color.white.opacity(0.05))
+        .glassEffect(
+            .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.15)),
+            in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
         )
-        .overlay(
+        .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-        )
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
+        }
         .overlay(alignment: .leading) {
             // Golden favorite indicator on left edge
             if capturedQuote?.isFavorite == true {

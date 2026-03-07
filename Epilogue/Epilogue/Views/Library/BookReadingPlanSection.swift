@@ -78,8 +78,12 @@ struct BookReadingPlanSection: View {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
                                 Button("Pause Plan", systemImage: "pause.circle") {
-                                    plan.pause()
-                                    try? modelContext.save()
+                                    Task {
+                                        // Cancel notifications when pausing
+                                        await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                                        plan.pause()
+                                        try? modelContext.save()
+                                    }
                                 }
                                 Divider()
                                 Button("Delete Plan", systemImage: "trash", role: .destructive) {

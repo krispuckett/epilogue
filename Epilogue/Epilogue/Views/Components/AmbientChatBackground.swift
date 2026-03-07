@@ -266,7 +266,7 @@ struct SmartSuggestionsView: View {
                         onSelectSuggestion(suggestion)
                     } label: {
                         HStack {
-                            Image(systemName: "sparkles")
+                            Image(systemName: "wand.and.stars")
                                 .font(.system(size: 14))
                                 .foregroundStyle(Color.orange.opacity(0.7))
                             
@@ -282,8 +282,7 @@ struct SmartSuggestionsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .background(Color.white.opacity(0.05))
-                    .cornerRadius(8)
+                    .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 8))
                 }
             }
             .padding(12)

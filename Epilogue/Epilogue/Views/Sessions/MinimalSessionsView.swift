@@ -298,17 +298,13 @@ struct MinimalSessionCard: View {
             showingDetail = true
         } label: {
             HStack(spacing: 16) {
-                // Book cover or placeholder
-                if let book = book, let coverURL = book.coverImageURL, let url = URL(string: coverURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
-                    }
-                    .frame(width: 44, height: 66)
+                // Book cover (cached for offline)
+                if let book = book {
+                    SharedBookCoverView(
+                        coverURL: book.coverImageURL,
+                        width: 44,
+                        height: 66
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
                     RoundedRectangle(cornerRadius: 4)

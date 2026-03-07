@@ -603,24 +603,33 @@ struct BookSearchSheet: View {
             searchResults = await BookScannerService.shared.reRankBooksWithFeaturePrint(searchResults)
         }
 
+        // If Google returned nothing (quota exceeded or no results), try fallbacks
         if searchResults.isEmpty {
-            // Try spell correction
-            if let correctedQuery = spellCorrect(query), correctedQuery != query {
+            // Check if quota is exhausted for a better error message
+            if booksService.isQuotaExhausted {
                 #if DEBUG
-                print("🔤 Trying spell correction: '\(correctedQuery)'")
+                print("⚠️ Google Books quota exceeded, falling back to Open Library")
                 #endif
-                searchResults = await booksService.searchBooksWithRanking(query: correctedQuery)
-                #if DEBUG
-                print("📖 Found \(searchResults.count) results after correction")
-                #endif
+            }
+
+            // Try spell correction first
+            if !booksService.isQuotaExhausted {
+                if let correctedQuery = spellCorrect(query), correctedQuery != query {
+                    #if DEBUG
+                    print("🔤 Trying spell correction: '\(correctedQuery)'")
+                    #endif
+                    searchResults = await booksService.searchBooksWithRanking(query: correctedQuery)
+                    #if DEBUG
+                    print("📖 Found \(searchResults.count) results after correction")
+                    #endif
+                }
             }
         }
 
         // FALLBACK: Try Open Library if Google Books returned nothing
-        // This helps find obscure books not in Google's index
         if searchResults.isEmpty {
             #if DEBUG
-            print("📚 Google Books returned no results, trying Open Library fallback...")
+            print("📚 Trying Open Library fallback...")
             #endif
             searchResults = await OpenLibrarySearchService.shared.searchBooks(query: query)
             #if DEBUG
@@ -917,7 +926,7 @@ struct BookSearchSheet: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Analyzes your library on-device", systemImage: "cpu")
                         Label("Uses AI to understand your taste", systemImage: "brain")
-                        Label("Recommends books you'll love", systemImage: "sparkles")
+                        Label("Recommends books you'll love", systemImage: "wand.and.stars")
                     }
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.7))
@@ -1149,8 +1158,8 @@ struct BookSearchResultCard: View {
                 addButtonView
             }
             .padding(16)
-            .background(cardBackground)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .glassEffect(.regular.tint(Color.white.opacity(isPressed ? 0.1 : 0.05)), in: .rect(cornerRadius: 16))
+            .overlay(cardBorder)
             .scaleEffect(isPressed ? 0.98 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())

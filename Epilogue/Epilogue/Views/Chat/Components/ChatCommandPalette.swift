@@ -48,7 +48,7 @@ struct ChatCommandPalette: View {
             action: .viewNotes
         ),
         Command(
-            icon: "sparkles",
+            icon: "wand.and.stars",
             title: "Ask AI",
             description: "Get insights about this passage",
             action: .askAI

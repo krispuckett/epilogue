@@ -11,6 +11,7 @@ final class DeepLinkHandler: ObservableObject {
 
     @Published var highlightedBookId: UUID?
     @Published var scrollToBookId: UUID?
+    @Published var pendingCompanionToken: String?  // For companion invitation deep links
 
     weak var navigationCoordinator: NavigationCoordinator?
 
@@ -50,6 +51,10 @@ final class DeepLinkHandler: ObservableObject {
             handleChatDeepLink(components)
         case "continueReading":
             handleContinueReading()
+        case "welcomeback":
+            handleWelcomeBack()
+        case "companion":
+            handleCompanionDeepLink(components)
         default:
             logger.warning("Unknown deep link host: \(components.host ?? "nil")")
         }
@@ -166,6 +171,19 @@ final class DeepLinkHandler: ObservableObject {
         }
     }
 
+    private func handleWelcomeBack() {
+        logger.info("🎴 Welcome Back Live Activity tapped")
+
+        // End the Live Activity since user is now in the app
+        WelcomeBackActivityManager.shared.endActivityOnAppOpen()
+
+        // Mark return card as shown so it doesn't re-trigger
+        ReturnCardManager.shared.markCardShown()
+
+        // Show the full return card overlay
+        NotificationCenter.default.post(name: Notification.Name("ShowReturnCard"), object: nil)
+    }
+
     private func handleContinueReading() {
         logger.info("🎯 Widget tapped: Continue Reading")
 
@@ -177,7 +195,8 @@ final class DeepLinkHandler: ObservableObject {
             return
         }
 
-        logger.info("📚 Opening Ambient Mode with: \(currentBook.title)")
+        let bookTitle = currentBook.title
+        logger.info("📚 Opening Ambient Mode with: \(bookTitle)")
 
         // Post notification to trigger ambient mode (same as Siri intent)
         NotificationCenter.default.post(
@@ -187,6 +206,31 @@ final class DeepLinkHandler: ObservableObject {
                 "bookId": currentBook.id,
                 "bookTitle": currentBook.title
             ]
+        )
+    }
+
+    private func handleCompanionDeepLink(_ components: URLComponents) {
+        // Check if social features are enabled (feature flag in Developer Options)
+        guard UserDefaults.standard.bool(forKey: "socialFeaturesEnabled") else {
+            logger.info("📬 Companion deep link ignored - social features disabled")
+            return
+        }
+
+        // Extract invitation token from URL: epilogue://companion?token=ABC123
+        guard let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+            logger.error("Companion deep link missing token parameter")
+            return
+        }
+
+        logger.info("📬 Received companion invitation with token")
+
+        // Store the pending token - UI will react to this
+        pendingCompanionToken = token
+
+        // Post notification so the app can show the invitation acceptance UI
+        NotificationCenter.default.post(
+            name: Notification.Name("ShowCompanionInvitation"),
+            object: token
         )
     }
 }

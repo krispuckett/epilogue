@@ -70,75 +70,32 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }
         
         // Generate optimized search queries for Google Books API
+        // Keep it lean — max 3 queries to conserve API quota
         func generateSearchQueries() -> [String] {
             var queries: [String] = []
-            
-            // Clean title - remove special characters that might break the API
+
             let cleanTitle = title
                 .replacingOccurrences(of: ":", with: " ")
                 .replacingOccurrences(of: "\"", with: "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            
+
             if let author = author {
                 let cleanAuthor = author
                     .replacingOccurrences(of: "\"", with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                // Most specific: exact title and author
+
+                // Best query: title + author
                 queries.append("intitle:\"\(cleanTitle)\" inauthor:\"\(cleanAuthor)\"")
-                
-                // Try without quotes for more results
-                queries.append("intitle:\(cleanTitle) inauthor:\(cleanAuthor)")
-                
-                // Special case for known popular books
-                if cleanTitle.lowercased().contains("hobbit") && cleanAuthor.lowercased().contains("tolkien") {
-                    queries.insert("intitle:\"The Hobbit\" inauthor:\"J.R.R. Tolkien\"", at: 0)
-                    // Also search for anniversary editions explicitly
-                    queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\" anniversary", at: 1)
-                    queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\" 75th", at: 2)
-                }
-                
-                // Try with just first word of title and full author (handles subtitle variations)
-                let firstWord = cleanTitle.split(separator: " ").first ?? ""
-                if !firstWord.isEmpty {
-                    queries.append("intitle:\(firstWord) inauthor:\"\(cleanAuthor)\"")
-                }
-                
-                // Try with author's last name only
-                let authorParts = cleanAuthor.split(separator: " ")
-                if let lastName = authorParts.last {
-                    queries.append("intitle:\"\(cleanTitle)\" inauthor:\(lastName)")
-                }
             }
-            
-            // Fallback to just title
+
+            // Fallback: just title (handles most cases well)
             queries.append("intitle:\"\(cleanTitle)\"")
 
-            // Special handling for The Hobbit - search for specific editions AND ISBNs
-            // IMPORTANT: Insert in REVERSE order so ISBN stays at position 0!
-            if cleanTitle.lowercased() == "the hobbit" || cleanTitle.lowercased() == "hobbit" {
-                queries.insert("intitle:\"The Hobbit\" illustrated", at: 0)
-                queries.insert("intitle:\"The Hobbit\" anniversary edition", at: 0)
-                queries.insert("intitle:\"The Hobbit\" 75th anniversary", at: 0)
-                queries.insert("intitle:\"The Hobbit\" inauthor:\"Tolkien\"", at: 0)
-                queries.insert("intitle:\"The Hobbit\" inauthor:\"J.R.R. Tolkien\"", at: 0)
-                // ISBN query MUST be first - this is the 75th Anniversary Edition with Tolkien's mountain/red sun cover!
-                // Google Books ID: pD6arNyKyi8C (2012 HarperCollins edition)
-                queries.insert("isbn:0547951973", at: 0)
-            }
-            
-            queries.append(cleanTitle)
-            
-            // If we have a year, add a query with year
-            if let year = year {
-                queries.append("\(cleanTitle) \(year)")
-            }
-            
-            // Finally, try the original query as-is
+            // Final fallback: raw query as-is
             if !queries.contains(originalQuery) {
                 queries.append(originalQuery)
             }
-            
+
             return queries
         }
     }
@@ -164,17 +121,14 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             }
         }
 
-        // Get initial batch of results with overall timeout (8 seconds max)
-        // This prevents runaway searches when Google returns many irrelevant results
-        let results = await withSearchTimeout(seconds: 8) {
-            await self.fetchEnhancedBatch(
-                query: query,
-                parsedQuery: parsedQuery,
-                preferISBN: preferISBN,
-                publisherHint: publisherHint,
-                lightMode: lightMode
-            )
-        }
+        // Get initial batch of results
+        let results = await fetchEnhancedBatch(
+            query: query,
+            parsedQuery: parsedQuery,
+            preferISBN: preferISBN,
+            publisherHint: publisherHint,
+            lightMode: lightMode
+        )
 
         enhancedSearchResults = results
         enhancedStartIndex = results.count
@@ -215,31 +169,6 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         return enhancedSearchResults
     }
 
-    // MARK: - Timeout Helper
-
-    /// Execute a search operation with a timeout - returns empty array if timeout exceeded
-    private func withSearchTimeout(seconds: Int, operation: @escaping () async -> [Book]) async -> [Book] {
-        await withTaskGroup(of: [Book]?.self) { group in
-            // Main operation task
-            group.addTask {
-                return await operation()
-            }
-
-            // Timeout task
-            group.addTask {
-                try? await Task.sleep(for: .seconds(seconds))
-                return nil // Signal timeout
-            }
-
-            // Return first result (completion or timeout)
-            for await result in group {
-                group.cancelAll()
-                return result ?? []
-            }
-            return []
-        }
-    }
-
     // Fetch a batch of enhanced results
     @MainActor
     private func fetchEnhancedBatch(
@@ -267,8 +196,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         var triedQueries = Set<String>()
         var isbnResultIDs = Set<String>()  // Track IDs from ISBN queries
 
-        // Try each query until we get good results
+        // Try each query until we get good results (stop if quota exhausted)
         for searchQuery in searchQueries {
+            guard !isQuotaExhausted else { break }
             guard !triedQueries.contains(searchQuery) else { continue }
             triedQueries.insert(searchQuery)
 
@@ -298,13 +228,8 @@ class EnhancedGoogleBooksService: GoogleBooksService {
 
             allResults.append(contentsOf: results)
 
-            // If we have enough good results, stop searching
-            let booksWithCovers = allResults.filter { item in
-                item.volumeInfo.imageLinks?.thumbnail != nil
-            }
-
-            // Get at least 40 books with covers for a full page of high-quality results
-            if booksWithCovers.count >= 40 {
+            // If we have enough results, stop searching (conserve API quota)
+            if allResults.count >= 20 {
                 break
             }
         }
@@ -420,127 +345,34 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             return passes
         }.map { $0.book }
 
-        #if DEBUG
-        print("📚 Validating cover URLs for \(filteredBooks.count) books in PARALLEL")
-        #endif
-
-        // PERFORMANCE FIX: Parallel cover resolution
-        // Previously sequential: 40 books × ~2 sec each = 80 seconds
-        // Now parallel: all at once with quick mode = ~3-5 seconds total
-        let booksToValidate = Array(filteredBooks.prefix(20)) // Limit to top 20 for search
-
-        // Use withTaskGroup for parallel processing - all books at once
-        let validatedResults: [(index: Int, book: Book)] = await withTaskGroup(of: (Int, Book?).self) { group in
-            for (index, book) in booksToValidate.enumerated() {
-                group.addTask {
-                    // Use quick mode (3 URLs, shorter timeouts) for search results
-                    if let resolvedURL = await DisplayCoverURLResolver.resolveDisplayURL(
-                        googleID: book.id,
-                        isbn: book.isbn,
-                        thumbnailURL: book.coverImageURL,
-                        mode: .quick
-                    ) {
-                        var validated = book
-                        validated.coverImageURL = resolvedURL
-                        return (index, validated)
-                    }
-                    return (index, nil)
-                }
-            }
-
-            // Collect all results
-            var results: [(Int, Book)] = []
-            for await (idx, book) in group {
-                if let book = book {
-                    results.append((idx, book))
-                }
-            }
-            return results
-        }
-
-        // Sort by original index to maintain ranking order
-        let validatedBooks = validatedResults
-            .sorted { $0.index < $1.index }
-            .map { $0.book }
+        // Return top results directly — no cover URL validation during search.
+        // The image view handles failed loads with placeholders.
+        // Cover validation was causing books to be silently dropped from results.
+        let topResults = Array(filteredBooks.prefix(20))
 
         #if DEBUG
-        print("📚 Returning \(validatedBooks.count) books with validated covers (filtered \(booksToValidate.count - validatedBooks.count) blanks)")
+        print("📚 Returning \(topResults.count) books (from \(filteredBooks.count) scored)")
         #endif
 
-        return validatedBooks
+        return topResults
     }
     
     private func getRawSearchResults(query: String, maxResults: Int = 40, lightMode: Bool = false, startIndex: Int = 0) async -> [GoogleBookItem] {
         var allItems: [GoogleBookItem] = []
 
-        // OPTIMIZATION: Light mode for large imports reduces API calls by 60%
-        if lightMode {
-            // Only do 1-2 most reliable searches to reduce API load
-            // Strategy 1: Regular search with more results
-            if let items = await performRawSearch(query: query, maxResults: 30, startIndex: startIndex) {
+        // Single relevance search — one API call instead of 4
+        // This dramatically reduces quota usage
+        if let items = await performRawSearch(query: query, maxResults: maxResults, startIndex: startIndex) {
+            allItems.append(contentsOf: items)
+        }
+
+        // Only fetch more if we got very few results and haven't hit quota
+        if allItems.count < 5 && !isQuotaExhausted && !lightMode {
+            if let items = await performRawSearch(query: query, maxResults: 20, orderBy: "newest", startIndex: startIndex) {
                 allItems.append(contentsOf: items)
             }
-
-            // Strategy 2: Relevance search only if we don't have enough results
-            if allItems.count < 15 {
-                if let items = await performRawSearch(query: query, maxResults: 15, orderBy: "relevance", startIndex: startIndex) {
-                    allItems.append(contentsOf: items)
-                }
-            }
-        } else {
-            // Full parallel search for normal imports
-            // Try multiple search strategies in parallel
-            await withTaskGroup(of: [GoogleBookItem]?.self) { group in
-                // Strategy 1: Regular search
-                group.addTask {
-                    return await self.performRawSearch(query: query, maxResults: maxResults, startIndex: startIndex)
-                }
-
-                // Strategy 2: If it looks like title + author, search each separately
-                if query.contains(" by ") || query.split(separator: " ").count > 2 {
-                    let words = query.split(separator: " ")
-                    if words.count > 1 {
-                        // Search by likely title (first few words)
-                        let titleQuery = words.prefix(min(3, words.count - 1)).joined(separator: " ")
-                        group.addTask {
-                            return await self.performRawSearch(
-                                query: "intitle:\(titleQuery)",
-                                maxResults: 10,
-                                startIndex: startIndex
-                            )
-                        }
-                    }
-                }
-
-                // Strategy 3: Search with orderBy relevance
-                group.addTask {
-                    return await self.performRawSearch(
-                        query: query,
-                        maxResults: 10,
-                        orderBy: "relevance",
-                        startIndex: startIndex
-                    )
-                }
-
-                // Strategy 4: Search with orderBy newest (sometimes gets better editions)
-                group.addTask {
-                    return await self.performRawSearch(
-                        query: query,
-                        maxResults: 10,
-                        orderBy: "newest",
-                        startIndex: startIndex
-                    )
-                }
-
-                // Collect all results
-                for await items in group {
-                    if let items = items {
-                        allItems.append(contentsOf: items)
-                    }
-                }
-            }
         }
-        
+
         // Remove duplicates by ID
         var seen = Set<String>()
         return allItems.filter { item in
@@ -550,12 +382,18 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         }
     }
     
+    /// Tracks whether we've hit API quota limits this session
+    private(set) var isQuotaExhausted = false
+
     private func performRawSearch(
         query: String,
         maxResults: Int,
         orderBy: String = "relevance",
         startIndex: Int = 0
     ) async -> [GoogleBookItem]? {
+        // Don't bother calling if we already know quota is exhausted
+        guard !isQuotaExhausted else { return nil }
+
         let apiBaseURL = "https://www.googleapis.com/books/v1/volumes"
         guard var components = URLComponents(string: apiBaseURL) else { return nil }
 
@@ -564,18 +402,24 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             URLQueryItem(name: "maxResults", value: String(maxResults)),
             URLQueryItem(name: "startIndex", value: String(startIndex)),
             URLQueryItem(name: "orderBy", value: orderBy),
-            // REMOVED printType restriction to include all formats (esp. self-published)
-            // URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "langRestrict", value: "en"),
-            URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
+            URLQueryItem(name: "projection", value: "full")
         ]
-        
+
         guard let url = components.url else { return nil }
-        
+
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(GoogleBooksResponse.self, from: data)
-            return response.items ?? []
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            // Check for rate limiting (429)
+            if let http = response as? HTTPURLResponse, http.statusCode == 429 {
+                isQuotaExhausted = true
+                os_log(.fault, log: OSLog.default, "Google Books API quota exceeded (429)")
+                return nil
+            }
+
+            let decoded = try JSONDecoder().decode(GoogleBooksResponse.self, from: data)
+            return decoded.items ?? []
         } catch {
             os_log(.error, log: OSLog.default, "Search error: %@", error.localizedDescription)
             return nil

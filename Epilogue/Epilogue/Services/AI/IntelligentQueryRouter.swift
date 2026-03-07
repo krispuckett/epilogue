@@ -60,8 +60,10 @@ class IntelligentQueryRouter {
 
     private func setupNetworkMonitoring() {
         networkMonitor.pathUpdateHandler = { [weak self] path in
+            // Extract value before Task to avoid capturing non-Sendable NWPath
+            let isConnected = path.status == .satisfied
             Task { @MainActor in
-                self?.isOnline = path.status == .satisfied
+                self?.isOnline = isConnected
             }
         }
         networkMonitor.start(queue: DispatchQueue.global(qos: .utility))
@@ -101,13 +103,13 @@ class IntelligentQueryRouter {
         }
 
         // SONAR: Web search, current events, facts
+        // Note: "similar books" and "books like" are handled by AmbientConversationFlows vibe recommendation
         let webSearchIndicators = [
             "latest", "2024", "2025", "2026", "news", "current",
             "author interview", "movie adaptation", "reviews",
             "recently", "today", "this year", "update",
             "real world", "actually", "in reality",
-            "other books by", "published", "awards",
-            "similar books", "books like", "sequels"
+            "other books by", "published", "awards", "sequels"
         ]
 
         for indicator in webSearchIndicators {

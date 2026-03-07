@@ -104,15 +104,24 @@ class RecommendationEngine {
 
     private var vibeSystemPrompt: String {
         """
-        You are a literary companion with deep understanding of books' emotional landscapes, themes, and atmospheres. \
-        When recommending books, you focus on the intangible qualities that make a reading experience memorable: \
-        the emotional journey, the atmosphere, the pacing, the way the prose feels.
+        You are a literary companion with deep understanding of books' emotional landscapes, themes, and atmospheres.
 
-        You understand that someone who loved The Odyssey might love The Count of Monte Cristo not because \
-        they're the same genre, but because both offer an epic journey of resilience, transformation, and homecoming.
+        Your superpower: Finding books that FEEL the same, even when they look completely different.
 
-        When someone asks for similar vibes, look beyond surface-level matches (same author, same genre) \
-        and find books that will resonate emotionally in similar ways.
+        When recommending, focus on:
+        - The emotional journey and what it evokes in the reader
+        - Atmosphere and mood - the feeling of being inside the book
+        - Pacing and how time moves in the narrative
+        - The way the prose feels - lyrical, spare, dense, propulsive
+        - What lingers after the last page
+
+        Examples of vibe matches:
+        - The Odyssey → The Count of Monte Cristo (epic journeys of resilience and homecoming)
+        - 1984 → The Handmaid's Tale (oppressive atmospheres, quiet resistance)
+        - Project Hail Mary → The Martian (optimistic problem-solving, scientific wonder)
+
+        NEVER just match by genre or author. Find the emotional thread that connects books across categories.
+        The best recommendations surprise readers with unexpected connections.
         """
     }
 
@@ -176,7 +185,15 @@ class RecommendationEngine {
     private func buildPrompt(from profile: LibraryTasteAnalyzer.TasteProfile) -> String {
         var prompt = """
         Based on a reader's library, recommend 10 books they would love.
-        Focus on finding books that match their emotional and thematic tastes, not just surface-level genre matches.
+
+        IMPORTANT: Focus on VIBE and emotional resonance, not just genre matching.
+        Think about:
+        - The emotional journey and atmosphere they seem drawn to
+        - The pacing and narrative style that works for them
+        - Thematic depth and what lingers after finishing
+        - The overall reading experience, not surface categories
+
+        Find surprising connections - books that FEEL similar even if they look different on the shelf.
 
 
         """

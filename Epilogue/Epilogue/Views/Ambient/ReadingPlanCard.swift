@@ -286,6 +286,7 @@ private struct PlanCardButtonStyle: ButtonStyle {
 struct ReadingPlanDetailView: View {
     let plan: ReadingHabitPlan
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
     @State private var isVisible = false
 
@@ -349,10 +350,37 @@ struct ReadingPlanDetailView: View {
 
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("Edit Plan", systemImage: "pencil") { }
-                    Button("Pause Plan", systemImage: "pause.circle") { }
+                    if plan.isPaused {
+                        Button("Resume Plan", systemImage: "play.circle") {
+                            plan.resume()
+                            try? modelContext.save()
+                            // Re-schedule notifications if they were enabled
+                            if plan.notificationsEnabled {
+                                Task {
+                                    await ReadingPlanNotificationService.shared.scheduleReminders(for: plan)
+                                }
+                            }
+                        }
+                    } else {
+                        Button("Pause Plan", systemImage: "pause.circle") {
+                            Task {
+                                // Cancel notifications when pausing
+                                await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                                plan.pause()
+                                try? modelContext.save()
+                            }
+                        }
+                    }
                     Divider()
-                    Button("Delete Plan", systemImage: "trash", role: .destructive) { }
+                    Button("Delete Plan", systemImage: "trash", role: .destructive) {
+                        Task {
+                            // Cancel notifications before deleting
+                            await ReadingPlanNotificationService.shared.cancelReminders(for: plan)
+                            modelContext.delete(plan)
+                            try? modelContext.save()
+                            dismiss()
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 14, weight: .semibold))

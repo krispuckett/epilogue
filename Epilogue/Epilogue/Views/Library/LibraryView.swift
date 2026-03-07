@@ -33,6 +33,18 @@ struct LibraryView: View {
     @State private var toastMessage = ""
     @State private var showingWebSearch = false
     @State private var showingReadingPlansHub = false
+
+    // MARK: - Reading Activity Card
+    // Query recent reading sessions to find the last book the user was actually reading
+    @Query(
+        sort: [SortDescriptor(\ReadingSession.startDate, order: .reverse)]
+    ) private var recentSessions: [ReadingSession]
+
+    @Query(
+        filter: #Predicate<BookModel> { $0.readingStatus == "Currently Reading" },
+        sort: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
+    ) private var currentlyReadingBooks: [BookModel]
+    @State private var showInlineActivityCard = false
     
     #if DEBUG
     @State private var frameDrops = 0
@@ -108,6 +120,41 @@ struct LibraryView: View {
             NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
             SensoryFeedback.light()
         }
+    }
+
+    // MARK: - Inline Reading Card Helper
+
+    private func findMatchingBook(for localId: String) -> Book? {
+        for vmBook in viewModel.books {
+            if vmBook.localId.uuidString == localId {
+                return vmBook
+            }
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func inlineReadingCard(for bookModel: BookModel) -> some View {
+        ReadingActivityCard(
+            book: bookModel,
+            onContinue: {
+                // Navigate to book detail
+                if let foundBook = findMatchingBook(for: bookModel.localId) {
+                    selectedBookForNavigation = foundBook
+                    navigateToBookDetail = true
+                }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showInlineActivityCard = false
+                }
+                ReturnCardManager.shared.markInlineShown()
+            },
+            onDismiss: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showInlineActivityCard = false
+                }
+                ReturnCardManager.shared.markInlineShown()
+            }
+        )
     }
 
     /// Unified book addition: syncs both UserDefaults (legacy) and SwiftData (modern)
@@ -624,46 +671,80 @@ struct LibraryView: View {
             .environmentObject(viewModel)
     }
     
-    @ViewBuilder
-    private var mainContent: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                
-                if viewModel.isLoading {
-                    // Show skeleton screens while loading
-                    ScrollView {
-                        if viewMode == .grid {
-                            SkeletonGrid(columns: 2, rows: 4)
-                        } else {
-                            SkeletonList(count: 6)
-                        }
-                    }
-                    .transition(.opacity)
-                } else if viewModel.books.isEmpty {
-                    emptyStateView
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                } else {
-                    ZStack {
-                        if viewMode == .grid {
-                            gridContent
-                                // Removed transition for performance
-                        } else {
-                            listContent
-                                // Removed transition for performance
-                        }
-                    }
-                    // Removed animation for smoother scrolling
-                }
-                
-                // Add bottom padding to prevent content from scrolling under action buttons
-                Color.clear
-                    .frame(height: 45) // Space for action buttons above tab bar
+    // Find the book from the most recent reading session (not just most recently added)
+    private var currentReadingBook: BookModel? {
+        // First, try to find a book from recent sessions that's still being read
+        for session in recentSessions {
+            if let book = session.bookModel,
+               book.readingStatus == ReadingStatus.currentlyReading.rawValue,
+               book.coverImageData != nil {
+                return book
             }
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollDismissesKeyboard(.immediately)
-        .refreshable {
-            await refreshLibrary()
+        // Fallback: any currently reading book with a cover
+        return currentlyReadingBooks.first(where: { $0.coverImageData != nil })
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            // MARK: - Inline Reading Activity Card (OUTSIDE ScrollView for performance)
+            if showInlineActivityCard, let currentBook = currentReadingBook {
+                inlineReadingCard(for: currentBook)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
+            }
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    if viewModel.isLoading {
+                        // Show skeleton screens while loading
+                        ScrollView {
+                            if viewMode == .grid {
+                                SkeletonGrid(columns: 2, rows: 4)
+                            } else {
+                                SkeletonList(count: 6)
+                            }
+                        }
+                        .transition(.opacity)
+                    } else if viewModel.books.isEmpty {
+                        emptyStateView
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    } else {
+                        ZStack {
+                            if viewMode == .grid {
+                                gridContent
+                            } else {
+                                listContent
+                            }
+                        }
+                    }
+
+                    // Add bottom padding to prevent content from scrolling under action buttons
+                    Color.clear
+                        .frame(height: 45) // Space for action buttons above tab bar
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.immediately)
+            .refreshable {
+                await refreshLibrary()
+            }
+        }
+        .task {
+            // Check if we should show the inline activity card
+            if ReturnCardManager.shared.shouldShowInlineCard,
+               currentReadingBook != nil {
+                // Small delay for smoother appearance after view loads
+                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    showInlineActivityCard = true
+                }
+            }
         }
     }
     
@@ -744,6 +825,12 @@ struct LibraryView: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     showingBookAddedToast = true
                 }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ForceShowInlineActivityCard"))) { _ in
+            // Developer option: force show inline activity card
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                showInlineActivityCard = true
             }
         }
         .modifier(GlassToastModifier(isShowing: $showingBookAddedToast, message: toastMessage))

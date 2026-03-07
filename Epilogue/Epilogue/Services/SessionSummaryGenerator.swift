@@ -130,6 +130,101 @@ final class SessionSummaryGenerator: ObservableObject {
         }
     }
 
+    // MARK: - Simple Reflection for Ambient Mode
+
+    /// Generate a reflection from simple ambient session data (used by TrueAmbientProcessor)
+    func generateAmbientReflection(
+        bookTitle: String?,
+        bookAuthor: String?,
+        questions: [String],
+        quotes: [String],
+        notes: [String],
+        duration: TimeInterval
+    ) async -> SessionReflection {
+        isGenerating = true
+        defer { isGenerating = false }
+
+        let systemPrompt = """
+        You are a thoughtful reading companion reflecting on a reading session.
+        Synthesize what was discussed, connect themes, and offer a warm, insightful reflection.
+        Be genuine and literary, not generic. Keep it concise (2-3 short paragraphs max). No emojis.
+        """
+
+        let bookContext = bookTitle != nil ? "\"\(bookTitle!)\" by \(bookAuthor ?? "the author")" : "their reading"
+
+        let userPrompt = """
+        Please reflect on this reading session for \(bookContext):
+
+        QUESTIONS DISCUSSED:
+        \(questions.isEmpty ? "No questions asked" : questions.prefix(10).map { "- \($0.prefix(100))" }.joined(separator: "\n"))
+
+        \(quotes.isEmpty ? "" : "QUOTES CAPTURED:\n\(quotes.prefix(5).map { "- \"\($0.prefix(80))...\"" }.joined(separator: "\n"))\n")
+        \(notes.isEmpty ? "" : "NOTES TAKEN:\n\(notes.prefix(5).map { "- \($0.prefix(80))" }.joined(separator: "\n"))\n")
+
+        SESSION: \(formatDuration(duration)), \(questions.count) questions
+
+        Generate a warm, insightful reflection that:
+        1. Summarizes what themes or questions emerged
+        2. Notes any interesting connections
+        3. Offers a thought to carry forward
+        """
+
+        do {
+            let reflection = try await ClaudeService.shared.subscriberChat(
+                message: userPrompt,
+                systemPrompt: systemPrompt,
+                maxTokens: 500
+            )
+
+            logger.info("✨ Generated ambient session reflection")
+
+            return SessionReflection(
+                text: reflection,
+                themes: extractThemesFromStrings(questions),
+                duration: duration,
+                questionCount: questions.count,
+                bookTitle: bookTitle ?? "Reading Session",
+                generatedAt: Date()
+            )
+
+        } catch {
+            logger.error("Claude reflection failed: \(error), using fallback")
+            return SessionReflection(
+                text: generateSimpleFallbackReflection(questions: questions, bookTitle: bookTitle),
+                themes: extractThemesFromStrings(questions),
+                duration: duration,
+                questionCount: questions.count,
+                bookTitle: bookTitle ?? "Reading Session",
+                generatedAt: Date()
+            )
+        }
+    }
+
+    private func extractThemesFromStrings(_ questions: [String]) -> [String] {
+        var themes: [String] = []
+        let allText = questions.joined(separator: " ").lowercased()
+
+        if allText.contains("character") || allText.contains("who") { themes.append("Characters") }
+        if allText.contains("theme") || allText.contains("meaning") { themes.append("Themes") }
+        if allText.contains("symbol") || allText.contains("represent") { themes.append("Symbolism") }
+        if allText.contains("plot") || allText.contains("happen") { themes.append("Plot") }
+        if allText.contains("why") || allText.contains("motive") { themes.append("Motivation") }
+
+        return themes.isEmpty ? ["General Discussion"] : themes
+    }
+
+    private func generateSimpleFallbackReflection(questions: [String], bookTitle: String?) -> String {
+        let book = bookTitle ?? "this book"
+        if questions.isEmpty {
+            return "A quiet reading session with \(book). Sometimes the best sessions are those spent simply absorbing the words."
+        }
+
+        let questionCount = questions.count
+        let topic = questions.first?.prefix(50) ?? "various aspects"
+
+        return "You explored \(questionCount) question\(questionCount == 1 ? "" : "s") about \(book), starting with \"\(topic)...\". Each question opens new doors in understanding. Consider revisiting these threads in your next session."
+    }
+
     private func buildConversationSummary(messages: [UnifiedChatMessage]) -> String {
         let userQuestions = messages
             .filter { $0.isUser }

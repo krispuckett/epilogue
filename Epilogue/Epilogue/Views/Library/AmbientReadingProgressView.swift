@@ -18,8 +18,9 @@ struct AmbientReadingProgressView: View {
     @State private var hasAppeared: Bool = false
     @State private var isDragging: Bool = false
     @State private var dragStartProgress: Double = 0
-    @State private var celebrationPulses: [CelebrationPulse] = []
     @State private var hasTriggeredCompletion: Bool = false
+    @State private var celebrationStartTime: Date?
+    @State private var isCelebrating: Bool = false
 
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -146,34 +147,32 @@ struct AmbientReadingProgressView: View {
     
     @ViewBuilder
     private var heroProgressDisplay: some View {
-        ZStack {
-            // Ambient background glow - more pronounced as progress increases but fixed size
+        let heroContent = ZStack {
+            // Ambient background glow
             Circle()
                 .fill(
                     RadialGradient(
                         colors: [
-                            primaryColor.opacity(glowIntensity * 0.2 * (1 + animatedProgress * 2)),  // Intensifies with progress
+                            primaryColor.opacity(glowIntensity * 0.2 * (1 + animatedProgress * 2)),
                             secondaryColor.opacity(glowIntensity * 0.15 * (1 + animatedProgress * 1.5)),
-                            accentColor.opacity(glowIntensity * 0.1 * animatedProgress * 2),  // Only appears with progress
+                            accentColor.opacity(glowIntensity * 0.1 * animatedProgress * 2),
                             Color.clear
                         ],
                         center: .center,
-                        startRadius: 20,  // Fixed start radius
-                        endRadius: 140  // Fixed end radius
+                        startRadius: 20,
+                        endRadius: 140
                     )
                 )
-                .frame(width: 280, height: 280)  // Fixed size - no growth
-                .blur(radius: 6)  // Fixed blur for consistency
-                .opacity(0.6 + 0.4 * animatedProgress)  // Use opacity to show progress instead of size
-            
+                .frame(width: 280, height: 280)
+                .blur(radius: 6)
+                .opacity(0.6 + 0.4 * animatedProgress)
+
             // Floating progress ring
             ZStack {
-                // Background ring
                 Circle()
                     .stroke(Color.white.opacity(0.10), lineWidth: 3)
                     .frame(width: 120, height: 120)
 
-                // Animated progress ring - more vibrant but fixed thickness
                 Circle()
                     .trim(from: 0, to: animatedProgress)
                     .stroke(
@@ -191,62 +190,33 @@ struct AmbientReadingProgressView: View {
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
                     .shadow(color: primaryColor.opacity(0.3 * animatedProgress), radius: 4, x: 0, y: 0)
-                    .shadow(
-                        color: primaryColor.opacity(0.6),
-                        radius: 4,
-                        y: 2
-                    )
+                    .shadow(color: primaryColor.opacity(0.6), radius: 4, y: 2)
 
-                // Center progress display - single line
                 Text("\(Int(animatedProgress * 100))%")
                     .font(.system(size: 24, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.white)
                     .contentTransition(.numericText())
             }
-            .overlay {
-                // Celebration pulse rings - as overlay so they don't affect layout
-                // Clean expanding rings with subtle organic wobble via Metal shader
-                ForEach(celebrationPulses) { pulse in
-                    ZStack {
-                        // Soft outer glow
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        primaryColor.opacity(pulse.opacity * 0.7),
-                                        secondaryColor.opacity(pulse.opacity * 0.5),
-                                        accentColor.opacity(pulse.opacity * 0.3)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 12
-                            )
-                            .frame(width: 120 * pulse.scale, height: 120 * pulse.scale)
-                            .blur(radius: 16)
-                            .modifier(WaterWobbleModifier(wobblePhase: pulse.scale * 10.0))
+        }
 
-                        // Sharp inner ring
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        primaryColor.opacity(pulse.opacity * 1.0),
-                                        secondaryColor.opacity(pulse.opacity * 0.85),
-                                        accentColor.opacity(pulse.opacity * 0.7)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 5
-                            )
-                            .frame(width: 120 * pulse.scale, height: 120 * pulse.scale)
-                            .blur(radius: 2)
-                            .modifier(WaterWobbleModifier(wobblePhase: pulse.scale * 12.0))
+        if isCelebrating {
+            TimelineView(.animation) { timeline in
+                let elapsed = Float(celebrationStartTime?.distance(to: timeline.date) ?? 0)
+                heroContent
+                    .drawingGroup()
+                    .visualEffect { content, proxy in
+                        content.layerEffect(
+                            ShaderLibrary.bcs_celebrationWave(
+                                .float2(proxy.size),
+                                .float(elapsed),
+                                .float(1.0)
+                            ),
+                            maxSampleOffset: CGSize(width: 40, height: 40)
+                        )
                     }
-                    .allowsHitTesting(false)
-                }
             }
+        } else {
+            heroContent
         }
     }
     
@@ -561,37 +531,13 @@ struct AmbientReadingProgressView: View {
     }
 
     private func triggerCelebrationPulses() {
-        // Create 5 expanding pulse rings with realistic water-ripple physics
-        for i in 0..<5 {
-            let delay = Double(i) * 0.15  // Faster succession like real water ripples
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                let pulse = CelebrationPulse(id: UUID())
-                celebrationPulses.append(pulse)
+        isCelebrating = true
+        celebrationStartTime = .now
 
-                // Realistic water physics - each ring loses energy as it travels outward
-                let waveNumber = Double(i)
-                let baseResponse = 1.8
-                let variableResponse = baseResponse + (waveNumber * 0.18)  // Later waves slower
-                let variableDamping = 0.38 + (waveNumber * 0.04)           // Progressive energy loss
-                let variableScale = 5.0 - (waveNumber * 0.15)              // Later waves don't travel as far
-
-                // Add slight randomness for organic feel
-                let randomOffset = Double.random(in: -0.05...0.05)
-                let finalResponse = variableResponse + randomOffset
-
-                // Animate with water-like spring physics
-                withAnimation(.spring(response: finalResponse, dampingFraction: variableDamping)) {
-                    if let index = celebrationPulses.firstIndex(where: { $0.id == pulse.id }) {
-                        celebrationPulses[index].scale = variableScale
-                        celebrationPulses[index].opacity = 0.0
-                    }
-                }
-
-                // Remove pulse after animation completes
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-                    celebrationPulses.removeAll(where: { $0.id == pulse.id })
-                }
-            }
+        // Stop celebration after shader animation completes (~3s)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            isCelebrating = false
+            celebrationStartTime = nil
         }
     }
 }
@@ -603,12 +549,6 @@ private struct ProgressDot {
     var isActive: Bool
     let isMilestone: Bool
     let size: CGFloat
-}
-
-struct CelebrationPulse: Identifiable {
-    let id: UUID
-    var scale: CGFloat = 1.0
-    var opacity: Double = 1.0
 }
 
 // MARK: - Preview

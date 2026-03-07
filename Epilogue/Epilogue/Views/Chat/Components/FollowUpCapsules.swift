@@ -239,7 +239,7 @@ struct SmartFollowUpCapsules: View {
         case .deeper: return "arrow.down.circle"
         case .related: return "arrow.triangle.branch"
         case .clarification: return "questionmark.circle"
-        case .prediction: return "sparkles"
+        case .prediction: return "wand.and.stars"
         }
     }
 }

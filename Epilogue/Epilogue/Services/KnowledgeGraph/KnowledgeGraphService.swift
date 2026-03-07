@@ -401,7 +401,7 @@ final class KnowledgeGraphService {
         let allThemes = try getTopThemes(limit: 100)
 
         return allThemes.filter { theme in
-            let bookOrigins = Set(theme.sourceBooks.map { $0.id })
+            let bookOrigins = Set(theme.safeSourceBooks.map { $0.id })
             let matchCount = bookIds.filter { bookOrigins.contains($0) }.count
             return matchCount >= 2
         }
@@ -423,7 +423,7 @@ final class KnowledgeGraphService {
         let allNodes = try context.fetch(descriptor)
 
         for node in allNodes {
-            let bookIds = node.sourceBooks.map { $0.id }
+            let bookIds = node.safeSourceBooks.map { $0.id }
             if bookIds.contains(book1Id) && bookIds.contains(book2Id) {
                 connections.append(ConnectionResult(
                     node: node,
@@ -553,7 +553,7 @@ final class KnowledgeGraphService {
         var evidence: [String] = []
 
         // Get quotes mentioning this entity
-        for quote in node.sourceQuotes {
+        for quote in node.safeSourceQuotes {
             if let text = quote.text, let bookId = quote.book?.id, bookIds.contains(bookId) {
                 let preview = String(text.prefix(100))
                 evidence.append("\"\(preview)...\"")
@@ -561,7 +561,7 @@ final class KnowledgeGraphService {
         }
 
         // Get notes mentioning this entity
-        for note in node.sourceNotes {
+        for note in node.safeSourceNotes {
             if let bookId = note.book?.id, bookIds.contains(bookId) {
                 if let content = note.content, !content.isEmpty {
                     let preview = String(content.prefix(100))

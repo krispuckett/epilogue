@@ -198,20 +198,13 @@ struct BookScanResultCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Book cover
-            if let coverURL = book.coverImageURL, let url = URL(string: coverURL) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
-                        .fill(Color.gray.opacity(0.2))
-                        .overlay {
-                            ProgressView()
-                        }
-                }
-                .frame(width: 60, height: 90)
+            // Book cover (cached for offline)
+            if book.coverImageURL != nil {
+                SharedBookCoverView(
+                    coverURL: book.coverImageURL,
+                    width: 60,
+                    height: 90
+                )
                 .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small))
             }
             

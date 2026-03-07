@@ -381,7 +381,7 @@ struct IntelligentSuggestionsSection: View {
         if !suggestions.isEmpty && showingSuggestions {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Label("Suggested Actions", systemImage: "sparkles")
+                    Label("Suggested Actions", systemImage: "wand.and.stars")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.warmAmber)
                     
@@ -436,7 +436,7 @@ struct SuggestionCard: View {
             // Action disabled for now
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "sparkles")
+                Image(systemName: "wand.and.stars")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color.warmAmber)
                     .frame(width: 32, height: 32)
@@ -532,8 +532,7 @@ struct ProgressUpdateCard: View {
                     .foregroundStyle(Color.warmAmber)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.warmAmber.opacity(0.1))
-                    .clipShape(Capsule())
+                    .glassEffect(.regular.tint(Color.warmAmber.opacity(0.15)), in: Capsule())
             }
         }
         .padding(12)

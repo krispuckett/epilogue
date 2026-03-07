@@ -106,19 +106,12 @@ struct BookPickerRow: View {
             HStack(spacing: 16) {
                 // Book cover thumbnail
                 if let coverURL = book.coverImageURL {
-                    let enhancedURL = enhanceGoogleBooksImageURL(coverURL)
-                    if let url = URL(string: enhancedURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
-                    }
-                    .frame(width: 40, height: 60)
+                    SharedBookCoverView(
+                        coverURL: coverURL,
+                        width: 40,
+                        height: 60
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
                 } else {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color(red: 0.2, green: 0.2, blue: 0.25))

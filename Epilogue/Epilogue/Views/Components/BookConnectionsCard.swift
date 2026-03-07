@@ -117,14 +117,14 @@ struct BookConnectionsCard: View {
             // Get themes from the knowledge graph
             let allThemes = try graphService.getTopThemes(limit: 20)
             let bookThemes = allThemes.filter { theme in
-                theme.sourceBooks.contains { $0.id == bookModel.id }
+                theme.safeSourceBooks.contains { $0.id == bookModel.id }
             }
 
             // Find books that share themes
             var connectedBooks: [String: (book: BookModel, themes: [String])] = [:]
 
             for theme in bookThemes {
-                for relatedBook in theme.sourceBooks {
+                for relatedBook in theme.safeSourceBooks {
                     guard relatedBook.id != bookModel.id else { continue }
 
                     let bookIdString = relatedBook.id
@@ -180,18 +180,13 @@ struct ConnectionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Small cover thumbnail
-            if let urlString = connection.coverURL,
-               let url = URL(string: urlString) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                }
-                .frame(width: 36, height: 54)
+            // Small cover thumbnail (cached for offline)
+            if let urlString = connection.coverURL {
+                SharedBookCoverView(
+                    coverURL: urlString,
+                    width: 36,
+                    height: 54
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 Rectangle()
