@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 struct PerplexityChatView: View {
-    @StateObject private var viewModel: PerplexityChatViewModel
+    @State private var viewModel: PerplexityChatViewModel
     @State private var messageText = ""
     @State private var isShowingCitations = false
     @State private var selectedCitation: Citation?
@@ -12,7 +12,7 @@ struct PerplexityChatView: View {
     
     init(book: BookModel? = nil) {
         self.book = book
-        self._viewModel = StateObject(wrappedValue: PerplexityChatViewModel(book: book))
+        self._viewModel = State(wrappedValue: PerplexityChatViewModel(book: book))
     }
     
     var body: some View {
@@ -129,7 +129,7 @@ struct PerplexityChatView: View {
 // MARK: - Chat Header
 
 struct ChatHeaderView: View {
-    @ObservedObject var viewModel: PerplexityChatViewModel
+    var viewModel: PerplexityChatViewModel
     
     var body: some View {
         HStack {
@@ -452,23 +452,24 @@ struct CitationDetailView: View {
 // MARK: - View Model
 
 @MainActor
-class PerplexityChatViewModel: ObservableObject {
-    @Published var messages: [ChatMessage] = []
-    @Published var isProcessing = false
-    @Published var isTyping = false
-    @Published var isStreaming = false
-    @Published var streamingContent = ""
-    @Published var streamingCitations: [Citation] = []
-    @Published var queriesRemaining = 20
-    @Published var isPro = false
-    @Published var isGandalfEnabled = false
-    @Published var showQuotaAlert = false
-    @Published var currentModel: SonarModel = .small
-    @Published var totalTokensUsed = 0
-    
+@Observable
+class PerplexityChatViewModel {
+    var messages: [ChatMessage] = []
+    var isProcessing = false
+    var isTyping = false
+    var isStreaming = false
+    var streamingContent = ""
+    var streamingCitations: [Citation] = []
+    var queriesRemaining = 20
+    var isPro = false
+    var isGandalfEnabled = false
+    var showQuotaAlert = false
+    var currentModel: SonarModel = .small
+    var totalTokensUsed = 0
+
     private let book: BookModel?
-    private let requestManager = PerplexityRequestManager.shared
-    private var streamTask: Task<Void, Error>?
+    @ObservationIgnored private let requestManager = PerplexityRequestManager.shared
+    @ObservationIgnored private var streamTask: Task<Void, Error>?
     
     let dailyQuota = 20
     

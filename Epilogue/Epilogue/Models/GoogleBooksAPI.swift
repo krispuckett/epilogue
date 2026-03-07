@@ -461,19 +461,20 @@ struct Book: Identifiable, Codable, Equatable, Transferable {
 
 // MARK: - Google Books API Service
 @MainActor
-class GoogleBooksService: ObservableObject {
-    private let baseURL = "https://www.googleapis.com/books/v1/volumes"
-    private let session = URLSession.shared
+@Observable
+class GoogleBooksService {
+    @ObservationIgnored private let baseURL = "https://www.googleapis.com/books/v1/volumes"
+    @ObservationIgnored private let session = URLSession.shared
 
-    @Published var searchResults: [Book] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    var searchResults: [Book] = []
+    var isLoading = false
+    var errorMessage: String?
 
     // Pagination support
-    private var currentQuery: String = ""
-    private var startIndex: Int = 0
-    private var hasMoreResults: Bool = true
-    private let resultsPerPage: Int = 40
+    @ObservationIgnored private var currentQuery: String = ""
+    @ObservationIgnored private var startIndex: Int = 0
+    @ObservationIgnored private var hasMoreResults: Bool = true
+    @ObservationIgnored private let resultsPerPage: Int = 40
     
     func searchBookByISBN(_ isbn: String) async -> Book? {
         #if DEBUG

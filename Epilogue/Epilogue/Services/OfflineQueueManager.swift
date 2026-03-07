@@ -6,19 +6,20 @@ import OSLog
 import UserNotifications
 
 @MainActor
-class OfflineQueueManager: ObservableObject {
+@Observable
+class OfflineQueueManager {
     static let shared = OfflineQueueManager()
-    
-    @Published var queuedQuestions: [QueuedQuestion] = []
-    @Published var isOnline: Bool = true
-    @Published var isProcessing: Bool = false
-    @Published var queueDepth: Int = 0
-    
-    private let logger = Logger(subsystem: "com.epilogue", category: "OfflineQueue")
-    private let monitor = NWPathMonitor()
-    private let monitorQueue = DispatchQueue(label: "com.epilogue.networkmonitor")
-    private var modelContext: ModelContext?
-    private var cancellables = Set<AnyCancellable>()
+
+    var queuedQuestions: [QueuedQuestion] = []
+    var isOnline: Bool = true
+    var isProcessing: Bool = false
+    var queueDepth: Int = 0
+
+    @ObservationIgnored private let logger = Logger(subsystem: "com.epilogue", category: "OfflineQueue")
+    @ObservationIgnored private let monitor = NWPathMonitor()
+    @ObservationIgnored private let monitorQueue = DispatchQueue(label: "com.epilogue.networkmonitor")
+    @ObservationIgnored private var modelContext: ModelContext?
+    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     
     private init() {
         setupNetworkMonitoring()

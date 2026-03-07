@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 struct SonarChatView: View {
-    @StateObject private var viewModel: SonarChatViewModel
+    @State private var viewModel: SonarChatViewModel
     @State private var messageText = ""
     @State private var isShowingCitations = false
     @State private var selectedCitation: Citation?
@@ -12,7 +12,7 @@ struct SonarChatView: View {
     
     init(book: Book? = nil) {
         self.book = book
-        self._viewModel = StateObject(wrappedValue: SonarChatViewModel(book: book))
+        self._viewModel = State(wrappedValue: SonarChatViewModel(book: book))
     }
     
     var body: some View {
@@ -463,23 +463,24 @@ struct CitationDetailView: View {
 // MARK: - View Model
 
 @MainActor
-class SonarChatViewModel: ObservableObject {
-    @Published var messages: [ChatMessageItem] = []
-    @Published var isProcessing = false
-    @Published var isTyping = false
-    @Published var isStreaming = false
-    @Published var streamingContent = ""
-    @Published var streamingCitations: [Citation] = []
-    @Published var queriesRemaining = 20
-    @Published var isPro = false
-    @Published var isGandalfEnabled = false
-    @Published var showQuotaAlert = false
-    @Published var currentModel: SonarModel = .sonarSmall
-    @Published var totalTokensUsed = 0
-    
+@Observable
+class SonarChatViewModel {
+    var messages: [ChatMessageItem] = []
+    var isProcessing = false
+    var isTyping = false
+    var isStreaming = false
+    var streamingContent = ""
+    var streamingCitations: [Citation] = []
+    var queriesRemaining = 20
+    var isPro = false
+    var isGandalfEnabled = false
+    var showQuotaAlert = false
+    var currentModel: SonarModel = .sonarSmall
+    var totalTokensUsed = 0
+
     private let book: Book?
-    private let requestManager = SonarRequestManager.shared
-    private var streamTask: Task<Void, Error>?
+    @ObservationIgnored private let requestManager = SonarRequestManager.shared
+    @ObservationIgnored private var streamTask: Task<Void, Error>?
     
     let dailyQuota = 20
     

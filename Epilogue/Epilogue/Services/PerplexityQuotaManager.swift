@@ -2,19 +2,21 @@ import Foundation
 import SwiftUI
 import Combine
 
-class PerplexityQuotaManager: ObservableObject {
+@MainActor
+@Observable
+class PerplexityQuotaManager {
     static let shared = PerplexityQuotaManager()
 
     // Daily quota limits
-    private let dailyQuotaLimit = 10
+    @ObservationIgnored private let dailyQuotaLimit = 10
 
-    // Published properties for UI
-    @Published var remainingQuestions: Int = 10
-    @Published var showQuotaExceededSheet = false
+    // Observed properties for UI
+    var remainingQuestions: Int = 10
+    var showQuotaExceededSheet = false
 
     // Storage keys
-    private let questionsUsedKey = "perplexity_questions_used_today"
-    private let lastResetDateKey = "perplexity_quota_last_reset"
+    @ObservationIgnored private let questionsUsedKey = "perplexity_questions_used_today"
+    @ObservationIgnored private let lastResetDateKey = "perplexity_quota_last_reset"
 
     private init() {
         checkAndResetIfNeeded()

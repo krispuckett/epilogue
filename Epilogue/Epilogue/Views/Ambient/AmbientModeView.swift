@@ -115,9 +115,9 @@ struct AmbientModeView: View {
     @StateObject private var processor = TrueAmbientProcessor.shared
     @StateObject private var voiceManager = VoiceRecognitionManager.shared
     @StateObject private var bookDetector = AmbientBookDetector.shared
-    @StateObject private var microInteractionManager = MicroInteractionManager.shared
+    @State private var microInteractionManager = MicroInteractionManager.shared
     @State private var themeManager = ThemeManager.shared
-    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
+    @State private var storeKit = SimplifiedStoreKitManager.shared
 
     // Namespace for matched geometry morphing animation
     @Namespace private var buttonMorphNamespace

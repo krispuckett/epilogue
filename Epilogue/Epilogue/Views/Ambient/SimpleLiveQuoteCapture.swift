@@ -13,7 +13,7 @@ struct SimpleLiveQuoteCapture: View {
     let onQuestionAsked: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var coordinator = DataScannerCoordinator()
+    @State private var coordinator = DataScannerCoordinator()
 
     var body: some View {
         ZStack {
@@ -125,10 +125,11 @@ struct SimpleLiveQuoteCapture: View {
 // MARK: - DataScanner Coordinator
 
 @MainActor
-class DataScannerCoordinator: NSObject, ObservableObject {
-    @Published var selectedText: String?
+@Observable
+class DataScannerCoordinator: NSObject {
+    var selectedText: String?
 
-    var dataScanner: DataScannerViewController?
+    @ObservationIgnored var dataScanner: DataScannerViewController?
 
     override init() {
         super.init()
@@ -189,7 +190,7 @@ extension DataScannerCoordinator: DataScannerViewControllerDelegate {
 
 @available(iOS 16.0, *)
 struct SimpleDataScannerRepresentable: UIViewControllerRepresentable {
-    @ObservedObject var coordinator: DataScannerCoordinator
+    var coordinator: DataScannerCoordinator
 
     func makeUIViewController(context: Context) -> UIViewController {
         guard let scanner = coordinator.dataScanner else {

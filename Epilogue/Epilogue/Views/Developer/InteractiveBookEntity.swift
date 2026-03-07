@@ -1,6 +1,5 @@
 import SwiftUI
 import RealityKit
-import Combine
 
 // MARK: - Interactive 3D Book Entity
 // A fully interactive book with openable covers, page flipping, and physics
@@ -428,11 +427,12 @@ private class AnimationTarget: NSObject {
 // Manages multiple books in a scene
 
 @MainActor
-final class InteractiveBookManager: ObservableObject {
-    @Published var books: [InteractiveBookEntity] = []
-    @Published var selectedBook: InteractiveBookEntity?
+@Observable
+final class InteractiveBookManager {
+    var books: [InteractiveBookEntity] = []
+    var selectedBook: InteractiveBookEntity?
 
-    private let colorExtractor = OKLABColorExtractor()
+    @ObservationIgnored private let colorExtractor = OKLABColorExtractor()
 
     func createBook(from bookModel: BookModel) async -> InteractiveBookEntity {
         // Load cover image

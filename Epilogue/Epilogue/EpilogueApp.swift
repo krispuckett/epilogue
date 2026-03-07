@@ -9,7 +9,7 @@ struct EpilogueApp: App {
     @State private var modelContainer: ModelContainer?
     @State private var showingCloudKitAlert = false
     @State private var cloudKitErrorMessage = ""
-    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
+    @State private var storeKit = SimplifiedStoreKitManager.shared
 
     var body: some Scene {
         WindowGroup {

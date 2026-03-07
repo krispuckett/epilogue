@@ -1,12 +1,12 @@
 import SwiftUI
-import Combine
 
 // MARK: - Batch Selection Manager
 @MainActor
-final class BatchSelectionManager: ObservableObject {
-    @Published var isSelectionMode = false
-    @Published var selectedItems: Set<UUID> = []
-    @Published var showingDeleteConfirmation = false
+@Observable
+final class BatchSelectionManager {
+    var isSelectionMode = false
+    var selectedItems: Set<UUID> = []
+    var showingDeleteConfirmation = false
     
     var hasSelection: Bool {
         !selectedItems.isEmpty
@@ -86,7 +86,7 @@ final class BatchSelectionManager: ObservableObject {
 
 // MARK: - Batch Selection Navigation Bar
 struct BatchSelectionNavigationBar: View {
-    @ObservedObject var selectionManager: BatchSelectionManager
+    var selectionManager: BatchSelectionManager
     let allItems: [Note]
     let onDelete: (Set<UUID>) -> Void
     
@@ -180,7 +180,7 @@ struct SelectionIndicator: View {
 
 // MARK: - iOS 26 Delete Confirmation Toast
 struct BatchDeleteConfirmationToast: View {
-    @ObservedObject var selectionManager: BatchSelectionManager
+    var selectionManager: BatchSelectionManager
     let onConfirm: () -> Void
     @State private var scale: CGFloat = 0.9
     @State private var opacity: Double = 0.0
@@ -267,7 +267,7 @@ struct BatchDeleteConfirmationToast: View {
 // MARK: - Selectable Note Card Wrapper
 struct SelectableNoteCard: View {
     let note: Note
-    @ObservedObject var selectionManager: BatchSelectionManager
+    var selectionManager: BatchSelectionManager
     let content: AnyView
     let onTap: () -> Void
     

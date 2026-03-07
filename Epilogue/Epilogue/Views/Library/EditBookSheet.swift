@@ -7,7 +7,7 @@ struct EditBookSheet: View {
     let onBookReplaced: (Book) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var booksService = GoogleBooksService()
+    @State private var booksService = GoogleBooksService()
     @State private var searchTerm: String
     @State private var searchResults: [Book] = []
     @State private var isLoading = false

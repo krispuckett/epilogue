@@ -15,7 +15,7 @@ struct PerplexitySettingsView: View {
     @State private var connectionTestResult: ConnectionTestResult?
     @State private var showingUpgradeView = false
     
-    @StateObject private var usageStats = UsageStatsViewModel()
+    @State private var usageStats = UsageStatsViewModel()
     
     enum ConnectionTestResult {
         case success
@@ -465,14 +465,15 @@ struct ProFeatureRow: View {
 
 // MARK: - Usage Stats View Model
 
-class UsageStatsViewModel: ObservableObject {
-    @Published var queriesUsedToday = 0
-    @Published var dailyQuota = 20
-    @Published var tokensUsedToday = 0
-    @Published var estimatedCostToday = 0.0
-    @Published var cacheHitRate = 0.0
-    @Published var cachedResponseCount = 0
-    @Published var offlineQueueCount = 0
+@Observable
+class UsageStatsViewModel {
+    var queriesUsedToday = 0
+    var dailyQuota = 20
+    var tokensUsedToday = 0
+    var estimatedCostToday = 0.0
+    var cacheHitRate = 0.0
+    var cachedResponseCount = 0
+    var offlineQueueCount = 0
     
     init() {
         loadStats()

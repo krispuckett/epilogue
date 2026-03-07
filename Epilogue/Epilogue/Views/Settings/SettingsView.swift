@@ -309,8 +309,6 @@ struct SettingsView: View {
                                 SensoryFeedback.success()
                                 // Reset quota sheet state to prevent showing old quota exceeded sheets
                                 PerplexityQuotaManager.shared.showQuotaExceededSheet = false
-                                // Force reload quota count
-                                PerplexityQuotaManager.shared.objectWillChange.send()
                             }
                         }
 
@@ -986,7 +984,7 @@ struct SettingsView: View {
 
 // MARK: - Epilogue+ Upsell Card
 struct EpiloguePlusUpsellCard: View {
-    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
+    @State private var storeKit = SimplifiedStoreKitManager.shared
     @State private var themeManager = ThemeManager.shared
     @State private var showingPaywall = false
 

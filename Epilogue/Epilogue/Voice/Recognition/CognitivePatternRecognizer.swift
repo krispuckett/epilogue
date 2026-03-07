@@ -89,13 +89,14 @@ struct SessionCognitiveAnalysis {
     }
 }
 
-// MARK: - Cognitive Pattern Recognizer  
+// MARK: - Cognitive Pattern Recognizer
 @MainActor
-class CognitivePatternRecognizer: ObservableObject {
+@Observable
+class CognitivePatternRecognizer {
     static let shared = CognitivePatternRecognizer()
-    
-    @Published var currentPatterns: [PatternMatch] = []
-    @Published var isAnalyzing = false
+
+    var currentPatterns: [PatternMatch] = []
+    var isAnalyzing = false
     
     private init() {}
     

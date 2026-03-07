@@ -51,12 +51,13 @@ struct RecentCommand: Identifiable, Codable {
 // MARK: - Command History Manager
 
 @MainActor
-class CommandHistoryManager: ObservableObject {
+@Observable
+class CommandHistoryManager {
     static let shared = CommandHistoryManager()
-    
-    @Published var recentCommands: [RecentCommand] = []
-    
-    private let maxRecentCommands = 5
+
+    var recentCommands: [RecentCommand] = []
+
+    @ObservationIgnored private let maxRecentCommands = 5
     private let deduplicationWindow: TimeInterval = 86400 // 24 hours
     private let userDefaultsKey = "com.epilogue.commandHistory"
     

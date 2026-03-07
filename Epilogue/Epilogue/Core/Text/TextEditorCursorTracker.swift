@@ -1,17 +1,17 @@
 import Foundation
 import SwiftUI
 import UIKit
-import Combine
 
 // MARK: - Text Editor Cursor Tracker
 /// Tracks cursor position and selection in TextEditor for markdown insertion
 /// Uses UITextView introspection to access cursor position
 
-class TextEditorCursorTracker: ObservableObject {
-    @Published var cursorPosition: Int = 0
-    @Published var selectedRange: NSRange?
+@Observable
+class TextEditorCursorTracker {
+    var cursorPosition: Int = 0
+    var selectedRange: NSRange?
 
-    weak var textView: UITextView?
+    @ObservationIgnored weak var textView: UITextView?
 
     func trackTextView(_ textView: UITextView) {
         self.textView = textView

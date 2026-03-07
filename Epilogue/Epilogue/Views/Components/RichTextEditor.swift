@@ -10,7 +10,7 @@ struct RichTextEditor: View {
     let placeholder: String
     @FocusState.Binding var isFocused: Bool
 
-    @StateObject private var cursorTracker = TextEditorCursorTracker()
+    @State private var cursorTracker = TextEditorCursorTracker()
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -88,7 +88,7 @@ struct SimpleRichTextEditor: View {
     let placeholder: String
     @FocusState.Binding var isFocused: Bool
 
-    @StateObject private var cursorTracker = TextEditorCursorTracker()
+    @State private var cursorTracker = TextEditorCursorTracker()
 
     var body: some View {
         VStack(spacing: 0) {

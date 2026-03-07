@@ -15,7 +15,7 @@ import Combine
 struct PerfectBookScanner: View {
     let onBookAdded: (Book) -> Void
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var coordinator = ScannerCoordinator()
+    @State private var coordinator = ScannerCoordinator()
     @State private var showingManualSearch = false
     @State private var manualSearchQuery = ""
     @State private var showingISBNInput = false
@@ -525,25 +525,26 @@ struct PerfectBookScanner: View {
 
 /// Coordinator for scanner state and book lookup
 @MainActor
-class ScannerCoordinator: ObservableObject {
-    @Published var isProcessing = false
-    @Published var statusMessage = "Ready"
-    @Published var isTorchOn = false
-    @Published var booksScannedThisSession = 0
-    @Published var scannedBooksInSession: [Book] = []
-    @Published var showingSessionBooks = false
+@Observable
+class ScannerCoordinator {
+    var isProcessing = false
+    var statusMessage = "Ready"
+    var isTorchOn = false
+    var booksScannedThisSession = 0
+    var scannedBooksInSession: [Book] = []
+    var showingSessionBooks = false
 
-    var onBookFound: ((Book) -> Void)?
-    var onConfirmBooks: (([Book]) -> Void)?  // ← New callback for batch confirm
+    @ObservationIgnored var onBookFound: ((Book) -> Void)?
+    @ObservationIgnored var onConfirmBooks: (([Book]) -> Void)?  // ← New callback for batch confirm
 
     // Duplicate prevention
-    private var scannedItems = Set<String>()
-    private var lastScanTime: [String: Date] = [:]
-    private let rescanDelay: TimeInterval = 3.0
+    @ObservationIgnored private var scannedItems = Set<String>()
+    @ObservationIgnored private var lastScanTime: [String: Date] = [:]
+    @ObservationIgnored private let rescanDelay: TimeInterval = 3.0
 
     // Services
-    private let booksService = EnhancedGoogleBooksService()
-    private let spineRecognizer = SpineTextRecognizer()
+    @ObservationIgnored private let booksService = EnhancedGoogleBooksService()
+    @ObservationIgnored private let spineRecognizer = SpineTextRecognizer()
 
     // CHANGED: Stage books instead of adding to library
     func stageBook(_ book: Book) {

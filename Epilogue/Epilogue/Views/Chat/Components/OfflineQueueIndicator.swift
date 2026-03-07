@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OfflineQueueIndicator: View {
-    @ObservedObject var queueManager = OfflineQueueManager.shared
+    var queueManager = OfflineQueueManager.shared
     @State private var showingQueueSheet = false
     @State private var animateQueue = false
     
@@ -60,7 +60,7 @@ struct OfflineQueueIndicator: View {
 }
 
 struct QueuedQuestionsSheet: View {
-    @ObservedObject var queueManager = OfflineQueueManager.shared
+    var queueManager = OfflineQueueManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var processedResponses: [(question: String, response: String, timestamp: Date)] = []
     
@@ -145,7 +145,7 @@ struct QueuedQuestionsSheet: View {
 
 struct QueuedQuestionRow: View {
     let question: QueuedQuestion
-    @ObservedObject var queueManager = OfflineQueueManager.shared
+    var queueManager = OfflineQueueManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

@@ -8,7 +8,7 @@ import Combine
 
 struct ReadingRoomView: View {
     @Query(sort: \BookModel.dateAdded, order: .reverse) private var allBooks: [BookModel]
-    @StateObject private var bookManager = InteractiveBookManager()
+    @State private var bookManager = InteractiveBookManager()
 
     // Scene state
     @State private var sceneRoot: Entity?

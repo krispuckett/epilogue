@@ -8,7 +8,7 @@ import OSLog
 
 struct BookScannerView: View {
     @StateObject private var scanner = BookScannerService.shared
-    @StateObject private var cameraManager = BookCameraManager()
+    @State private var cameraManager = BookCameraManager()
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryViewModel.self) var libraryViewModel
     @State private var countdownTimer: Timer?
@@ -618,15 +618,16 @@ struct CameraOverlay: View {
 // MARK: - Camera Manager
 
 @MainActor
-class BookCameraManager: NSObject, ObservableObject {
-    @Published var isSessionRunning = false
-    let session = AVCaptureSession()
-    private var videoOutput = AVCaptureVideoDataOutput()
-    private var photoOutput = AVCapturePhotoOutput()
-    private var photoCaptureDelegate: PhotoCaptureDelegate?
-    
-    var onFrameCapture: ((UIImage) -> Void)?
-    private var lastFrameTime = Date()
+@Observable
+class BookCameraManager: NSObject {
+    var isSessionRunning = false
+    @ObservationIgnored let session = AVCaptureSession()
+    @ObservationIgnored private var videoOutput = AVCaptureVideoDataOutput()
+    @ObservationIgnored private var photoOutput = AVCapturePhotoOutput()
+    @ObservationIgnored private var photoCaptureDelegate: PhotoCaptureDelegate?
+
+    @ObservationIgnored var onFrameCapture: ((UIImage) -> Void)?
+    @ObservationIgnored private var lastFrameTime = Date()
     
     override init() {
         super.init()

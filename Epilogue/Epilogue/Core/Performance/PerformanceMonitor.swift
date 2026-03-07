@@ -6,23 +6,24 @@ import QuartzCore
 
 // MARK: - Performance Monitor
 @MainActor
-final class PerformanceMonitor: ObservableObject {
+@Observable
+final class PerformanceMonitor {
     static let shared = PerformanceMonitor()
-    
-    // MARK: - Published Properties
-    @Published private(set) var fps: Double = 120
-    @Published private(set) var frameDrops: Int = 0
-    @Published private(set) var mainThreadBlocks: Int = 0
-    
+
+    // MARK: - Observed Properties
+    private(set) var fps: Double = 120
+    private(set) var frameDrops: Int = 0
+    private(set) var mainThreadBlocks: Int = 0
+
     // MARK: - Private Properties
-    private let logger = Logger(subsystem: "com.epilogue", category: "Performance")
-    private var displayLink: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval = 0
-    private var frameCount: Int = 0
-    private var frameDropThreshold: CFTimeInterval = 1.0 / 60.0 // 60 FPS threshold
-    
+    @ObservationIgnored private let logger = Logger(subsystem: "com.epilogue", category: "Performance")
+    @ObservationIgnored private var displayLink: CADisplayLink?
+    @ObservationIgnored private var lastTimestamp: CFTimeInterval = 0
+    @ObservationIgnored private var frameCount: Int = 0
+    @ObservationIgnored private var frameDropThreshold: CFTimeInterval = 1.0 / 60.0 // 60 FPS threshold
+
     // Performance tracking
-    private var performanceMetrics: [String: PerformanceMetric] = [:]
+    @ObservationIgnored private var performanceMetrics: [String: PerformanceMetric] = [:]
     
     private init() {
         setupDisplayLink()

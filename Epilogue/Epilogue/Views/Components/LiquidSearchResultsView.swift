@@ -4,7 +4,7 @@ struct LiquidSearchResultsView: View {
     let searchText: String
     @Environment(LibraryViewModel.self) var libraryViewModel
     @Environment(NotesViewModel.self) var notesViewModel
-    @StateObject private var historyManager = CommandHistoryManager.shared
+    @State private var historyManager = CommandHistoryManager.shared
     
     @State private var detectedBook: Book?
     @State private var detectedNote: Note?

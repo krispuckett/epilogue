@@ -4,22 +4,23 @@ import Combine
 
 // MARK: - Simplified StoreKit Manager
 @MainActor
-class SimplifiedStoreKitManager: ObservableObject {
+@Observable
+class SimplifiedStoreKitManager {
     static let shared = SimplifiedStoreKitManager()
 
     // Product IDs
-    private let monthlyID = "com.epilogue.plus.monthly"  // $7.99
-    private let annualID = "com.epilogue.plus.annual"    // $67.00
+    @ObservationIgnored private let monthlyID = "com.epilogue.plus.monthly"  // $7.99
+    @ObservationIgnored private let annualID = "com.epilogue.plus.annual"    // $67.00
 
     // State
-    @Published var isPlus = false
-    @Published var conversationsUsed = 0
-    @Published var monthlyProduct: Product?
-    @Published var annualProduct: Product?
-    @Published var isLoading = false
-    @Published var purchaseError: String?
+    var isPlus = false
+    var conversationsUsed = 0
+    var monthlyProduct: Product?
+    var annualProduct: Product?
+    var isLoading = false
+    var purchaseError: String?
 
-    private var updateListenerTask: Task<Void, Error>?
+    @ObservationIgnored private var updateListenerTask: Task<Void, Error>?
 
     private init() {
         // Load conversation count from UserDefaults

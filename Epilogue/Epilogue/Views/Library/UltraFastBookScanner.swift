@@ -12,7 +12,7 @@ import Combine
 struct UltraFastBookScanner: View {
     let onBookAdded: (Book) -> Void
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var scanner = UltraFastScannerCoordinator()
+    @State private var scanner = UltraFastScannerCoordinator()
     @State private var showingSearchSheet = false
     @State private var searchQuery = ""
 
@@ -150,15 +150,16 @@ struct UltraFastBookScanner: View {
 
 /// Coordinator for ultra-fast scanner
 @MainActor
-class UltraFastScannerCoordinator: ObservableObject {
-    @Published var isProcessing = false
-    @Published var statusMessage = "Ready"
-    @Published var isTorchOn = false
-    @Published var lastScannedISBN: String?
+@Observable
+class UltraFastScannerCoordinator {
+    var isProcessing = false
+    var statusMessage = "Ready"
+    var isTorchOn = false
+    var lastScannedISBN: String?
 
-    var onBookFound: ((Book) -> Void)?
+    @ObservationIgnored var onBookFound: ((Book) -> Void)?
 
-    private let booksService = EnhancedGoogleBooksService()
+    @ObservationIgnored private let booksService = EnhancedGoogleBooksService()
 
     func processISBN(_ isbn: String) {
         // Prevent duplicate scans

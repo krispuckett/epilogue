@@ -6,19 +6,20 @@ private let logger = Logger(subsystem: "com.epilogue", category: "AppStateManage
 
 // MARK: - App-wide State Manager
 @MainActor
-final class AppStateManager: ObservableObject {
+@Observable
+final class AppStateManager {
     static let shared = AppStateManager()
 
     // Global sheet presentations
-    @Published var showingBookSearch = false
-    @Published var showingGoodreadsImport = false
-    @Published var showingEnhancedScanner = false
-    @Published var showingSettings = false
+    var showingBookSearch = false
+    var showingGoodreadsImport = false
+    var showingEnhancedScanner = false
+    var showingSettings = false
 
     // Selected book for actions
-    @Published var selectedBook: Book?
+    var selectedBook: Book?
 
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
     private init() {
         logger.debug("AppStateManager initialized")

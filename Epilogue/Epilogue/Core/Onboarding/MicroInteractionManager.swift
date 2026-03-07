@@ -3,22 +3,38 @@ import Combine
 
 /// Manages one-time micro-interactions for post-onboarding guidance
 @MainActor
-final class MicroInteractionManager: ObservableObject {
+@Observable
+final class MicroInteractionManager {
     // MARK: - Singleton
     static let shared = MicroInteractionManager()
 
-    // MARK: - Published States
-    @Published var showAddBookBorderAnimation = false
-    @Published var showFirstBookShake = false
-    @Published var showAmbientIconAnimation = false
-    @Published var showDoubleTapHint = false
+    // MARK: - Observed States
+    var showAddBookBorderAnimation = false
+    var showFirstBookShake = false
+    var showAmbientIconAnimation = false
+    var showDoubleTapHint = false
 
-    // MARK: - AppStorage for persistence
-    @AppStorage("hasShownAddBookAnimation") private var hasShownAddBookAnimation = false
-    @AppStorage("hasShownFirstBookShake") private var hasShownFirstBookShake = false
-    @AppStorage("hasShownAmbientAnimation") private var hasShownAmbientAnimation = false
-    @AppStorage("hasShownDoubleTapHint") private var hasShownDoubleTapHint = false
-    @AppStorage("firstBookAddedID") private var firstBookAddedID: String = ""
+    // MARK: - UserDefaults persistence (manual, @AppStorage incompatible with @Observable)
+    @ObservationIgnored private var hasShownAddBookAnimation: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownAddBookAnimation") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownAddBookAnimation") }
+    }
+    @ObservationIgnored private var hasShownFirstBookShake: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownFirstBookShake") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownFirstBookShake") }
+    }
+    @ObservationIgnored private var hasShownAmbientAnimation: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownAmbientAnimation") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownAmbientAnimation") }
+    }
+    @ObservationIgnored private var hasShownDoubleTapHint: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownDoubleTapHint") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownDoubleTapHint") }
+    }
+    @ObservationIgnored private var firstBookAddedID: String {
+        get { UserDefaults.standard.string(forKey: "firstBookAddedID") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "firstBookAddedID") }
+    }
 
     private init() {}
 
@@ -106,7 +122,7 @@ final class MicroInteractionManager: ObservableObject {
 
 // MARK: - Border Animation View
 struct AnimatedBorderButton: ViewModifier {
-    @StateObject private var manager = MicroInteractionManager.shared
+    @State private var manager = MicroInteractionManager.shared
     @State private var pulseOpacity: Double = 0
     @State private var blur: CGFloat = 0
 
@@ -272,7 +288,7 @@ struct BlurToAmberAnimation: ViewModifier {
 
 // MARK: - Double Tap Hint Pill
 struct DoubleTapHintPill: View {
-    @StateObject private var manager = MicroInteractionManager.shared
+    @State private var manager = MicroInteractionManager.shared
     @State private var opacity: Double = 0
 
     var body: some View {

@@ -3,7 +3,7 @@ import Charts
 import CoreData
 
 struct QueryAnalyticsDashboard: View {
-    @StateObject private var viewModel = AnalyticsDashboardViewModel()
+    @State private var viewModel = AnalyticsDashboardViewModel()
     @State private var selectedTimeRange: TimeRange = .today
     @State private var showingExportOptions = false
     
@@ -410,15 +410,16 @@ struct OptimizationSuggestionsView: View {
 
 // MARK: - View Model
 
-class AnalyticsDashboardViewModel: ObservableObject {
-    @Published var keyMetrics = KeyMetrics()
-    @Published var performanceData: [PerformanceDataPoint] = []
-    @Published var queryTypeDistribution: [QueryTypeData] = []
-    @Published var costAnalysis = CostAnalysis()
-    @Published var recentCacheHits: [CacheHitInfo] = []
-    @Published var suggestions: [OptimizationSuggestion] = []
-    
-    private let coreDataManager = CoreDataManager.shared
+@Observable
+class AnalyticsDashboardViewModel {
+    var keyMetrics = KeyMetrics()
+    var performanceData: [PerformanceDataPoint] = []
+    var queryTypeDistribution: [QueryTypeData] = []
+    var costAnalysis = CostAnalysis()
+    var recentCacheHits: [CacheHitInfo] = []
+    var suggestions: [OptimizationSuggestion] = []
+
+    @ObservationIgnored private let coreDataManager = CoreDataManager.shared
     
     func loadAnalytics(for timeRange: QueryAnalyticsDashboard.TimeRange) {
         let dateRange = getDateRange(for: timeRange)

@@ -10,8 +10,8 @@ import Combine
 /// Access via Developer Options > Experimental Quote Capture
 
 struct LiveQuoteCapture: View {
-    @StateObject private var viewModel = LiveQuoteCaptureViewModel()
-    @StateObject private var intelligence = QuoteIntelligence()
+    @State private var viewModel = LiveQuoteCaptureViewModel()
+    @State private var intelligence = QuoteIntelligence()
 
     let bookContext: Book?
     let onQuoteSaved: (String, Int?) -> Void
@@ -221,16 +221,17 @@ struct LiveQuoteCapture: View {
 // MARK: - Live Quote Capture View Model
 
 @MainActor
-class LiveQuoteCaptureViewModel: ObservableObject {
-    @Published var recognizedParagraphs: [TextBlock] = []
-    @Published var selectedParagraph: TextBlock?
-    @Published var pageNumber: Int?
-    @Published var isAnalyzing = false
-    @Published var recognitionConfidence: Float = 0.0
+@Observable
+class LiveQuoteCaptureViewModel {
+    var recognizedParagraphs: [TextBlock] = []
+    var selectedParagraph: TextBlock?
+    var pageNumber: Int?
+    var isAnalyzing = false
+    var recognitionConfidence: Float = 0.0
 
-    private let recognitionService = DocumentRecognitionService(configuration: .bookScanning)
-    private var hasTriggeredHaptic = false
-    private var frameCount = 0
+    @ObservationIgnored private let recognitionService = DocumentRecognitionService(configuration: .bookScanning)
+    @ObservationIgnored private var hasTriggeredHaptic = false
+    @ObservationIgnored private var frameCount = 0
 
     func processFrame(_ pixelBuffer: CVPixelBuffer) async {
         frameCount += 1

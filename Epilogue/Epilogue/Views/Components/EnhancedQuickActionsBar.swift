@@ -5,7 +5,7 @@ struct EnhancedQuickActionsBar: View {
     @Environment(LibraryViewModel.self) var libraryViewModel
     @Environment(NotesViewModel.self) var notesViewModel
     @ObservedObject private var voiceManager = VoiceRecognitionManager.shared
-    @StateObject private var microInteractionManager = MicroInteractionManager.shared
+    @State private var microInteractionManager = MicroInteractionManager.shared
 
     // Gesture states
     @State private var showRadialMenu = false

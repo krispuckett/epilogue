@@ -6,7 +6,7 @@ import simd
 // MARK: - Premium Paywall View
 struct PremiumPaywallView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
+    @State private var storeKit = SimplifiedStoreKitManager.shared
     @State private var orbAppeared = false
     @State private var heroAppeared = false
     @State private var featuresAppeared = false

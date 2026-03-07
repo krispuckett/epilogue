@@ -25,7 +25,7 @@ struct AmbientSessionSummaryView: View {
     @State private var showingAmbientMode = false
     @State private var textFieldHeight: CGFloat = 44
     @State private var showQuickActions = false
-    @StateObject private var quotaManager = PerplexityQuotaManager.shared
+    @State private var quotaManager = PerplexityQuotaManager.shared
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext

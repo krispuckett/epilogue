@@ -137,7 +137,7 @@ struct OptimizedGridItem: View {
     @State private var isPressed = false
     @State private var imageLoaded = false
     @State private var isHoldingForReorder = false
-    @StateObject private var microInteractionManager = MicroInteractionManager.shared
+    @State private var microInteractionManager = MicroInteractionManager.shared
 
     var body: some View {
         NavigationLink(destination: BookDetailView(book: book).environment(viewModel)) {

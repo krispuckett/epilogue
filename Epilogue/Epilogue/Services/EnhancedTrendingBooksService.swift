@@ -7,12 +7,13 @@ import OSLog
 
 // MARK: - Enhanced Trending Books Service
 @MainActor
-final class EnhancedTrendingBooksService: ObservableObject {
+@Observable
+final class EnhancedTrendingBooksService {
     static let shared = EnhancedTrendingBooksService()
-    
-    private let logger = Logger(subsystem: "com.epilogue.app", category: "TrendingBooks")
-    private let perplexitySearch = PerplexitySearchService.shared
-    private let googleBooksService = EnhancedGoogleBooksService()
+
+    @ObservationIgnored private let logger = Logger(subsystem: "com.epilogue.app", category: "TrendingBooks")
+    @ObservationIgnored private let perplexitySearch = PerplexitySearchService.shared
+    @ObservationIgnored private let googleBooksService = EnhancedGoogleBooksService()
     
     // Known book covers that often fail from Google Books
     private let knownBookCovers: [String: String] = [
@@ -40,10 +41,10 @@ final class EnhancedTrendingBooksService: ObservableObject {
         "the light we carry": "9780593237465"
     ]
     
-    @Published var trendingCategories: [TrendingCategory] = []
-    @Published var isLoading = false
-    @Published var selectedCategory: TrendingCategory.CategoryType = .nytFiction
-    @Published var lastUpdateTime: Date?
+    var trendingCategories: [TrendingCategory] = []
+    var isLoading = false
+    var selectedCategory: TrendingCategory.CategoryType = .nytFiction
+    var lastUpdateTime: Date?
     
     // Background task identifier
     static let refreshTaskIdentifier = "com.epilogue.trending.refresh"

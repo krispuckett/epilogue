@@ -8,7 +8,7 @@ struct SwiftDataNotesView: View {
     @Environment(NavigationCoordinator.self) private var navigationCoordinator
     @Environment(LibraryViewModel.self) private var libraryViewModel
     @Environment(NotesViewModel.self) private var notesViewModel
-    @StateObject private var performanceMonitor = PerformanceMonitor.shared
+    @State private var performanceMonitor = PerformanceMonitor.shared
     
     // Queries
     @Query(sort: \CapturedNote.timestamp, order: .reverse) private var notes: [CapturedNote]
@@ -23,7 +23,7 @@ struct SwiftDataNotesView: View {
     @State private var isInitialLoad = true
     
     // Batch selection
-    @StateObject private var selectionManager = BatchSelectionManager()
+    @State private var selectionManager = BatchSelectionManager()
     
     // Deleted notes for undo
     @State private var deletedNotes: [UUID: (note: Any, type: String)] = [:]

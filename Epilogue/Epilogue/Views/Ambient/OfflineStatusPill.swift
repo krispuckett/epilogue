@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Liquid glass status pill showing offline/online state and queue depth
 struct OfflineStatusPill: View {
-    @ObservedObject var queueManager = OfflineQueueManager.shared
+    var queueManager = OfflineQueueManager.shared
     @State private var pulseAnimation = false
 
     var body: some View {

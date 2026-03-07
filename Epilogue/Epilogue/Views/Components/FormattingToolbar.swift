@@ -6,7 +6,7 @@ import SwiftUI
 
 struct FormattingToolbar: View {
     @Binding var text: String
-    @ObservedObject var cursorTracker: TextEditorCursorTracker
+    var cursorTracker: TextEditorCursorTracker
     let onDismiss: () -> Void
 
     @State private var showingPreview = false
@@ -53,7 +53,7 @@ struct FormattingToolbar: View {
 /// Even more minimal toolbar for constrained spaces
 struct CompactFormattingToolbar: View {
     @Binding var text: String
-    @ObservedObject var cursorTracker: TextEditorCursorTracker
+    var cursorTracker: TextEditorCursorTracker
 
     var body: some View {
         HStack(spacing: 12) {

@@ -15,7 +15,7 @@ struct LiveTextQuoteCapture: View {
     let onQuestionAsked: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = LiveTextCaptureViewModel()
+    @State private var viewModel = LiveTextCaptureViewModel()
     @State private var showingToast = false
     @State private var toastMessage = ""
     @State private var hasDetectedText = false
@@ -233,10 +233,11 @@ struct LiveTextQuoteCapture: View {
 // MARK: - View Model
 
 @MainActor
-class LiveTextCaptureViewModel: ObservableObject {
-    @Published var capturedImage: UIImage?
-    @Published var selectedText: String = ""
-    @Published var shouldCapture = false
+@Observable
+class LiveTextCaptureViewModel {
+    var capturedImage: UIImage?
+    var selectedText: String = ""
+    var shouldCapture = false
 
     func requestCapture() {
         shouldCapture = true

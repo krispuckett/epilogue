@@ -3,7 +3,7 @@ import SwiftUI
 struct QuotaExceededView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var themeManager = ThemeManager.shared
-    @StateObject private var quotaManager = PerplexityQuotaManager.shared
+    @State private var quotaManager = PerplexityQuotaManager.shared
 
     // Animation states
     @State private var contentOpacity: Double = 0

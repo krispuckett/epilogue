@@ -19,7 +19,7 @@ struct LiquidCommandPalette: View {
     @State private var contentOffset: CGFloat = 0
     
     // Book search integration
-    @StateObject private var googleBooksService = GoogleBooksService()
+    @State private var googleBooksService = GoogleBooksService()
     @State private var searchDebounceTask: Task<Void, Never>?
     @State private var showingGoogleResults = false
     

@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 // MARK: - Cognitive Pattern Visualizer
 struct CognitivePatternVisualizer: View {
@@ -190,7 +189,8 @@ struct ConfidenceBar: View {
 }
 
 // MARK: - Particle System
-class ParticleSystem: ObservableObject {
+@Observable
+class ParticleSystem {
     struct Particle {
         var position: CGPoint
         var velocity: CGPoint
@@ -200,9 +200,9 @@ class ParticleSystem: ObservableObject {
         var maxLife: Double
     }
     
-    @Published var particles: [Particle] = []
-    @Published var time: Double = 0
-    private var timer: Timer?
+    var particles: [Particle] = []
+    var time: Double = 0
+    @ObservationIgnored private var timer: Timer?
     
     func startAnimation() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
@@ -282,7 +282,7 @@ class ParticleSystem: ObservableObject {
 
 // MARK: - Real-time Pattern Display
 struct RealTimePatternDisplay: View {
-    @ObservedObject var recognizer = CognitivePatternRecognizer.shared
+    var recognizer = CognitivePatternRecognizer.shared
     @State private var currentPatterns: [PatternMatch] = []
     @State private var patternHistory: [PatternMatch] = []
     

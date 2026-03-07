@@ -13,8 +13,8 @@ struct BookSearchSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    @StateObject private var booksService = EnhancedGoogleBooksService()
-    @StateObject private var trendingService = EnhancedTrendingBooksService.shared
+    @State private var booksService = EnhancedGoogleBooksService()
+    @State private var trendingService = EnhancedTrendingBooksService.shared
     @State private var searchResults: [Book] = []
     @State private var isLoading = true
     @State private var searchError: String?

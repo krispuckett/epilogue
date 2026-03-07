@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 struct OptimizedAIQueryView: View {
-    @StateObject private var viewModel: OptimizedAIQueryViewModel
+    @State private var viewModel: OptimizedAIQueryViewModel
     @State private var query = ""
     @State private var showingUpgradePrompt = false
     @State private var showingSimilarQueries = false
@@ -14,7 +14,7 @@ struct OptimizedAIQueryView: View {
     
     init(book: Book) {
         self.book = book
-        self._viewModel = StateObject(wrappedValue: OptimizedAIQueryViewModel(book: book))
+        self._viewModel = State(wrappedValue: OptimizedAIQueryViewModel(book: book))
     }
     
     enum ProgressiveStage {
@@ -507,23 +507,24 @@ struct FeatureRow: View {
 
 // MARK: - View Model
 
-class OptimizedAIQueryViewModel: ObservableObject {
-    @Published var currentResponse: String?
-    @Published var isLoading = false
-    @Published var isFromCache = false
-    @Published var cacheConfidence: Double = 0
-    @Published var similarQueries: [CachedQueryResult] = []
-    @Published var queriesRemaining: Int = 20
-    @Published var isPro = false
-    @Published var showQuotaExceeded = false
-    @Published var canSubmitQuery = true
-    @Published var showOptimizationTips = false
-    @Published var queryType: String?
-    @Published var estimatedTokens = 0
-    
+@Observable
+class OptimizedAIQueryViewModel {
+    var currentResponse: String?
+    var isLoading = false
+    var isFromCache = false
+    var cacheConfidence: Double = 0
+    var similarQueries: [CachedQueryResult] = []
+    var queriesRemaining: Int = 20
+    var isPro = false
+    var showQuotaExceeded = false
+    var canSubmitQuery = true
+    var showOptimizationTips = false
+    var queryType: String?
+    var estimatedTokens = 0
+
     private let book: Book
-    private let optimizer = QueryOptimizationService.shared
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private let optimizer = QueryOptimizationService.shared
+    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     
     init(book: Book) {
         self.book = book
@@ -532,10 +533,12 @@ class OptimizedAIQueryViewModel: ObservableObject {
     
     private func setupBindings() {
         optimizer.$queriesRemainingToday
-            .assign(to: &$queriesRemaining)
-        
+            .sink { [weak self] value in self?.queriesRemaining = value }
+            .store(in: &cancellables)
+
         optimizer.$isPro
-            .assign(to: &$isPro)
+            .sink { [weak self] value in self?.isPro = value }
+            .store(in: &cancellables)
     }
     
     func submitQuery(_ query: String) async {

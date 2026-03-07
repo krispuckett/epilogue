@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 // MARK: - Undo Action
 struct UndoAction {
@@ -11,13 +10,14 @@ struct UndoAction {
 
 // MARK: - Undo Manager
 @MainActor
-final class UndoManager: ObservableObject {
+@Observable
+final class UndoManager {
     static let shared = UndoManager()
     
-    @Published private(set) var currentAction: UndoAction?
-    @Published private(set) var timeRemaining: TimeInterval = 0
-    
-    private var timer: Timer?
+    private(set) var currentAction: UndoAction?
+    private(set) var timeRemaining: TimeInterval = 0
+
+    @ObservationIgnored private var timer: Timer?
     private let undoDuration: TimeInterval = 5.0
     
     private init() {}
@@ -76,7 +76,7 @@ final class UndoManager: ObservableObject {
 
 // MARK: - Undo Snackbar View
 struct UndoSnackbar: View {
-    @StateObject private var undoManager = UndoManager.shared
+    @State private var undoManager = UndoManager.shared
     
     var body: some View {
         if let action = undoManager.currentAction {

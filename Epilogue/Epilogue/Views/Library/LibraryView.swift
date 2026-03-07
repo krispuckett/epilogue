@@ -7,7 +7,7 @@ import Combine
 
 struct LibraryView: View {
     @Environment(LibraryViewModel.self) var viewModel
-    @StateObject private var appState = AppStateManager.shared
+    @State private var appState = AppStateManager.shared
     @State private var searchText = ""
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @AppStorage("libraryReadFilter") private var readFilter: ReadFilter = .all
@@ -23,9 +23,9 @@ struct LibraryView: View {
     // Removed scroll tracking - not needed
     @State private var settingsButtonPressed = false
     @State private var visibleBookIDs: Set<UUID> = []
-    @StateObject private var performanceMonitor = PerformanceMonitor.shared
+    @State private var performanceMonitor = PerformanceMonitor.shared
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var googleBooksService = GoogleBooksService()
+    @State private var googleBooksService = GoogleBooksService()
     @State private var themeManager = ThemeManager.shared
     @State private var isRefreshing = false
     @Namespace private var settingsTransition

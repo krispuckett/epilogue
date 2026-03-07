@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 struct GoodreadsImportView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var googleBooksService: GoogleBooksService
+    @State private var googleBooksService = GoogleBooksService()
     
     let libraryViewModel: LibraryViewModel?  // Pass this from ContentView
     @StateObject private var importService: GoodreadsImportService

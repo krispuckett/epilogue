@@ -6,7 +6,7 @@ struct CoverSelectionView: View {
     let currentCoverURL: String?
     let onCoverSelected: (String?) -> Void
     
-    @StateObject private var googleBooksService = GoogleBooksService()
+    @State private var googleBooksService = GoogleBooksService()
     @State private var availableCovers: [String] = []
     @State private var selectedCoverURL: String?
     @State private var isLoading = false

@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Conversation Counter (Visual Component)
 struct ConversationCounter: View {
-    @StateObject private var storeKit = SimplifiedStoreKitManager.shared
+    @State private var storeKit = SimplifiedStoreKitManager.shared
     @AppStorage("devShowConversationCounter") private var devShowCounter = false
 
     var body: some View {

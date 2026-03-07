@@ -8,10 +8,11 @@ import Combine
 /// Falls back to smart heuristics
 
 @MainActor
-class QuoteIntelligence: ObservableObject {
+@Observable
+class QuoteIntelligence {
 
-    @Published var isGenerating = false
-    @Published var lastQuestion: String?
+    var isGenerating = false
+    var lastQuestion: String?
 
     // MARK: - Question Generation
 
