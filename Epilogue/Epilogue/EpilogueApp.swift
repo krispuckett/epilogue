@@ -37,6 +37,9 @@ struct EpilogueApp: App {
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 1_000_000_000)
 
+                            // Reconcile UserDefaults ↔ SwiftData to fix any drift
+                            LibraryService.shared.reconcileStores()
+
                             // Configure offline services
                             OfflineQueueManager.shared.configure(with: context)
                             OfflineCoverCacheService.shared.configure(with: context)

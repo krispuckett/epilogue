@@ -329,34 +329,6 @@ struct AmbientModeView: View {
             }
             .zIndex(100)  // Ensure it's on top
 
-            // Onboarding text overlay - only show when there's no empty state visible and no messages yet
-            if showOnboarding && onboardingShownCount < 5 && messages.isEmpty {
-                VStack(spacing: 0) {
-                    Spacer()
-
-                    VStack(spacing: 28) {
-                        Text("Ambient Reading")
-                            .font(.system(size: 32, weight: .regular, design: .default))
-                            .foregroundStyle(.white)
-                            .tracking(0.5)
-
-                        Text("What are you reading today? Just say the\nbook title and lose yourself in the pages.")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.65))
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(4)
-                    }
-                    .padding(.horizontal, 40)
-
-                    Spacer()
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(onboardingOpacity)
-                .animation(.easeInOut(duration: 0.8), value: onboardingOpacity)
-                .allowsHitTesting(false)
-                .zIndex(200)
-            }
 
             // Conversational recommendation flow overlay (for generic mode)
             if showRecommendationFlow {
@@ -1089,10 +1061,7 @@ struct AmbientModeView: View {
                         !msg.content.contains("[Transcribing]")
                     }
 
-                    // Don't show empty state pills when onboarding overlay is visible
-                    let isOnboardingVisible = showOnboarding && onboardingShownCount < 5 && messages.isEmpty
-
-                    if !hasRealContent && !showRecommendationFlow && showReadingPlanFlow == nil && !isOnboardingVisible {
+                    if !hasRealContent && !showRecommendationFlow && showReadingPlanFlow == nil {
                         if currentBookContext == nil {
                             // Generic ambient mode - beautiful liquid glass pills
                             GenericAmbientEmptyState(
@@ -5305,6 +5274,9 @@ struct AmbientModeView: View {
 
             do {
                 try modelContext.save()
+
+                // Sync to UserDefaults to prevent desync
+                LibraryService.shared.syncBookModelToUserDefaults(bookModel)
 
                 // Show success feedback
                 SensoryFeedback.success()

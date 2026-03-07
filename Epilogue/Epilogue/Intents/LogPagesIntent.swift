@@ -56,6 +56,9 @@ struct LogPagesIntent: AppIntent {
             UserDefaults.standard.synchronize()
         }
 
+        // Sync to SwiftData to prevent desync
+        try? await LibraryService.shared.updateCurrentPage(bookEntity.id, page: newPage)
+
         // Create message
         var message = "Logged \(pageCount) pages for \(bookEntity.title)"
         if let totalPages = books[index].pageCount {

@@ -168,7 +168,7 @@ final class LibraryService {
         }
 
         // 3. Update Spotlight
-        await SpotlightIndexingService.shared.indexBook(books[index])
+        SpotlightIndexingService.shared.indexBook(books[index])
 
         // 4. Notify UI
         NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
@@ -204,12 +204,157 @@ final class LibraryService {
         }
 
         // 3. Update Spotlight
-        await SpotlightIndexingService.shared.indexBook(books[index])
+        SpotlightIndexingService.shared.indexBook(books[index])
 
         // 4. Notify UI
         NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
 
         logger.info("✅ Book rating updated successfully")
+    }
+
+    /// Update current page atomically across all storage layers
+    func updateCurrentPage(_ bookId: String, page: Int) async throws {
+        logger.info("📖 Updating current page: \(bookId) → \(page)")
+
+        // 1. Update UserDefaults
+        var books = loadBooks()
+        guard let index = books.firstIndex(where: { $0.id == bookId }) else {
+            throw LibraryError.bookNotFound(bookId)
+        }
+
+        let validPage = max(0, page)
+        books[index].currentPage = validPage
+
+        // Auto-mark as Read at 100%
+        if let pageCount = books[index].pageCount, pageCount > 0, validPage >= pageCount {
+            books[index].readingStatus = .read
+        }
+
+        try saveBooks(books)
+
+        // 2. Update SwiftData
+        let context = ModelContext(modelContainer)
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.id == bookId }
+        )
+
+        if let bookModel = try? context.fetch(descriptor).first {
+            bookModel.currentPage = validPage
+            if let pageCount = bookModel.pageCount, pageCount > 0, validPage >= pageCount {
+                bookModel.readingStatus = ReadingStatus.read.rawValue
+            }
+            try context.save()
+            logger.debug("  ✅ Updated SwiftData")
+        }
+
+        // 3. Notify UI
+        NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
+
+        logger.info("✅ Current page updated successfully")
+    }
+
+    /// Sync a single BookModel's mutable fields to UserDefaults
+    func syncBookModelToUserDefaults(_ bookModel: BookModel) {
+        var books = loadBooks()
+
+        if let index = books.firstIndex(where: { $0.id == bookModel.id }) {
+            // Update mutable fields from SwiftData → UserDefaults
+            books[index].currentPage = max(books[index].currentPage, bookModel.currentPage)
+            books[index].readingStatus = ReadingStatus(rawValue: bookModel.readingStatus) ?? books[index].readingStatus
+            if let rating = bookModel.userRating {
+                books[index].userRating = rating
+            }
+            if let notes = bookModel.userNotes, !notes.isEmpty {
+                books[index].userNotes = notes
+            }
+            if let coverURL = bookModel.coverImageURL {
+                books[index].coverImageURL = coverURL
+            }
+        } else {
+            // Book exists in SwiftData but not UserDefaults — add it
+            books.append(bookModel.asBook)
+        }
+
+        try? saveBooks(books)
+    }
+
+    /// Reconcile UserDefaults and SwiftData on startup
+    /// Rule: currentPage = max(both), other mutable fields = SwiftData wins
+    func reconcileStores() {
+        logger.info("🔄 Reconciling UserDefaults ↔ SwiftData...")
+
+        let context = ModelContext(modelContainer)
+        var udBooks = loadBooks()
+        let descriptor = FetchDescriptor<BookModel>()
+
+        guard let sdBooks = try? context.fetch(descriptor) else {
+            logger.warning("⚠️ Could not fetch SwiftData books for reconciliation")
+            return
+        }
+
+        var udChanged = false
+        var sdChanged = false
+
+        // Pass 1: Sync SwiftData → UserDefaults
+        for sdBook in sdBooks {
+            if let udIndex = udBooks.firstIndex(where: { $0.id == sdBook.id }) {
+                // Reconcile mutable fields
+                let maxPage = max(udBooks[udIndex].currentPage, sdBook.currentPage)
+                if udBooks[udIndex].currentPage != maxPage {
+                    udBooks[udIndex].currentPage = maxPage
+                    udChanged = true
+                }
+                if sdBook.currentPage != maxPage {
+                    sdBook.currentPage = maxPage
+                    sdChanged = true
+                }
+
+                // SwiftData wins for status/rating/notes
+                let sdStatus = ReadingStatus(rawValue: sdBook.readingStatus) ?? .wantToRead
+                if udBooks[udIndex].readingStatus != sdStatus {
+                    udBooks[udIndex].readingStatus = sdStatus
+                    udChanged = true
+                }
+                if let sdRating = sdBook.userRating, udBooks[udIndex].userRating != sdRating {
+                    udBooks[udIndex].userRating = sdRating
+                    udChanged = true
+                }
+                if let sdNotes = sdBook.userNotes, !sdNotes.isEmpty, udBooks[udIndex].userNotes != sdNotes {
+                    udBooks[udIndex].userNotes = sdNotes
+                    udChanged = true
+                }
+            } else {
+                // Book in SwiftData but not UserDefaults — add it
+                udBooks.append(sdBook.asBook)
+                udChanged = true
+                logger.debug("  ➕ Added SwiftData-only book to UserDefaults: \(sdBook.title)")
+            }
+        }
+
+        // Pass 2: Sync UserDefaults → SwiftData (books that exist only in UD)
+        for udBook in udBooks {
+            let bookId = udBook.id
+            if !sdBooks.contains(where: { $0.id == bookId }) {
+                // Book in UserDefaults but not SwiftData — create BookModel
+                let newModel = BookModel(from: udBook)
+                context.insert(newModel)
+                sdChanged = true
+                logger.debug("  ➕ Created SwiftData BookModel from UserDefaults: \(udBook.title)")
+            }
+        }
+
+        // Save changes
+        if udChanged {
+            try? saveBooks(udBooks)
+            logger.info("  ✅ UserDefaults updated during reconciliation")
+        }
+        if sdChanged {
+            try? context.save()
+            logger.info("  ✅ SwiftData updated during reconciliation")
+        }
+
+        let totalBooks = udBooks.count
+        logger.info("🔄 Reconciliation complete: \(totalBooks) books in sync")
     }
 
     // MARK: - Delete Operations
@@ -272,7 +417,7 @@ final class LibraryService {
         }
 
         // 3. Remove from Spotlight
-        await SpotlightIndexingService.shared.deindexBook(bookId)
+        SpotlightIndexingService.shared.deindexBook(bookId)
 
         // 4. Notify UI
         NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)

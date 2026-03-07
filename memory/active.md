@@ -1,21 +1,34 @@
 # Active Context
 
 ## Current Focus
-Post-1.4 polish and new features. Large batch of uncommitted work in progress including social sharing, companion system, return cards, and various UI improvements across library, notes, sessions, and settings views.
+v2.0 bug bash — P0/P1 issues from deep audit. First pass complete (10 issues resolved). KRI-35 (UserDefaults/SwiftData desync) scoped out for dedicated session.
 
 ## Recent Changes
-- Replaced AsyncImage with SharedBookCoverView for offline caching (5b602fe)
-- Fixed recommendation engine and generic session improvements (142ffae)
-- Auto-enrich books on app startup after CloudKit sync (0d1e7a2)
-- Custom cover upload and search performance improvements (4b6901f)
-- Knowledge graph system for thematic connections (c54e579)
+- Bug bash commit c505016: 9 issues fixed across Waves 1-4
+  - KRI-71: Removed debug cache clearing from startup
+  - KRI-72: Deleted unused EpilogueWidgetsLiveActivity.swift
+  - KRI-38: Removed loadSampleData() from production
+  - KRI-39: Deleted unused EmptyStateView.noBooks
+  - KRI-70: Fixed Task.detached + @MainActor contradiction
+  - KRI-36: Fixed PerformanceMonitor data race (removed metricsQueue)
+  - KRI-37: Replaced fatalError with graceful fallback in LibraryService
+  - KRI-85: Phased startup into 3 tiers (critical/UI-ready/background)
+  - KRI-46: Added library search by title/author (.searchable)
+  - KRI-75: Limited preloadAllBookCovers to 6 visible books (was 20)
+- KRI-40: Closed — no hardcoded secrets found, downgraded to P3
+- KRI-77: Closed — try! in #Preview is standard (macro doesn't support try)
 
 ## Open Questions
-- Large number of uncommitted changes across many views — need to review and commit incrementally
-- Multiple new untracked files (SocialSharing/, Companion/, ReturnCard, etc.) not yet committed
-- Many markdown documentation files staged for deletion (cleanup in progress)
+- KRI-35 (UserDefaults/SwiftData desync) is the biggest remaining P0 — needs dedicated session
+  - `com.epilogue.savedBooks` dual-written to UserDefaults + SwiftData from 15+ files
+  - All Siri Intents read from UserDefaults only
+  - LogPagesIntent updates UserDefaults only (no SwiftData sync)
+- KRI-47 (edit button on NoteDetailView) not yet addressed
+- KRI-42 (@Observable migration) — large mechanical change, needs batching
+- Pre-existing uncommitted changes in EnhancedGoogleBooksService.swift, AmbientModeView.swift, CLAUDE.md
 
 ## Next Steps
-- Review and commit the pending changes in logical groups
-- Test new features (social sharing, companion, return cards) on device
-- Continue iOS 26 Liquid Glass polish pass
+- Dedicated session for KRI-35 UserDefaults/SwiftData desync
+- Continue remaining P1 issues (KRI-47, KRI-42, etc.)
+- Test library search on device
+- Review and commit pre-existing uncommitted changes

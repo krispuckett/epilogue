@@ -1659,9 +1659,13 @@ struct ManualMatchView: View {
         
         // Save to database
         modelContext.insert(bookModel)
-        
+
         do {
             try modelContext.save()
+
+            // Sync to UserDefaults to prevent desync
+            LibraryService.shared.syncBookModelToUserDefaults(bookModel)
+
             dismiss()
         } catch {
             #if DEBUG

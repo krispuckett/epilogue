@@ -1871,6 +1871,12 @@ class GoodreadsImportService: ObservableObject {
             // Save after each chunk
             do {
                 try modelContext.save()
+
+                // Sync imported books to UserDefaults to prevent desync
+                for processedBook in chunk {
+                    LibraryService.shared.syncBookModelToUserDefaults(processedBook.bookModel)
+                }
+
                 #if DEBUG
                 print("  ✅ Batch \(index + 1) saved successfully")
                 #endif
