@@ -1292,10 +1292,11 @@ struct AmbientModeView: View {
     // MARK: - Clean Bottom Input Area
     @ViewBuilder
     private var bottomInputArea: some View {
+        GlassEffectContainer {
         ZStack {
             // Removed invisible tap area that was blocking scrolling
             // Dismissal will be handled by scrollDismissesKeyboard instead
-            
+
             VStack(spacing: 8) { // ← Tightened spacing between elements
                 // Removed Spacer that was expanding the VStack unnecessarily
 
@@ -1633,8 +1634,9 @@ struct AmbientModeView: View {
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: inputMode)
         .animation(.spring(response: 0.5, dampingFraction: 0.86, blendDuration: 0), value: textFieldHeight)
         }
+        } // GlassEffectContainer
     }
-    
+
     // MARK: - Text Input Bar Component (DEPRECATED - now integrated into bottomInputArea)
     // Keeping for reference but no longer used
     private var ambientTextInputBar_DEPRECATED: some View {
@@ -1710,6 +1712,7 @@ struct AmbientModeView: View {
     
     // MARK: - BookView-Style Header
     private var bookStyleHeader: some View {
+        GlassEffectContainer {
         HStack(spacing: 0) {
             // Left side - Exit button (X in circle with liquid glass)
             Button {
@@ -1743,8 +1746,9 @@ struct AmbientModeView: View {
                     }
                 }
         }
+        } // GlassEffectContainer
     }
-    
+
     // MARK: - Actions
     
     private func setupKeyboardObservers() {

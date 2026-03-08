@@ -36,6 +36,7 @@ struct LiveTextQuoteCapture: View {
                 .ignoresSafeArea()
 
                 // Top bar with close
+                GlassEffectContainer {
                 VStack {
                     HStack {
                         Button {
@@ -65,8 +66,10 @@ struct LiveTextQuoteCapture: View {
 
                     Spacer()
                 }
+                } // GlassEffectContainer
 
                 // Bottom action bar - centered group of 3 buttons
+                GlassEffectContainer {
                 VStack {
                     Spacer()
 
@@ -141,6 +144,7 @@ struct LiveTextQuoteCapture: View {
                         .padding(.bottom, 34)
                     }
                 }
+                } // GlassEffectContainer
 
             } else {
                 // Live camera with intelligent auto-capture
@@ -159,6 +163,7 @@ struct LiveTextQuoteCapture: View {
                 .ignoresSafeArea()
 
                 // Clean UI - system handles capture automatically
+                GlassEffectContainer {
                 VStack {
                     // Top bar
                     HStack {
@@ -195,6 +200,7 @@ struct LiveTextQuoteCapture: View {
 
                     Spacer()
                 }
+                } // GlassEffectContainer
             }
         }
         .preferredColorScheme(.dark)

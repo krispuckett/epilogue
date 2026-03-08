@@ -335,6 +335,7 @@ struct ShareInvitationSheet: View {
                 )
                 .ignoresSafeArea()
 
+                GlassEffectContainer {
                 VStack(spacing: 0) {
                     Spacer()
                         .frame(height: 40)
@@ -456,6 +457,7 @@ struct ShareInvitationSheet: View {
                     .padding(.top, 16)
                     .padding(.bottom, 24)
                 }
+                } // GlassEffectContainer
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

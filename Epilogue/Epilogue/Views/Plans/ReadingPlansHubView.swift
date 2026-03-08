@@ -613,6 +613,7 @@ private struct CreatePlanFromHubSheet: View {
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
+            GlassEffectContainer {
             VStack(spacing: 12) {
                 PlanTypeCard(
                     icon: "calendar.badge.clock",
@@ -634,6 +635,7 @@ private struct CreatePlanFromHubSheet: View {
                     }
                 }
             }
+            } // GlassEffectContainer
             .padding(.horizontal, 20)
 
             Spacer()

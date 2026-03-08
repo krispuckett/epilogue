@@ -82,6 +82,7 @@ struct CleanGoodreadsImportView: View {
     // MARK: - Start View
     private var startView: some View {
         ScrollView {
+            GlassEffectContainer {
             VStack(spacing: 0) {
                 Spacer()
                     .frame(height: 40)
@@ -254,9 +255,10 @@ struct CleanGoodreadsImportView: View {
             Spacer()
                 .frame(height: 40)
             }
+            } // GlassEffectContainer
         }
     }
-    
+
     // MARK: - Helper Views
     private func instructionRow(number: String, text: String, icon: String) -> some View {
         HStack(alignment: .top, spacing: 16) {
@@ -450,6 +452,7 @@ struct CleanGoodreadsImportView: View {
             
             // Results list
             ScrollView {
+                GlassEffectContainer {
                 LazyVStack(spacing: 8) {
                     switch selectedTab {
                     case .imported:
@@ -462,6 +465,7 @@ struct CleanGoodreadsImportView: View {
                         }
                     }
                 }
+                } // GlassEffectContainer
                 .padding(.horizontal)
             }
             

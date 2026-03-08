@@ -29,23 +29,25 @@ struct ReadwiseSyncView: View {
                         headerSection
                         
                         // Main content with consistent spacing
+                        GlassEffectContainer {
                         VStack(spacing: 20) {
                             // Authentication Status
                             authenticationSection
-                            
+
                             // Sync Options
                             if readwise.isAuthenticated {
                                 syncOptionsSection
-                                
+
                                 // Sync Status
                                 if readwise.lastSyncDate != nil || readwise.syncProgress != nil {
                                     syncStatusSection
                                 }
-                                
+
                                 // Sync Button
                                 syncButtonSection
                             }
                         }
+                        } // GlassEffectContainer
                         .padding(.horizontal)
                         
                         Spacer(minLength: 50)

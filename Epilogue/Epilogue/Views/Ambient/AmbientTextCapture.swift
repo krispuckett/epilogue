@@ -196,6 +196,7 @@ struct AmbientTextCapture: View {
     private var selectionPillsOverlay: some View {
         Group {
             if !selectedText.isEmpty {
+                GlassEffectContainer {
                 VStack {
                     Spacer()
 
@@ -262,6 +263,7 @@ struct AmbientTextCapture: View {
                     }
                     .padding(.bottom, 40)
                 }
+                } // GlassEffectContainer
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .animation(.spring(response: 0.2, dampingFraction: 0.8), value: !selectedText.isEmpty)
             }
@@ -270,6 +272,7 @@ struct AmbientTextCapture: View {
 
     // MARK: - Navigation Bar
     private var navigationBar: some View {
+        GlassEffectContainer {
         HStack {
             Button { dismiss() } label: {
                 Image(systemName: "arrow.left")
@@ -299,6 +302,7 @@ struct AmbientTextCapture: View {
                     .glassEffect(in: .circle)
             }
         }
+        } // GlassEffectContainer
         .padding(.horizontal)
         .padding(.top, 60)
         .padding(.bottom, 12)

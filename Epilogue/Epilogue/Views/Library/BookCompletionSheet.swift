@@ -42,25 +42,27 @@ struct BookCompletionSheet: View {
                 .ignoresSafeArea()
                 
                 ScrollView {
+                    GlassEffectContainer {
                     VStack(spacing: 32) {
                         // Book cover and title
                         headerSection
-                        
+
                         // Rating section
                         ratingSection
-                        
+
                         // Review text section
                         reviewSection
-                        
+
                         // Reading stats
                         statsSection
-                        
+
                         // Favorite toggle
                         favoriteSection
-                        
+
                         // Emotional tags section (optional, at bottom)
                         tagsSection
                     }
+                    } // GlassEffectContainer
                     .padding(.horizontal, DesignSystem.Spacing.cardPadding)
                     .padding(.vertical, 32)
                 }

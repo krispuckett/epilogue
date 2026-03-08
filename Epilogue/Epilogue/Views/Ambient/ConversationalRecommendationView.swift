@@ -102,6 +102,7 @@ private struct MoodChipGrid: View {
     ]
 
     var body: some View {
+        GlassEffectContainer {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(Array(AmbientConversationFlows.ReadingMood.allCases.enumerated()), id: \.element) { index, mood in
                 MoodChip(
@@ -114,6 +115,7 @@ private struct MoodChipGrid: View {
                 }
             }
         }
+        } // GlassEffectContainer
     }
 }
 

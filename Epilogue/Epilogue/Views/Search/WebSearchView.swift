@@ -28,6 +28,7 @@ struct WebSearchView: View {
     
     var body: some View {
         NavigationStack {
+            GlassEffectContainer {
             VStack(spacing: 0) {
                 // Search type selector
                 Picker("Search Type", selection: $selectedSearchType) {
@@ -141,6 +142,7 @@ struct WebSearchView: View {
                         .padding()
                 }
             }
+            } // GlassEffectContainer
             .navigationTitle("Web Search")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

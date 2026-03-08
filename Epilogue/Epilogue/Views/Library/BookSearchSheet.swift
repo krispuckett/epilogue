@@ -128,6 +128,7 @@ struct BookSearchSheet: View {
     
     // MARK: - Search Input Bar (Bottom)
     private var searchInputBar: some View {
+        GlassEffectContainer {
         HStack(spacing: 12) {
             // Main input bar with glass effect
             HStack(spacing: 0) {
@@ -201,6 +202,7 @@ struct BookSearchSheet: View {
             }
             .buttonStyle(.plain)
         }
+        } // GlassEffectContainer
         .padding(.horizontal, DesignSystem.Spacing.inlinePadding)
         .padding(.bottom, 8)
         .animation(DesignSystem.Animation.springStandard, value: refinedSearchQuery.isEmpty)

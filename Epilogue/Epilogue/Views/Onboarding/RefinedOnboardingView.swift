@@ -141,6 +141,7 @@ struct RefinedOnboardingView: View {
     }
     // MARK: - Header
     private var headerView: some View {
+        GlassEffectContainer {
         HStack {
             // Progress indicators - proper liquid glass
             HStack(spacing: 8) {
@@ -176,8 +177,9 @@ struct RefinedOnboardingView: View {
                     )
             }
         }
+        } // GlassEffectContainer
     }
-    
+
     // MARK: - Bottom Controls
     private var bottomControls: some View {
         HStack {

@@ -8,6 +8,7 @@ struct FollowUpCapsules: View {
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
+            GlassEffectContainer {
             HStack(spacing: 10) {
                 ForEach(animatedSuggestions, id: \.self) { suggestion in
                     FollowUpCapsule(
@@ -35,6 +36,7 @@ struct FollowUpCapsules: View {
                     ))
                 }
             }
+            } // GlassEffectContainer
             .padding(.horizontal)
             .padding(.vertical, 8)
         }

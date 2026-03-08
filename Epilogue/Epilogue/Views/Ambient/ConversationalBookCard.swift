@@ -96,6 +96,7 @@ struct BookRecommendationsMessageView: View {
             }
 
             // Book cards
+            GlassEffectContainer {
             ForEach(recommendations) { rec in
                 ConversationalBookCard(
                     recommendation: rec,
@@ -103,6 +104,7 @@ struct BookRecommendationsMessageView: View {
                     onPurchase: onPurchase
                 )
             }
+            } // GlassEffectContainer
         }
     }
 }
@@ -131,6 +133,7 @@ struct ConversationalResponseMessageView: View {
                         .foregroundStyle(.white.opacity(0.5))
                         .textCase(.uppercase)
 
+                    GlassEffectContainer {
                     FlowLayout(spacing: 8) {
                         ForEach(followUpQuestions, id: \.self) { question in
                             FollowUpPill(text: question) {
@@ -138,6 +141,7 @@ struct ConversationalResponseMessageView: View {
                             }
                         }
                     }
+                    } // GlassEffectContainer
                 }
             }
         }

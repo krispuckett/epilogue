@@ -61,6 +61,7 @@ struct SimpleCommandIntent: View {
     var body: some View {
         VStack(spacing: 0) {
             // Clean input field with glass effect
+            GlassEffectContainer {
             VStack(spacing: 16) {
                 // Text input
                 HStack(spacing: 12) {
@@ -146,6 +147,7 @@ struct SimpleCommandIntent: View {
                     .glassEffect(.regular, in: .rect(cornerRadius: 16))
                 }
             }
+            } // GlassEffectContainer
             .padding(.horizontal, 16)
             .padding(.vertical, 20)
         }

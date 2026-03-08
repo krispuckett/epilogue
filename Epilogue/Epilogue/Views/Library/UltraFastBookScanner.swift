@@ -31,6 +31,7 @@ struct UltraFastBookScanner: View {
             .ignoresSafeArea()
 
             // Minimal UI overlay
+            GlassEffectContainer {
             VStack {
                 // Top bar
                 HStack {
@@ -102,6 +103,7 @@ struct UltraFastBookScanner: View {
                 .padding(.top, 12)
                 .padding(.bottom, 40)
             }
+            } // GlassEffectContainer
         }
         .statusBar(hidden: true)
         .sheet(isPresented: $showingSearchSheet) {

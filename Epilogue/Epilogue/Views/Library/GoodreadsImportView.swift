@@ -544,6 +544,7 @@ struct GoodreadsImportView: View {
             
             // Control buttons for medium/large imports
             if let total = importService.currentProgress?.total, total >= 50 {
+                GlassEffectContainer {
                 HStack(spacing: 16) {
                     Button {
                         if importService.isPaused {
@@ -560,7 +561,7 @@ struct GoodreadsImportView: View {
                         .frame(width: 120, height: 44)
                         .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     }
-                    
+
                     Button {
                         importService.cancel()
                         importState = .start
@@ -571,6 +572,7 @@ struct GoodreadsImportView: View {
                             .glassEffect(.regular, in: .rect(cornerRadius: DesignSystem.CornerRadius.medium))
                     }
                 }
+                } // GlassEffectContainer
             }
             
             // Background processing note
@@ -606,13 +608,14 @@ struct GoodreadsImportView: View {
                         .foregroundColor(.white)
                     
                     // Stats grid
+                    GlassEffectContainer {
                     HStack(spacing: 12) {
                         ResultStatCard(
                             value: "\(result.successful.count)",
                             label: "Imported",
                             color: .green
                         )
-                        
+
                         if result.needsMatching.count > 0 {
                             ResultStatCard(
                                 value: "\(result.needsMatching.count)",
@@ -620,7 +623,7 @@ struct GoodreadsImportView: View {
                                 color: .orange
                             )
                         }
-                        
+
                         if result.duplicates.count > 0 {
                             ResultStatCard(
                                 value: "\(result.duplicates.count)",
@@ -629,12 +632,14 @@ struct GoodreadsImportView: View {
                             )
                         }
                     }
+                    } // GlassEffectContainer
                     .padding(.horizontal)
                 }
                 .padding(.vertical, 24)
                 
                 // Tab selector
                 ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer {
                     HStack(spacing: 12) {
                         ForEach(ResultsTab.allCases, id: \.self) { tab in
                             Button {
@@ -664,10 +669,11 @@ struct GoodreadsImportView: View {
                             }
                         }
                     }
+                    } // GlassEffectContainer
                     .padding(.horizontal)
                 }
                 .padding(.bottom, 16)
-                
+
                 // Search bar for larger result sets
                 if totalResultsCount > 20 {
                     HStack {

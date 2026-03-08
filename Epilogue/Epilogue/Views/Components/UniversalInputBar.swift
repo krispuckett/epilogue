@@ -62,6 +62,7 @@ struct UniversalInputBar: View {
     }
     
     var body: some View {
+        GlassEffectContainer {
         HStack(spacing: 8) {
             // Main input bar - EXACT copy from UnifiedChatInputBar
             HStack(spacing: 0) {
@@ -196,6 +197,7 @@ struct UniversalInputBar: View {
                 .buttonStyle(.plain)
             }
         }
+        } // GlassEffectContainer
         .animation(DesignSystem.Animation.springStandard, value: messageText.isEmpty)
     }
 }

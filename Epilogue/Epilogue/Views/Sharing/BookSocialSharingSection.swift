@@ -33,6 +33,7 @@ struct BookSocialSharingSection: View {
             }
 
             // Action buttons
+            GlassEffectContainer {
             HStack(spacing: 12) {
                 // Share Book button
                 Button {
@@ -76,6 +77,7 @@ struct BookSocialSharingSection: View {
                     .buttonStyle(.plain)
                 }
             }
+            } // GlassEffectContainer
         }
         .task {
             await loadCompanionship()

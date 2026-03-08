@@ -12,6 +12,7 @@ struct SessionSummaryView: View {
                 .ignoresSafeArea()
             
             ScrollView {
+                GlassEffectContainer {
                 VStack(spacing: 20) {
                     // Header card with glass effect
                     VStack(spacing: 16) {
@@ -132,6 +133,7 @@ struct SessionSummaryView: View {
                     .padding(.top, 8)
                 }
                 .padding(DesignSystem.Spacing.listItemPadding)
+                } // GlassEffectContainer
             }
         }
     }

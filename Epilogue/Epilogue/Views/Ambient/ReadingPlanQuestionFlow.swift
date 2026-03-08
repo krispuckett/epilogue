@@ -179,6 +179,7 @@ struct ReadingPlanQuestionFlow: View {
                             .offset(y: questionVisible ? 0 : -10)
 
                         // Duration stepper
+                        GlassEffectContainer {
                         HStack(spacing: 20) {
                             Button {
                                 if customDurationDays > 30 {
@@ -230,6 +231,7 @@ struct ReadingPlanQuestionFlow: View {
                         }
                         .padding(.top, 16)
                         .padding(.bottom, 100) // Clear input bar
+                        } // GlassEffectContainer
                     }
                 }
                 .padding(.horizontal, 24)

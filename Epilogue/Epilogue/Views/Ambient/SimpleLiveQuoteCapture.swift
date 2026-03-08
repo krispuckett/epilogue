@@ -22,6 +22,7 @@ struct SimpleLiveQuoteCapture: View {
                 .ignoresSafeArea()
 
             // Layer 2: Top Controls
+            GlassEffectContainer {
             VStack {
                 HStack {
                     // Close button
@@ -52,9 +53,11 @@ struct SimpleLiveQuoteCapture: View {
 
                 Spacer()
             }
+            } // GlassEffectContainer
 
             // Layer 3: Action Pills (when text selected)
             if let selectedText = coordinator.selectedText {
+                GlassEffectContainer {
                 VStack {
                     Spacer()
 
@@ -80,6 +83,7 @@ struct SimpleLiveQuoteCapture: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 40)
                 }
+                } // GlassEffectContainer
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }

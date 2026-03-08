@@ -1002,6 +1002,7 @@ struct BookDetailView: View {
     
     @ViewBuilder
     private var contextualContentSections: some View {
+        GlassEffectContainer {
         VStack(spacing: 32) {
             // Always show Notes section (persistent)
             notesSection
@@ -1057,6 +1058,7 @@ struct BookDetailView: View {
         }
         // Only animate status changes after initial load
         .animation(hasAppeared ? DesignSystem.Animation.easeStandard : nil, value: book.readingStatus)
+        } // GlassEffectContainer
     }
     
     private func summarySection(description: String) -> some View {
@@ -1239,6 +1241,7 @@ struct BookDetailView: View {
     // MARK: - Quick Capture Section
     /// Clean capture buttons + view notes - all content lives in Notes tab
     private var notesSection: some View {
+        GlassEffectContainer {
         VStack(spacing: 12) {
             // Quick capture row
             HStack(spacing: 12) {
@@ -1302,6 +1305,7 @@ struct BookDetailView: View {
             }
             .buttonStyle(.plain)
         }
+        } // GlassEffectContainer
     }
 
     // MARK: - Contextual Sections for Currently Reading

@@ -292,6 +292,7 @@ struct ReadingPlanDetailView: View {
 
     var body: some View {
         ScrollView {
+            GlassEffectContainer {
             VStack(alignment: .leading, spacing: 24) {
                 // Hero header
                 heroHeader
@@ -328,6 +329,7 @@ struct ReadingPlanDetailView: View {
 
                 Spacer(minLength: 100)
             }
+            } // GlassEffectContainer
             .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
         .background {

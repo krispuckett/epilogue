@@ -33,6 +33,7 @@ struct SimplifiedBookScanner: View {
                     Spacer()
                     
                     // Instructions
+                    GlassEffectContainer {
                     VStack(spacing: 16) {
                         Text("Point at book cover or ISBN barcode")
                             .font(.system(size: 16, weight: .medium))
@@ -41,7 +42,7 @@ struct SimplifiedBookScanner: View {
                             .padding(.vertical, 12)
                             .glassEffect()
                             .clipShape(Capsule())
-                        
+
                         // Manual search button
                         Button {
                             showBookSearch = true
@@ -58,6 +59,7 @@ struct SimplifiedBookScanner: View {
                             .clipShape(Capsule())
                         }
                     }
+                    } // GlassEffectContainer
                     .padding(.bottom, 50)
                 }
             }

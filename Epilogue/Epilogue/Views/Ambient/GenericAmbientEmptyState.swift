@@ -40,6 +40,7 @@ struct GenericAmbientEmptyState: View {
             Spacer()
 
             // Centered pills
+            GlassEffectContainer {
             VStack(spacing: 10) {
                 ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
                     SuggestionPill(
@@ -51,6 +52,7 @@ struct GenericAmbientEmptyState: View {
                     }
                 }
             }
+            } // GlassEffectContainer
 
             Spacer()
             Spacer()
@@ -155,6 +157,7 @@ struct BookSpecificEmptyState: View {
             Spacer()
 
             // Centered pills - matching generic ambient style
+            GlassEffectContainer {
             VStack(spacing: 10) {
                 ForEach(Array(suggestions.enumerated()), id: \.element.text) { index, suggestion in
                     SuggestionPill(
@@ -170,6 +173,7 @@ struct BookSpecificEmptyState: View {
                     }
                 }
             }
+            } // GlassEffectContainer
             .opacity(isVisible ? 1 : 0)
             .offset(y: isVisible ? 0 : 15)
 
@@ -211,6 +215,7 @@ struct RelatedQuestionsPillRow: View {
 
             // Horizontal scroll of compact pills
             ScrollView(.horizontal, showsIndicators: false) {
+                GlassEffectContainer {
                 HStack(spacing: 8) {
                     ForEach(Array(questions.prefix(4).enumerated()), id: \.offset) { index, question in
                         RelatedQuestionPill(
@@ -222,6 +227,7 @@ struct RelatedQuestionsPillRow: View {
                         }
                     }
                 }
+                } // GlassEffectContainer
                 .padding(.horizontal, 2)
             }
         }

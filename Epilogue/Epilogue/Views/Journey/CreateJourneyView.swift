@@ -101,6 +101,7 @@ struct CreateJourneyView: View {
 
     // MARK: - Welcome Step
     private var welcomeStep: some View {
+        GlassEffectContainer {
         VStack(spacing: 24) {
             Image(systemName: "map.fill")
                 .font(.system(size: 64))
@@ -165,6 +166,7 @@ struct CreateJourneyView: View {
             .buttonStyle(.plain)
             .padding(.top, 8)
         }
+        } // GlassEffectContainer
     }
 
     // MARK: - Select Books Step

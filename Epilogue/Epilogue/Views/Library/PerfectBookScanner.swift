@@ -162,6 +162,7 @@ struct PerfectBookScanner: View {
     // MARK: - Scanner UI Overlay
 
     private var scannerUIOverlay: some View {
+        GlassEffectContainer {
         VStack {
                 // Top bar with controls
                 HStack {
@@ -360,6 +361,7 @@ struct PerfectBookScanner: View {
                 .padding(.bottom, 24)
 
         }
+        } // GlassEffectContainer
     }
 
     // MARK: - ISBN Search

@@ -41,6 +41,7 @@ struct CompanionAwareEmptyState: View {
             Spacer()
 
             // All suggestions in clean glass pills
+            GlassEffectContainer {
             VStack(spacing: 10) {
                 // Companion suggestions (proactive, intelligent)
                 ForEach(Array(companionSuggestions.enumerated()), id: \.element) { index, suggestion in
@@ -71,6 +72,7 @@ struct CompanionAwareEmptyState: View {
                     }
                 }
             }
+            } // GlassEffectContainer
             .opacity(isVisible ? 1 : 0)
             .offset(y: isVisible ? 0 : 15)
 

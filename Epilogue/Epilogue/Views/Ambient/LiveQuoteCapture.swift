@@ -44,6 +44,7 @@ struct LiveQuoteCapture: View {
             )
 
             // Layer 3: Top Chrome (Minimal)
+            GlassEffectContainer {
             VStack {
                 HStack {
                     // Back button
@@ -95,6 +96,7 @@ struct LiveQuoteCapture: View {
 
                 Spacer()
             }
+            } // GlassEffectContainer
 
             // Layer 4: Action Pills (When text selected)
             if let selected = viewModel.selectedParagraph {

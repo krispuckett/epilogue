@@ -26,6 +26,7 @@ struct ModernEmptyStates {
             }
             
             // Two buttons side by side
+            GlassEffectContainer {
             HStack(spacing: 12) {
                 Button(action: addAction) {
                     Label("Add Book", systemImage: "plus.circle.fill")
@@ -51,7 +52,7 @@ struct ModernEmptyStates {
                         )
                 }
                 .shadow(color: DesignSystem.Colors.primaryAccent.opacity(0.2), radius: 8, y: 4)
-                
+
                 Button(action: importAction) {
                     Label("Import", systemImage: "square.and.arrow.down")
                         .font(.system(size: 15, weight: .medium))
@@ -62,6 +63,7 @@ struct ModernEmptyStates {
                 }
                 .buttonStyle(.plain)
             }
+            } // GlassEffectContainer
             .padding(.horizontal, 32)
             
             Spacer()

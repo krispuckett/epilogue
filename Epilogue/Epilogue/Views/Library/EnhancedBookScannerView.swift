@@ -68,9 +68,10 @@ struct EnhancedBookScannerView: View {
                 .allowsHitTesting(false)
                 
                 // Overlay UI
+                GlassEffectContainer {
                 VStack {
                     Spacer()
-                    
+
                     // Scanning guidance overlay
                     VStack(spacing: 20) {
                         // Visual scanning frame - Elegant rounded design
@@ -191,7 +192,8 @@ struct EnhancedBookScannerView: View {
                     .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
                     .padding(.bottom, 30)
                 }
-                
+                } // GlassEffectContainer
+
                 if isProcessing {
                     Color.black.opacity(0.6)
                         .ignoresSafeArea()

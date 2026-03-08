@@ -554,6 +554,7 @@ struct PremiumPaywallView: View {
             .ignoresSafeArea(.all)
 
             ScrollView {
+                GlassEffectContainer {
                 VStack(spacing: 0) {
                     // Animated orb with checkmark overlay
                     celebrationOrbHeader
@@ -574,6 +575,7 @@ struct PremiumPaywallView: View {
 
                     Spacer(minLength: 60)
                 }
+                } // GlassEffectContainer
             }
             .scrollIndicators(.hidden)
         }

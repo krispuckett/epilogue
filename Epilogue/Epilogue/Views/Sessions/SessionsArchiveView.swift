@@ -239,21 +239,23 @@ struct SessionsArchiveView: View {
     
     // MARK: - Connections View
     private var connectionsView: some View {
+        GlassEffectContainer {
         VStack(spacing: 20) {
             // Temporal insights
             TemporalInsightsCard(sessions: sessions)
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-            
+
             // Character companions
             if !characterCompanions.isEmpty {
                 CharacterCompanionsCard(companions: characterCompanions)
                     .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
             }
-            
+
             // Theme connections
             ThemeConnectionsCard(sessions: sessions)
                 .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
         }
+        } // GlassEffectContainer
     }
     
     // MARK: - Helper Functions

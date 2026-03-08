@@ -183,6 +183,7 @@ struct ImprovedCommandPalette: View {
 
                 // Category filters
                 ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer {
                     HStack(spacing: 8) {
                         ForEach(CommandCategory.allCases, id: \.self) { category in
                             CategoryChip(
@@ -196,6 +197,7 @@ struct ImprovedCommandPalette: View {
                             }
                         }
                     }
+                    } // GlassEffectContainer
                     .padding(.horizontal, 2)
                 }
             }
