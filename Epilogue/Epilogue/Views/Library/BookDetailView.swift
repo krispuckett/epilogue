@@ -206,6 +206,10 @@ struct BookDetailView: View {
     @State private var showingQuoteCapture = false
     @State private var showingNoteCapture = false
 
+    // Re-entry intelligence
+    @State private var showReEntryCard = false
+    @State private var reEntryRecap: ReEntryIntelligenceService.ReEntryRecap?
+
     // Computed properties for book data
     private var progressPercentage: Double {
         guard let total = book.pageCount,
@@ -355,6 +359,17 @@ struct BookDetailView: View {
                 #if DEBUG
                 print("ℹ️ [loadBookData] Book already enriched: \(bookModel.title)")
                 #endif
+            }
+        }
+
+        // Re-entry intelligence: check if user has been away 3+ days
+        if let bookModel = bookModel,
+           ReEntryIntelligenceService.shared.needsReEntry(for: bookModel) {
+            self.reEntryRecap = ReEntryIntelligenceService.shared.buildRecap(
+                for: bookModel, modelContext: modelContext
+            )
+            if reEntryRecap != nil {
+                self.showReEntryCard = true
             }
         }
     }
@@ -764,10 +779,33 @@ struct BookDetailView: View {
                 )
             }
         }
+        .sheet(isPresented: $showReEntryCard) {
+            if let recap = reEntryRecap {
+                ReEntryCardView(
+                    recap: recap,
+                    bookColors: bookModel?.extractedColors,
+                    onContinue: {
+                        showReEntryCard = false
+                    },
+                    onStartAmbient: {
+                        showReEntryCard = false
+                        upgradeToAmbientMode()
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.clear)
+            }
+        }
+        .onChange(of: showReEntryCard) { _, isShowing in
+            if !isShowing, let bookModel = bookModel {
+                ReEntryIntelligenceService.shared.markDismissed(bookModel.localId)
+            }
+        }
         .glassToast(isShowing: $showingSessionSavedToast, message: "Quick Session Saved")
         .onAppear {
             // findOrCreateThreadForBook() // DISABLED - ChatThread removed
-            
+
             // Check for cached colors first for instant display
             Task {
                 let bookID = book.localId.uuidString
