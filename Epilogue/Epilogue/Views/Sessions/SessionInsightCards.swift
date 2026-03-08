@@ -76,6 +76,8 @@ struct TemporalInsightsCard: View {
         
         // Reading streak
         let streakDays = calculateReadingStreak()
+        // Sync to shared defaults for widget
+        UserDefaults(suiteName: "group.com.epilogue.app")?.set(streakDays, forKey: "readingStreakDays")
         if streakDays > 0 {
             insights.append(TemporalInsight(
                 icon: "flame",

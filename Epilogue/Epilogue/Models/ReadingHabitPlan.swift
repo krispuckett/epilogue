@@ -223,6 +223,8 @@ final class ReadingHabitPlan {
 
         currentStreak = streak
         longestStreak = max(longestStreak, currentStreak)
+        // Sync to shared defaults for widget
+        UserDefaults(suiteName: "group.com.epilogue.app")?.set(currentStreak, forKey: "readingStreakDays")
     }
 
     func pause() {

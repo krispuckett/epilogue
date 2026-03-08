@@ -9,17 +9,20 @@ import WidgetKit
 import SwiftUI
 
 struct ReadingStreakProvider: TimelineProvider {
+    private let sharedDefaults = UserDefaults(suiteName: "group.com.epilogue.app")
+
     func placeholder(in context: Context) -> ReadingStreakEntry {
-        ReadingStreakEntry(date: Date(), streakDays: 18)
+        ReadingStreakEntry(date: Date(), streakDays: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ReadingStreakEntry) -> ()) {
-        let entry = placeholder(in: context)
-        completion(entry)
+        let streak = sharedDefaults?.integer(forKey: "readingStreakDays") ?? 0
+        completion(ReadingStreakEntry(date: Date(), streakDays: streak))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        let entry = placeholder(in: context)
+        let streak = sharedDefaults?.integer(forKey: "readingStreakDays") ?? 0
+        let entry = ReadingStreakEntry(date: Date(), streakDays: streak)
         let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
         completion(timeline)
     }
