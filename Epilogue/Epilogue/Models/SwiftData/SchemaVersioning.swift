@@ -208,6 +208,44 @@ enum EpilogueSchemaV9: VersionedSchema {
     }
 }
 
+enum EpilogueSchemaV10: VersionedSchema {
+    static var versionIdentifier = Schema.Version(10, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            BookModel.self,
+            CapturedNote.self,
+            CapturedQuote.self,
+            CapturedQuestion.self,
+            AmbientSession.self,
+            QueuedQuestion.self,
+            ReadingSession.self,
+            // Reading Journey models
+            ReadingJourney.self,
+            JourneyBook.self,
+            JourneyMilestone.self,
+            BookMilestone.self,
+            // Reading Habit Plan models
+            ReadingHabitPlan.self,
+            HabitDay.self,
+            // AI Memory models
+            ConversationMemoryEntry.self,
+            MemoryThread.self,
+            UserReadingProfile.self,
+            BookInsight.self,
+            // Knowledge Graph models
+            KnowledgeNode.self,
+            KnowledgeEdge.self,
+            // Memory Resurfacing
+            MemoryCard.self,
+            // Cover Pipeline (NEW in V10)
+            CoverRecord.self,
+            // Book DNA (NEW in V10)
+            BookDNA.self
+        ]
+    }
+}
+
 // Migration plan between versions
 enum EpilogueMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
@@ -220,7 +258,8 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             EpilogueSchemaV6.self,
             EpilogueSchemaV7.self,
             EpilogueSchemaV8.self,
-            EpilogueSchemaV9.self
+            EpilogueSchemaV9.self,
+            EpilogueSchemaV10.self
         ]
     }
 
@@ -241,7 +280,9 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             // Migration from V7 to V8 (adding Knowledge Graph models) - LIGHTWEIGHT
             MigrationStage.lightweight(fromVersion: EpilogueSchemaV7.self, toVersion: EpilogueSchemaV8.self),
             // Migration from V8 to V9 (adding MemoryCard) - LIGHTWEIGHT
-            MigrationStage.lightweight(fromVersion: EpilogueSchemaV8.self, toVersion: EpilogueSchemaV9.self)
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV8.self, toVersion: EpilogueSchemaV9.self),
+            // Migration from V9 to V10 (adding CoverRecord) - LIGHTWEIGHT
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV9.self, toVersion: EpilogueSchemaV10.self)
         ]
     }
 

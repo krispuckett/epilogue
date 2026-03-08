@@ -51,30 +51,20 @@ class SmartEpilogueAI: ObservableObject {
         var instructions = "You are Epilogue's AI reading companion."
         
         if let book = activeBook {
-            // Build rich context for the book
-            var bookInfo = """
-            You are Epilogue's AI reading companion currently discussing '\(book.title)' by \(book.author).
-            
-            IMPORTANT: You are discussing THIS SPECIFIC BOOK. When asked any question about:
-            - "the main character" or "protagonist" - answer about \(book.title)'s main character
-            - "the plot" or "story" - answer about \(book.title)'s plot
-            - "the ending" - answer about \(book.title)'s ending
-            - "the theme" - answer about \(book.title)'s themes
-            - Any character names - assume they're from \(book.title)
-            
-            Book Details:
-            - Title: \(book.title)
-            - Author: \(book.author)
-            """
-            
-            // Add book-specific knowledge for popular books  
+            // Build grounded context from SwiftData enrichment (works for ANY book)
+            let groundedContext = GroundedBookSession.shared.buildGroundedInstructions(for: book)
+
+            var bookInfo = groundedContext
+
+            // Add book-specific knowledge for popular books (legacy fallback/supplement)
             #if DEBUG
-            print("📚 Setting up AI context for book: \(book.title) by \(book.author)")
+            let enrichmentStatus = GroundedBookSession.shared.enrichmentStatus(for: book)
+            print("📚 Setting up AI context for book: \(book.title) by \(book.author) [\(enrichmentStatus.description)]")
             #endif
-            
+
             if book.title.lowercased().contains("project hail mary") {
                 bookInfo += """
-                
+
                 Key Information about Project Hail Mary:
                 - Main characters: Ryland Grace (human protagonist) and Rocky (alien friend)
                 - Plot: Ryland Grace wakes up alone on a spaceship with amnesia, tasked with saving Earth from extinction
@@ -84,7 +74,7 @@ class SmartEpilogueAI: ObservableObject {
                 """
             } else if book.title.lowercased().contains("lord of the rings") || book.title.lowercased().contains("fellowship") || book.title.lowercased().contains("two towers") || book.title.lowercased().contains("return of the king") {
                 bookInfo += """
-                
+
                 Key Information about Lord of the Rings:
                 - Main characters: Frodo Baggins (hobbit, ring-bearer), Sam Gamgee (Frodo's loyal companion), Aragorn/Strider (ranger, true king), Gandalf (wizard), Legolas (elf), Gimli (dwarf), Boromir, Merry, Pippin
                 - Plot: Frodo must destroy the One Ring in Mount Doom to save Middle-earth from Sauron
@@ -105,14 +95,14 @@ class SmartEpilogueAI: ObservableObject {
                 """
             } else if book.title.lowercased().contains("the silmarillion") {
                 bookInfo += """
-                
+
                 Key Information about The Silmarillion:
                 - Main themes: Creation myth of Middle-earth, the Silmarils, wars of the First Age
                 - Key figures: Eru Ilúvatar, Melkor/Morgoth, Fëanor, Beren and Lúthien
                 - Structure: Mythological history from creation through the First Age
                 """
             }
-            
+
             // Add series spoiler protection
             let seriesInfo = detectSeriesInformation(title: book.title, author: book.author)
             var seriesSpoilerInstructions = ""

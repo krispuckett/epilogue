@@ -58,6 +58,10 @@ struct EpilogueApp: App {
                             // Knowledge graph
                             await KnowledgeGraphIndexer.shared.configure(with: context)
 
+                            // Book DNA — generate profiles for books with activity
+                            BookDNAService.shared.configure(with: container)
+                            BookDNAService.shared.generateMissingDNAs(modelContext: context)
+
                             // Memory Resurfacing — feature flagged off for now
                             // MemoryResurfacingService.shared.configure(with: container)
                             // MemoryResurfacingService.shared.generateCardsFromExistingContent(modelContext: context)
@@ -74,6 +78,12 @@ struct EpilogueApp: App {
 
                             // Cache covers for offline use
                             await OfflineCoverCacheService.shared.cacheAllLibraryCovers()
+
+                            // Cover Pipeline — fetch missing covers from multi-source fallback chain
+                            await MainActor.run {
+                                CoverAcquisitionService.shared.configure(with: container)
+                            }
+                            await CoverAcquisitionService.shared.fetchMissingCovers(container: container)
 
                             // Schedule background refresh for trending books
                             await MainActor.run {
@@ -185,6 +195,10 @@ struct EpilogueApp: App {
                          BookInsight.self,
                          // Memory Resurfacing (V9)
                          MemoryCard.self,
+                         // Cover Pipeline (V10)
+                         CoverRecord.self,
+                         // Book DNA (V10)
+                         BookDNA.self,
                     configurations: cloudKitContainer
                 )
                 #if DEBUG
@@ -314,6 +328,10 @@ struct EpilogueApp: App {
                      BookInsight.self,
                      // Memory Resurfacing (V9)
                      MemoryCard.self,
+                     // Cover Pipeline (V10)
+                     CoverRecord.self,
+                     // Book DNA (V10)
+                     BookDNA.self,
                 configurations: localConfig
             )
 
@@ -359,6 +377,10 @@ struct EpilogueApp: App {
                      BookInsight.self,
                      // Memory Resurfacing (V9)
                      MemoryCard.self,
+                     // Cover Pipeline (V10)
+                     CoverRecord.self,
+                     // Book DNA (V10)
+                     BookDNA.self,
                 configurations: localConfig
             )
 
@@ -413,6 +435,10 @@ struct EpilogueApp: App {
                          BookInsight.self,
                          // Memory Resurfacing (V9)
                          MemoryCard.self,
+                         // Cover Pipeline (V10)
+                         CoverRecord.self,
+                         // Book DNA (V10)
+                         BookDNA.self,
                     configurations: inMemoryConfig
                 )
 
