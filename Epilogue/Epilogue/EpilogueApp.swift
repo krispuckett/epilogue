@@ -37,6 +37,9 @@ struct EpilogueApp: App {
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 1_000_000_000)
 
+                            // Privacy: run data retention cleanup if needed
+                            DataRetentionService.shared.performCleanupIfNeeded(container: container)
+
                             // Reconcile UserDefaults ↔ SwiftData to fix any drift
                             LibraryService.shared.reconcileStores()
 

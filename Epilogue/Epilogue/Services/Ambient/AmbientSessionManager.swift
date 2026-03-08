@@ -28,19 +28,22 @@ class AmbientLifecycleManager: ObservableObject {
     
     func startSession() {
         guard !isSessionActive else { return }
-        
+
         isSessionActive = true
         sessionStartTime = Date()
-        
+
+        // Track microphone access for privacy dashboard
+        UserDefaults.standard.set(Date(), forKey: "privacy_lastMicrophoneAccess")
+
         // Configure for background audio
         configureBackgroundAudio()
-        
+
         // Start session timer
         startSessionTimer()
-        
+
         // Begin background task for extended processing
         beginBackgroundTask()
-        
+
         #if DEBUG
         print("🎬 Ambient session manager started")
         #endif

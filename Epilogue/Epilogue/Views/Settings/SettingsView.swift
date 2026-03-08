@@ -22,6 +22,15 @@ struct SettingsView: View {
     @State private var toastMessage = ""
     @State private var showingWhatsNew = false
 
+    // Privacy & Data state
+    @State private var showingClearTranscriptsConfirmation = false
+    @State private var showingClearAIHistoryConfirmation = false
+    @State private var autoDeleteTranscripts = UserDefaults.standard.bool(forKey: "privacy_autoDeleteTranscripts")
+    @State private var transcriptRetention = DataRetentionService.RetentionPeriod(rawValue: UserDefaults.standard.string(forKey: "privacy_transcriptRetention") ?? "90_days") ?? .ninetyDays
+    @State private var autoDeleteAIHistory = UserDefaults.standard.bool(forKey: "privacy_autoDeleteAIHistory")
+    @State private var aiHistoryRetention = DataRetentionService.RetentionPeriod(rawValue: UserDefaults.standard.string(forKey: "privacy_aiHistoryRetention") ?? "90_days") ?? .ninetyDays
+    @State private var dataSummary: DataRetentionService.DataSummary?
+
     // Batch enrichment state
     @State private var isEnriching = false
     @State private var enrichmentProgress: (current: Int, total: Int, title: String)?
@@ -245,6 +254,12 @@ struct SettingsView: View {
                 } footer: {
                     Text("AI-generated summaries provide spoiler-free context, themes, and character info for your books. Use \"Re-enrich\" to refresh data if book info seems incorrect.")
                 }
+
+                // MARK: - Privacy & Data
+                privacyAndDataSection
+
+                // MARK: - Data Summary
+                dataSummarySection
 
                 // MARK: - Ambient Mode
                 Section {
@@ -649,6 +664,9 @@ struct SettingsView: View {
                 // Style list row backgrounds with glass effect
                 UITableView.appearance().backgroundColor = .clear
                 UITableViewCell.appearance().backgroundColor = UIColor(white: 1, alpha: 0.05)
+
+                // Load privacy data summary
+                dataSummary = DataRetentionService.shared.getDataSummary(modelContext: modelContext)
             }
             .navigationTitle(L10n.Settings.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -678,6 +696,149 @@ struct SettingsView: View {
             .modifier(GlassToastModifier(isShowing: $showingCacheClearedToast, message: toastMessage))
             .sheet(isPresented: $showingWhatsNew) {
                 WhatsNewView()
+            }
+            .alert("Clear Voice Transcripts", isPresented: $showingClearTranscriptsConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    let count = DataRetentionService.shared.clearAllVoiceTranscripts(modelContext: modelContext)
+                    toastMessage = "Cleared \(count) ambient session\(count == 1 ? "" : "s")"
+                    dataSummary = DataRetentionService.shared.getDataSummary(modelContext: modelContext)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingCacheClearedToast = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation { showingCacheClearedToast = false }
+                    }
+                }
+            } message: {
+                Text("This will permanently delete all ambient reading session transcripts. Notes and quotes captured during those sessions will not be deleted.")
+            }
+            .alert("Clear AI History", isPresented: $showingClearAIHistoryConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    let count = DataRetentionService.shared.clearAllAIHistory(modelContext: modelContext)
+                    toastMessage = "Cleared \(count) AI conversation\(count == 1 ? "" : "s")"
+                    dataSummary = DataRetentionService.shared.getDataSummary(modelContext: modelContext)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingCacheClearedToast = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation { showingCacheClearedToast = false }
+                    }
+                }
+            } message: {
+                Text("This will permanently delete all AI conversation history and memory threads. The AI will no longer remember previous conversations.")
+            }
+        }
+    }
+
+    // MARK: - Privacy & Data Section
+    @ViewBuilder
+    private var privacyAndDataSection: some View {
+        Section {
+            Toggle(isOn: $autoDeleteTranscripts) {
+                Label("Auto-delete Ambient Transcripts", systemImage: "mic.slash")
+                    .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+            }
+            .tint(ThemeManager.shared.currentTheme.primaryAccent)
+            .onChange(of: autoDeleteTranscripts) { _, newValue in
+                DataRetentionService.shared.autoDeleteTranscripts = newValue
+            }
+
+            if autoDeleteTranscripts {
+                Picker("Transcript Retention", selection: $transcriptRetention) {
+                    ForEach(DataRetentionService.RetentionPeriod.allCases) { period in
+                        Text(period.displayName).tag(period)
+                    }
+                }
+                .onChange(of: transcriptRetention) { _, newValue in
+                    DataRetentionService.shared.transcriptRetentionPeriod = newValue
+                }
+            }
+
+            Toggle(isOn: $autoDeleteAIHistory) {
+                Label("Auto-delete AI History", systemImage: "brain")
+                    .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+            }
+            .tint(ThemeManager.shared.currentTheme.primaryAccent)
+            .onChange(of: autoDeleteAIHistory) { _, newValue in
+                DataRetentionService.shared.autoDeleteAIHistory = newValue
+            }
+
+            if autoDeleteAIHistory {
+                Picker("AI History Retention", selection: $aiHistoryRetention) {
+                    ForEach(DataRetentionService.RetentionPeriod.allCases) { period in
+                        Text(period.displayName).tag(period)
+                    }
+                }
+                .onChange(of: aiHistoryRetention) { _, newValue in
+                    DataRetentionService.shared.aiHistoryRetentionPeriod = newValue
+                }
+            }
+
+            Button(role: .destructive) {
+                showingClearTranscriptsConfirmation = true
+            } label: {
+                Label("Clear All Voice Transcripts", systemImage: "waveform.slash")
+                    .foregroundStyle(.red)
+            }
+
+            Button(role: .destructive) {
+                showingClearAIHistoryConfirmation = true
+            } label: {
+                Label("Clear All AI History", systemImage: "xmark.bin")
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Text("Privacy & Data")
+        } footer: {
+            Text("Control how long sensitive data is retained. Auto-delete removes data older than the selected period on each app launch.")
+        }
+    }
+
+    // MARK: - Data Summary Section
+    @ViewBuilder
+    private var dataSummarySection: some View {
+        if let summary = dataSummary {
+            Section {
+                HStack {
+                    Label("Ambient Sessions", systemImage: "mic.fill")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(summary.ambientSessionCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Label("Notes & Quotes", systemImage: "note.text")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(summary.notesAndQuotesCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Label("AI Conversations", systemImage: "brain")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(summary.aiConversationCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Label("Last Mic Access", systemImage: "clock")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let lastAccess = summary.lastMicrophoneAccess {
+                        Text(lastAccess, style: .relative)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Never")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Data Summary")
             }
         }
     }
