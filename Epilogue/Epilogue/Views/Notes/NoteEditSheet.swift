@@ -231,7 +231,7 @@ struct NoteEditSheet: View {
                     quoteData["pageNumber"] = page
                 }
                 NotificationCenter.default.post(
-                    name: Notification.Name("SaveQuote"),
+                    name: .saveQuote,
                     object: quoteData
                 )
             } else {
@@ -248,14 +248,14 @@ struct NoteEditSheet: View {
                     noteData["bookAuthor"] = editedAuthor
                 }
                 NotificationCenter.default.post(
-                    name: Notification.Name("CreateNewNote"),
+                    name: .createNewNote,
                     object: noteData
                 )
             }
         } else {
             // Post notification so views can refresh (for existing note updates)
             NotificationCenter.default.post(
-                name: Notification.Name("NoteUpdated"),
+                name: .noteUpdated,
                 object: updatedNote
             )
         }

@@ -911,7 +911,7 @@ struct AmbientModeView: View {
 
             // Set up listener for queued questions being processed
             NotificationCenter.default.addObserver(
-                forName: Notification.Name("QueuedQuestionProcessed"),
+                forName: .queuedQuestionProcessed,
                 object: nil,
                 queue: .main
             ) { notification in
@@ -930,7 +930,7 @@ struct AmbientModeView: View {
             }
         }
         .onDisappear {
-            NotificationCenter.default.removeObserver(self, name: Notification.Name("QueuedQuestionProcessed"), object: nil)
+            NotificationCenter.default.removeObserver(self, name: .queuedQuestionProcessed, object: nil)
         }
         // Local toast for ambient mode (since fullScreenCover covers ContentView's toast)
         .overlay(alignment: .top) {
@@ -4999,7 +4999,7 @@ struct AmbientModeView: View {
             
             // Show toast
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: ["message": "Quote saved to \(currentBookContext?.title ?? "your collection")"]
             )
         } catch {
@@ -5077,7 +5077,7 @@ struct AmbientModeView: View {
             #endif
             // Show error notification to user instead of false success
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: ["message": "Failed to save quote. Please try again."]
             )
             return  // Don't show success animation if save failed
@@ -7422,7 +7422,7 @@ struct GenericModeMarkdownText: View {
                             Button {
                                 SensoryFeedback.light()
                                 NotificationCenter.default.post(
-                                    name: NSNotification.Name("AddBookToLibrary"),
+                                    name: .addBookToLibrary,
                                     object: title
                                 )
                             } label: {

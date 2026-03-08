@@ -1,13 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let navigateToNote = Notification.Name("navigateToNote")
-    static let navigateToQuote = Notification.Name("navigateToQuote")
-}
-
 struct ChatMessageView: View {
     let message: UnifiedChatMessage
     let currentBookContext: Book?

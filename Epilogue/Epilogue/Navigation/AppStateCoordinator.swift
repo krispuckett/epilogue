@@ -85,7 +85,7 @@ final class AppStateCoordinator {
 
     private func setupNotificationObservers() {
         // Show book scanner
-        NotificationCenter.default.publisher(for: Notification.Name("ShowBookScanner"))
+        NotificationCenter.default.publisher(for: .showBookScanner)
             .sink { [weak self] _ in
                 self?.showingBookScanner = true
                 self?.dismissCommandInput()
@@ -93,7 +93,7 @@ final class AppStateCoordinator {
             .store(in: &cancellables)
 
         // Show book search
-        NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))
+        NotificationCenter.default.publisher(for: .showBookSearch)
             .compactMap { $0.object as? String }
             .sink { [weak self] query in
                 self?.handleBookSearchRequest(query: query)
@@ -101,7 +101,7 @@ final class AppStateCoordinator {
             .store(in: &cancellables)
 
         // Show batch book search
-        NotificationCenter.default.publisher(for: Notification.Name("ShowBatchBookSearch"))
+        NotificationCenter.default.publisher(for: .showBatchBookSearch)
             .compactMap { $0.object as? [String] }
             .sink { [weak self] titles in
                 self?.openBatchBookSearch(with: titles)
@@ -110,7 +110,7 @@ final class AppStateCoordinator {
             .store(in: &cancellables)
 
         // Show command input with optional custom prompt
-        NotificationCenter.default.publisher(for: Notification.Name("ShowCommandInput"))
+        NotificationCenter.default.publisher(for: .showCommandInput)
             .sink { [weak self] notification in
                 var isBookNote = false
                 if let data = notification.object as? [String: Any] {
@@ -129,7 +129,7 @@ final class AppStateCoordinator {
             .store(in: &cancellables)
 
         // Show glass toast
-        NotificationCenter.default.publisher(for: Notification.Name("ShowGlassToast"))
+        NotificationCenter.default.publisher(for: .showGlassToast)
             .compactMap { $0.object as? [String: Any] }
             .compactMap { $0["message"] as? String }
             .sink { [weak self] message in

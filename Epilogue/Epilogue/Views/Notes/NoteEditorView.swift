@@ -302,7 +302,7 @@ struct NoteEditorView: View {
             KnowledgeGraphIndexer.shared.onQuoteSaved(quote)
         }
 
-        NotificationCenter.default.post(name: Notification.Name("NoteUpdated"), object: nil)
+        NotificationCenter.default.post(name: .noteUpdated, object: nil)
         SensoryFeedback.success()
         dismiss()
     }

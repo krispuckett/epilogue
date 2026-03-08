@@ -77,7 +77,7 @@ struct ReadingJourneyView: View {
                     hasAppeared = true
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToJourneyFromNotification"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToJourneyFromNotification)) { notification in
                 // Handle navigation from check-in notification
                 if let journeyId = notification.object as? String,
                    let journey = manager.currentJourney,

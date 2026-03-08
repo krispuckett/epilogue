@@ -290,7 +290,7 @@ extension View {
     func showToast(_ message: String, icon: String) {
         DispatchQueue.main.async {
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: message,
                 userInfo: ["icon": icon]
             )

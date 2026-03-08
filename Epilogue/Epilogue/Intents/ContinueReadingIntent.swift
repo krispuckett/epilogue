@@ -43,7 +43,7 @@ struct ContinueReadingIntent: AppIntent {
         // Post notification to open ambient mode with this book
         // The app will listen for this notification and navigate accordingly
         NotificationCenter.default.post(
-            name: Notification.Name("OpenAmbientModeFromIntent"),
+            name: .openAmbientModeFromIntent,
             object: targetBook.id,
             userInfo: [
                 "bookId": targetBook.id,

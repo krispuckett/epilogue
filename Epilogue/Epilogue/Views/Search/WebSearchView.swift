@@ -165,7 +165,7 @@ struct WebSearchView: View {
         .alert("API Key Required", isPresented: $showingAPIKeyAlert) {
             Button("Settings") {
                 // Navigate to settings
-                NotificationCenter.default.post(name: Notification.Name("ShowSettings"), object: nil)
+                NotificationCenter.default.post(name: .showSettings, object: nil)
                 dismiss()
             }
             Button("Cancel", role: .cancel) {}

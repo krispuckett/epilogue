@@ -408,7 +408,7 @@ struct SettingsView: View {
                             dismiss()
                             // Post notification to trigger modal overlay
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(name: Notification.Name("ShowReturnCard"), object: nil)
+                                NotificationCenter.default.post(name: .showReturnCard, object: nil)
                             }
                         } label: {
                             Label("Test Modal (Full Card)", systemImage: "rectangle.portrait.inset.filled")
@@ -430,7 +430,7 @@ struct SettingsView: View {
                             ReturnCardManager.shared.forceShowInline()
                             dismiss()
                             // Post notification to trigger inline card in library
-                            NotificationCenter.default.post(name: Notification.Name("ForceShowInlineActivityCard"), object: nil)
+                            NotificationCenter.default.post(name: .forceShowInlineActivityCard, object: nil)
                         } label: {
                             Label("Test Inline Card", systemImage: "rectangle.topthird.inset.filled")
                                 .foregroundStyle(.teal)
@@ -596,7 +596,7 @@ struct SettingsView: View {
                         UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
 
                         // Post notification to trigger onboarding
-                        NotificationCenter.default.post(name: Notification.Name("ShowOnboarding"), object: nil)
+                        NotificationCenter.default.post(name: .showOnboarding, object: nil)
 
                         dismiss()
                     } label: {

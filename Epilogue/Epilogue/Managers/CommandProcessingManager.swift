@@ -74,28 +74,28 @@ class CommandProcessingManager: ObservableObject {
                 print("📚 CommandProcessingManager: Opening BookSearch with query: '\(query)'")
                 #endif
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShowBookSearch"),
+                    name: .showBookSearch,
                     object: query
                 )
                 
             case .existingBook(let book):
                 // Navigate to book
                 NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToBook"),
+                    name: .navigateToBookNotification,
                     object: book
                 )
                 
             case .existingNote(let note):
                 // Navigate to note
                 NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToNote"), 
+                    name: .navigateToNoteNotification, 
                     object: note
                 )
                 
             case .searchNotes(let query), .searchAll(let query):
                 // Post notification to trigger search
                 NotificationCenter.default.post(
-                    name: Notification.Name("SearchNotes"),
+                    name: .searchNotes,
                     object: query
                 )
                 
@@ -182,7 +182,7 @@ class CommandProcessingManager: ObservableObject {
             // Post success notification
             let bookInfo = bookTitle ?? "your collection"
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: ["message": "Quote saved to \(bookInfo)"]
             )
         } catch {
@@ -206,7 +206,7 @@ class CommandProcessingManager: ObservableObject {
             
             // Post success notification
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: ["message": "Note saved successfully"]
             )
         } catch {
@@ -221,7 +221,7 @@ class CommandProcessingManager: ObservableObject {
     private func searchBooks(query: String) {
         // Trigger book search (ContentView expects "ShowBookSearch")
         NotificationCenter.default.post(
-            name: Notification.Name("ShowBookSearch"),
+            name: .showBookSearch,
             object: query
         )
     }
@@ -230,7 +230,7 @@ class CommandProcessingManager: ObservableObject {
         // Find and open book
         if let book = libraryViewModel.books.first(where: { $0.title.lowercased().contains(title.lowercased()) }) {
             NotificationCenter.default.post(
-                name: Notification.Name("OpenBook"),
+                name: .openBook,
                 object: book
             )
         }
@@ -295,7 +295,7 @@ class CommandProcessingManager: ObservableObject {
             
             // Post success notification
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: ["message": "Note saved to \(book.title)"]
             )
         } catch {
@@ -342,7 +342,7 @@ class CommandProcessingManager: ObservableObject {
             
             // Post success notification
             NotificationCenter.default.post(
-                name: Notification.Name("ShowToastMessage"),
+                name: .showToastMessage,
                 object: ["message": "Quote saved from \(book.title)"]
             )
         } catch {
@@ -363,7 +363,7 @@ class CommandProcessingManager: ObservableObject {
                     // Post notification to show book search
                     await MainActor.run {
                         NotificationCenter.default.post(
-                            name: Notification.Name("ShowBookSearch"),
+                            name: .showBookSearch,
                             object: title
                         )
                     }
@@ -431,7 +431,7 @@ class CommandProcessingManager: ObservableObject {
                 formatter.dateStyle = .short
                 formatter.timeStyle = .short
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShowToastMessage"),
+                    name: .showToastMessage,
                     object: ["message": "Reminder set for \(formatter.string(from: date))"]
                 )
             }
@@ -449,13 +449,13 @@ class CommandProcessingManager: ObservableObject {
         
         // Post notification to update UI
         NotificationCenter.default.post(
-            name: Notification.Name("ReadingGoalSet"),
+            name: .readingGoalSet,
             object: ["book": book, "pagesPerDay": pagesPerDay]
         )
         
         // Post success toast
         NotificationCenter.default.post(
-            name: Notification.Name("ShowToastMessage"),
+            name: .showToastMessage,
             object: ["message": "Reading goal: \(pagesPerDay) pages/day for \(book.title)"]
         )
     }
@@ -469,7 +469,7 @@ class CommandProcessingManager: ObservableObject {
         
         // Post notification with the entire batch
         NotificationCenter.default.post(
-            name: Notification.Name("ShowBatchBookSearch"),
+            name: .showBatchBookSearch,
             object: titles
         )
         
@@ -479,7 +479,7 @@ class CommandProcessingManager: ObservableObject {
         
         // Post success notification
         NotificationCenter.default.post(
-            name: Notification.Name("ShowToastMessage"),
+            name: .showToastMessage,
             object: ["message": "Adding \(titles.count) books to library..."]
         )
     }
@@ -494,7 +494,7 @@ class CommandProcessingManager: ObservableObject {
         
         // Show search for this book
         NotificationCenter.default.post(
-            name: Notification.Name("ShowBookSearch"),
+            name: .showBookSearch,
             object: nextBook
         )
         

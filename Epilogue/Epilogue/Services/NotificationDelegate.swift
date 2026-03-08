@@ -24,7 +24,7 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
             // Navigate to the book
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToBookFromNotification"),
+                    name: .navigateToBookFromNotification,
                     object: bookId
                 )
             }
@@ -35,7 +35,7 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
             // Navigate to library tab
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToTab"),
+                    name: .navigateToTab,
                     object: 0 // Library tab
                 )
             }
@@ -47,7 +47,7 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
             // Navigate to ambient mode with the reading plan
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
-                    name: Notification.Name("NavigateToReadingPlan"),
+                    name: .navigateToReadingPlan,
                     object: planId
                 )
             }

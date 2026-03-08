@@ -22,19 +22,19 @@ struct SimpleCommandIntent: View {
             QuickAction(icon: "camera.viewfinder", title: "Scan book") {
                 dismiss()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+                    NotificationCenter.default.post(name: .showEnhancedBookScanner, object: nil)
                 }
             },
             QuickAction(icon: "magnifyingglass", title: "Search books") {
                 dismiss()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+                    NotificationCenter.default.post(name: .showBookSearch, object: nil)
                 }
             },
             QuickAction(icon: "note.text", title: "New note") {
                 dismiss()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    NotificationCenter.default.post(name: Notification.Name("CreateNewNote"), object: nil)
+                    NotificationCenter.default.post(name: .createNewNote, object: nil)
                 }
             }
         ]
@@ -167,12 +167,12 @@ struct SimpleCommandIntent: View {
         if trimmed.lowercased().contains("book") {
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+                NotificationCenter.default.post(name: .showBookSearch, object: nil)
             }
         } else if trimmed.lowercased().contains("note") {
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(name: Notification.Name("CreateNewNote"), object: nil)
+                NotificationCenter.default.post(name: .createNewNote, object: nil)
             }
         } else {
             // Default action - search

@@ -71,7 +71,7 @@ class ResponseOrchestrator: ObservableObject {
         // Trigger book search
         await MainActor.run {
             NotificationCenter.default.post(
-                name: Notification.Name("VoiceAddBook"),
+                name: .voiceAddBook,
                 object: ["title": title, "author": author ?? ""]
             )
         }
@@ -143,7 +143,7 @@ class ResponseOrchestrator: ObservableObject {
             actionResult = .success(message: "Found 1 book")
             
             // Navigate to book
-            NotificationCenter.default.post(name: Notification.Name("NavigateToBook"), object: book)
+            NotificationCenter.default.post(name: .navigateToBookNotification, object: book)
         } else {
             responseText = "Found \(results.count) books matching \"\(query)\". "
             let titles = results.prefix(3).map { $0.title }.joined(separator: ", ")

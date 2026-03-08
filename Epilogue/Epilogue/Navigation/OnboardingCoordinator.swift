@@ -128,7 +128,7 @@ struct OnboardingWrapper: ViewModifier {
                     coordinator.completeOnboarding()
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowOnboarding"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .showOnboarding)) { _ in
                 coordinator.resetOnboarding()
             }
             .onChange(of: coordinator.showOnboarding) { _, newValue in

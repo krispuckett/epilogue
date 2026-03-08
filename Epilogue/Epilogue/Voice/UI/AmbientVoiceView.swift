@@ -30,7 +30,7 @@ struct AmbientVoiceView: View {
                 ))
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WakeWordDetected"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .wakeWordDetected)) { _ in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 showingVoiceInterface = true
             }

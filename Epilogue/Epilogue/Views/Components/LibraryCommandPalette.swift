@@ -164,21 +164,21 @@ struct LibraryCommandPalette: View {
             // Dismiss first, then trigger enhanced book scanner after a delay
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+                NotificationCenter.default.post(name: .showEnhancedBookScanner, object: nil)
             }
             
         case .addBook:
             // Dismiss first, then show Google Books search after a delay
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+                NotificationCenter.default.post(name: .showBookSearch, object: nil)
             }
             
         case .importFromGoodreads:
             // Dismiss first, then trigger Goodreads import after a delay
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(name: Notification.Name("ShowGoodreadsImport"), object: nil)
+                NotificationCenter.default.post(name: .showGoodreadsImport, object: nil)
             }
             
         case .createNote, .createQuote, .searchNotes:

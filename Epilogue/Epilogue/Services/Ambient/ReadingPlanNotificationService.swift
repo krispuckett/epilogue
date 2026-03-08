@@ -274,7 +274,7 @@ extension NotificationDelegate {
         // Post notification to navigate to ambient mode with the plan
         DispatchQueue.main.async {
             NotificationCenter.default.post(
-                name: Notification.Name("NavigateToReadingPlan"),
+                name: .navigateToReadingPlan,
                 object: planId
             )
         }

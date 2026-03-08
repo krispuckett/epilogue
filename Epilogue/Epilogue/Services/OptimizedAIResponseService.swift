@@ -107,7 +107,7 @@ class OptimizedAIResponseService: ObservableObject {
             
             // Post immediate response (for backward compatibility)
             NotificationCenter.default.post(
-                name: Notification.Name("AIResponseReady"),
+                name: .aiResponseReady,
                 object: aiResponse
             )
             return aiResponse
@@ -156,7 +156,7 @@ class OptimizedAIResponseService: ObservableObject {
                 
                 // Post partial response for immediate UI update
                 NotificationCenter.default.post(
-                    name: Notification.Name("AIStreamingUpdate"),
+                    name: .aiStreamingUpdate,
                     object: [
                         "streamId": streamId,
                         "text": accumulatedText,
@@ -197,7 +197,7 @@ class OptimizedAIResponseService: ObservableObject {
             
             // Post final response
             NotificationCenter.default.post(
-                name: Notification.Name("AIResponseComplete"),
+                name: .aiResponseComplete,
                 object: aiResponse
             )
             
@@ -225,7 +225,7 @@ class OptimizedAIResponseService: ObservableObject {
             addToHistory(errorResponse)
             
             NotificationCenter.default.post(
-                name: Notification.Name("AIResponseError"),
+                name: .aiResponseError,
                 object: errorResponse
             )
             
@@ -362,7 +362,7 @@ class OptimizedAIResponseService: ObservableObject {
     
     private func setupNotificationObservers() {
         // Listen for immediate questions from voice recognition
-        NotificationCenter.default.publisher(for: Notification.Name("ImmediateQuestionDetected"))
+        NotificationCenter.default.publisher(for: .immediateQuestionDetected)
             .compactMap { $0.object as? [String: Any] }
             .sink { [weak self] data in
                 guard let self = self,
@@ -377,7 +377,7 @@ class OptimizedAIResponseService: ObservableObject {
             .store(in: &cancellables)
         
         // Listen for batch processing requests
-        NotificationCenter.default.publisher(for: Notification.Name("BatchProcessQuestions"))
+        NotificationCenter.default.publisher(for: .batchProcessQuestions)
             .compactMap { $0.object as? [String: Any] }
             .sink { [weak self] data in
                 guard let self = self,

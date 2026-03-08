@@ -59,7 +59,7 @@ struct NoteContextMenu: View {
                                 dismissMenu()
                                 // Send notification to trigger edit mode
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    NotificationCenter.default.post(name: Notification.Name("EditNote"), object: note)
+                                    NotificationCenter.default.post(name: .editNote, object: note)
                                 }
                             }
                         )

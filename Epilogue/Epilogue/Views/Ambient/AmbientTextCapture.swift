@@ -394,7 +394,7 @@ class SaveQuoteActivity: UIActivity {
 
     override func perform() {
         NotificationCenter.default.post(
-            name: Notification.Name("TriggerQuoteSave"),
+            name: .triggerQuoteSave,
             object: nil
         )
         activityDidFinish(true)
@@ -420,7 +420,7 @@ class AskAIActivity: UIActivity {
 
     override func perform() {
         NotificationCenter.default.post(
-            name: Notification.Name("TriggerAskAI"),
+            name: .triggerAskAI,
             object: nil
         )
         activityDidFinish(true)

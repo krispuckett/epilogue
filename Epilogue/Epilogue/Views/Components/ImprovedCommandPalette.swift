@@ -351,22 +351,22 @@ struct ImprovedCommandPalette: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             switch command.action {
             case .scanBook:
-                NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+                NotificationCenter.default.post(name: .showEnhancedBookScanner, object: nil)
 
             case .searchBooks:
-                NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+                NotificationCenter.default.post(name: .showBookSearch, object: nil)
 
             case .importGoodreads:
-                NotificationCenter.default.post(name: Notification.Name("ShowGoodreadsImport"), object: nil)
+                NotificationCenter.default.post(name: .showGoodreadsImport, object: nil)
 
             case .createNote:
-                NotificationCenter.default.post(name: Notification.Name("CreateNewNote"), object: nil)
+                NotificationCenter.default.post(name: .createNewNote, object: nil)
 
             case .createQuote:
-                NotificationCenter.default.post(name: Notification.Name("ShowQuoteCapture"), object: nil)
+                NotificationCenter.default.post(name: .showQuoteCapture, object: nil)
 
             case .searchNotes:
-                NotificationCenter.default.post(name: Notification.Name("SearchNotes"), object: nil)
+                NotificationCenter.default.post(name: .searchNotes, object: nil)
 
             case .startReading:
                 if let currentBook = libraryViewModel.currentDetailBook {
@@ -376,10 +376,10 @@ struct ImprovedCommandPalette: View {
                 }
 
             case .viewTimeline:
-                NotificationCenter.default.post(name: Notification.Name("ShowReadingTimeline"), object: nil)
+                NotificationCenter.default.post(name: .showReadingTimeline, object: nil)
 
             case .exportLibrary:
-                NotificationCenter.default.post(name: Notification.Name("ExportLibrary"), object: nil)
+                NotificationCenter.default.post(name: .exportLibrary, object: nil)
             }
         }
     }

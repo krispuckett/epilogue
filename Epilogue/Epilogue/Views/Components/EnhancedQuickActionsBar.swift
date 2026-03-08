@@ -222,7 +222,7 @@ struct EnhancedQuickActionsBar: View {
         startGlowAnimation()
 
         // Start voice recognition for commands
-        NotificationCenter.default.post(name: Notification.Name("StartVoiceCommand"), object: nil)
+        NotificationCenter.default.post(name: .startVoiceCommand, object: nil)
     }
     
     private func handleDoubleTap() {
@@ -240,7 +240,7 @@ struct EnhancedQuickActionsBar: View {
         if translation.height < -30 {
             // Swipe up - Quick note capture
             SensoryFeedback.light()
-            NotificationCenter.default.post(name: Notification.Name("StartVoiceNote"), object: nil)
+            NotificationCenter.default.post(name: .startVoiceNote, object: nil)
         } else if translation.height > 30 {
             // Swipe down - Show recent captures
             SensoryFeedback.light()
@@ -377,7 +377,7 @@ struct EnhancedQuickActionsBar: View {
                 noteData["bookAuthor"] = currentBook.author
             }
             NotificationCenter.default.post(
-                name: Notification.Name("CreateNewNote"),
+                name: .createNewNote,
                 object: noteData
             )
         case .quote(let text, let attribution):
@@ -389,7 +389,7 @@ struct EnhancedQuickActionsBar: View {
                 quoteData["bookAuthor"] = currentBook.author
             }
             NotificationCenter.default.post(
-                name: Notification.Name("SaveQuote"),
+                name: .saveQuote,
                 object: quoteData
             )
         case .bookAdded(let book):
@@ -398,7 +398,7 @@ struct EnhancedQuickActionsBar: View {
         case .search(let query):
             // Perform search
             NotificationCenter.default.post(
-                name: Notification.Name("PerformSearch"),
+                name: .performSearch,
                 object: ["query": query]
             )
         case .richTextNote:
@@ -520,7 +520,7 @@ extension EnhancedQuickActionsBar {
                 }
             }
             .accessibilityAction(named: "Quick Note") {
-                NotificationCenter.default.post(name: Notification.Name("StartVoiceNote"), object: nil)
+                NotificationCenter.default.post(name: .startVoiceNote, object: nil)
             }
     }
 }

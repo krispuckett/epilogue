@@ -149,7 +149,7 @@ struct LiquidSearchResultsView: View {
             } else {
                 // Open book search
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShowBookSearch"),
+                    name: .showBookSearch,
                     object: command.text
                 )
             }
@@ -168,15 +168,15 @@ struct LiquidSearchResultsView: View {
     private func handleBookTap(_ book: Book) {
         SensoryFeedback.light()
         NotificationCenter.default.post(
-            name: Notification.Name("NavigateToBook"),
+            name: .navigateToBookNotification,
             object: book
         )
     }
-    
+
     private func handleNoteTap(_ note: Note) {
         SensoryFeedback.light()
         NotificationCenter.default.post(
-            name: Notification.Name("NavigateToNote"),
+            name: .navigateToNoteNotification,
             object: note
         )
     }

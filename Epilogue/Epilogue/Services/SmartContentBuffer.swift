@@ -572,7 +572,7 @@ class SmartContentBuffer: ObservableObject {
         // Post notification for UI update
         await MainActor.run {
             NotificationCenter.default.post(
-                name: Notification.Name("SmartBufferProcessed"),
+                name: .smartBufferProcessed,
                 object: content
             )
         }

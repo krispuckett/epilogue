@@ -215,7 +215,7 @@ public class TrueAmbientProcessor: ObservableObject {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleNaturalReaction),
-            name: Notification.Name("NaturalReactionDetected"),
+            name: .naturalReactionDetected,
             object: nil
         )
     }
@@ -409,7 +409,7 @@ public class TrueAmbientProcessor: ObservableObject {
 
                         // Post notification for UI to show evolution correction
                         NotificationCenter.default.post(
-                            name: Notification.Name("TranscriptionEvolved"),
+                            name: .transcriptionEvolved,
                             object: nil,
                             userInfo: [
                                 "original": evolving.base,
@@ -3366,15 +3366,6 @@ extension TrueAmbientProcessor {
     }
 }
 
-// MARK: - Notification Names
-extension Notification.Name {
-    static let voiceTranscriptUpdated = Notification.Name("voiceTranscriptUpdated")
-    static let bookMentionDetected = Notification.Name("bookMentionDetected")
-    static let questionDetected = Notification.Name("questionDetected")
-    static let questionProcessing = Notification.Name("questionProcessing")
-    static let questionProcessed = Notification.Name("questionProcessed")
-    static let contentSaved = Notification.Name("contentSaved")
-}
 
 // MARK: - Safe Array Subscript Extension
 extension Array {

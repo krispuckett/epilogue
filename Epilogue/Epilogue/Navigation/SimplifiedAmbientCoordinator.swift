@@ -237,7 +237,7 @@ final class SimplifiedAmbientCoordinator {
         
         // Post notification for UI updates
         NotificationCenter.default.post(
-            name: Notification.Name("AmbientBookDetected"),
+            name: .ambientBookDetected,
             object: book
         )
     }
@@ -250,7 +250,7 @@ final class SimplifiedAmbientCoordinator {
         
         // Post notification
         NotificationCenter.default.post(
-            name: Notification.Name("AmbientBookCleared"),
+            name: .ambientBookCleared,
             object: nil
         )
     }

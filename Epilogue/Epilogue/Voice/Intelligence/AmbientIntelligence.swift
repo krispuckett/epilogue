@@ -101,7 +101,7 @@ class AmbientIntelligence: ObservableObject {
         logger.info("Ambient Intelligence activated")
         
         NotificationCenter.default.post(
-            name: Notification.Name("AmbientIntelligenceActivated"),
+            name: .ambientIntelligenceActivated,
             object: nil
         )
     }
@@ -115,7 +115,7 @@ class AmbientIntelligence: ObservableObject {
         logger.info("Ambient Intelligence deactivated")
         
         NotificationCenter.default.post(
-            name: Notification.Name("AmbientIntelligenceDeactivated"),
+            name: .ambientIntelligenceDeactivated,
             object: nil
         )
     }
@@ -144,7 +144,7 @@ class AmbientIntelligence: ObservableObject {
     
     private func setupObservers() {
         // Listen for natural reactions from voice recognition
-        NotificationCenter.default.publisher(for: Notification.Name("NaturalReactionDetected"))
+        NotificationCenter.default.publisher(for: .naturalReactionDetected)
             .compactMap { $0.object as? String }
             .sink { [weak self] utterance in
                 Task {
@@ -266,7 +266,7 @@ class AmbientIntelligence: ObservableObject {
         
         // Post notification for UI
         NotificationCenter.default.post(
-            name: Notification.Name("IntelligenceResponseReady"),
+            name: .intelligenceResponseReady,
             object: response
         )
         
@@ -353,7 +353,7 @@ class AmbientIntelligence: ObservableObject {
         let visualHint = generateVisualHint(for: reaction)
         
         NotificationCenter.default.post(
-            name: Notification.Name("VisualFeedbackRequested"),
+            name: .visualFeedbackRequested,
             object: visualHint
         )
     }

@@ -165,7 +165,7 @@ class OfflineQueueManager {
 
                 // Post notification for UI update
                 NotificationCenter.default.post(
-                    name: Notification.Name("QueuedQuestionProcessed"),
+                    name: .queuedQuestionProcessed,
                     object: question
                 )
 

@@ -12,10 +12,10 @@ final class NotesSyncManager: ObservableObject {
     @Published var deletedNoteIds: Set<UUID> = []
     @Published var updatedNotes: [UUID: Note] = [:]
     
-    // MARK: - Notification Names
-    static let noteDeletedNotification = Notification.Name("NotesSyncManager.noteDeleted")
-    static let noteUpdatedNotification = Notification.Name("NotesSyncManager.noteUpdated")
-    static let noteBatchDeletedNotification = Notification.Name("NotesSyncManager.noteBatchDeleted")
+    // MARK: - Notification Names (forwarding to central definitions)
+    static let noteDeletedNotification: Notification.Name = .notesSyncNoteDeleted
+    static let noteUpdatedNotification: Notification.Name = .notesSyncNoteUpdated
+    static let noteBatchDeletedNotification: Notification.Name = .notesSyncNoteBatchDeleted
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()

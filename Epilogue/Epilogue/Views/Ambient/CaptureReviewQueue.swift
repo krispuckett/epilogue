@@ -107,7 +107,7 @@ struct CaptureReviewQueue: View {
         .opacity(reviewQueue.isEmpty ? 0 : 1)
         .scaleEffect(reviewQueue.isEmpty ? 0.9 : 1)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: reviewQueue.count)
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CaptureForReview"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .captureForReview)) { notification in
             if let data = notification.object as? [String: Any],
                let text = data["text"] as? String,
                let typeString = data["type"] as? String,

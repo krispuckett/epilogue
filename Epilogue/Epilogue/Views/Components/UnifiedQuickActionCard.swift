@@ -744,7 +744,7 @@ struct UnifiedQuickActionCard: View {
             print("📚 UnifiedQuickActionCard: Opening book search with query: '\(query)'")
             #endif
             NotificationCenter.default.post(
-                name: Notification.Name("ShowBookSearch"),
+                name: .showBookSearch,
                 object: query
             )
 
@@ -765,14 +765,14 @@ struct UnifiedQuickActionCard: View {
         case .existingBook(let book):
             // Navigate to book
             NotificationCenter.default.post(
-                name: Notification.Name("NavigateToBook"),
+                name: .navigateToBookNotification,
                 object: book
             )
 
         case .existingNote(let note):
             // Navigate to note
             NotificationCenter.default.post(
-                name: Notification.Name("NavigateToNote"),
+                name: .navigateToNoteNotification,
                 object: note
             )
 
@@ -980,7 +980,7 @@ struct UnifiedQuickActionCard: View {
         // Post the notification with a small delay to ensure the view is ready
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             NotificationCenter.default.post(
-                name: Notification.Name("CreateNewNote"),
+                name: .createNewNote,
                 object: noteData
             )
         }
@@ -1008,15 +1008,15 @@ struct UnifiedQuickActionCard: View {
         // Post the notification with a small delay to ensure the view is ready
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             NotificationCenter.default.post(
-                name: Notification.Name("SaveQuote"),
+                name: .saveQuote,
                 object: quoteData
             )
         }
-        
+
         SensoryFeedback.success()
         showToast("Quote saved")
     }
-    
+
     private func createQuoteWithAttribution(text: String, author: String?, bookTitle: String?) {
         let book = selectedBookContext ?? libraryViewModel.currentDetailBook
         
@@ -1048,11 +1048,11 @@ struct UnifiedQuickActionCard: View {
         // Post the notification with a small delay to ensure the view is ready
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             NotificationCenter.default.post(
-                name: Notification.Name("SaveQuote"),
+                name: .saveQuote,
                 object: quoteData
             )
         }
-        
+
         SensoryFeedback.success()
         showToast("Quote saved")
     }

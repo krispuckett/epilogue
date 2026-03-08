@@ -118,7 +118,7 @@ final class ResponseCache {
             // Post notification for prefetch
             Task { @MainActor in
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShouldPrefetchResponses"),
+                    name: .shouldPrefetchResponses,
                     object: prefetchCandidates
                 )
             }
@@ -157,7 +157,7 @@ final class ResponseCache {
                 // Post notification to generate response
                 Task { @MainActor in
                     NotificationCenter.default.post(
-                        name: Notification.Name("ShouldPreloadQuestion"),
+                        name: .shouldPreloadQuestion,
                         object: [
                             "question": question,
                             "book": book

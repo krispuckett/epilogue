@@ -397,12 +397,12 @@ struct NotesView: View {
                 addNoteToolbarButton
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .editNote)) { notification in
             if let note = notification.object as? Note {
                 editingNote = note
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToNote"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToNoteNotification)) { notification in
             if let note = notification.object as? Note {
                 // Scroll to and highlight the note
                 scrollToNoteId = note.id
@@ -548,7 +548,7 @@ struct EmptyNotesView: View {
                     
                     HStack(spacing: 12) {
                         Button {
-                            NotificationCenter.default.post(name: NSNotification.Name("ShowCommandPalette"), object: nil)
+                            NotificationCenter.default.post(name: .showCommandPalette, object: nil)
                         } label: {
                             Label("Add Note", systemImage: "note.text.badge.plus")
                                 .font(.system(size: 14))
@@ -558,7 +558,7 @@ struct EmptyNotesView: View {
                         }
                         
                         Button {
-                            NotificationCenter.default.post(name: NSNotification.Name("ShowCommandPalette"), object: nil)
+                            NotificationCenter.default.post(name: .showCommandPalette, object: nil)
                         } label: {
                             Label("Add Quote", systemImage: "quote.opening")
                                 .font(.system(size: 14))

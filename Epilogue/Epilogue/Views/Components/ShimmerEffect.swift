@@ -79,8 +79,3 @@ extension View {
         modifier(ParallaxMotionModifier(magnitude: magnitude))
     }
 }
-
-// Device motion notification extension
-extension Notification.Name {
-    static let deviceMotionUpdate = Notification.Name("deviceMotionUpdate")
-}

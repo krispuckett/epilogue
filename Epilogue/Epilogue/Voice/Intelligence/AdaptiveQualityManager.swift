@@ -179,7 +179,7 @@ class AdaptiveQualityManager: ObservableObject {
         
         // Post notification for components to adjust
         NotificationCenter.default.post(
-            name: Notification.Name("QualityLevelChanged"),
+            name: .qualityLevelChanged,
             object: level
         )
     }

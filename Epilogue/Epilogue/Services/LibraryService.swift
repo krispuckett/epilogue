@@ -171,7 +171,7 @@ final class LibraryService {
         SpotlightIndexingService.shared.indexBook(books[index])
 
         // 4. Notify UI
-        NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
+        NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Book status updated successfully")
     }
@@ -207,7 +207,7 @@ final class LibraryService {
         SpotlightIndexingService.shared.indexBook(books[index])
 
         // 4. Notify UI
-        NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
+        NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Book rating updated successfully")
     }
@@ -248,7 +248,7 @@ final class LibraryService {
         }
 
         // 3. Notify UI
-        NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
+        NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Current page updated successfully")
     }
@@ -391,7 +391,7 @@ final class LibraryService {
         SpotlightIndexingService.shared.deindexBook(bookId)
 
         // 4. Notify UI
-        NotificationCenter.default.post(name: Notification.Name("RefreshLibrary"), object: nil)
+        NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Book deleted successfully: '\(removedBook.title)'")
     }

@@ -330,7 +330,7 @@ class NotesViewModel {
         
         // Listen for book replacements
         NotificationCenter.default.addObserver(
-            forName: Notification.Name("BookReplaced"),
+            forName: .bookReplaced,
             object: nil,
             queue: .main
         ) { [weak self] notification in

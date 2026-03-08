@@ -397,7 +397,7 @@ struct CleanNotesView: View {
             .onChange(of: navigationCoordinator.highlightedNoteID) { _, newValue in handleHighlightedNote(newValue) }
             .onChange(of: navigationCoordinator.highlightedQuoteID) { _, newValue in handleHighlightedQuote(newValue) }
             // Note: CreateNewNote and SaveQuote are handled globally in ContentView
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowToastMessage"))) { handleShowToast($0) }
+            .onReceive(NotificationCenter.default.publisher(for: .showToastMessage)) { handleShowToast($0) }
     }
 
     // MARK: - Navigation Content

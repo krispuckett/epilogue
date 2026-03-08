@@ -259,7 +259,7 @@ struct QuickActionsSheet: View {
 
                     // Show success toast
                     NotificationCenter.default.post(
-                        name: Notification.Name("ShowBookAddedToast"),
+                        name: .showBookAddedToast,
                         object: ["message": "Added \(book.title)"]
                     )
                     SensoryFeedback.success()
@@ -439,17 +439,17 @@ struct QuickActionsSheet: View {
         SensoryFeedback.light()
         // Navigate to book
         NotificationCenter.default.post(
-            name: Notification.Name("NavigateToBook"),
+            name: .navigateToBookNotification,
             object: book
         )
         dismiss()
     }
-    
+
     private func handleNoteSelection(_ note: Note) {
         SensoryFeedback.light()
         // Navigate to note
         NotificationCenter.default.post(
-            name: Notification.Name("NavigateToNote"),
+            name: .navigateToNoteNotification,
             object: note
         )
         dismiss()

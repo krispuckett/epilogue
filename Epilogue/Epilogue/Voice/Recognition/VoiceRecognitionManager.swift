@@ -966,7 +966,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         // For backward compatibility, still post the notification
         NotificationCenter.default.post(
-            name: Notification.Name("ImmediateQuestionDetected"),
+            name: .immediateQuestionDetected,
             object: [
                 "question": question,
                 "timestamp": Date(),
@@ -1017,7 +1017,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
                 
                 // Post notification for quote processing
                 NotificationCenter.default.post(
-                    name: Notification.Name("ReactionBasedQuoteDetected"),
+                    name: .reactionBasedQuoteDetected,
                     object: ["reaction": reaction, "fullText": self.transcribedText]
                 )
             }
@@ -1041,7 +1041,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         
         // Post reaction for AI processing with confidence
         NotificationCenter.default.post(
-            name: Notification.Name("NaturalReactionDetected"),
+            name: .naturalReactionDetected,
             object: ["text": text, "confidence": self.confidenceScore]
         )
     }
@@ -1430,7 +1430,7 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
 
                 // Also post notification for any other listeners
                 NotificationCenter.default.post(
-                    name: Notification.Name("WhisperTranscriptionReady"),
+                    name: .whisperTranscriptionReady,
                     object: result.text as NSString
                 )
             }

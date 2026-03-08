@@ -221,7 +221,7 @@ struct EnhancedBookScannerView: View {
         .onAppear {
             checkCameraPermission()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearchFromScanner"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .showBookSearchFromScanner)) { notification in
             if let query = notification.object as? String {
                 searchQuery = query
                 showBookSearch = true
@@ -863,7 +863,7 @@ extension CameraScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
                 
                 // Always show search sheet with ISBN query
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShowBookSearchFromScanner"),
+                    name: .showBookSearchFromScanner,
                     object: "isbn:\(stringValue)"
                 )
                 

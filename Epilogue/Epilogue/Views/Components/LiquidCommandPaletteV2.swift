@@ -464,7 +464,7 @@ struct LiquidCommandPaletteV2: View {
                     icon: "book",
                     action: { 
                         NotificationCenter.default.post(
-                            name: Notification.Name("NavigateToBook"),
+                            name: .navigateToBookNotification,
                             object: book
                         )
                         dismissPalette()

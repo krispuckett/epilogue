@@ -133,7 +133,7 @@ struct LibraryView: View {
 
         await MainActor.run {
             // Trigger refresh - loadBooks is private
-            NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+            NotificationCenter.default.post(name: .refreshLibrary, object: nil)
             SensoryFeedback.light()
         }
     }
@@ -202,7 +202,7 @@ struct LibraryView: View {
 
         // Show success toast
         NotificationCenter.default.post(
-            name: Notification.Name("ShowBookAddedToast"),
+            name: .showBookAddedToast,
             object: ["message": "Added \(book.title)"]
         )
         SensoryFeedback.success()
@@ -608,7 +608,7 @@ struct LibraryView: View {
                             await BookColorPaletteCache.shared.refreshPalette(for: book.id, coverURL: finalURL)
                         }
 
-                        NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                        NotificationCenter.default.post(name: .refreshLibrary, object: nil)
                         showingCoverPicker = false
                         selectedBookForEdit = nil
                     }
@@ -823,14 +823,14 @@ struct LibraryView: View {
         .sheet(isPresented: $showingReadingPlansHub) {
             ReadingPlansHubView()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToBookNotification)) { notification in
             if let book = notification.object as? Book {
                 // Navigate directly to book detail
                 selectedBookForNavigation = book
                 navigateToBookDetail = true
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookSearch"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .showBookSearch)) { notification in
             // Capture the search query if provided
             if let query = notification.object as? String {
                 pendingBookSearchQuery = query
@@ -839,13 +839,13 @@ struct LibraryView: View {
             }
             appState.showingBookSearch = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowEnhancedBookScanner"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .showEnhancedBookScanner)) { _ in
             appState.showingEnhancedScanner = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowGoodreadsImport"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .showGoodreadsImport)) { _ in
             appState.showingGoodreadsImport = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowBookAddedToast"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .showBookAddedToast)) { notification in
             if let userInfo = notification.object as? [String: String],
                let message = userInfo["message"] {
                 toastMessage = message
@@ -854,7 +854,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ForceShowInlineActivityCard"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .forceShowInlineActivityCard)) { _ in
             // Developer option: force show inline activity card
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 showInlineActivityCard = true
@@ -1848,7 +1848,7 @@ class LibraryViewModel {
         
         // Listen for library refresh notification
         NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("RefreshLibrary"),
+            forName: .refreshLibrary,
             object: nil,
             queue: .main
         ) { _ in
@@ -2333,7 +2333,7 @@ class LibraryViewModel {
             
             // Post notification so other views can update
             NotificationCenter.default.post(
-                name: NSNotification.Name("BookCoverUpdated"),
+                name: .bookCoverUpdated,
                 object: nil,
                 userInfo: ["bookId": book.id, "coverURL": newCoverURL as Any]
             )
@@ -2374,7 +2374,7 @@ class LibraryViewModel {
 
             // Post notification for other views to update
             NotificationCenter.default.post(
-                name: NSNotification.Name("BookProgressUpdated"),
+                name: .bookProgressUpdated,
                 object: nil,
                 userInfo: ["bookId": book.id, "currentPage": validPage]
             )
@@ -2415,7 +2415,7 @@ class LibraryViewModel {
     private func updateNotesForReplacedBook(oldLocalId: UUID, newLocalId: UUID) {
         // This would ideally be handled by NotesViewModel, but we can trigger it here
         NotificationCenter.default.post(
-            name: Notification.Name("BookReplaced"),
+            name: .bookReplaced,
             object: nil,
             userInfo: ["oldLocalId": oldLocalId, "newLocalId": newLocalId]
         )

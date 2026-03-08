@@ -405,19 +405,19 @@ struct SwiftDataNotesView: View {
                     .zIndex(1000)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EditNote"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .editNote)) { notification in
                 if let note = notification.object as? Note {
                     editingNote = note
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DeleteNote"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .deleteNote)) { notification in
                 if let note = notification.object as? Note {
                     withAnimation(.smooth) {
                         deleteNote(note)
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NoteUpdated"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .noteUpdated)) { notification in
                 if let updatedNote = notification.object as? Note {
                     // Force refresh by triggering SwiftUI update
                     Task {
@@ -828,7 +828,7 @@ struct CapturedQuestionCard: View {
                 Button {
                     // Navigate to book
                     NotificationCenter.default.post(
-                        name: Notification.Name("NavigateToBook"),
+                        name: .navigateToBookNotification,
                         object: book
                     )
                 } label: {

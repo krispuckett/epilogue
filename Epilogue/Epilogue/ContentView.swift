@@ -58,17 +58,17 @@ struct ContentView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToLibraryTab"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
                 // Switch to library tab when navigating from ambient mode
                 selectedTab = 0
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowQuickActionCard"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .showQuickActionCard)) { _ in
                 // Show unified input card from anywhere in the app
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     showQuickActionCard = true
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenAmbientModeFromIntent"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .openAmbientModeFromIntent)) { notification in
                 // Handle Siri "Continue Reading" intent
                 handleAmbientModeIntent(notification)
             }
@@ -79,23 +79,23 @@ struct ContentView: View {
             // MARK: - Global Note/Quote Persistence
             // These handlers ensure notes and quotes are saved to SwiftData
             // regardless of which tab the user is on
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CreateNewNote"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .createNewNote)) { notification in
                 handleCreateNewNote(notification)
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaveQuote"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .saveQuote)) { notification in
                 handleSaveQuote(notification)
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowReturnCard"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .showReturnCard)) { _ in
                 // Developer trigger from Gandalf Mode
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     showReturnCard = true
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ForceShowDynamicIslandToast"))) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .forceShowDynamicIslandToast)) { _ in
                 // Developer trigger for Dynamic Island Toast
                 showDynamicIslandToast = true
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ShowCompanionInvitation"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .showCompanionInvitation)) { notification in
                 // Deep link for reading companion invitation
                 if let token = notification.object as? String {
                     pendingCompanionToken = token

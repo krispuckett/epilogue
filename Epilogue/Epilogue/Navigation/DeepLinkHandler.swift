@@ -66,7 +66,7 @@ final class DeepLinkHandler {
 
     private func setupNotificationObservers() {
         // Navigate to book
-        NotificationCenter.default.publisher(for: Notification.Name("NavigateToBook"))
+        NotificationCenter.default.publisher(for: .navigateToBookNotification)
             .sink { [weak self] notification in
                 if let book = notification.object as? Book {
                     self?.navigateToBook(book)
@@ -77,7 +77,7 @@ final class DeepLinkHandler {
             .store(in: &cancellables)
 
         // Navigate to note
-        NotificationCenter.default.publisher(for: Notification.Name("NavigateToNote"))
+        NotificationCenter.default.publisher(for: .navigateToNoteNotification)
             .compactMap { $0.object as? Note }
             .sink { [weak self] note in
                 self?.navigateToNote(note)
@@ -85,7 +85,7 @@ final class DeepLinkHandler {
             .store(in: &cancellables)
 
         // Navigate to tab
-        NotificationCenter.default.publisher(for: Notification.Name("NavigateToTab"))
+        NotificationCenter.default.publisher(for: .navigateToTab)
             .compactMap { $0.object as? Int }
             .sink { [weak self] tabIndex in
                 self?.navigateToTab(tabIndex)
@@ -93,7 +93,7 @@ final class DeepLinkHandler {
             .store(in: &cancellables)
 
         // Share quote
-        NotificationCenter.default.publisher(for: Notification.Name("ShareQuote"))
+        NotificationCenter.default.publisher(for: .shareQuote)
             .compactMap { $0.object as? Note }
             .sink { quote in
                 ShareQuoteService.shareQuote(quote)
@@ -101,7 +101,7 @@ final class DeepLinkHandler {
             .store(in: &cancellables)
 
         // Voice note
-        NotificationCenter.default.publisher(for: Notification.Name("StartVoiceNote"))
+        NotificationCenter.default.publisher(for: .startVoiceNote)
             .sink { _ in
                 HapticManager.shared.voiceModeStart()
                 // Voice note handling would go here
@@ -183,7 +183,7 @@ final class DeepLinkHandler {
         ReturnCardManager.shared.markCardShown()
 
         // Show the full return card overlay
-        NotificationCenter.default.post(name: Notification.Name("ShowReturnCard"), object: nil)
+        NotificationCenter.default.post(name: .showReturnCard, object: nil)
     }
 
     private func handleContinueReading() {
@@ -202,7 +202,7 @@ final class DeepLinkHandler {
 
         // Post notification to trigger ambient mode (same as Siri intent)
         NotificationCenter.default.post(
-            name: Notification.Name("OpenAmbientModeFromIntent"),
+            name: .openAmbientModeFromIntent,
             object: currentBook.id,
             userInfo: [
                 "bookId": currentBook.id,
@@ -231,7 +231,7 @@ final class DeepLinkHandler {
 
         // Post notification so the app can show the invitation acceptance UI
         NotificationCenter.default.post(
-            name: Notification.Name("ShowCompanionInvitation"),
+            name: .showCompanionInvitation,
             object: token
         )
     }

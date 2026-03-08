@@ -19,7 +19,7 @@ struct OpenBookIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         // Navigate to book detail
         NotificationCenter.default.post(
-            name: Notification.Name("NavigateToBook"),
+            name: .navigateToBookNotification,
             object: book.id,
             userInfo: [
                 "bookId": book.id,
@@ -29,7 +29,7 @@ struct OpenBookIntent: AppIntent {
 
         // Switch to library tab
         NotificationCenter.default.post(
-            name: Notification.Name("SwitchToLibraryTab"),
+            name: .switchToLibraryTab,
             object: nil
         )
 

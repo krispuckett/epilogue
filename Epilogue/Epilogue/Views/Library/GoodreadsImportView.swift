@@ -165,7 +165,7 @@ struct GoodreadsImportView: View {
                             }
                             
                             // Post notification to refresh library
-                            NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                            NotificationCenter.default.post(name: .refreshLibrary, object: nil)
                             dismiss()
                         }
                         .fontWeight(.semibold)

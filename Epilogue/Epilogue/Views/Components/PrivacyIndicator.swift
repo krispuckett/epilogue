@@ -371,12 +371,6 @@ struct AutoStopWarningView: View {
     }
 }
 
-// MARK: - Notification Names
-extension Notification.Name {
-    static let autoStopTriggered = Notification.Name("autoStopTriggered")
-    static let autoStopWarning = Notification.Name("autoStopWarning")
-}
-
 // MARK: - Privacy Blur Effect
 struct PrivacyBlurModifier: ViewModifier {
     let isActive: Bool

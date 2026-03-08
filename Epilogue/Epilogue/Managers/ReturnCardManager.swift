@@ -153,7 +153,7 @@ final class ReturnCardManager {
         #endif
 
         NotificationCenter.default.post(
-            name: Notification.Name("ForceShowDynamicIslandToast"),
+            name: .forceShowDynamicIslandToast,
             object: nil
         )
     }

@@ -84,7 +84,7 @@ struct CompactNoteCard: View {
             Button {
                 // Edit note
                 NotificationCenter.default.post(
-                    name: Notification.Name("EditNote"),
+                    name: .editNote,
                     object: note
                 )
             } label: {

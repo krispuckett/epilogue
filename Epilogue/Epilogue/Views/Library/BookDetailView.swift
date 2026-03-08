@@ -674,7 +674,7 @@ struct BookDetailView: View {
                         await BookColorPaletteCache.shared.refreshPalette(for: updated.id, coverURL: newURL)
                     }
 
-                    NotificationCenter.default.post(name: NSNotification.Name("RefreshLibrary"), object: nil)
+                    NotificationCenter.default.post(name: .refreshLibrary, object: nil)
                     showingBookSearch = false
                     }
                 },
@@ -730,7 +730,7 @@ struct BookDetailView: View {
                         quoteData["pageNumber"] = page
                     }
                     NotificationCenter.default.post(
-                        name: Notification.Name("SaveQuote"),
+                        name: .saveQuote,
                         object: quoteData
                     )
                     SensoryFeedback.success()
@@ -1814,7 +1814,7 @@ struct BookDetailView: View {
                         backgroundColor: accentColor,
                         handler: {
                             NotificationCenter.default.post(
-                                name: Notification.Name("EditNote"),
+                                name: .editNote,
                                 object: note
                             )
                             SensoryFeedback.light()
@@ -1864,7 +1864,7 @@ struct BookDetailView: View {
                             handler: {
                                 // Edit note
                                 NotificationCenter.default.post(
-                                    name: Notification.Name("EditNote"),
+                                    name: .editNote,
                                     object: note
                                 )
                                 SensoryFeedback.light()
@@ -3268,7 +3268,7 @@ struct QuickNoteSheet: View {
 
             // Show glass toast notification
             NotificationCenter.default.post(
-                name: Notification.Name("ShowGlassToast"),
+                name: .showGlassToast,
                 object: ["message": "Note saved to \(book.title)"]
             )
 
@@ -3280,7 +3280,7 @@ struct QuickNoteSheet: View {
             #endif
             // Show error toast
             NotificationCenter.default.post(
-                name: Notification.Name("ShowGlassToast"),
+                name: .showGlassToast,
                 object: ["message": "Failed to save note"]
             )
         }

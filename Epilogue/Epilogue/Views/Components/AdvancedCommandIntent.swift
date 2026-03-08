@@ -373,7 +373,7 @@ struct AdvancedCommandIntent: View {
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 NotificationCenter.default.post(
-                    name: Notification.Name("ShowBookSearch"),
+                    name: .showBookSearch,
                     object: query  // Pass the query string directly
                 )
             }
@@ -388,7 +388,7 @@ struct AdvancedCommandIntent: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             // Pass the title as search query
             NotificationCenter.default.post(
-                name: Notification.Name("ShowBookSearch"),
+                name: .showBookSearch,
                 object: title  // Changed to pass string directly, matching what LibraryView expects
             )
         }
@@ -397,7 +397,7 @@ struct AdvancedCommandIntent: View {
     private func openBookScanner() {
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+            NotificationCenter.default.post(name: .showEnhancedBookScanner, object: nil)
         }
     }
 
@@ -405,7 +405,7 @@ struct AdvancedCommandIntent: View {
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             NotificationCenter.default.post(
-                name: Notification.Name("CreateNewNote"),
+                name: .createNewNote,
                 object: ["context": context]
             )
         }
@@ -414,14 +414,14 @@ struct AdvancedCommandIntent: View {
     private func createNewNote() {
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NotificationCenter.default.post(name: Notification.Name("CreateNewNote"), object: nil)
+            NotificationCenter.default.post(name: .createNewNote, object: nil)
         }
     }
 
     private func saveQuote() {
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NotificationCenter.default.post(name: Notification.Name("ShowQuoteCapture"), object: nil)
+            NotificationCenter.default.post(name: .showQuoteCapture, object: nil)
         }
     }
 
@@ -440,7 +440,7 @@ struct AdvancedCommandIntent: View {
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             NotificationCenter.default.post(
-                name: Notification.Name("PerformSearch"),
+                name: .performSearch,
                 object: ["query": query]
             )
         }
@@ -483,7 +483,7 @@ struct AdvancedCommandIntent: View {
                 showAddBookPopover = false
                 dismiss()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    NotificationCenter.default.post(name: Notification.Name("ShowBookSearch"), object: nil)
+                    NotificationCenter.default.post(name: .showBookSearch, object: nil)
                 }
             }) {
                 Label("Add Book", systemImage: "book")
@@ -499,7 +499,7 @@ struct AdvancedCommandIntent: View {
                 showAddBookPopover = false
                 dismiss()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    NotificationCenter.default.post(name: Notification.Name("ShowEnhancedBookScanner"), object: nil)
+                    NotificationCenter.default.post(name: .showEnhancedBookScanner, object: nil)
                 }
             }) {
                 Label("Scan Cover", systemImage: "camera")

@@ -137,7 +137,7 @@ struct LiquidCommandPalette: View {
                                             
                                             // Show success toast
                                             NotificationCenter.default.post(
-                                                name: Notification.Name("ShowGlassToast"),
+                                                name: .showGlassToast,
                                                 object: ["message": "Added \"\(book.title)\" to library"]
                                             )
                                             
@@ -264,10 +264,10 @@ struct LiquidCommandPalette: View {
                     
                     // Navigate to the newly added book
                     NotificationCenter.default.post(
-                        name: Notification.Name("NavigateToBook"),
+                        name: .navigateToBookNotification,
                         object: book
                     )
-                    
+
                     // Close sheets
                     showBookSearch = false
                     dismissPalette()
@@ -418,14 +418,14 @@ struct LiquidCommandPalette: View {
         case .existingBook(let book):
             HapticManager.shared.bookOpen()
             NotificationCenter.default.post(
-                name: Notification.Name("NavigateToBook"),
+                name: .navigateToBookNotification,
                 object: book
             )
             dismissPalette()
         case .existingNote(let note):
             SensoryFeedback.light()
             NotificationCenter.default.post(
-                name: Notification.Name("NavigateToNote"),
+                name: .navigateToNoteNotification,
                 object: note
             )
             dismissPalette()
@@ -481,17 +481,17 @@ struct LiquidCommandPalette: View {
         switch intent {
         case .searchLibrary(_):
             NotificationCenter.default.post(
-                name: Notification.Name("SearchLibrary"),
+                name: .searchLibrary,
                 object: query
             )
         case .searchNotes(_):
             NotificationCenter.default.post(
-                name: Notification.Name("SearchNotes"),
+                name: .searchNotes,
                 object: query
             )
         case .searchAll(_):
             NotificationCenter.default.post(
-                name: Notification.Name("SearchAll"),
+                name: .searchAll,
                 object: query
             )
         default:
@@ -798,7 +798,7 @@ struct LiquidCommandPalette: View {
         
         // Post notification with book context
         NotificationCenter.default.post(
-            name: Notification.Name("NoteCreatedWithBook"),
+            name: .noteCreatedWithBook,
             object: ["note": text, "book": book]
         )
     }
@@ -810,7 +810,7 @@ struct LiquidCommandPalette: View {
         
         // Post notification with book context
         NotificationCenter.default.post(
-            name: Notification.Name("QuoteCreatedWithBook"),
+            name: .quoteCreatedWithBook,
             object: ["quote": text, "book": book]
         )
     }
@@ -891,7 +891,7 @@ struct LiquidCommandPalette: View {
         
         // Post notification to update UI
         NotificationCenter.default.post(
-            name: Notification.Name("ReadingGoalSet"),
+            name: .readingGoalSet,
             object: ["book": book, "pagesPerDay": pagesPerDay]
         )
         
