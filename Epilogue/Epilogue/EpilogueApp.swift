@@ -58,10 +58,10 @@ struct EpilogueApp: App {
                             // Knowledge graph
                             await KnowledgeGraphIndexer.shared.configure(with: context)
 
-                            // Memory Resurfacing — generate cards from existing quotes/notes
-                            MemoryResurfacingService.shared.configure(with: container)
-                            MemoryResurfacingService.shared.generateCardsFromExistingContent(modelContext: context)
-                            MemoryResurfacingService.shared.scheduleReviewNotification(modelContext: context)
+                            // Memory Resurfacing — feature flagged off for now
+                            // MemoryResurfacingService.shared.configure(with: container)
+                            // MemoryResurfacingService.shared.generateCardsFromExistingContent(modelContext: context)
+                            // MemoryResurfacingService.shared.scheduleReviewNotification(modelContext: context)
 
                             // Notification cleanup
                             await cleanupOrphanedReadingPlanNotifications(context: context)
