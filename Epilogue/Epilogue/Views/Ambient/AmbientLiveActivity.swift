@@ -173,31 +173,36 @@ struct AmbientLiveActivity: Widget {
 }
 
 // MARK: - App Intents for Live Activity Controls
+// These use LiveActivityIntent (not AppIntent) so they execute in the main app
+// process where TrueAmbientProcessor.shared is valid, without bringing the app
+// to the foreground. Plain AppIntent runs in the widget extension process where
+// app singletons are unavailable, causing silent failures.
 
-struct ToggleAmbientListeningIntent: AppIntent {
+struct ToggleAmbientListeningIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Toggle Ambient Listening"
-    
+
     func perform() async throws -> some IntentResult {
-        // Toggle listening state
+        // LiveActivityIntent runs in the app process — singletons are valid here
         await TrueAmbientProcessor.shared.toggleListening()
-        
-        // Update Live Activity
-        await AmbientLiveActivityManager.shared.updateActivity()
-        
+
+        // Update Live Activity to reflect new listening state
+        let isListening = await TrueAmbientProcessor.shared.sessionActive
+        await AmbientLiveActivityManager.shared.updateActivity(isListening: isListening)
+
         return .result()
     }
 }
 
-struct EndAmbientSessionIntent: AppIntent {
+struct EndAmbientSessionIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "End Ambient Session"
-    
+
     func perform() async throws -> some IntentResult {
-        // End the session
+        // LiveActivityIntent runs in the app process — singletons are valid here
         _ = await TrueAmbientProcessor.shared.endSession()
-        
+
         // End Live Activity
         await AmbientLiveActivityManager.shared.endActivity()
-        
+
         return .result()
     }
 }

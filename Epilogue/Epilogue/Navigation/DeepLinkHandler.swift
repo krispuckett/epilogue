@@ -57,6 +57,8 @@ final class DeepLinkHandler {
             handleWelcomeBack()
         case "companion":
             handleCompanionDeepLink(components)
+        case "ambient":
+            handleAmbientDeepLink(components)
         default:
             logger.warning("Unknown deep link host: \(components.host ?? "nil")")
         }
@@ -234,5 +236,31 @@ final class DeepLinkHandler {
             name: .showCompanionInvitation,
             object: token
         )
+    }
+
+    private func handleAmbientDeepLink(_ components: URLComponents) {
+        logger.info("Live Activity tapped — navigating to ambient mode")
+
+        let action = components.queryItems?.first(where: { $0.name == "action" })?.value
+
+        switch action {
+        case "toggle-listening":
+            // Fallback path: if a deep link is used instead of LiveActivityIntent
+            Task {
+                await TrueAmbientProcessor.shared.toggleListening()
+            }
+        case "end-session":
+            // Fallback path: if a deep link is used instead of LiveActivityIntent
+            Task {
+                _ = await TrueAmbientProcessor.shared.endSession()
+                await AmbientLiveActivityManager.shared.endActivity()
+            }
+        default:
+            // Body tap — bring user to the active ambient session
+            let coordinator = EpilogueAmbientCoordinator.shared
+            if !coordinator.isActive {
+                coordinator.launch(from: .general)
+            }
+        }
     }
 }
