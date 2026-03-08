@@ -174,6 +174,40 @@ enum EpilogueSchemaV8: VersionedSchema {
     }
 }
 
+enum EpilogueSchemaV9: VersionedSchema {
+    static var versionIdentifier = Schema.Version(9, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            BookModel.self,
+            CapturedNote.self,
+            CapturedQuote.self,
+            CapturedQuestion.self,
+            AmbientSession.self,
+            QueuedQuestion.self,
+            ReadingSession.self,
+            // Reading Journey models
+            ReadingJourney.self,
+            JourneyBook.self,
+            JourneyMilestone.self,
+            BookMilestone.self,
+            // Reading Habit Plan models
+            ReadingHabitPlan.self,
+            HabitDay.self,
+            // AI Memory models
+            ConversationMemoryEntry.self,
+            MemoryThread.self,
+            UserReadingProfile.self,
+            BookInsight.self,
+            // Knowledge Graph models
+            KnowledgeNode.self,
+            KnowledgeEdge.self,
+            // Memory Resurfacing (NEW in V9)
+            MemoryCard.self
+        ]
+    }
+}
+
 // Migration plan between versions
 enum EpilogueMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
@@ -185,7 +219,8 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             EpilogueSchemaV5.self,
             EpilogueSchemaV6.self,
             EpilogueSchemaV7.self,
-            EpilogueSchemaV8.self
+            EpilogueSchemaV8.self,
+            EpilogueSchemaV9.self
         ]
     }
 
@@ -204,7 +239,9 @@ enum EpilogueMigrationPlan: SchemaMigrationPlan {
             // Migration from V6 to V7 (adding AI Memory models) - LIGHTWEIGHT
             MigrationStage.lightweight(fromVersion: EpilogueSchemaV6.self, toVersion: EpilogueSchemaV7.self),
             // Migration from V7 to V8 (adding Knowledge Graph models) - LIGHTWEIGHT
-            MigrationStage.lightweight(fromVersion: EpilogueSchemaV7.self, toVersion: EpilogueSchemaV8.self)
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV7.self, toVersion: EpilogueSchemaV8.self),
+            // Migration from V8 to V9 (adding MemoryCard) - LIGHTWEIGHT
+            MigrationStage.lightweight(fromVersion: EpilogueSchemaV8.self, toVersion: EpilogueSchemaV9.self)
         ]
     }
 

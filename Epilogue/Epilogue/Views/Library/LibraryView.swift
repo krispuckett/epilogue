@@ -33,6 +33,8 @@ struct LibraryView: View {
     @State private var toastMessage = ""
     @State private var showingWebSearch = false
     @State private var showingReadingPlansHub = false
+    @State private var showingDailyReview = false
+    @State private var pendingReviewCount: Int = 0
     @State private var cachedFilteredBooks: [Book] = []
 
     // MARK: - Reading Activity Card
@@ -538,7 +540,40 @@ struct LibraryView: View {
             .accessibilityIdentifier("library.viewOptionsMenu")
         }
         
-        // Fixed spacer between menu and journey
+        // Fixed spacer between menu and daily review
+        ToolbarSpacer(.fixed)
+
+        // Daily Review button
+        ToolbarItem {
+            Button {
+                showingDailyReview = true
+                SensoryFeedback.light()
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 18))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                        .symbolRenderingMode(.hierarchical)
+
+                    // Badge showing pending review count
+                    if pendingReviewCount > 0 {
+                        Text("\(min(pendingReviewCount, 99))")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(DesignSystem.Colors.primaryAccent)
+                            .clipShape(Capsule())
+                            .offset(x: 8, y: -6)
+                    }
+                }
+            }
+            .accessibilityLabel("Daily Review")
+            .accessibilityHint("Double tap to review your highlights. \(pendingReviewCount) cards due.")
+            .accessibilityIdentifier("library.dailyReviewButton")
+        }
+
+        // Fixed spacer between daily review and plans
         ToolbarSpacer(.fixed)
 
         // Reading Plans Hub button
@@ -823,6 +858,9 @@ struct LibraryView: View {
         .sheet(isPresented: $showingReadingPlansHub) {
             ReadingPlansHubView()
         }
+        .fullScreenCover(isPresented: $showingDailyReview) {
+            DailyReviewView()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToBookNotification)) { notification in
             if let book = notification.object as? Book {
                 // Navigate directly to book detail
@@ -873,7 +911,16 @@ struct LibraryView: View {
             // Preload all book covers when the library loads
             await preloadAllBookCovers()
         }
-        .onAppear { recomputeFilteredBooks() }
+        .onAppear {
+            recomputeFilteredBooks()
+            pendingReviewCount = MemoryResurfacingService.shared.pendingReviewCount(modelContext: modelContext)
+        }
+        .onChange(of: showingDailyReview) { _, isShowing in
+            if !isShowing {
+                // Refresh count after review session
+                pendingReviewCount = MemoryResurfacingService.shared.pendingReviewCount(modelContext: modelContext)
+            }
+        }
         .onChange(of: searchText) { _, _ in recomputeFilteredBooks() }
         .onChange(of: readFilter) { _, _ in recomputeFilteredBooks() }
         .onChange(of: viewModel.books) { _, _ in recomputeFilteredBooks() }
