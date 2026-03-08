@@ -34,6 +34,7 @@ final class ResponseCache {
     static let shared = ResponseCache()
 
     private let cacheKey = "com.epilogue.responseCache"
+    private let maxEntries = 200
     private var cache: [String: CachedResponse] = [:]
     private let logger = Logger(subsystem: "com.epilogue", category: "ResponseCache")
 
@@ -91,6 +92,7 @@ final class ResponseCache {
         )
         
         cache[key] = cached
+        evictIfNeeded()
         saveCache()
         logger.info("💾 Cached response for question (confidence: \(confidence))")
     }
@@ -170,6 +172,17 @@ final class ResponseCache {
     
     // MARK: - Private Methods
     
+    /// Evict least-recently-accessed entries when over capacity
+    private func evictIfNeeded() {
+        guard cache.count > maxEntries else { return }
+        let sorted = cache.sorted { $0.value.lastAccessed < $1.value.lastAccessed }
+        let toRemove = cache.count - maxEntries
+        for (key, _) in sorted.prefix(toRemove) {
+            cache.removeValue(forKey: key)
+        }
+        logger.info("🗑️ Evicted \(toRemove) LRU cache entries")
+    }
+
     private func loadCache() {
         guard let data = UserDefaults.standard.data(forKey: cacheKey),
               let decoded = try? JSONDecoder().decode([String: CachedResponse].self, from: data) else {

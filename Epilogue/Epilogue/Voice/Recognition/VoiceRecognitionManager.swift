@@ -64,6 +64,8 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
     private var inputNode: AVAudioInputNode?
     
     // Silence detection for complete thoughts
+    private var lastAmplitudeUpdateTime: Date = .distantPast
+    private let amplitudeUpdateInterval: TimeInterval = 0.1 // 10 Hz max
     private var lastSpeechTime: Date = Date()
     private var pendingTranscription: String = ""
     private var thoughtTimer: Timer?
@@ -719,12 +721,16 @@ class VoiceRecognitionManager: NSObject, ObservableObject {
         // Analyze voice patterns with boosted amplitude
         analyzeVoicePatterns(from: buffer, amplitude: boostedAmplitude)
         
-        // Smooth the amplitude for visualization (less smoothing for more responsiveness)
+        // Smooth the amplitude for visualization, throttled to ≤10 Hz
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            let now = Date()
+            guard now.timeIntervalSince(self.lastAmplitudeUpdateTime) >= self.amplitudeUpdateInterval else { return }
+            self.lastAmplitudeUpdateTime = now
+
             let previousAmplitude = self.currentAmplitude
             self.currentAmplitude = self.currentAmplitude * 0.6 + boostedAmplitude * 0.4
-            
+
             // Debug logging for audio level changes
             if abs(self.currentAmplitude - previousAmplitude) > 0.01 {
                 logger.info("🎤 Audio Level Update: \(String(format: "%.3f", self.currentAmplitude)) (raw: \(String(format: "%.3f", amplitude)))")
