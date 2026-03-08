@@ -37,6 +37,10 @@ final class BookModel {
     var literaryStyle: String?        // "High fantasy, allegorical"
     var enrichedAt: Date?             // When enrichment was fetched
 
+    // Enrichment retry tracking
+    var enrichmentFailCount: Int = 0       // Number of consecutive enrichment failures
+    var lastEnrichmentAttempt: Date?       // When enrichment was last attempted
+
     // Series metadata (from enrichment)
     var seriesName: String?           // "Harry Potter", "Lord of the Rings"
     var seriesOrder: Int?             // 1, 2, 3, etc.

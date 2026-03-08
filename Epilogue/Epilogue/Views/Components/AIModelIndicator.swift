@@ -4,28 +4,32 @@ import SwiftUI
 struct AIModelIndicator: View {
     enum ModelType {
         case foundationModels
+        case claude
         case perplexity
         case hybrid
-        
+
         var icon: String {
             switch self {
             case .foundationModels: return "brain"
+            case .claude: return "brain.head.profile"
             case .perplexity: return "globe"
             case .hybrid: return "arrow.triangle.branch"
             }
         }
-        
+
         var label: String {
             switch self {
             case .foundationModels: return "On-Device"
+            case .claude: return "Claude"
             case .perplexity: return "Cloud"
             case .hybrid: return "Smart"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .foundationModels: return .blue
+            case .claude: return .orange
             case .perplexity: return .purple
             case .hybrid: return DesignSystem.Colors.primaryAccent
             }
@@ -120,6 +124,8 @@ struct AIStatusView: View {
         switch smartAI.currentMode {
         case .localOnly:
             return .foundationModels
+        case .claudeOnly:
+            return .claude
         case .externalOnly:
             return .perplexity
         case .automatic:

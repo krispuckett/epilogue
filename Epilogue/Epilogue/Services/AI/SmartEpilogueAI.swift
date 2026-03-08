@@ -27,10 +27,12 @@ class SmartEpilogueAI: ObservableObject {
     @Published var currentMode: AIMode = .automatic
     @Published var isProcessing = false
     @Published var lastResponse = ""
-    
+    @Published var lastProvider: String = ""
+
     enum AIMode {
-        case automatic      // Smart routing
+        case automatic      // Smart routing (Foundation → Claude → Perplexity)
         case localOnly      // Foundation Models only
+        case claudeOnly     // Claude only
         case externalOnly   // Perplexity only
     }
     
@@ -261,40 +263,43 @@ class SmartEpilogueAI: ObservableObject {
     func smartQuery(_ question: String) async -> String {
         isProcessing = true
         defer { isProcessing = false }
-        
+
         // Force mode overrides
         if currentMode == .externalOnly {
             return await queryWithPerplexity(question)
         } else if currentMode == .localOnly {
             return await queryLocal(question)
+        } else if currentMode == .claudeOnly {
+            return await queryWithClaude(question)
         }
-        
+
         // AUTOMATIC MODE - Intelligent routing
+        // Step 1: Check if external web knowledge is needed → Perplexity
         let needsExternal = await shouldUseExternal(question)
-        
         if needsExternal {
-            // External knowledge needed - go straight to Perplexity
-            return await queryWithPerplexity(question)
-        } else {
-            // CRITICAL FIX: Check if model is ACTUALLY ready before trying local
-            // The session existing doesn't mean it's ready to use!
-            #if canImport(FoundationModels)
-            if #available(iOS 26.0, *), session != nil {
-                // Double-check the model is actually ready
-                // If we see "Model is downloading or not ready" in logs, skip local
-                if isLocalModelActuallyReady() {
-                    return await queryLocal(question)
-                } else {
-                    #if DEBUG
-                    print("⚡ Local model not ready - using Perplexity for fast response")
-                    #endif
-                }
-            }
-            #endif
-            
-            // Fallback to Perplexity if local not available or not ready
             return await queryWithPerplexity(question)
         }
+
+        // Step 2: Check if deep analysis is needed → Claude
+        if shouldUseClaude(question) {
+            return await queryWithClaude(question)
+        }
+
+        // Step 3: Try Foundation Models locally, with fallback chain
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *), session != nil {
+            if isLocalModelActuallyReady() {
+                return await queryLocal(question)
+            } else {
+                #if DEBUG
+                print("⚡ Local model not ready - falling back to Claude")
+                #endif
+            }
+        }
+        #endif
+
+        // Step 4: Fallback → Claude → Perplexity
+        return await queryWithClaude(question)
     }
     
     // MARK: - Determine Query Type (OPTIMIZED)
@@ -370,6 +375,52 @@ class SmartEpilogueAI: ObservableObject {
         return false
     }
     
+    // MARK: - Determine if Claude is Best Provider
+    private func shouldUseClaude(_ question: String) -> Bool {
+        let questionLower = question.lowercased()
+
+        // Deep thinking / literary analysis keywords
+        let claudeKeywords = [
+            // Meaning and symbolism
+            "what does", "what do", "represent", "symbolism", "symbolize",
+            "metaphor", "allegory", "imagery",
+            // Analysis
+            "analyze", "analysis", "interpretation", "significance",
+            "deeper meaning", "underlying",
+            // Comparison and connections
+            "compare", "contrast", "difference between", "connection between",
+            "similarities", "parallel",
+            // Author craft
+            "why does the author", "writing style", "narrative technique",
+            "prose style", "literary device", "foreshadowing", "motif",
+            // Opinion / subjective
+            "what do you think", "your thoughts", "opinion",
+            "how do you interpret", "do you believe",
+            // Recommendations
+            "recommend", "similar books", "if i liked",
+            "books like", "should i read"
+        ]
+
+        for keyword in claudeKeywords {
+            if questionLower.contains(keyword) {
+                #if DEBUG
+                print("🧠 Deep analysis detected ('\(keyword)') - routing to Claude")
+                #endif
+                return true
+            }
+        }
+
+        // Long/complex questions benefit from Claude's reasoning
+        if question.count > 100 {
+            #if DEBUG
+            print("🧠 Complex question (\(question.count) chars) - routing to Claude")
+            #endif
+            return true
+        }
+
+        return false
+    }
+
     // MARK: - Query with Smart Routing
     private func queryWithSmartRouting(_ question: String) async -> String {
         #if canImport(FoundationModels)
@@ -420,12 +471,13 @@ class SmartEpilogueAI: ObservableObject {
                 let formattedQuestion = formatQuestionWithContext(question)
                 let response = try await session.respond(to: formattedQuestion)
                 lastResponse = response.content
-                
+                lastProvider = "Apple Intelligence"
+
                 let responseTime = Date().timeIntervalSince(startTime) * 1000
                 #if DEBUG
                 print("⚡ Local response in \(String(format: "%.1f", responseTime))ms")
                 #endif
-                
+
                 return response.content
             } catch {
                 #if DEBUG
@@ -452,7 +504,8 @@ class SmartEpilogueAI: ObservableObject {
                 bookContext: activeBook?.toBook()
             )
             lastResponse = response
-            
+            lastProvider = "Perplexity"
+
             let responseTime = Date().timeIntervalSince(startTime) * 1000
             #if DEBUG
             print("⚡ Perplexity response in \(String(format: "%.1f", responseTime))ms")
@@ -499,6 +552,81 @@ class SmartEpilogueAI: ObservableObject {
         }
     }
     
+    // MARK: - Claude Query
+    private func queryWithClaude(_ question: String) async -> String {
+        let startTime = Date()
+        do {
+            let formattedQuestion = formatQuestionWithContext(question)
+            let response = try await ClaudeService.shared.subscriberChat(
+                message: formattedQuestion,
+                systemPrompt: buildClaudeSystemPrompt(),
+                maxTokens: 2048
+            )
+            lastResponse = response
+            lastProvider = "Claude"
+            let responseTime = Date().timeIntervalSince(startTime) * 1000
+            #if DEBUG
+            print("⚡ Claude response in \(String(format: "%.1f", responseTime))ms")
+            #endif
+            return response
+        } catch {
+            #if DEBUG
+            print("❌ Claude error: \(error), falling back to Perplexity")
+            #endif
+            return await queryWithPerplexity(question)
+        }
+    }
+
+    // MARK: - Claude System Prompt
+    private func buildClaudeSystemPrompt() -> String {
+        var prompt = """
+        You are Epilogue's AI reading companion — a thoughtful, knowledgeable literary partner.
+        You excel at deep analysis, thematic interpretation, and drawing connections.
+        """
+
+        if let book = activeBook {
+            let groundedContext = GroundedBookSession.shared.buildGroundedInstructions(for: book)
+
+            // Add series spoiler protection
+            let seriesInfo = detectSeriesInformation(title: book.title, author: book.author)
+            var spoilerInstructions = ""
+
+            if let (seriesName, bookNumber) = seriesInfo {
+                spoilerInstructions = """
+
+                SPOILER PROTECTION: This is Book \(bookNumber) of the "\(seriesName)" series.
+                Only discuss events from Books 1-\(bookNumber). Never reveal anything from later books.
+                """
+            }
+
+            prompt += """
+
+            \(groundedContext)
+            \(spoilerInstructions)
+
+            Context: The user is actively reading '\(book.title)' by \(book.author).
+            They are using Epilogue's ambient mode to ask questions while reading.
+
+            Your strengths for this conversation:
+            - Deep literary analysis: themes, symbolism, narrative techniques, character psychology
+            - Drawing connections between this book and broader literary traditions
+            - Thoughtful interpretation that enhances the reading experience
+            - Nuanced discussion of complex ideas and moral questions raised by the text
+
+            Response Guidelines:
+            - Start with a direct answer, then build depth
+            - Provide specific textual evidence when discussing themes or interpretations
+            - Connect ideas to broader literary or philosophical contexts when relevant
+            - Aim for 2-3 substantive paragraphs for analysis questions
+            - For simple factual questions, be concise and direct
+            - NO emojis, NO sycophantic language, NO "As an AI..." phrasing
+            - Be natural and conversational, like a well-read friend
+            """
+        }
+
+        return prompt
+    }
+
     // MARK: - Format Question with Book Context
     private func formatQuestionWithContext(_ question: String) -> String {
         guard let book = activeBook else {
@@ -562,17 +690,35 @@ class SmartEpilogueAI: ObservableObject {
     func streamResponse(to question: String) async {
         isProcessing = true
         lastResponse = ""
-        
+
+        // Determine which provider to stream from
+        let provider: AIMode
+        if currentMode == .externalOnly {
+            provider = .externalOnly
+        } else if currentMode == .claudeOnly {
+            provider = .claudeOnly
+        } else if currentMode == .localOnly {
+            provider = .localOnly
+        } else {
+            // Automatic routing
+            let needsExternal = await shouldUseExternal(question)
+            if needsExternal {
+                provider = .externalOnly
+            } else if shouldUseClaude(question) {
+                provider = .claudeOnly
+            } else {
+                provider = .localOnly
+            }
+        }
+
         do {
-            let shouldUseExternalCheck = await shouldUseExternal(question)
-            let useExternal = currentMode == .externalOnly || shouldUseExternalCheck
-            if useExternal {
+            switch provider {
+            case .externalOnly:
                 // Stream from Perplexity
-                // Convert PerplexityResponse stream to String stream
                 let responseStream = AsyncThrowingStream<String, Error> { continuation in
                     Task {
                         do {
-                            for try await response in perplexityService.streamSonarResponse(formatQuestionWithContext(question), bookContext: activeBook?.toBook()) {
+                            for try await response in self.perplexityService.streamSonarResponse(self.formatQuestionWithContext(question), bookContext: self.activeBook?.toBook()) {
                                 continuation.yield(response.text)
                             }
                             continuation.finish()
@@ -581,31 +727,81 @@ class SmartEpilogueAI: ObservableObject {
                         }
                     }
                 }
-                let stream = responseStream
-                
-                for try await chunk in stream {
+
+                for try await chunk in responseStream {
                     await MainActor.run {
                         self.lastResponse += chunk
                     }
                 }
-            } else {
-                // Stream from local Foundation Models
-                guard let session = session else { return }
-                
-                let stream = session.streamResponse(to: formatQuestionWithContext(question))
-                
-                for try await partial in stream {
+                lastProvider = "Perplexity"
+
+            case .claudeOnly:
+                // Stream from Claude
+                let formattedQuestion = formatQuestionWithContext(question)
+                let stream = ClaudeService.shared.subscriberStreamChat(
+                    message: formattedQuestion,
+                    systemPrompt: buildClaudeSystemPrompt(),
+                    maxTokens: 2048
+                )
+
+                for try await response in stream {
                     await MainActor.run {
-                        self.lastResponse = partial.content
+                        self.lastResponse = response.text
                     }
                 }
+                lastProvider = "Claude"
+
+            case .localOnly, .automatic:
+                // Stream from local Foundation Models
+                #if canImport(FoundationModels)
+                if #available(iOS 26.0, *), let session = session {
+                    let stream = session.streamResponse(to: formatQuestionWithContext(question))
+
+                    for try await partial in stream {
+                        await MainActor.run {
+                            self.lastResponse = partial.content
+                        }
+                    }
+                    lastProvider = "Apple Intelligence"
+                } else {
+                    // Fallback to Claude streaming if local unavailable
+                    let formattedQuestion = formatQuestionWithContext(question)
+                    let stream = ClaudeService.shared.subscriberStreamChat(
+                        message: formattedQuestion,
+                        systemPrompt: buildClaudeSystemPrompt(),
+                        maxTokens: 2048
+                    )
+
+                    for try await response in stream {
+                        await MainActor.run {
+                            self.lastResponse = response.text
+                        }
+                    }
+                    lastProvider = "Claude"
+                }
+                #else
+                // No Foundation Models - fall back to Claude streaming
+                let formattedQuestion = formatQuestionWithContext(question)
+                let stream = ClaudeService.shared.subscriberStreamChat(
+                    message: formattedQuestion,
+                    systemPrompt: buildClaudeSystemPrompt(),
+                    maxTokens: 2048
+                )
+
+                for try await response in stream {
+                    await MainActor.run {
+                        self.lastResponse = response.text
+                    }
+                }
+                lastProvider = "Claude"
+                #endif
             }
         } catch {
             await MainActor.run {
                 self.lastResponse = "Error: \(error.localizedDescription)"
             }
         }
-        
+
         await MainActor.run {
             self.isProcessing = false
         }

@@ -35,6 +35,10 @@ struct SettingsView: View {
     @State private var isEnriching = false
     @State private var enrichmentProgress: (current: Int, total: Int, title: String)?
 
+    // New Features Lab state
+    @State private var showingDailyReview = false
+    @State private var showingBookDNAStats = false
+
     // Hidden developer mode activation
     @State private var developerModeUnlocked = false
     @State private var versionTapCount = 0
@@ -496,6 +500,9 @@ struct SettingsView: View {
                     } footer: {
                         Text("Gandalf mode disables all API quotas for testing. Use responsibly!\n\nReset CloudKit Migration will re-run the sync process for all local data.")
                     }
+
+                    // MARK: - New Features Lab
+                    newFeaturesLabSection
                 }
 
                 // MARK: - iCloud Sync
@@ -683,6 +690,12 @@ struct SettingsView: View {
             .sheet(isPresented: $showingWhatsNew) {
                 WhatsNewView()
             }
+            .fullScreenCover(isPresented: $showingDailyReview) {
+                DailyReviewView()
+            }
+            .sheet(isPresented: $showingBookDNAStats) {
+                BookDNAStatsView()
+            }
             .alert("Clear Voice Transcripts", isPresented: $showingClearTranscriptsConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Clear All", role: .destructive) {
@@ -826,6 +839,104 @@ struct SettingsView: View {
             } header: {
                 Text("Data Summary")
             }
+        }
+    }
+
+    // MARK: - New Features Lab Section
+    @ViewBuilder
+    private var newFeaturesLabSection: some View {
+        Section {
+            // Memory Resurfacing toggle
+            Toggle(isOn: Binding(
+                get: { UserDefaults.standard.bool(forKey: "memoryResurfacingEnabled") },
+                set: { newValue in
+                    UserDefaults.standard.set(newValue, forKey: "memoryResurfacingEnabled")
+                    SensoryFeedback.light()
+                    if newValue {
+                        let ctx = ModelContext(modelContext.container)
+                        MemoryResurfacingService.shared.configure(with: modelContext.container)
+                        MemoryResurfacingService.shared.generateCardsFromExistingContent(modelContext: ctx)
+                    }
+                }
+            )) {
+                HStack {
+                    Image(systemName: "brain.head.profile")
+                        .foregroundColor(.pink)
+                    VStack(alignment: .leading) {
+                        Text("Memory Resurfacing")
+                            .foregroundColor(.pink)
+                        Text("Spaced repetition daily review for quotes & notes")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .tint(.pink)
+
+            if UserDefaults.standard.bool(forKey: "memoryResurfacingEnabled") {
+                Button {
+                    showingDailyReview = true
+                    SensoryFeedback.light()
+                } label: {
+                    Label("Open Daily Review", systemImage: "rectangle.stack.fill")
+                        .foregroundStyle(.pink)
+                }
+            }
+
+            Button {
+                showingBookDNAStats = true
+                SensoryFeedback.light()
+            } label: {
+                Label("Book DNA Profiles", systemImage: "leaf.fill")
+                    .foregroundStyle(.green)
+            }
+
+            Button {
+                Task { @MainActor in
+                    CoverAcquisitionService.shared.configure(with: modelContext.container)
+                    await CoverAcquisitionService.shared.fetchMissingCovers(container: modelContext.container)
+                    toastMessage = "Cover pipeline scan complete"
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showingCacheClearedToast = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation { showingCacheClearedToast = false }
+                    }
+                }
+            } label: {
+                Label("Run Cover Pipeline", systemImage: "photo.stack")
+                    .foregroundStyle(.blue)
+            }
+
+            Button {
+                ReEntryIntelligenceService.shared.clearDismissals()
+                dismiss()
+                SensoryFeedback.light()
+            } label: {
+                Label("Reset Re-entry Cards", systemImage: "arrow.uturn.backward")
+                    .foregroundStyle(.orange)
+            }
+
+            Button {
+                let ctx = ModelContext(modelContext.container)
+                BookDNAService.shared.configure(with: modelContext.container)
+                BookDNAService.shared.generateMissingDNAs(modelContext: ctx)
+                SensoryFeedback.success()
+                toastMessage = "Book DNA profiles generated"
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showingCacheClearedToast = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation { showingCacheClearedToast = false }
+                }
+            } label: {
+                Label("Generate Missing DNA", systemImage: "wand.and.stars.inverse")
+                    .foregroundStyle(.green)
+            }
+        } header: {
+            Text("New Features Lab")
+        } footer: {
+            Text("Memory Resurfacing adds a daily review button to the library. Book DNA powers personalized recommendations. Cover Pipeline fetches high-res covers from multiple sources.")
         }
     }
 

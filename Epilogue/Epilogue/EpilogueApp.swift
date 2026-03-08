@@ -62,10 +62,12 @@ struct EpilogueApp: App {
                             BookDNAService.shared.configure(with: container)
                             BookDNAService.shared.generateMissingDNAs(modelContext: context)
 
-                            // Memory Resurfacing — feature flagged off for now
-                            // MemoryResurfacingService.shared.configure(with: container)
-                            // MemoryResurfacingService.shared.generateCardsFromExistingContent(modelContext: context)
-                            // MemoryResurfacingService.shared.scheduleReviewNotification(modelContext: context)
+                            // Memory Resurfacing — gated on Gandalf Mode toggle
+                            if UserDefaults.standard.bool(forKey: "memoryResurfacingEnabled") {
+                                MemoryResurfacingService.shared.configure(with: container)
+                                MemoryResurfacingService.shared.generateCardsFromExistingContent(modelContext: context)
+                                MemoryResurfacingService.shared.scheduleReviewNotification(modelContext: context)
+                            }
 
                             // Notification cleanup
                             await cleanupOrphanedReadingPlanNotifications(context: context)

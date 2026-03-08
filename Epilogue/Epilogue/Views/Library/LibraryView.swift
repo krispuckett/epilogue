@@ -559,6 +559,35 @@ struct LibraryView: View {
             .accessibilityIdentifier("library.readingPlansButton")
         }
 
+        // Daily Review button (Memory Resurfacing, gated on Gandalf toggle)
+        if UserDefaults.standard.bool(forKey: "memoryResurfacingEnabled") {
+            ToolbarSpacer(.fixed)
+
+            ToolbarItem {
+                Button {
+                    showingDailyReview = true
+                    SensoryFeedback.light()
+                } label: {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 18))
+                        .foregroundStyle(pendingReviewCount > 0 ? .pink : DesignSystem.Colors.primaryAccent)
+                        .symbolRenderingMode(.hierarchical)
+                        .overlay(alignment: .topTrailing) {
+                            if pendingReviewCount > 0 {
+                                Text("\(min(pendingReviewCount, 99))")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 3)
+                                    .background(.pink, in: Capsule())
+                                    .offset(x: 6, y: -4)
+                            }
+                        }
+                }
+                .accessibilityLabel("Daily Review")
+                .accessibilityHint("Review your memory cards")
+            }
+        }
+
         // Fixed spacer between journey and settings
         ToolbarSpacer(.fixed)
 
@@ -824,6 +853,9 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showingReadingPlansHub) {
             ReadingPlansHubView()
+        }
+        .fullScreenCover(isPresented: $showingDailyReview) {
+            DailyReviewView()
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToBookNotification)) { notification in
             if let book = notification.object as? Book {

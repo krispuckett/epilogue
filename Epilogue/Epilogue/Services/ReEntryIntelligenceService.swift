@@ -36,6 +36,10 @@ final class ReEntryIntelligenceService {
         dismissedBooks.contains(bookId)
     }
 
+    func clearDismissals() {
+        dismissedBooks.removeAll()
+    }
+
     // MARK: - Detection
 
     /// Check if a book needs re-entry intelligence (3+ days since last session)
