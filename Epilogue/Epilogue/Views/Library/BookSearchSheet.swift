@@ -123,18 +123,7 @@ struct BookSearchSheet: View {
     
     // MARK: - Ambient Gradient Background - MATCHING AMBIENT SESSION SUMMARY
     private var ambientGradientBackground: some View {
-        ZStack {
-            // Permanent ambient gradient background - EXACTLY LIKE SESSION SUMMARY
-            AmbientChatGradientView()
-                .opacity(0.4)
-                .ignoresSafeArea(.all)
-                .allowsHitTesting(false)
-
-            // Subtle darkening overlay for better readability
-            Color.black.opacity(0.15)
-                .ignoresSafeArea(.all)
-                .allowsHitTesting(false)
-        }
+        AmbientChatGradientBackground()
     }
     
     // MARK: - Search Input Bar (Bottom)

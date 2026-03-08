@@ -72,27 +72,7 @@ struct EmbeddedAmbientProgress: View {
     // MARK: - Views (EXACT COPIES from AmbientProgressSheet)
     
     private var ambientBackground: some View {
-        ZStack {
-            // Base dark background - EXACT same as sheet
-            Color.black
-            
-            // Animated gradient that responds to progress - EXACT same as sheet
-            RadialGradient(
-                colors: [
-                    primaryColor.opacity(0.3 * displayProgress),
-                    secondaryColor.opacity(0.2 * displayProgress),
-                    primaryColor.opacity(0.1 * displayProgress),
-                    Color.clear
-                ],
-                center: .center,
-                startRadius: 100,
-                endRadius: 500
-            )
-            .animation(.easeInOut(duration: 0.8), value: displayProgress)
-            
-            // Subtle overlay texture - EXACT same as sheet
-            Color.white.opacity(0.02)
-        }
+        AmbientProgressBackground(primaryColor: primaryColor, secondaryColor: secondaryColor, displayProgress: displayProgress)
     }
     
     private var compactHeroTimeline: some View {

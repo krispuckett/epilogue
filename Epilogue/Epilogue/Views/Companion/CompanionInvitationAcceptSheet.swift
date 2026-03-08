@@ -62,27 +62,7 @@ struct CompanionInvitationAcceptSheet: View {
     // MARK: - Ambient Background
 
     private var ambientBackground: some View {
-        ZStack {
-            // Base dark
-            Color.black.ignoresSafeArea()
-
-            // Warm invitation glow
-            RadialGradient(
-                colors: [
-                    DesignSystem.Colors.primaryAccent.opacity(0.2),
-                    DesignSystem.Colors.primaryAccent.opacity(0.08),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 50,
-                endRadius: 400
-            )
-            .ignoresSafeArea()
-
-            // Texture
-            Color.white.opacity(0.02)
-                .ignoresSafeArea()
-        }
+        AmbientRadialGlowBackground(glowOpacity: 0.2)
     }
 
     // MARK: - Loading View

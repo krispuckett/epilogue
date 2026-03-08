@@ -55,16 +55,7 @@ struct QuoteShareSheet: View {
 
     // MARK: - Ambient Gradient Background
     private var ambientGradientBackground: some View {
-        ZStack {
-            AmbientChatGradientView()
-                .opacity(0.4)
-                .ignoresSafeArea(.all)
-                .allowsHitTesting(false)
-
-            Color.black.opacity(0.15)
-                .ignoresSafeArea(.all)
-                .allowsHitTesting(false)
-        }
+        AmbientChatGradientBackground()
     }
 
     // MARK: - Preview Card - Matching note card design

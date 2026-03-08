@@ -90,27 +90,7 @@ struct CompanionInviteSheet: View {
     // MARK: - Ambient Background
 
     private var ambientBackground: some View {
-        ZStack {
-            // Base dark
-            Color.black.ignoresSafeArea()
-
-            // Subtle amber radial glow
-            RadialGradient(
-                colors: [
-                    DesignSystem.Colors.primaryAccent.opacity(0.15),
-                    DesignSystem.Colors.primaryAccent.opacity(0.08),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 50,
-                endRadius: 400
-            )
-            .ignoresSafeArea()
-
-            // Subtle texture overlay
-            Color.white.opacity(0.02)
-                .ignoresSafeArea()
-        }
+        AmbientRadialGlowBackground()
     }
 
     // MARK: - Hero Section

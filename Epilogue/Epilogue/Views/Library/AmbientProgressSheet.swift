@@ -99,29 +99,7 @@ struct AmbientProgressSheet: View {
     // MARK: - Views
     
     private var ambientBackground: some View {
-        ZStack {
-            // Base dark background
-            Color.black.ignoresSafeArea()
-            
-            // Animated gradient that responds to progress
-            RadialGradient(
-                colors: [
-                    primaryColor.opacity(0.3 * displayProgress),
-                    secondaryColor.opacity(0.2 * displayProgress),
-                    primaryColor.opacity(0.1 * displayProgress),
-                    Color.clear
-                ],
-                center: .center,
-                startRadius: 100,
-                endRadius: 500
-            )
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.8), value: displayProgress)
-            
-            // Subtle overlay texture
-            Color.white.opacity(0.02)
-                .ignoresSafeArea()
-        }
+        AmbientProgressBackground(primaryColor: primaryColor, secondaryColor: secondaryColor, displayProgress: displayProgress)
     }
     
     private var heroTimelineSection: some View {
