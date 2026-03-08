@@ -246,6 +246,7 @@ struct BookDetailView: View {
         }
         let session = ReadingSession(bookModel: model, startPage: book.currentPage)
         modelContext.insert(session)
+        try? modelContext.save()
 
         // Polished morphing animation with haptic
         SensoryFeedback.success()

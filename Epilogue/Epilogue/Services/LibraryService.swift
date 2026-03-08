@@ -379,41 +379,12 @@ final class LibraryService {
         )
 
         if let bookModel = try? context.fetch(descriptor).first {
-            // Cascade delete: notes
-            let notesDescriptor = FetchDescriptor<CapturedNote>(
-                predicate: #Predicate { $0.book?.id == bookId }
-            )
-            let notes = (try? context.fetch(notesDescriptor)) ?? []
-            for note in notes {
-                context.delete(note)
-                logger.debug("  🗑️ Deleted note: \(note.id?.uuidString ?? "unknown")")
-            }
-
-            // Cascade delete: quotes
-            let quotesDescriptor = FetchDescriptor<CapturedQuote>(
-                predicate: #Predicate { $0.book?.id == bookId }
-            )
-            let quotes = (try? context.fetch(quotesDescriptor)) ?? []
-            for quote in quotes {
-                context.delete(quote)
-                logger.debug("  🗑️ Deleted quote: \(quote.id?.uuidString ?? "unknown")")
-            }
-
-            // Cascade delete: questions
-            let questionsDescriptor = FetchDescriptor<CapturedQuestion>(
-                predicate: #Predicate { $0.book?.id == bookId }
-            )
-            let questions = (try? context.fetch(questionsDescriptor)) ?? []
-            for question in questions {
-                context.delete(question)
-                logger.debug("  🗑️ Deleted question: \(question.id?.uuidString ?? "unknown")")
-            }
-
-            // Delete the book itself
+            // SwiftData cascade rules on BookModel handle related data deletion
+            // (notes, quotes, questions, sessions all have deleteRule: .cascade)
             context.delete(bookModel)
             try context.save()
 
-            logger.info("  ✅ Deleted from SwiftData with cascade (\(notes.count) notes, \(quotes.count) quotes, \(questions.count) questions)")
+            logger.info("  ✅ Deleted from SwiftData with cascade")
         }
 
         // 3. Remove from Spotlight

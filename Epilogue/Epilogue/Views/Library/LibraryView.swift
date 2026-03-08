@@ -33,6 +33,7 @@ struct LibraryView: View {
     @State private var toastMessage = ""
     @State private var showingWebSearch = false
     @State private var showingReadingPlansHub = false
+    @State private var cachedFilteredBooks: [Book] = []
 
     // MARK: - Reading Activity Card
     // Query recent reading sessions to find the last book the user was actually reading
@@ -71,8 +72,16 @@ struct LibraryView: View {
         }
     }
     
-    // Filter books based on search text, read status, and prioritize currently reading
+    // Cached filtered books — call recomputeFilteredBooks() when inputs change
     private var filteredBooks: [Book] {
+        cachedFilteredBooks
+    }
+
+    private func recomputeFilteredBooks() {
+        cachedFilteredBooks = computeFilteredBooks()
+    }
+
+    private func computeFilteredBooks() -> [Book] {
         var books = viewModel.books
 
         // Apply search filter
@@ -98,13 +107,11 @@ struct LibraryView: View {
 
         // Sort to put currently reading books first
         books.sort { book1, book2 in
-            // Currently reading books come first
             if book1.readingStatus == .currentlyReading && book2.readingStatus != .currentlyReading {
                 return true
             } else if book1.readingStatus != .currentlyReading && book2.readingStatus == .currentlyReading {
                 return false
             }
-            // Then sort by date added (most recent first)
             return book1.dateAdded > book2.dateAdded
         }
 
@@ -866,6 +873,10 @@ struct LibraryView: View {
             // Preload all book covers when the library loads
             await preloadAllBookCovers()
         }
+        .onAppear { recomputeFilteredBooks() }
+        .onChange(of: searchText) { _, _ in recomputeFilteredBooks() }
+        .onChange(of: readFilter) { _, _ in recomputeFilteredBooks() }
+        .onChange(of: viewModel.books) { _, _ in recomputeFilteredBooks() }
     }
 }
 

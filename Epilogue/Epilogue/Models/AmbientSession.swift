@@ -15,8 +15,7 @@ final class AmbientSession {
 
     // Transient property for Book
     @Transient var book: Book? {
-        // Convert BookModel to Book if needed
-        return nil
+        bookModel?.asBook
     }
     
     // Raw content - Store as Data for CloudKit
