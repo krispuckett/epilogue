@@ -376,13 +376,6 @@ struct SettingsView: View {
                         }
 
                         NavigationLink {
-                            WidgetDesignLab()
-                        } label: {
-                            Label("Widget Design Lab", systemImage: "rectangle.3.group.fill")
-                                .foregroundStyle(.orange)
-                        }
-
-                        NavigationLink {
                             PremiumPaywallView()
                         } label: {
                             Label("Preview Premium Paywall", systemImage: "crown.fill")
@@ -470,13 +463,6 @@ struct SettingsView: View {
                         } label: {
                             Label("The Reading Room", systemImage: "books.vertical.fill")
                                 .foregroundStyle(.orange)
-                        }
-
-                        NavigationLink {
-                            TouchRippleExperiment()
-                        } label: {
-                            Label("Touch Ripple Shader", systemImage: "water.waves")
-                                .foregroundStyle(.blue)
                         }
 
                         NavigationLink {
