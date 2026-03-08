@@ -2103,6 +2103,16 @@ struct AmbientModeView: View {
             await MainActor.run {
                 isGenericModeThinking = false
                 streamingResponses.removeValue(forKey: messageId)
+                if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                    messages[index] = UnifiedChatMessage(
+                        id: messageId,
+                        content: "Sorry, I couldn't create your reading plan. Please try again.",
+                        isUser: false,
+                        timestamp: Date(),
+                        bookContext: nil,
+                        messageType: .text
+                    )
+                }
             }
         }
     }
@@ -3347,6 +3357,11 @@ struct AmbientModeView: View {
             #if DEBUG
             print("❌ Failed to save quote: \(error)")
             #endif
+            SensoryFeedback.error()
+            NotificationCenter.default.post(
+                name: .showToastMessage,
+                object: ["message": "Failed to save quote. Please try again."]
+            )
             return nil
         }
     }
@@ -3411,6 +3426,11 @@ struct AmbientModeView: View {
             #if DEBUG
             print("❌ Failed to save note: \(error)")
             #endif
+            SensoryFeedback.error()
+            NotificationCenter.default.post(
+                name: .showToastMessage,
+                object: ["message": "Failed to save note. Please try again."]
+            )
             return nil
         }
     }
@@ -3541,6 +3561,7 @@ struct AmbientModeView: View {
             #if DEBUG
             print("❌ Failed to save question: \(error)")
             #endif
+            SensoryFeedback.error()
         }
     }
     
@@ -4556,7 +4577,11 @@ struct AmbientModeView: View {
                     isGenericModeThinking = false
                 }
 
-                // Fallback to Perplexity
+                // Fallback to Perplexity with brief user notice
+                localToastMessage = "Switching to backup AI..."
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showLocalToast = true
+                }
                 Task {
                     await getGenericAIResponse(for: query)
                 }
@@ -5006,6 +5031,11 @@ struct AmbientModeView: View {
             #if DEBUG
             print("Failed to save quote: \(error)")
             #endif
+            SensoryFeedback.error()
+            NotificationCenter.default.post(
+                name: .showToastMessage,
+                object: ["message": "Failed to save quote. Please try again."]
+            )
         }
     }
     
@@ -5289,6 +5319,10 @@ struct AmbientModeView: View {
                 print("❌ Failed to save recommendation: \(error)")
                 #endif
                 SensoryFeedback.error()
+                NotificationCenter.default.post(
+                    name: .showToastMessage,
+                    object: ["message": "Failed to add book. Please try again."]
+                )
             }
         }
     }
