@@ -410,50 +410,176 @@ struct UnifiedAtmosphericGradient: View {
     @ViewBuilder
     private func meshGradientLayer(geometry: GeometryProxy) -> some View {
         let voiceBoost = 1.0 + Double(audioLevel) * 0.5
-        let breathX = sin(breathePhase) * 0.02
-        let breathY = cos(breathePhase * 0.7) * 0.015
+        let rawBase = palette.primary
 
-        // 3×3 mesh with colors derived from palette roles in OKLCH
-        // Pre-calculate intermediates to guarantee perceptually even transitions
-        let mid1 = OKLCHColorSpace.interpolate(from: palette.primary, to: palette.secondary, t: 0.5)
-        let mid2 = OKLCHColorSpace.interpolate(from: palette.accent, to: palette.background, t: 0.5)
-        let center = OKLCHColorSpace.interpolate(from: mid1, to: palette.complementary, t: 0.3)
+        // ─── Chroma floor: inject accent color when primary is near-neutral ───
+        // Dark covers (like LotR) have chroma ~0.007 — all-gray mesh without this.
+        // Blend up to 40% accent to bring visible color while staying tonal.
+        let base: OKLCHColor = {
+            let chromaFloor: Double = 0.04
+            if rawBase.chroma < chromaFloor {
+                let blendAmount = min(0.4, (chromaFloor - rawBase.chroma) / chromaFloor * 0.4)
+                return OKLCHColorSpace.interpolate(from: rawBase, to: palette.accent, t: blendAmount)
+            }
+            return rawBase
+        }()
+
+        // ─── Cover-type aware parameters ───
+        let hueSpread: Double = {
+            switch palette.coverType {
+            case .monochromatic: return 2.0
+            case .vibrant:       return 4.0
+            case .dark:          return 6.0
+            case .light:         return 3.0
+            case .muted:         return 5.0
+            case .balanced:      return 5.0
+            }
+        }()
+
+        let chromaBoost: Double = {
+            switch palette.coverType {
+            case .muted:    return 1.25
+            case .dark:     return 1.15
+            case .vibrant:  return 0.90
+            default:        return 1.05
+            }
+        }()
+
+        // ─── Tonal palette: all 9 points derived from primary ───
+
+        // Top row: brighter / more chromatic (near the cover art)
+        let topLeft = OKLCHColor(
+            lightness: min(base.lightness * 1.15, 0.82),
+            chroma: min(base.chroma * 1.1 * chromaBoost, 0.32),
+            hue: base.hue - hueSpread * 0.6
+        )
+        let topCenter = OKLCHColor(
+            lightness: min(base.lightness * 1.05, 0.78),
+            chroma: min(base.chroma * chromaBoost, 0.30),
+            hue: base.hue
+        )
+        let topRight = OKLCHColor(
+            lightness: min(base.lightness * 1.10, 0.80),
+            chroma: min(base.chroma * 0.9 * chromaBoost, 0.28),
+            hue: base.hue + hueSpread * 0.8
+        )
+
+        // Middle row: the primary atmosphere at full expression
+        let midLeft = OKLCHColor(
+            lightness: base.lightness * 0.95,
+            chroma: min(base.chroma * 1.05, 0.30),
+            hue: base.hue - hueSpread
+        )
+        // Center: accent whisper — 85% primary, 15% accent for subtle depth
+        let midCenter = OKLCHColorSpace.interpolate(
+            from: base,
+            to: palette.accent,
+            t: 0.15
+        )
+        let midRight = OKLCHColor(
+            lightness: base.lightness * 0.90,
+            chroma: min(base.chroma * 0.95, 0.28),
+            hue: base.hue + hueSpread * 1.2
+        )
+
+        // Bottom row: darker, desaturated (fading to dark)
+        let bottomLeft = OKLCHColor(
+            lightness: base.lightness * 0.55,
+            chroma: base.chroma * 0.4,
+            hue: base.hue - hueSpread * 0.4
+        )
+        let bottomCenter = OKLCHColor(
+            lightness: base.lightness * 0.40,
+            chroma: base.chroma * 0.25,
+            hue: base.hue
+        )
+        let bottomRight = OKLCHColor(
+            lightness: base.lightness * 0.30,
+            chroma: base.chroma * 0.15,
+            hue: base.hue + hueSpread * 0.6
+        )
+
+        // ─── Opacity curve: peaks at mid-row (behind cover), fades to edges ───
+        // Much lower than standard renderer because mesh has no blur diffusion
+        let opacities: [Double] = [
+            intensity * 0.30 * voiceBoost,   // topLeft — dim corner
+            intensity * 0.50 * voiceBoost,   // topCenter — glow above cover
+            intensity * 0.25 * voiceBoost,   // topRight — dim corner
+            intensity * 0.40 * voiceBoost,   // midLeft
+            intensity * 0.55 * voiceBoost,   // midCenter — brightest, behind cover
+            intensity * 0.35 * voiceBoost,   // midRight
+            intensity * 0.10 * voiceBoost,   // bottomLeft — nearly gone
+            intensity * 0.05 * voiceBoost,   // bottomCenter
+            intensity * 0.02 * voiceBoost,   // bottomRight — near black
+        ]
+
+        // ─── Animated points: corners pinned, interior drifts ───
+        let t = Float(breathePhase)
+
+        let points: [SIMD2<Float>] = [
+            // Top row — corners pinned, center drifts slightly
+            SIMD2<Float>(0.0, 0.0),
+            SIMD2<Float>(
+                sinInRange(0.45...0.55, offset: 0.439, timeScale: 0.15, t: t),
+                0.0
+            ),
+            SIMD2<Float>(1.0, 0.0),
+
+            // Middle row — edges drift a little, center drifts more
+            SIMD2<Float>(
+                0.0,
+                sinInRange(0.45...0.55, offset: 1.2, timeScale: 0.12, t: t)
+            ),
+            SIMD2<Float>(
+                sinInRange(0.42...0.58, offset: 2.1, timeScale: 0.08, t: t),
+                sinInRange(0.42...0.58, offset: 3.7, timeScale: 0.10, t: t)
+            ),
+            SIMD2<Float>(
+                1.0,
+                sinInRange(0.45...0.55, offset: 0.8, timeScale: 0.13, t: t)
+            ),
+
+            // Bottom row — corners pinned, center drifts slightly
+            SIMD2<Float>(0.0, 1.0),
+            SIMD2<Float>(
+                sinInRange(0.45...0.55, offset: 4.2, timeScale: 0.11, t: t),
+                1.0
+            ),
+            SIMD2<Float>(1.0, 1.0)
+        ]
 
         MeshGradient(
             width: 3,
             height: 3,
-            points: [
-                // Top row
-                SIMD2<Float>(0.0, 0.0),
-                SIMD2<Float>(0.5 + Float(breathX), 0.0),
-                SIMD2<Float>(1.0, 0.0),
-                // Middle row
-                SIMD2<Float>(0.0, 0.5 + Float(breathY)),
-                SIMD2<Float>(0.5 + Float(breathX * 0.5), 0.5 + Float(breathY * 0.7)),
-                SIMD2<Float>(1.0, 0.5 - Float(breathY)),
-                // Bottom row
-                SIMD2<Float>(0.0, 1.0),
-                SIMD2<Float>(0.5 - Float(breathX), 1.0),
-                SIMD2<Float>(1.0, 1.0)
-            ],
+            points: points,
             colors: [
-                // Top row: primary → accent → secondary
-                palette.primary.color.opacity(intensity * 0.9 * voiceBoost),
-                palette.accent.color.opacity(intensity * 0.7 * voiceBoost),
-                palette.secondary.color.opacity(intensity * 0.85 * voiceBoost),
-                // Middle row: analogous → center blend → complementary
-                palette.analogous.color.opacity(intensity * 0.6 * voiceBoost),
-                center.color.opacity(intensity * 0.5 * voiceBoost),
-                palette.complementary.color.opacity(intensity * 0.4 * voiceBoost),
-                // Bottom row: fade to dark
-                palette.background.color.opacity(intensity * 0.3 * voiceBoost),
-                mid2.color.opacity(intensity * 0.15 * voiceBoost),
-                Color.clear
-            ]
+                topLeft.color.opacity(opacities[0]),
+                topCenter.color.opacity(opacities[1]),
+                topRight.color.opacity(opacities[2]),
+                midLeft.color.opacity(opacities[3]),
+                midCenter.color.opacity(opacities[4]),
+                midRight.color.opacity(opacities[5]),
+                bottomLeft.color.opacity(opacities[6]),
+                bottomCenter.color.opacity(opacities[7]),
+                bottomRight.color.opacity(opacities[8]),
+            ],
+            background: .black
         )
         .ignoresSafeArea()
         .onAppear { startBreathing() }
         .onDisappear { breathePhase = 0 }
+    }
+
+    /// Sine wave mapped to a range — for organic mesh point drift
+    private func sinInRange(
+        _ range: ClosedRange<Float>,
+        offset: Float,
+        timeScale: Float,
+        t: Float
+    ) -> Float {
+        let amplitude = (range.upperBound - range.lowerBound) / 2
+        let midPoint = (range.upperBound + range.lowerBound) / 2
+        return midPoint + amplitude * sin(timeScale * t + offset)
     }
 
     // MARK: - Ambient Breathing
@@ -482,9 +608,9 @@ struct UnifiedAtmosphericGradient: View {
     }
 
     private func startBreathing() {
-        // Continuous slow animation
-        withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
-            breathePhase = .pi * 2
+        // Long smooth cycle — autoreverses for seamless looping with sinInRange offsets
+        withAnimation(.linear(duration: 120).repeatForever(autoreverses: true)) {
+            breathePhase = 120
         }
     }
 
