@@ -20,6 +20,8 @@ struct BookSearchSheet: View {
     @State private var searchError: String?
     @State private var refinedSearchQuery: String = ""
     @State private var hasAutoSearched = false
+    @State private var liveSearchTask: Task<Void, Never>?
+    @State private var isLiveSearching = false
     @FocusState private var isSearchFocused: Bool
 
     // For You state
@@ -60,20 +62,37 @@ struct BookSearchSheet: View {
                                 .padding(.top, 16)
                         } else {
                             // Original trending/search view
-                            if isLoading {
+                            if isLoading && searchResults.isEmpty {
                                 loadingView
                                     .padding(.top, 100)
                             } else if let error = searchError {
                                 errorView(error: error)
                             } else if searchResults.isEmpty {
                                 // Show bestsellers when no search results and no query
-                                if searchQuery.isEmpty && refinedSearchQuery.isEmpty {
+                                if searchQuery.isEmpty && refinedSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
                                     bestsellersView
                                         .padding(.top, 24)
+                                } else if isLiveSearching {
+                                    // Subtle loading while live search is in flight
+                                    loadingView
+                                        .padding(.top, 100)
                                 } else {
                                     emptyStateView
                                 }
                             } else {
+                                // Show inline loading bar when refreshing with results already visible
+                                if isLoading && !searchResults.isEmpty {
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                            .tint(DesignSystem.Colors.primaryAccent)
+                                            .scaleEffect(0.8)
+                                        Text("Updating results...")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.white.opacity(0.5))
+                                    }
+                                    .padding(.top, 16)
+                                    .transition(.opacity)
+                                }
                                 resultsView
                                     .padding(.top, 24)
                             }
@@ -118,6 +137,33 @@ struct BookSearchSheet: View {
             guard !searchQuery.isEmpty, !hasAutoSearched else { return }
             hasAutoSearched = true
             await search(query: searchQuery)
+        }
+        // Live search: debounce 400ms after typing stops
+        .onChange(of: refinedSearchQuery) { _, newValue in
+            // Cancel any pending live search
+            liveSearchTask?.cancel()
+
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Need at least 2 characters to trigger live search
+            guard trimmed.count >= 2 else {
+                if trimmed.isEmpty && searchQuery.isEmpty {
+                    // Return to trending view
+                    searchResults = []
+                    isLoading = false
+                    isLiveSearching = false
+                }
+                return
+            }
+
+            isLiveSearching = true
+
+            liveSearchTask = Task {
+                // 400ms debounce
+                try? await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled else { return }
+                await search(query: trimmed)
+            }
         }
     }
     
@@ -553,6 +599,9 @@ struct BookSearchSheet: View {
     }
     
     private func performSearchWithQuery(_ query: String) {
+        // Cancel any pending live search — manual submit takes priority
+        liveSearchTask?.cancel()
+        isLiveSearching = false
         Task {
             await search(query: query)
         }
@@ -637,6 +686,7 @@ struct BookSearchSheet: View {
         }
 
         isLoading = false
+        isLiveSearching = false
     }
 
     @MainActor

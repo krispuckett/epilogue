@@ -29,25 +29,42 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         let author: String?
         let year: String?
         let originalQuery: String
-        
+
+        // Extract a 4-digit year (1900-2099) from anywhere in a string, return the year and the string with it removed
+        private static func extractYear(from text: String) -> (year: String, remainder: String)? {
+            let pattern = #"\b(19\d{2}|20\d{2})\b"#
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let range = Range(match.range, in: text) else { return nil }
+            let year = String(text[range])
+            let remainder = text.replacingCharacters(in: range, with: "")
+                .replacingOccurrences(of: "  ", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return (year, remainder)
+        }
+
         init(from query: String) {
             self.originalQuery = query
-            
+
             // Parse "Title by Author" format
             if query.contains(" by ") {
                 let parts = query.components(separatedBy: " by ")
-                self.title = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                
+                let rawTitle = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+
                 if parts.count > 1 {
                     let authorPart = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-                    
-                    // Check if year is included (e.g., "Rob Bell 2011")
-                    let components = authorPart.split(separator: " ")
-                    if let lastComponent = components.last,
-                       let yearValue = Int(String(lastComponent)),
-                       yearValue > 1900 && yearValue < 2100 {
-                        self.year = String(lastComponent)
-                        self.author = components.dropLast().joined(separator: " ")
+
+                    // Extract year from author part first (e.g., "Mendelsohn 2025")
+                    if let extracted = Self.extractYear(from: authorPart) {
+                        self.year = extracted.year
+                        self.author = extracted.remainder.isEmpty ? nil : extracted.remainder
+                    }
+                    // Then check title part for year (e.g., "The Odyssey 2025 by Homer")
+                    else if let extracted = Self.extractYear(from: rawTitle) {
+                        self.year = extracted.year
+                        self.author = authorPart
+                        self.title = extracted.remainder
+                        return
                     } else {
                         self.author = authorPart
                         self.year = nil
@@ -56,24 +73,55 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     self.author = nil
                     self.year = nil
                 }
+
+                // Strip year from title if it ended up there
+                if let yr = self.year, let extracted = Self.extractYear(from: rawTitle), extracted.year == yr {
+                    self.title = extracted.remainder
+                } else {
+                    self.title = rawTitle
+                }
             }
             // Parse comma-separated format: "Title, Author"
             else if query.contains(", ") {
                 let parts = query.components(separatedBy: ", ")
-                self.title = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                self.author = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespacesAndNewlines) : nil
-                self.year = nil
+                let rawTitle = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawAuthor = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespacesAndNewlines) : nil
+
+                // Extract year from either part
+                if let author = rawAuthor, let extracted = Self.extractYear(from: author) {
+                    self.year = extracted.year
+                    self.author = extracted.remainder.isEmpty ? nil : extracted.remainder
+                } else if let extracted = Self.extractYear(from: rawTitle) {
+                    self.year = extracted.year
+                    self.title = extracted.remainder
+                    self.author = rawAuthor
+                    return
+                } else {
+                    self.year = nil
+                    self.author = rawAuthor
+                }
+
+                if let yr = self.year, let extracted = Self.extractYear(from: rawTitle), extracted.year == yr {
+                    self.title = extracted.remainder
+                } else {
+                    self.title = rawTitle
+                }
             }
-            // No clear separation, use the whole query as title
+            // No clear separation — check for trailing year (e.g., "The Odyssey 2025")
             else {
-                self.title = query
+                if let extracted = Self.extractYear(from: query) {
+                    self.year = extracted.year
+                    self.title = extracted.remainder
+                } else {
+                    self.title = query
+                    self.year = nil
+                }
                 self.author = nil
-                self.year = nil
             }
         }
         
         // Generate optimized search queries for Google Books API
-        // Keep it lean — max 3 queries to conserve API quota
+        // Keep it lean — max 4 queries to conserve API quota
         func generateSearchQueries() -> [String] {
             var queries: [String] = []
 
@@ -87,8 +135,16 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     .replacingOccurrences(of: "\"", with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                // Best query: title + author
+                // Best query: title + author (+ year if available for disambiguation)
+                if let year = year {
+                    queries.append("intitle:\"\(cleanTitle)\" inauthor:\"\(cleanAuthor)\" \(year)")
+                }
                 queries.append("intitle:\"\(cleanTitle)\" inauthor:\"\(cleanAuthor)\"")
+            }
+
+            // Title + year — critical for disambiguating classic works with many editions
+            if let year = year {
+                queries.append("intitle:\"\(cleanTitle)\" \(year)")
             }
 
             // Fallback: just title (handles most cases well)
@@ -422,9 +478,13 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     }
                 }
 
-                // Year match
-                if let year = parsed.year, let pubDate = volumeInfo.publishedDate, pubDate.contains(year) {
-                    score += 15
+                // Year match — heavy boost when user explicitly specified a year
+                if let year = parsed.year {
+                    if let pubDate = volumeInfo.publishedDate, pubDate.contains(year) {
+                        score += 200  // Strong boost: exact year match
+                    } else if volumeInfo.publishedDate != nil {
+                        score -= 50   // Penalize wrong year when user asked for a specific one
+                    }
                 }
             } else {
                 // Simple word-based matching

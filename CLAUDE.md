@@ -37,9 +37,14 @@ Load these skills from `~/.claude/skills/` when relevant:
 |-------|-------------|
 | `swiftui-liquid-glass` | Implementing or reviewing Liquid Glass effects |
 | `swift-concurrency-expert` | Fixing Swift 6 concurrency errors, actor isolation, Sendable issues |
-| `swiftui-performance-audit` | Diagnosing scroll jank, slow renders, excessive view updates |
-| `swiftui-view-refactor` | Restructuring views, fixing @Observable patterns, dependency injection |
+| `swiftui-performance-audit` | Diagnosing scroll jank, slow renders, excessive view updates, animation perf |
+| `swiftui-view-refactor` | Restructuring views, @Observable patterns, deprecated API modernization |
 | `app-store-changelog` | Generating release notes from git history |
+
+Audit commands (`/audit-*`):
+- `/audit-glass` — Liquid Glass violations
+- `/audit-swift6` — Outdated patterns + deprecated APIs
+- `/audit-a11y` — Accessibility: VoiceOver, Dynamic Type, touch targets
 
 ---
 
