@@ -15,5 +15,6 @@ struct EpilogueWidgetsBundle: WidgetBundle {
         ReadingStreakWidget()
         AmbientModeWidget()
         WelcomeBackLiveActivity()
+        ReadingSessionLiveActivity()
     }
 }

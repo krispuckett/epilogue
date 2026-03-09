@@ -241,26 +241,42 @@ final class DeepLinkHandler {
     private func handleAmbientDeepLink(_ components: URLComponents) {
         logger.info("Live Activity tapped — navigating to ambient mode")
 
-        let action = components.queryItems?.first(where: { $0.name == "action" })?.value
+        // Support both path-based (/voice-capture) and query-based (?action=toggle-listening)
+        let pathAction = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let queryAction = components.queryItems?.first(where: { $0.name == "action" })?.value
+        let action = pathAction.isEmpty ? queryAction : pathAction
 
         switch action {
         case "toggle-listening":
-            // Fallback path: if a deep link is used instead of LiveActivityIntent
             Task {
                 await TrueAmbientProcessor.shared.toggleListening()
             }
         case "end-session":
-            // Fallback path: if a deep link is used instead of LiveActivityIntent
-            Task {
-                _ = await TrueAmbientProcessor.shared.endSession()
-                await AmbientLiveActivityManager.shared.endActivity()
-            }
+            // Route through AmbientModeView so it triggers save + session summary
+            ensureAmbientActive()
+            NotificationCenter.default.post(name: .ambientQuickAction, object: "end-session")
+        case "voice-capture":
+            // Open ambient mode and trigger voice capture
+            ensureAmbientActive()
+            NotificationCenter.default.post(name: .ambientQuickAction, object: "voice-capture")
+        case "ocr":
+            // Open ambient mode and trigger OCR camera
+            ensureAmbientActive()
+            NotificationCenter.default.post(name: .ambientQuickAction, object: "ocr")
+        case "ai-chat":
+            // Open ambient mode and focus AI chat
+            ensureAmbientActive()
+            NotificationCenter.default.post(name: .ambientQuickAction, object: "ai-chat")
         default:
             // Body tap — bring user to the active ambient session
-            let coordinator = EpilogueAmbientCoordinator.shared
-            if !coordinator.isActive {
-                coordinator.launch(from: .general)
-            }
+            ensureAmbientActive()
+        }
+    }
+
+    private func ensureAmbientActive() {
+        let coordinator = EpilogueAmbientCoordinator.shared
+        if !coordinator.isActive {
+            coordinator.launch(from: .general)
         }
     }
 }

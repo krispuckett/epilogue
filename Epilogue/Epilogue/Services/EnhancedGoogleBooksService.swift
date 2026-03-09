@@ -10,6 +10,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
     private var enhancedStartIndex: Int = 0
     private var hasMoreEnhancedResults: Bool = true
 
+    // Search result cache — avoids duplicate API calls for the same query
+    private var searchCache: [String: [Book]] = [:]
+
     struct ScoredBook {
         let book: Book
         let googleItem: GoogleBookItem
@@ -109,6 +112,15 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         hasMoreEnhancedResults = true
         enhancedSearchResults = []
 
+        // Return cached results if available (same query = instant)
+        let cacheKey = query.lowercased().trimmingCharacters(in: .whitespaces)
+        if let cached = searchCache[cacheKey] {
+            enhancedSearchResults = cached
+            enhancedStartIndex = cached.count
+            hasMoreEnhancedResults = cached.count >= 10
+            return cached
+        }
+
         // Parse the query to extract title, author, etc.
         let parsedQuery = ParsedQuery(from: query)
 
@@ -132,8 +144,12 @@ class EnhancedGoogleBooksService: GoogleBooksService {
 
         enhancedSearchResults = results
         enhancedStartIndex = results.count
-        // Keep trying to load more as long as we got at least some results
         hasMoreEnhancedResults = results.count > 0
+
+        // Cache for instant re-query
+        if !results.isEmpty {
+            searchCache[cacheKey] = results
+        }
 
         return results
     }
@@ -194,7 +210,6 @@ class EnhancedGoogleBooksService: GoogleBooksService {
 
         var allResults: [GoogleBookItem] = []
         var triedQueries = Set<String>()
-        var isbnResultIDs = Set<String>()  // Track IDs from ISBN queries
 
         // Try each query until we get good results (stop if quota exhausted)
         for searchQuery in searchQueries {
@@ -208,22 +223,13 @@ class EnhancedGoogleBooksService: GoogleBooksService {
 
             let results = await getRawSearchResults(
                 query: searchQuery,
-                maxResults: 40,
+                maxResults: 20,
                 lightMode: lightMode,
                 startIndex: startIndex
             )
 
             #if DEBUG
             print("🔍 Query '\(searchQuery)' returned \(results.count) results")
-            if searchQuery.contains("isbn:") {
-                print("🎯 ISBN QUERY EXECUTED! Results: \(results.count)")
-                for result in results {
-                    print("🎯   - \(result.volumeInfo.title)")
-                    print("🎯     ID: \(result.id)")
-                    print("🎯     Has cover: \(result.volumeInfo.imageLinks?.thumbnail != nil)")
-                    isbnResultIDs.insert(result.id)  // Track this ID
-                }
-            }
             #endif
 
             allResults.append(contentsOf: results)
@@ -240,25 +246,6 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             guard !seen.contains(item.id) else { return false }
             seen.insert(item.id)
             return true
-        }
-
-        // RELEVANCE CHECK: Fast-fail when no results match the query
-        // This prevents 30+ second delays when Google returns only fuzzy matches (e.g., "The Motern Method" → "Modern Method")
-        let queryWords = Set(query.lowercased().split(separator: " ").filter { $0.count > 2 }.map(String.init))
-        if !queryWords.isEmpty {
-            let hasRelevantResult = uniqueResults.contains { item in
-                let titleWords = Set(item.volumeInfo.title.lowercased().split(separator: " ").map(String.init))
-                let overlap = queryWords.intersection(titleWords)
-                // Require at least half the significant query words to match
-                return overlap.count >= max(1, queryWords.count / 2)
-            }
-
-            if !hasRelevantResult && uniqueResults.count > 0 {
-                #if DEBUG
-                print("🔍 No relevant results found for '\(query)' - all \(uniqueResults.count) results are fuzzy matches, returning empty")
-                #endif
-                return []  // Fast exit - don't waste time on cover resolution for irrelevant results
-            }
         }
 
         // Score and rank the results
@@ -279,79 +266,15 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             return lhs.confidenceScore > rhs.confidenceScore
         }
 
-        // MINIMAL FILTER: Only require a valid cover URL
-        // Anniversary/Special editions ALWAYS pass if they have a cover
-        // Regular books need at least some quality indicators
-        let filteredBooks = sorted.filter { scoredBook in
-            // Must have a cover URL
-            guard scoredBook.hasCover,
-                  let coverURL = scoredBook.book.coverImageURL,
-                  !coverURL.isEmpty else {
-                #if DEBUG
-                print("❌ Filtered out '\(scoredBook.book.title)' - No cover URL")
-                #endif
-                return false
-            }
-
-            // CRITICAL: Books found via ISBN query ALWAYS pass (this is the 75th Anniversary!)
-            if isbnResultIDs.contains(scoredBook.googleItem.id) {
-                #if DEBUG
-                print("✅ ISBN RESULT always passes: '\(scoredBook.book.title)' (ID: \(scoredBook.googleItem.id))")
-                #endif
-                return true
-            }
-
-            let volumeInfo = scoredBook.googleItem.volumeInfo
-            let titleLower = scoredBook.book.title.lowercased()
-
-            // SPECIAL CASE: Anniversary/Special/Illustrated editions ALWAYS pass if they have a cover
-            let isSpecialEdition = titleLower.contains("anniversary") ||
-                                   titleLower.contains("illustrated by") ||
-                                   titleLower.contains("special edition") ||
-                                   titleLower.contains("collector") ||
-                                   titleLower.contains("deluxe") ||
-                                   titleLower.contains("75th") ||
-                                   titleLower.contains("50th") ||
-                                   titleLower.contains("100th")
-
-            if isSpecialEdition {
-                #if DEBUG
-                print("✅ SPECIAL EDITION always passes: '\(scoredBook.book.title)'")
-                #endif
-                return true  // NO quality filter for special editions!
-            }
-
-            // For regular books, require at least some quality indicators
-            // RELAXED for self-published books: now requires only 1 indicator instead of 2
-            let hasPageCount = volumeInfo.pageCount != nil && volumeInfo.pageCount! > 0
-            let hasISBN = scoredBook.hasISBN
-            let hasRatings = (volumeInfo.ratingsCount ?? 0) > 0
-            let hasMultipleImageSizes = (volumeInfo.imageLinks?.small != nil ||
-                                         volumeInfo.imageLinks?.medium != nil ||
-                                         volumeInfo.imageLinks?.large != nil)
-
-            let qualityScore = (hasPageCount ? 1 : 0) +
-                              (hasISBN ? 1 : 0) +
-                              (hasRatings ? 1 : 0) +
-                              (hasMultipleImageSizes ? 1 : 0)
-
-            // Regular books need at least 1 indicator (lowered from 2 to include self-published)
-            let passes = qualityScore >= 1
-            #if DEBUG
-            if !passes {
-                print("❌ Filtered out '\(scoredBook.book.title)' - Quality score: \(qualityScore) (need 1+)")
-            }
-            #endif
-            return passes
-        }.map { $0.book }
-
-        // Return top results directly — no cover URL validation during search.
-        // The image view handles failed loads with placeholders.
-        // Cover validation was causing books to be silently dropped from results.
-        let topResults = Array(filteredBooks.prefix(20))
+        // Only filter out clear junk (study guides, spam) — identified by very negative scores.
+        // Everything else is shown, ranked by confidence. Books with covers sort first.
+        let topResults = sorted
+            .filter { $0.confidenceScore > -100 }  // Only reject extreme junk
+            .prefix(20)
+            .map { $0.book }
 
         #if DEBUG
-        print("📚 Returning \(topResults.count) books (from \(filteredBooks.count) scored)")
+        print("📚 Returning \(topResults.count) books (from \(sorted.count) scored)")
         #endif
 
         return topResults
@@ -399,6 +322,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
 
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: String(maxResults)),
             URLQueryItem(name: "startIndex", value: String(startIndex)),
             URLQueryItem(name: "orderBy", value: orderBy),
@@ -448,310 +372,112 @@ class EnhancedGoogleBooksService: GoogleBooksService {
         publisherHint: String? = nil
     ) -> [ScoredBook] {
         let queryWords = originalQuery.lowercased().split(separator: " ")
-        let originalLower = originalQuery.lowercased()
-        let isLOTRUmbrella = originalLower.contains("lord of the rings")
 
         return items.compactMap { item in
             var score = 0.0
             let volumeInfo = item.volumeInfo
             let book = item.book
-            
-            // Check for cover
+            let titleLower = volumeInfo.title.lowercased()
+            let authorLower = volumeInfo.authors?.joined(separator: " ").lowercased() ?? ""
+
+            // --- Cover & ISBN ---
             let hasCover = book.coverImageURL != nil && !(book.coverImageURL?.isEmpty ?? true)
             if hasCover { score += 40 }
-            // Bigger images are preferred
-            if let links = volumeInfo.imageLinks, (links.extraLarge ?? links.large ?? links.medium ?? links.small) != nil {
-                score += 10
-            }
-            
-            // Check for ISBN
+
             let hasISBN = book.isbn != nil
-            if hasISBN {
-                score += 15
-                
-                // Exact ISBN match gets huge boost
-                if let preferredISBN = preferredISBN,
-                   book.isbn == preferredISBN {
-                    score += 100
-                }
-            }
-            
-            // Special handling for specific popular books
-            let authorLower = volumeInfo.authors?.joined(separator: " ").lowercased() ?? ""
-            
-            // The Hobbit - strong preference for Tolkien editions
-            if originalQuery.lowercased().contains("hobbit") {
-                if authorLower.contains("tolkien") || authorLower.contains("j.r.r") {
-                    score += 200  // Massive boost for authentic Tolkien editions
-                } else {
-                    score -= 150  // Penalize non-Tolkien versions
-                }
-                // Extra boost for popular publishers
-                if let publisher = volumeInfo.publisher?.lowercased() {
-                    if publisher.contains("houghton") || publisher.contains("harper") ||
-                       publisher.contains("ballantine") || publisher.contains("mariner") {
-                        score += 50
-                    }
-                }
-            }
+            if hasISBN { score += 15 }
+            if let preferredISBN, book.isbn == preferredISBN { score += 100 }
 
-            // General publisher quality boost for all books
-            if let publisher = volumeInfo.publisher?.lowercased() {
-                // Major literary publishers get significant boost
-                let majorPublishers = [
-                    "penguin", "random house", "harpercollins", "simon & schuster",
-                    "macmillan", "oxford", "cambridge", "yale", "harvard",
-                    "vintage", "knopf", "pantheon", "norton", "farrar",
-                    "scribner", "bloomsbury", "penguin classics", "modern library",
-                    "dover", "everyman", "houghton mifflin"
-                ]
-
-                for majorPub in majorPublishers {
-                    if publisher.contains(majorPub) {
-                        score += 50
-                        break
-                    }
-                }
-
-                // Self-published detection - give them a fair chance to compete
-                let selfPublishedIndicators = [
-                    "independently published", "self-published", "self published",
-                    "createspace", "kindle direct", "kdp", "ingramspark",
-                    "lulu", "smashwords", "draft2digital", "blurb"
-                ]
-
-                for indicator in selfPublishedIndicators {
-                    if publisher.contains(indicator) {
-                        score += 20  // Smaller boost to compete, but not override quality
-                        #if DEBUG
-                        print("📚 Self-published book detected: '\(book.title)' (+20 boost)")
-                        #endif
-                        break
-                    }
-                }
-            }
-            
-            // Title match scoring
-            let titleLower = volumeInfo.title.lowercased()
-            
-            // If we have a parsed query, use it for better matching
+            // --- Title matching ---
             if let parsed = parsedQuery {
-                let targetTitle = parsed.title.lowercased()
-
-                // Clean both titles for better matching (remove common suffixes/prefixes)
-                let cleanedBookTitle = titleLower
+                let target = parsed.title.lowercased()
+                let cleaned = titleLower
                     .replacingOccurrences(of: ": a novel", with: "")
                     .replacingOccurrences(of: ": a memoir", with: "")
-                    .replacingOccurrences(of: " - a novel", with: "")
                     .components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces) ?? titleLower
 
-                // Exact title match (MASSIVE boost to override publisher bias)
-                if titleLower == targetTitle || cleanedBookTitle == targetTitle {
-                    score += 300  // Increased from 200 for decisive wins
-                    #if DEBUG
-                    print("🎯 EXACT MATCH: '\(book.title)' scores +300")
-                    #endif
+                if titleLower == target || cleaned == target {
+                    score += 300  // Exact match
+                } else if titleLower.hasPrefix(target + ":") || titleLower.hasPrefix(target + " ") {
+                    score += 250  // Title with subtitle
+                } else if titleLower.hasPrefix(target) {
+                    score += 180
+                } else if titleLower.contains(target) {
+                    score += 100
+                } else {
+                    let targetWords = Set(target.split(separator: " ").map(String.init))
+                    let bookWords = Set(titleLower.split(separator: " ").map(String.init))
+                    score += Double(targetWords.intersection(bookWords).count * 10)
                 }
-                // Title starts with target - likely the right book with subtitle
-                else if titleLower.hasPrefix(targetTitle + ":") || titleLower.hasPrefix(targetTitle + " ") {
-                    score += 250  // Almost as good as exact match
-                    #if DEBUG
-                    print("🎯 PREFIX MATCH: '\(book.title)' scores +250")
-                    #endif
-                }
-                // Title starts with target (very good match)
-                else if titleLower.hasPrefix(targetTitle) {
-                    score += 180  // Increased from 120
-                }
-                // Target title is contained in full (good match)
-                else if titleLower.contains(targetTitle) {
-                    score += 100  // Increased from 80
-                }
-                // All words from target title are in book title
-                else {
-                    let targetWords = Set(targetTitle.split(separator: " ").map { String($0) })
-                    let bookWords = Set(titleLower.split(separator: " ").map { String($0) })
-                    let matchingWords = targetWords.intersection(bookWords)
-                    score += Double(matchingWords.count * 10)
-                }
-                
-                // Author match (if we parsed an author)
-                if let targetAuthor = parsed.author,
-                   let authors = volumeInfo.authors {
-                    let targetAuthorLower = targetAuthor.lowercased()
-                    let authorString = authors.joined(separator: " ").lowercased()
 
-                    // Exact author match (HUGE boost to ensure correct book wins)
-                    if authorString == targetAuthorLower {
-                        score += 150  // Increased from 50 - title+author match is definitive
-                    }
-                    // Author contains target
-                    else if authorString.contains(targetAuthorLower) {
-                        score += 80  // Increased from 30
-                    }
-                    // Last name match (common for author searches)
-                    else {
-                        let targetLastName = targetAuthorLower.split(separator: " ").last ?? ""
-                        if !targetLastName.isEmpty && authorString.contains(targetLastName) {
-                            score += 40  // Increased from 20
-                        }
+                // Author match
+                if let targetAuthor = parsed.author {
+                    let targetLower = targetAuthor.lowercased()
+                    if authorLower == targetLower {
+                        score += 150
+                    } else if authorLower.contains(targetLower) {
+                        score += 80
+                    } else if let lastName = targetLower.split(separator: " ").last, authorLower.contains(lastName) {
+                        score += 40
                     }
                 }
-                
-                // Year match bonus
-                if let targetYear = parsed.year,
-                   let pubDate = volumeInfo.publishedDate {
-                    if pubDate.contains(targetYear) {
-                        score += 15
-                    }
+
+                // Year match
+                if let year = parsed.year, let pubDate = volumeInfo.publishedDate, pubDate.contains(year) {
+                    score += 15
                 }
             } else {
-                // Fallback to original word-based matching
-                for word in queryWords {
-                    if titleLower.contains(word) {
-                        score += 5
-                    }
-                }
-                
-                // Exact title match
-                let cleanedBookTitle = titleLower
-                    .replacingOccurrences(of: ": a novel", with: "")
-                    .replacingOccurrences(of: ": a memoir", with: "")
-                    .components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces) ?? titleLower
+                // Simple word-based matching
+                for word in queryWords where titleLower.contains(word) { score += 5 }
+                for word in queryWords where authorLower.contains(word) { score += 3 }
 
-                if titleLower == originalQuery.lowercased() || cleanedBookTitle == originalQuery.lowercased() {
-                    score += 300  // Increased to match parsed query
-                    #if DEBUG
-                    print("🎯 EXACT MATCH (fallback): '\(book.title)' scores +300")
-                    #endif
-                }
-                
-                // Author match (if provided)
-                if let authors = volumeInfo.authors {
-                    let authorString = authors.joined(separator: " ").lowercased()
-                    for word in queryWords {
-                        if authorString.contains(word) {
-                            score += 3
-                        }
-                    }
+                let cleaned = titleLower.components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces) ?? titleLower
+                if titleLower == originalQuery.lowercased() || cleaned == originalQuery.lowercased() {
+                    score += 300
                 }
             }
-            
-            // Popularity metrics - SIGNIFICANTLY boost popular editions
+
+            // --- Popularity ---
             let ratingsCount = volumeInfo.ratingsCount ?? 0
             let averageRating = volumeInfo.averageRating ?? 0
+            if ratingsCount > 0 { score += min(60, log10(Double(ratingsCount)) * 15) }
+            if averageRating >= 4.0 { score += 15 }
 
-            // Stronger logarithmic scale for ratings count (popular editions rise to top)
-            if ratingsCount > 0 {
-                // Much more aggressive: up to +80 for very popular books (10k+ ratings)
-                score += min(80, log10(Double(ratingsCount)) * 20)
-            }
-
-            // High average rating bonus (increased)
-            if averageRating >= 4.5 {
-                score += 30  // Excellent rating
-            } else if averageRating >= 4.0 {
-                score += 15  // Good rating
-            }
-            
-            // Page count (filter out previews/samples)
+            // --- Quality signals ---
             if let pageCount = volumeInfo.pageCount {
-                if pageCount < 50 {
-                    score -= 20 // Likely a preview or sample
-                } else {
-                    score += 5
-                }
+                score += pageCount < 50 ? -20 : 5
             }
-            
-            // Published date (prefer books with dates)
-            if volumeInfo.publishedDate != nil {
-                score += 5
-            }
-            
-            // Description exists
-            if let description = volumeInfo.description, !description.isEmpty {
-                score += 5
-            }
-            
-            // Publisher quality (major publishers score higher)
+            if volumeInfo.publishedDate != nil { score += 5 }
+            if let desc = volumeInfo.description, !desc.isEmpty { score += 5 }
+
+            // --- Publisher ---
             if let publisher = volumeInfo.publisher?.lowercased() {
                 let majorPublishers = [
                     "penguin", "random house", "harpercollins", "simon",
                     "macmillan", "hachette", "scholastic", "vintage",
-                    "knopf", "doubleday", "bantam", "tor", "ace"
+                    "knopf", "doubleday", "bantam", "tor", "ace",
+                    "oxford", "cambridge", "norton", "farrar", "scribner",
+                    "bloomsbury", "houghton mifflin"
                 ]
-                
-                if majorPublishers.contains(where: { publisher.contains($0) }) {
-                    score += 15
-                }
-                // Publisher hint from CSV (Goodreads). Light boost on substring match
+                if majorPublishers.contains(where: { publisher.contains($0) }) { score += 30 }
+
                 if let hint = publisherHint?.lowercased(), !hint.isEmpty {
-                    if publisher.contains(hint) || hint.contains(publisher) {
-                        score += 12
-                    }
+                    if publisher.contains(hint) || hint.contains(publisher) { score += 12 }
                 }
             }
-            
-            // Penalize if title contains unwanted terms
-            // REMOVED: "illustrated", "graphic" - legitimate books use these, esp. self-published
-            let unwantedTerms = [
-                "summary", "notes", "study guide", "spark",
-                "cliff", "analysis", "workbook", "teacher",
-                "companion", "annotated",
-                "movie tie-in", "calendar", "journal", "notebook",
-                "coloring", "colouring", "quickread", "condensed",
-                "abridged", "adapted", "retold", "simplified"
+
+            // --- Junk penalties ---
+            let junkTerms = [
+                "summary", "study guide", "sparknotes", "cliffnotes", "cliff notes",
+                "workbook", "teacher", "coloring", "colouring", "quickread",
+                "condensed", "abridged", "retold", "simplified"
             ]
-            
-            for term in unwantedTerms {
-                if titleLower.contains(term) {
-                    score -= 50  // Increased penalty from -30 to -50
-                }
-            }
-            
-            // Heavily penalize SparkNotes and similar
-            if titleLower.contains("sparknotes") || 
-               titleLower.contains("cliffnotes") ||
-               titleLower.contains("cliff notes") ||
-               titleLower.contains("study guide") {
-                score -= 200  // Massive penalty for study guides
-            }
-            
-            // Specifically penalize known study guide authors
-            let studyGuideAuthors = ["sparknotes", "cliffnotes", "shmoop", "gradesaver", 
-                                   "bookrags", "course hero", "litcharts"]
-            for sgAuthor in studyGuideAuthors {
-                if authorLower.contains(sgAuthor) {
-                    score -= 300  // Huge penalty for study guide publishers as authors
-                }
-            }
-            
-            // Check for language (prefer English)
+            for term in junkTerms where titleLower.contains(term) { score -= 100 }
+
+            let junkAuthors = ["sparknotes", "cliffnotes", "shmoop", "gradesaver", "bookrags", "litcharts"]
+            for author in junkAuthors where authorLower.contains(author) { score -= 300 }
+
             if let lang = volumeInfo.language, lang != "en" { score -= 10 }
-
-            // CRITICAL FIX: Reduced popularity bias from +90 max to +40 max
-            // This prevents popular wrong books from outranking correct obscure books
-            // Popularity still helps, but can't override title/author/ISBN matches
-            if let avg = volumeInfo.averageRating {
-                score += avg * 4  // up to +20 for 5.0 (was +50)
-            }
-            if let cnt = volumeInfo.ratingsCount {
-                // log-scale boost up to ~+20 for very popular editions (was +40)
-                let boost = min(20.0, log10(Double(max(cnt, 1))) * 10.0)
-                score += boost
-            }
-
-            // Heuristic: For LOTR umbrella queries, demote per-volume titles
-            if isLOTRUmbrella {
-                let t = volumeInfo.title.lowercased()
-                let perVolumeKeywords = [
-                    "fellowship of the ring", "two towers", "return of the king",
-                    "book 1", "book one", "book i", "#1", "part 1", "volume 1", "vol 1"
-                ]
-                if perVolumeKeywords.contains(where: { t.contains($0) }) {
-                    score -= 40 // prefer omnibus/canonical LOTR title
-                }
-            }
 
             return ScoredBook(
                 book: book,

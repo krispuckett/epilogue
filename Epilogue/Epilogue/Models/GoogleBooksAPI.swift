@@ -6,6 +6,9 @@ import UniformTypeIdentifiers
 // Toggle verbose console logging for Google Books plumbing
 private let GOOGLE_API_VERBOSE = false
 
+// Google Books API key — restrict to Books API in Google Cloud Console
+let GoogleBooksAPIKey = "AIzaSyASq6uyHXIQ9OIGTed8bOuKvtZR2neHnFQ"
+
 // MARK: - Google Books API Models
 struct GoogleBooksResponse: Codable {
     let items: [GoogleBookItem]?
@@ -486,6 +489,7 @@ class GoogleBooksService {
         guard var components = URLComponents(string: baseURL) else { return nil }
         components.queryItems = [
             URLQueryItem(name: "q", value: "isbn:\(isbn)"),
+            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: "1"),
             URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
@@ -660,6 +664,7 @@ class GoogleBooksService {
         }
         components.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
+            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: String(resultsPerPage)),
             URLQueryItem(name: "startIndex", value: String(startIndex)), // Pagination support
             URLQueryItem(name: "orderBy", value: "relevance"),
@@ -1037,6 +1042,7 @@ class GoogleBooksService {
 
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: String(resultsPerPage)),
             URLQueryItem(name: "startIndex", value: String(startIndex)), // Pagination support
             URLQueryItem(name: "orderBy", value: "relevance"),

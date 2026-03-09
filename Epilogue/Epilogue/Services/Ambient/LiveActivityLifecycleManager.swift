@@ -43,6 +43,8 @@ class LiveActivityLifecycleManager: ObservableObject {
 
     // Background task
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var coverImagePath: String?
+    private var orbImagePath: String?
 
     // Observers
     private var cancellables = Set<AnyCancellable>()
@@ -56,6 +58,8 @@ class LiveActivityLifecycleManager: ObservableObject {
         let capturedCount: Int
         let lastTranscript: String
         let totalDuration: TimeInterval
+        let pagesRead: Int
+        let coverAccentHex: String?
 
         var currentState: AmbientActivityAttributes.ContentState {
             AmbientActivityAttributes.ContentState(
@@ -63,7 +67,9 @@ class LiveActivityLifecycleManager: ObservableObject {
                 sessionDuration: totalDuration,
                 capturedCount: capturedCount,
                 isListening: true,
-                lastTranscript: lastTranscript
+                lastTranscript: lastTranscript,
+                pagesRead: pagesRead,
+                coverAccentHex: coverAccentHex
             )
         }
     }
@@ -77,7 +83,9 @@ class LiveActivityLifecycleManager: ObservableObject {
     // MARK: - Public API
 
     /// Starts a new Live Activity session with automatic restart support
-    func startSession() async {
+    func startSession(coverImagePath: String? = nil, orbImagePath: String? = nil) async {
+        self.coverImagePath = coverImagePath
+        self.orbImagePath = orbImagePath
         guard !isActive else {
             #if DEBUG
             print("⚠️ LiveActivity session already active")
@@ -96,6 +104,9 @@ class LiveActivityLifecycleManager: ObservableObject {
         sessionStartTime = Date()
         totalSessionDuration = 0
 
+        // Start nudge engine for this session
+        ReadingNudgeEngine.shared.startSession()
+
         startLifecycleMonitoring()
         startUpdateTimer()
 
@@ -109,7 +120,11 @@ class LiveActivityLifecycleManager: ObservableObject {
         bookTitle: String? = nil,
         capturedCount: Int? = nil,
         isListening: Bool? = nil,
-        lastTranscript: String? = nil
+        lastTranscript: String? = nil,
+        pagesRead: Int? = nil,
+        coverAccentHex: String? = nil,
+        nudgeMessage: String? = nil,
+        nudgeIcon: String? = nil
     ) async {
         guard let activity = currentActivity else { return }
 
@@ -121,7 +136,11 @@ class LiveActivityLifecycleManager: ObservableObject {
             sessionDuration: currentDuration,
             capturedCount: capturedCount ?? state.capturedCount,
             isListening: isListening ?? state.isListening,
-            lastTranscript: lastTranscript ?? state.lastTranscript
+            lastTranscript: lastTranscript ?? state.lastTranscript,
+            pagesRead: pagesRead ?? state.pagesRead,
+            coverAccentHex: coverAccentHex ?? state.coverAccentHex,
+            nudgeMessage: nudgeMessage,  // nil clears nudge
+            nudgeIcon: nudgeIcon
         )
 
         // Preserve state for potential restart
@@ -140,12 +159,15 @@ class LiveActivityLifecycleManager: ObservableObject {
 
         if let activity = currentActivity {
             let finalDuration = totalSessionDuration + (activityStartTime.map { Date().timeIntervalSince($0) } ?? 0)
+            let state = activity.content.state
             let finalState = AmbientActivityAttributes.ContentState(
-                bookTitle: activity.content.state.bookTitle,
+                bookTitle: state.bookTitle,
                 sessionDuration: finalDuration,
-                capturedCount: activity.content.state.capturedCount,
+                capturedCount: state.capturedCount,
                 isListening: false,
-                lastTranscript: "Session ended"
+                lastTranscript: "Session ended",
+                pagesRead: state.pagesRead,
+                coverAccentHex: state.coverAccentHex
             )
 
             await activity.end(
@@ -153,6 +175,9 @@ class LiveActivityLifecycleManager: ObservableObject {
                 dismissalPolicy: .after(Date().addingTimeInterval(5))
             )
         }
+
+        // End nudge engine
+        ReadingNudgeEngine.shared.endSession()
 
         // Cleanup
         currentActivity = nil
@@ -178,7 +203,7 @@ class LiveActivityLifecycleManager: ObservableObject {
         }
 
         let now = Date()
-        let attributes = AmbientActivityAttributes(startTime: sessionStartTime ?? now)
+        let attributes = AmbientActivityAttributes(startTime: sessionStartTime ?? now, coverImagePath: coverImagePath, orbImagePath: orbImagePath)
 
         // Use preserved state if available, otherwise create initial state
         let initialState: AmbientActivityAttributes.ContentState
@@ -310,7 +335,9 @@ class LiveActivityLifecycleManager: ObservableObject {
             bookTitle: state.bookTitle,
             capturedCount: state.capturedCount,
             lastTranscript: state.lastTranscript,
-            totalDuration: state.sessionDuration
+            totalDuration: state.sessionDuration,
+            pagesRead: state.pagesRead,
+            coverAccentHex: state.coverAccentHex
         )
     }
 
@@ -387,12 +414,25 @@ class LiveActivityLifecycleManager: ObservableObject {
         let currentDuration = totalSessionDuration + Date().timeIntervalSince(startTime)
 
         let state = activity.content.state
+
+        // Check for nudges during duration updates
+        let nudge = await ReadingNudgeEngine.shared.checkForNudge(
+            elapsedSeconds: currentDuration,
+            pagesRead: state.pagesRead,
+            captureCount: state.capturedCount,
+            totalPages: nil
+        )
+
         let updatedState = AmbientActivityAttributes.ContentState(
             bookTitle: state.bookTitle,
             sessionDuration: currentDuration,
             capturedCount: state.capturedCount,
             isListening: state.isListening,
-            lastTranscript: state.lastTranscript
+            lastTranscript: state.lastTranscript,
+            pagesRead: state.pagesRead,
+            coverAccentHex: state.coverAccentHex,
+            nudgeMessage: nudge?.message ?? ReadingNudgeEngine.shared.getPendingNudge()?.message,
+            nudgeIcon: nudge?.icon ?? ReadingNudgeEngine.shared.getPendingNudge()?.icon
         )
 
         await activity.update(.init(state: updatedState, staleDate: nil))

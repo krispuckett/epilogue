@@ -332,6 +332,75 @@ class OrbMetalRenderer: NSObject {
         commandBuffer.commit()
     }
 
+    /// Renders a single frame of the orb to a UIImage for use in widgets/Live Activities.
+    /// Uses a fixed time value for a deterministic "hero" frame.
+    func renderToImage(size: CGSize, atTime time: Float = 2.5) -> UIImage? {
+        guard let device = device,
+              let commandQueue = commandQueue,
+              let pipelineState = pipelineState else { return nil }
+
+        let width = Int(size.width)
+        let height = Int(size.height)
+
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb,
+            width: width,
+            height: height,
+            mipmapped: false
+        )
+        descriptor.usage = [.renderTarget, .shaderRead]
+
+        guard let texture = device.makeTexture(descriptor: descriptor),
+              let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
+
+        let rpd = MTLRenderPassDescriptor()
+        rpd.colorAttachments[0].texture = texture
+        rpd.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        rpd.colorAttachments[0].loadAction = .clear
+        rpd.colorAttachments[0].storeAction = .store
+
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: rpd) else { return nil }
+
+        encoder.setRenderPipelineState(pipelineState)
+
+        var t = time
+        var res = SIMD2<Float>(Float(width), Float(height))
+        var pressed: Float = 0
+        var color = themeColor
+
+        encoder.setFragmentBytes(&t, length: MemoryLayout<Float>.size, index: 0)
+        encoder.setFragmentBytes(&res, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
+        encoder.setFragmentBytes(&pressed, length: MemoryLayout<Float>.size, index: 2)
+        encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD3<Float>>.size, index: 3)
+
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        encoder.endEncoding()
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+
+        // Read pixels from texture
+        let bytesPerRow = 4 * width
+        var bytes = [UInt8](repeating: 0, count: bytesPerRow * height)
+        texture.getBytes(&bytes, bytesPerRow: bytesPerRow,
+                         from: MTLRegion(origin: .init(), size: .init(width: width, height: height, depth: 1)),
+                         mipmapLevel: 0)
+
+        // Create CGImage from BGRA pixel data
+        guard let dataProvider = CGDataProvider(data: Data(bytes) as CFData),
+              let cgImage = CGImage(
+                  width: width, height: height,
+                  bitsPerComponent: 8, bitsPerPixel: 32,
+                  bytesPerRow: bytesPerRow,
+                  space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
+                  provider: dataProvider, decode: nil,
+                  shouldInterpolate: true, intent: .defaultIntent
+              ) else { return nil }
+
+        return UIImage(cgImage: cgImage)
+    }
+
     // Render to a custom texture (for exporting)
     func renderToTexture(_ texture: MTLTexture, commandQueue: MTLCommandQueue, size: CGSize) {
         guard let pipelineState = pipelineState,

@@ -8,7 +8,10 @@ public class BookColorPaletteCache {
     static let shared = BookColorPaletteCache()
     
     // MARK: - Properties
-    
+
+    /// Bump this when extraction algorithm changes to invalidate stale caches
+    static let currentExtractionVersion = "2.0" // v2.0: peak merging + hue-aware accent
+
     /// Memory cache for quick access
     private let memoryCache = NSCache<NSString, CachedPalette>()
     
@@ -105,7 +108,7 @@ public class BookColorPaletteCache {
             palette: palette,
             coverURL: coverURL,
             timestamp: Date(),
-            extractionVersion: "1.0"
+            extractionVersion: Self.currentExtractionVersion
         )
         
         // Add to memory cache with cost estimation
@@ -187,8 +190,8 @@ public class BookColorPaletteCache {
             let data = try Data(contentsOf: url)
             let cached = try JSONDecoder().decode(CachedPalette.self, from: data)
             
-            // Check if expired (30 days)
-            if cached.isExpired {
+            // Check if expired (30 days) or stale extraction version
+            if cached.isExpired || cached.extractionVersion != Self.currentExtractionVersion {
                 try? FileManager.default.removeItem(at: url)
                 return nil
             } else {

@@ -120,7 +120,7 @@ class TrendingBooksService: ObservableObject {
     // MARK: - Google Books API Search
     private func searchGoogleBooks(query: String) async -> Book? {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "https://www.googleapis.com/books/v1/volumes?q=\(encodedQuery)&maxResults=1"
+        let urlString = "https://www.googleapis.com/books/v1/volumes?q=\(encodedQuery)&key=\(GoogleBooksAPIKey)&maxResults=1"
         
         guard let url = URL(string: urlString) else { return nil }
         

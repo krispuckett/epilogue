@@ -793,7 +793,36 @@ struct AmbientModeView: View {
         .onReceive(voiceManager.$currentAmplitude) { amplitude in
             audioLevel = amplitude
         }
-        // Removed duplicate question processing notification handler
+        // Live Activity quick action deep links
+        .onReceive(NotificationCenter.default.publisher(for: .ambientQuickAction)) { notification in
+            guard let action = notification.object as? String else { return }
+            switch action {
+            case "voice-capture":
+                // Switch to voice mode and start recording
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    isVoiceModeEnabled = true
+                    inputMode = .listening
+                }
+                if !isRecording {
+                    handleMicrophoneTap()
+                }
+            case "ocr":
+                showImagePicker = true
+            case "ai-chat":
+                // Switch to text input and focus keyboard
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    inputMode = .textInput
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isKeyboardFocused = true
+                }
+            case "end-session":
+                // Full session end: save, show summary, end Live Activity
+                stopAndSaveSession()
+            default:
+                break
+            }
+        }
         // Book strip overlay
         .overlay {
             if showingBookStrip {
@@ -1371,19 +1400,17 @@ struct AmbientModeView: View {
                     
                     // Single morphing container that expands/contracts
                     ZStack {
-                        // Unified morphing background - always present, just changes shape
+                        // Unified morphing background - subtle dark fill, no glass overlay
                         RoundedRectangle(
                             cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32,
                             style: .continuous
                         )
-                        .fill(Color.white.opacity(0.05)) // Slightly visible for glass to render properly
+                        .fill(Color.white.opacity(inputMode == .textInput || !isVoiceModeEnabled ? 0.08 : 0))
                         .frame(
                             width: inputMode == .textInput || !isVoiceModeEnabled ? geometry.size.width - 60 : 64,
                             height: inputMode == .textInput || !isVoiceModeEnabled ? textFieldHeight : 64
                         )
-                        .blur(radius: containerBlur) // Ambient container blur
-                        .glassEffect(.regular, in: .rect(cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32))
-                        .allowsHitTesting(false)  // Glass background shouldn't block touches
+                        .allowsHitTesting(false)
                         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: inputMode)
                         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: textFieldHeight)
                         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: isVoiceModeEnabled)
@@ -1574,13 +1601,12 @@ struct AmbientModeView: View {
                                 } label: {
                                     ZStack {
                                         Circle()
-                                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.15))
+                                            .fill(Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.2))
                                             .frame(width: 48, height: 48)
-                                            .glassEffect(in: Circle())
                                             .overlay {
                                                 Circle()
                                                     .strokeBorder(
-                                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.3),
+                                                        Color(red: 1.0, green: 0.549, blue: 0.259).opacity(0.4),
                                                         lineWidth: 0.5
                                                     )
                                             }
@@ -1614,7 +1640,7 @@ struct AmbientModeView: View {
             .allowsHitTesting(true)  // Ensure only actual controls are interactive
         }
         .padding(.horizontal, 16)  // iOS 26 style - closer to edges
-        .padding(.bottom, inputMode == .textInput || !isVoiceModeEnabled ? 1 : 24)  // Just 1pt above keyboard in text mode
+        .padding(.bottom, inputMode == .textInput || !isVoiceModeEnabled ? 8 : 24)  // Padding above home indicator
         
         // Long press for quick keyboard - only when voice mode is enabled
         .onLongPressGesture(minimumDuration: 0.5) {
@@ -1810,14 +1836,17 @@ struct AmbientModeView: View {
                 print("❌ Failed to save initial session: \(error)")
                 #endif
             }
-            
+
+            // Start Live Activity for Dynamic Island dashboard
+            startLiveActivityForSession()
+
             // Start book cover fade timer
             DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
                 withAnimation(.easeOut(duration: 2.0)) {
                     showBookCover = false
                 }
             }
-            
+
             return // Don't initialize any audio components
         }
         
@@ -1873,6 +1902,9 @@ struct AmbientModeView: View {
                     #endif
                 }
 
+                // Start Live Activity for Dynamic Island dashboard
+                startLiveActivityForSession()
+
                 // Start book cover fade timer - fade after 10 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
                     withAnimation(.easeOut(duration: 2.0)) {
@@ -1906,6 +1938,135 @@ struct AmbientModeView: View {
         }
     }
     
+    // MARK: - Live Activity Integration (KRI-134)
+
+    private func startLiveActivityForSession() {
+        Task {
+            // Save cover thumbnail to App Group container for widget access
+            let coverPath = saveCoverForLiveActivity()
+            let accentHex = colorPalette.flatMap { hexFromColor($0.accent) }
+
+            // Pre-render the ambient orb with the book's accent color
+            let orbPath = renderOrbForLiveActivity(accentHex: accentHex)
+
+            await LiveActivityLifecycleManager.shared.startSession(
+                coverImagePath: coverPath,
+                orbImagePath: orbPath
+            )
+            // Set initial content with book title and cover accent color
+            await LiveActivityLifecycleManager.shared.updateContent(
+                bookTitle: currentBookContext?.title,
+                coverAccentHex: accentHex
+            )
+        }
+    }
+
+    private func renderOrbForLiveActivity(accentHex: String?) -> String? {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.epilogue.app"
+        ) else { return nil }
+
+        let orbFileURL = containerURL.appendingPathComponent("ambient_orb.png")
+
+        // Parse accent color for the shader theme
+        let renderer = OrbMetalRenderer()
+        if let hex = accentHex {
+            let clean = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+            if clean.count == 6, let rgb = UInt64(clean, radix: 16) {
+                renderer.themeColor = SIMD3<Float>(
+                    Float((rgb >> 16) & 0xFF) / 255.0,
+                    Float((rgb >> 8) & 0xFF) / 255.0,
+                    Float(rgb & 0xFF) / 255.0
+                )
+            }
+        }
+
+        // Render at 2x for retina quality (orb shown at ~22-28pt)
+        guard let image = renderer.renderToImage(size: CGSize(width: 64, height: 64)),
+              let pngData = image.pngData() else {
+            #if DEBUG
+            print("⚠️ Failed to render orb snapshot for Live Activity")
+            #endif
+            return nil
+        }
+
+        do {
+            try pngData.write(to: orbFileURL)
+            #if DEBUG
+            print("✅ Live Activity: Orb snapshot saved to \(orbFileURL.path)")
+            #endif
+            return orbFileURL.path
+        } catch {
+            #if DEBUG
+            print("❌ Failed to save orb snapshot: \(error)")
+            #endif
+            return nil
+        }
+    }
+
+    private func saveCoverForLiveActivity() -> String? {
+        guard let book = currentBookContext else { return nil }
+
+        // Reuse the cover already cached by BookWidgetUpdater in the App Group container
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.epilogue.app"
+        ) else { return nil }
+
+        let coverPath = containerURL.appendingPathComponent("\(book.localId.uuidString)_cover.jpg")
+
+        if FileManager.default.fileExists(atPath: coverPath.path) {
+            #if DEBUG
+            print("✅ Live Activity: Found existing widget cover at \(coverPath.path)")
+            #endif
+            return coverPath.path
+        }
+
+        // If not cached yet, trigger caching now and return nil (fallback to accent color)
+        if let coverURL = book.coverImageURL {
+            Task {
+                let path = await cacheCoverToAppGroup(from: coverURL, bookID: book.localId.uuidString)
+                if path != nil {
+                    // Update the Live Activity with the cover path on next refresh
+                    #if DEBUG
+                    print("✅ Live Activity: Cover cached for next update")
+                    #endif
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func cacheCoverToAppGroup(from urlString: String, bookID: String) async -> String? {
+        guard let url = URL(string: urlString),
+              let containerURL = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: "group.com.epilogue.app"
+              ) else { return nil }
+
+        let coverFileURL = containerURL.appendingPathComponent("\(bookID)_cover.jpg")
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data),
+               let jpegData = image.jpegData(compressionQuality: 0.8) {
+                try jpegData.write(to: coverFileURL)
+                return coverFileURL.path
+            }
+        } catch {
+            #if DEBUG
+            print("❌ Failed to cache cover for Live Activity: \(error)")
+            #endif
+        }
+        return nil
+    }
+
+    private func hexFromColor(_ color: Color) -> String? {
+        let uiColor = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard uiColor.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+    }
+
     private func handleMicrophoneTap() {
         // Don't do anything if voice mode is disabled
         guard isVoiceModeEnabled else { return }

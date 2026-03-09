@@ -70,6 +70,7 @@ extension Notification.Name {
     static let triggerQuoteSave = Notification.Name("TriggerQuoteSave")
     static let visualFeedbackRequested = Notification.Name("VisualFeedbackRequested")
     static let transcriptionEvolved = Notification.Name("TranscriptionEvolved")
+    static let ambientQuickAction = Notification.Name("AmbientQuickAction")
 
     // MARK: - Voice
     static let voiceTranscriptUpdated = Notification.Name("voiceTranscriptUpdated")
