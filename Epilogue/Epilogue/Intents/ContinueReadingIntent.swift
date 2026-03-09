@@ -22,19 +22,17 @@ struct ContinueReadingIntent: AppIntent {
         // Determine which book to open
         let targetBook: Book
 
+        let books = LibraryService.shared.loadBooks()
+
         if let bookEntity = book {
             // Siri specified a book: "Continue reading Meditations"
-            guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-                  let books = try? JSONDecoder().decode([Book].self, from: data),
-                  let foundBook = books.first(where: { $0.id == bookEntity.id }) else {
+            guard let foundBook = books.first(where: { $0.id == bookEntity.id }) else {
                 throw IntentError.message("Could not find '\(bookEntity.title)' in your library")
             }
             targetBook = foundBook
         } else {
             // No book specified: "Continue reading" - use currently reading book
-            guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-                  let books = try? JSONDecoder().decode([Book].self, from: data),
-                  let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
+            guard let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
                 throw IntentError.message("You don't have any books currently marked as reading. Try saying 'Continue reading' followed by a book title.")
             }
             targetBook = currentBook

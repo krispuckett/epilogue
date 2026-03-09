@@ -143,27 +143,23 @@ struct BookEntity: AppEntity {
 /// Query for finding books by title or author
 struct BookQuery: EntityQuery, EnumerableEntityQuery {
     /// iOS 18+ optimization: System derives complex queries from this
+    @MainActor
     func allEntities() async throws -> [BookEntity] {
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            return []
-        }
-
+        let books = LibraryService.shared.loadBooks()
         return books.map { BookEntity(from: $0) }
     }
 
     /// Required: Find specific books by ID
+    @MainActor
     func entities(for identifiers: [String]) async throws -> [BookEntity] {
         let allBooks = try await allEntities()
         return allBooks.filter { identifiers.contains($0.id) }
     }
 
     /// Suggested books for Siri (currently reading + recently added)
+    @MainActor
     func suggestedEntities() async throws -> [BookEntity] {
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            return []
-        }
+        let books = LibraryService.shared.loadBooks()
 
         // Priority 1: Currently reading books
         let currentlyReading = books
@@ -183,11 +179,9 @@ struct BookQuery: EntityQuery, EnumerableEntityQuery {
     }
 
     /// Default sort: Currently Reading first, then by date added
+    @MainActor
     func defaultResult() async -> BookEntity? {
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            return nil
-        }
+        let books = LibraryService.shared.loadBooks()
 
         // Return the most recent "currently reading" book
         return books

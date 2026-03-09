@@ -53,6 +53,8 @@ struct ContentView: View {
             .setupAmbientMode(libraryViewModel: libraryViewModel, notesViewModel: notesViewModel, appStateCoordinator: appStateCoordinator)
             .withCloudKitMigration()
             .onAppear {
+                // Configure LibraryViewModel with SwiftData (KRI-151: single source of truth)
+                libraryViewModel.configure(modelContext: modelContext)
                 performInitialSetup()
             }
             .onChange(of: scenePhase) { _, newPhase in

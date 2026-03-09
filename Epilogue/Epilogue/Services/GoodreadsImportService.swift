@@ -1872,10 +1872,8 @@ class GoodreadsImportService: ObservableObject {
             do {
                 try modelContext.save()
 
-                // Sync imported books to UserDefaults to prevent desync
-                for processedBook in chunk {
-                    LibraryService.shared.syncBookModelToUserDefaults(processedBook.bookModel)
-                }
+                // Notify library to reload from SwiftData
+                NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
                 #if DEBUG
                 print("  ✅ Batch \(index + 1) saved successfully")

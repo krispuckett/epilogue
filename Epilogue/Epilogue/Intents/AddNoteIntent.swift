@@ -74,13 +74,12 @@ struct AddNoteIntent: AppIntent {
 
 extension BookEntity {
     /// Default to the currently reading book
+    @MainActor
     static var currentBook: BookEntity? {
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data),
-              let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
+        let books = LibraryService.shared.loadBooks()
+        guard let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
             return nil
         }
-
         return BookEntity(from: currentBook)
     }
 }

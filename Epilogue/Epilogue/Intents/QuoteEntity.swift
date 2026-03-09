@@ -91,11 +91,7 @@ struct QuoteEntity: AppEntity {
 struct QuoteQuery: EntityQuery, EnumerableEntityQuery {
     @MainActor
     func allEntities() async throws -> [QuoteEntity] {
-        // Load books from UserDefaults for book context
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            return []
-        }
+        let books = LibraryService.shared.loadBooks()
 
         // Fetch all quotes from SwiftData
         guard let container = try? ModelContainer(

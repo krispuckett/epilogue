@@ -660,8 +660,8 @@ extension AmbientModeView {
             do {
                 try modelContext.save()
 
-                // Sync to UserDefaults to prevent desync
-                LibraryService.shared.syncBookModelToUserDefaults(bookModel)
+                // Notify library to reload from SwiftData
+                NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
                 // Show success feedback
                 SensoryFeedback.success()

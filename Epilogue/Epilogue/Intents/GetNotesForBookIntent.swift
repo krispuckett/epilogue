@@ -19,10 +19,7 @@ struct GetNotesForBookIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<[NoteEntity]> & ProvidesDialog {
         // Load books for context
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            throw IntentError.message("Could not load library")
-        }
+        let books = LibraryService.shared.loadBooks()
 
         // Fetch notes from SwiftData for this specific book
         guard let container = try? ModelContainer(

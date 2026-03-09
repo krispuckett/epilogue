@@ -191,10 +191,9 @@ final class DeepLinkHandler {
     private func handleContinueReading() {
         logger.info("🎯 Widget tapped: Continue Reading")
 
-        // Load currently reading book from UserDefaults
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data),
-              let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
+        // Load currently reading book from SwiftData
+        let books = LibraryService.shared.loadBooks()
+        guard let currentBook = books.first(where: { $0.readingStatus == .currentlyReading }) else {
             logger.warning("No currently reading book found")
             return
         }

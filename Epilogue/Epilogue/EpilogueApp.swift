@@ -40,8 +40,8 @@ struct EpilogueApp: App {
                             // Privacy: run data retention cleanup if needed
                             DataRetentionService.shared.performCleanupIfNeeded(container: container)
 
-                            // Reconcile UserDefaults ↔ SwiftData to fix any drift
-                            LibraryService.shared.reconcileStores()
+                            // SwiftData is now the single source of truth (KRI-151)
+                            // No more UserDefaults ↔ SwiftData reconciliation needed
 
                             // Configure offline services
                             OfflineQueueManager.shared.configure(with: context)

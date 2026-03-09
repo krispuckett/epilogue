@@ -1864,14 +1864,14 @@ class LibraryViewModel {
     var isReorderMode = false  // Track if we're in reorder mode
 
     @ObservationIgnored private let googleBooksService = GoogleBooksService()
+    @ObservationIgnored private var modelContext: ModelContext?
     private let userDefaults = UserDefaults.standard
-    private let booksKey = "com.epilogue.savedBooks"
     private let bookOrderKey = "com.epilogue.bookOrder"
-    
+
     init() {
         loadBooks()
         updateBookCoverURLsToHigherQuality()
-        
+
         // Generate context for all books in background
         Task {
             await BookContextCache.shared.generateContextForAllBooks(books)
@@ -1881,7 +1881,7 @@ class LibraryViewModel {
         Task { @MainActor in
             SpotlightIndexingService.shared.indexBooks(books)
         }
-        
+
         // Listen for library refresh notification
         NotificationCenter.default.addObserver(
             forName: .refreshLibrary,
@@ -1896,53 +1896,81 @@ class LibraryViewModel {
             self.updateBookCoverURLsToHigherQuality()
         }
     }
+
+    /// Configure with SwiftData context — switches from UserDefaults to SwiftData as source of truth
+    func configure(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        loadBooks()
+        updateBookCoverURLsToHigherQuality()
+        #if DEBUG
+        print("✅ LibraryViewModel configured with SwiftData — \(books.count) books loaded")
+        #endif
+    }
     
     private func loadBooks() {
+        if let modelContext = modelContext {
+            loadBooksFromSwiftData(modelContext)
+        } else {
+            loadBooksFromUserDefaults()
+        }
+    }
+
+    private func loadBooksFromSwiftData(_ context: ModelContext) {
         #if DEBUG
-        print("📚 Loading books from UserDefaults")
+        print("📚 Loading books from SwiftData")
         #endif
-        #if DEBUG
-        print("🔍 DEBUG: loadBooks() called from: \(Thread.callStackSymbols[2...5].joined(separator: "\n"))")
-        #endif
-        if let data = userDefaults.data(forKey: booksKey) {
+        do {
+            var descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.isInLibrary == true }
+            )
+            descriptor.fetchLimit = 1000
+            let bookModels = try context.fetch(descriptor)
+
+            var convertedBooks = bookModels.map { $0.asBook }
+
+            // Apply custom sort order if exists
+            if let orderData = userDefaults.data(forKey: bookOrderKey),
+               let bookOrder = try? JSONDecoder().decode([String].self, from: orderData) {
+                convertedBooks = sortBooksByCustomOrder(convertedBooks, order: bookOrder)
+            }
+
+            self.books = convertedBooks
             #if DEBUG
-            print("  📦 Found data in UserDefaults, size: \(data.count) bytes")
+            print("  ✅ Loaded \(convertedBooks.count) books from SwiftData")
             #endif
+        } catch {
+            #if DEBUG
+            print("  ❌ SwiftData fetch failed: \(error), falling back to UserDefaults")
+            #endif
+            loadBooksFromUserDefaults()
+        }
+    }
+
+    private func loadBooksFromUserDefaults() {
+        #if DEBUG
+        print("📚 Loading books from UserDefaults (fallback)")
+        #endif
+        let booksKey = "com.epilogue.savedBooks"
+        if let data = userDefaults.data(forKey: booksKey) {
             do {
                 var decodedBooks = try JSONDecoder().decode([Book].self, from: data)
-                
+
                 // Apply custom sort order if exists
                 if let orderData = userDefaults.data(forKey: bookOrderKey),
                    let bookOrder = try? JSONDecoder().decode([String].self, from: orderData) {
-                    #if DEBUG
-                    print("  📋 Applying custom sort order")
-                    #endif
                     decodedBooks = sortBooksByCustomOrder(decodedBooks, order: bookOrder)
                 }
-                
+
                 self.books = decodedBooks
                 #if DEBUG
                 print("  ✅ Loaded \(decodedBooks.count) books from UserDefaults")
                 #endif
-                
-                // Log first few books for debugging
-                for (index, book) in decodedBooks.prefix(3).enumerated() {
-                    #if DEBUG
-                    print("    Book \(index + 1): \(book.title) by \(book.author)")
-                    #endif
-                    #if DEBUG
-                    print("      Cover URL: \(book.coverImageURL ?? "NO COVER")")
-                    #endif
-                }
             } catch {
                 #if DEBUG
                 print("  ❌ Failed to decode books: \(error)")
                 #endif
             }
         } else {
-            #if DEBUG
-            print("  ⚠️ No books found in UserDefaults")
-            #endif
             self.books = []
         }
     }
@@ -1996,49 +2024,105 @@ class LibraryViewModel {
     }
     
     private func saveBooks() {
-        #if DEBUG
-        print("💾 Saving \(books.count) books to UserDefaults")
-        #endif
-        
-        // Debug: Check URLs before encoding
-        for (index, book) in books.prefix(3).enumerated() {
-            #if DEBUG
-            print("  Book \(index + 1) before save: \(book.title)")
-            #endif
-            #if DEBUG
-            print("    Cover URL: \(book.coverImageURL ?? "NO URL")")
-            #endif
+        if let modelContext = modelContext {
+            persistToSwiftData(modelContext)
+        } else {
+            persistToUserDefaults()
         }
-        
+
+        // Index books for Spotlight search
+        Task { @MainActor in
+            SpotlightIndexingService.shared.indexBooks(books)
+        }
+    }
+
+    /// Sync in-memory books array to SwiftData
+    private func persistToSwiftData(_ context: ModelContext) {
+        #if DEBUG
+        print("💾 Persisting \(books.count) books to SwiftData")
+        #endif
+
+        do {
+            // Fetch ALL BookModels (not just isInLibrary) to catch duplicates
+            let descriptor = FetchDescriptor<BookModel>()
+            let existingModels = try context.fetch(descriptor)
+
+            // Group by ID — safely handles duplicates (unlike uniqueKeysWithValues which crashes)
+            let groupedById = Dictionary(grouping: existingModels) { $0.id }
+            var existingById: [String: BookModel] = [:]
+            for (id, models) in groupedById {
+                existingById[id] = models.first
+            }
+
+            let currentBookIds = Set(books.map { $0.id })
+            var processedIds = Set<String>()
+
+            // Update or create BookModels for all current books
+            for book in books {
+                // Skip duplicate entries in the books array itself
+                guard processedIds.insert(book.id).inserted else { continue }
+
+                if let model = existingById[book.id] {
+                    // Update existing model
+                    syncBookToModel(book, model: model)
+                    model.isInLibrary = true
+                } else {
+                    // Create new BookModel
+                    let newModel = BookModel(from: book)
+                    newModel.isInLibrary = true
+                    context.insert(newModel)
+                    existingById[book.id] = newModel
+                }
+            }
+
+            // Mark removed books as not in library (don't delete — preserve notes/quotes)
+            for model in existingModels where model.isInLibrary && !currentBookIds.contains(model.id) {
+                model.isInLibrary = false
+            }
+
+            try context.save()
+            #if DEBUG
+            print("  ✅ Persisted \(books.count) books to SwiftData")
+            #endif
+        } catch {
+            #if DEBUG
+            print("  ❌ SwiftData persist failed: \(error)")
+            #endif
+            errorMessage = "Failed to save library changes"
+        }
+    }
+
+    /// Sync a Book struct's mutable fields to a BookModel
+    private func syncBookToModel(_ book: Book, model: BookModel) {
+        model.title = book.title
+        model.author = book.author
+        model.coverImageURL = book.coverImageURL
+        model.isbn = book.isbn
+        model.desc = book.description
+        model.pageCount = book.pageCount
+        model.publishedYear = book.publishedYear
+        model.isInLibrary = book.isInLibrary
+        model.readingStatus = book.readingStatus.rawValue
+        model.currentPage = book.currentPage
+        model.userRating = book.userRating
+        model.userNotes = book.userNotes
+        model.dateAdded = book.dateAdded
+        model.userDescription = book.userDescription
+    }
+
+    /// Legacy UserDefaults persistence (fallback when modelContext not yet configured)
+    private func persistToUserDefaults() {
+        #if DEBUG
+        print("💾 Saving \(books.count) books to UserDefaults (fallback)")
+        #endif
+        let booksKey = "com.epilogue.savedBooks"
         do {
             let encoded = try JSONEncoder().encode(books)
             userDefaults.set(encoded, forKey: booksKey)
-            
-            // Force immediate save and verify
-            let didSync = userDefaults.synchronize()
-            #if DEBUG
-            print("  📝 UserDefaults synchronize: \(didSync)")
-            #endif
-            
-            // Verify the save worked
-            if let verifyData = userDefaults.data(forKey: booksKey) {
-                let verifyBooks = try JSONDecoder().decode([Book].self, from: verifyData)
-                #if DEBUG
-                print("  ✅ Verified save: \(verifyBooks.count) books in storage")
-                #endif
-            }
-            
-            #if DEBUG
-            print("  ✅ Successfully saved \(books.count) books")
-            #endif
-
-            // Index books for Spotlight search
-            Task { @MainActor in
-                SpotlightIndexingService.shared.indexBooks(books)
-            }
+            userDefaults.synchronize()
         } catch {
             #if DEBUG
-            print("  ❌ Failed to save books: \(error)")
+            print("  ❌ Failed to save books to UserDefaults: \(error)")
             #endif
             errorMessage = "Failed to save library changes"
         }

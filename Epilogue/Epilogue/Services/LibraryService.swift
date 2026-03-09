@@ -5,7 +5,7 @@ import OSLog
 private let logger = Logger(subsystem: "com.epilogue", category: "LibraryService")
 
 /// Unified service for all library data operations
-/// Ensures atomic updates across UserDefaults, SwiftData, Spotlight, and UI
+/// SwiftData is the single source of truth for all book data
 @MainActor
 final class LibraryService {
     static let shared = LibraryService()
@@ -13,9 +13,6 @@ final class LibraryService {
     // MARK: - Properties
 
     private let modelContainer: ModelContainer
-    private let userDefaults = UserDefaults.standard
-    private let booksKey = "com.epilogue.savedBooks"
-
     // Cache for performance
     private var cachedBooks: [Book]?
     private var lastLoadTime: Date?
@@ -113,7 +110,7 @@ final class LibraryService {
 
     // MARK: - Read Operations
 
-    /// Load all books with intelligent caching
+    /// Load all library books from SwiftData
     func loadBooks() -> [Book] {
         // Return cached books if fresh
         if let cached = cachedBooks,
@@ -122,12 +119,41 @@ final class LibraryService {
             return cached
         }
 
-        // Load from UserDefaults
-        guard let data = userDefaults.data(forKey: booksKey),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
+        let context = ModelContext(modelContainer)
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate { $0.isInLibrary == true }
+        )
+
+        guard var bookModels = try? context.fetch(descriptor) else {
             cachedBooks = []
             lastLoadTime = Date()
             return []
+        }
+
+        // Deduplicate BookModels if any share the same Google Books ID
+        let grouped = Dictionary(grouping: bookModels) { $0.id }
+        let hasDuplicates = grouped.values.contains { $0.count > 1 }
+        if hasDuplicates {
+            bookModels = deduplicateBookModels(grouped: grouped, context: context)
+        }
+
+        var books = bookModels.map { $0.asBook }
+
+        // Safety net: if SwiftData is empty but UserDefaults has books, auto-migrate
+        if books.isEmpty {
+            let booksKey = "com.epilogue.savedBooks"
+            if let data = UserDefaults.standard.data(forKey: booksKey),
+               let udBooks = try? JSONDecoder().decode([Book].self, from: data),
+               !udBooks.isEmpty {
+                logger.warning("⚠️ SwiftData empty but UserDefaults has \(udBooks.count) books — auto-migrating")
+                for book in udBooks {
+                    let model = BookModel(from: book)
+                    model.isInLibrary = true
+                    context.insert(model)
+                }
+                try? context.save()
+                books = udBooks
+            }
         }
 
         cachedBooks = books
@@ -140,221 +166,166 @@ final class LibraryService {
         loadBooks().first(where: { $0.id == id })
     }
 
+    /// Deduplicate BookModels that share the same Google Books ID.
+    /// Keeps the "best" copy (most data) and reassigns relationships from duplicates.
+    private func deduplicateBookModels(grouped: [String: [BookModel]], context: ModelContext) -> [BookModel] {
+        var keepers: [BookModel] = []
+
+        for (_, models) in grouped {
+            if models.count == 1 {
+                keepers.append(models[0])
+                continue
+            }
+
+            // Pick the best keeper: enriched > not enriched, most relationships > fewer
+            let sorted = models.sorted { a, b in
+                scoreForDedup(a) > scoreForDedup(b)
+            }
+
+            let keeper = sorted[0]
+            keepers.append(keeper)
+
+            // Reassign relationships from duplicates to keeper, then delete
+            for duplicate in sorted.dropFirst() {
+                // Reassign notes
+                for note in duplicate.notes ?? [] {
+                    note.book = keeper
+                }
+                // Reassign quotes
+                for quote in duplicate.quotes ?? [] {
+                    quote.book = keeper
+                }
+                // Reassign questions
+                for question in duplicate.questions ?? [] {
+                    question.book = keeper
+                }
+                // Reassign ambient sessions
+                for session in duplicate.sessions ?? [] {
+                    session.bookModel = keeper
+                }
+                // Reassign reading sessions
+                for rs in duplicate.readingSessions ?? [] {
+                    rs.bookModel = keeper
+                }
+                // Reassign insights
+                for insight in duplicate.insights ?? [] {
+                    insight.book = keeper
+                }
+                // Reassign memory entries
+                for entry in duplicate.memoryEntries ?? [] {
+                    entry.book = keeper
+                }
+                // Reassign memory threads
+                for thread in duplicate.memoryThreads ?? [] {
+                    thread.book = keeper
+                }
+
+                context.delete(duplicate)
+            }
+
+            logger.warning("⚠️ Deduplicated '\(keeper.title)' — removed \(sorted.count - 1) duplicate(s)")
+        }
+
+        try? context.save()
+        return keepers
+    }
+
+    /// Score a BookModel for dedup ranking — higher score = more data = keep this one
+    private func scoreForDedup(_ model: BookModel) -> Int {
+        var score = 0
+        if model.isEnriched { score += 100 }
+        score += model.notes?.count ?? 0
+        score += model.quotes?.count ?? 0
+        score += model.questions?.count ?? 0
+        score += model.sessions?.count ?? 0
+        return score
+    }
+
     // MARK: - Update Operations
 
-    /// Update book status atomically across all storage layers
+    /// Update book status in SwiftData
     func updateBookStatus(_ bookId: String, status: ReadingStatus) async throws {
         logger.info("📚 Updating book status: \(bookId) → \(status.rawValue)")
 
-        // 1. Update UserDefaults
-        var books = loadBooks()
-        guard let index = books.firstIndex(where: { $0.id == bookId }) else {
-            throw LibraryError.bookNotFound(bookId)
-        }
-
-        books[index].readingStatus = status
-        try saveBooks(books)
-
-        // 2. Update SwiftData
         let context = ModelContext(modelContainer)
         let descriptor = FetchDescriptor<BookModel>(
             predicate: #Predicate { $0.id == bookId }
         )
 
-        if let bookModel = try? context.fetch(descriptor).first {
-            bookModel.readingStatus = status.rawValue
-            try context.save()
-            logger.debug("  ✅ Updated SwiftData")
+        guard let bookModel = try context.fetch(descriptor).first else {
+            throw LibraryError.bookNotFound(bookId)
         }
 
-        // 3. Update Spotlight
-        SpotlightIndexingService.shared.indexBook(books[index])
+        bookModel.readingStatus = status.rawValue
+        try context.save()
 
-        // 4. Notify UI
+        // Update Spotlight
+        SpotlightIndexingService.shared.indexBook(bookModel.asBook)
+
+        // Invalidate cache and notify UI
+        cachedBooks = nil
         NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Book status updated successfully")
     }
 
-    /// Update book rating atomically
+    /// Update book rating in SwiftData
     func updateBookRating(_ bookId: String, rating: Double) async throws {
         logger.info("⭐️ Updating book rating: \(bookId) → \(rating)")
 
         let clampedRating = min(max(rating, 0.0), 5.0)
 
-        // 1. Update UserDefaults
-        var books = loadBooks()
-        guard let index = books.firstIndex(where: { $0.id == bookId }) else {
-            throw LibraryError.bookNotFound(bookId)
-        }
-
-        books[index].userRating = clampedRating
-        try saveBooks(books)
-
-        // 2. Update SwiftData
         let context = ModelContext(modelContainer)
         let descriptor = FetchDescriptor<BookModel>(
             predicate: #Predicate { $0.id == bookId }
         )
 
-        if let bookModel = try? context.fetch(descriptor).first {
-            bookModel.userRating = clampedRating
-            try context.save()
-            logger.debug("  ✅ Updated SwiftData")
+        guard let bookModel = try context.fetch(descriptor).first else {
+            throw LibraryError.bookNotFound(bookId)
         }
 
-        // 3. Update Spotlight
-        SpotlightIndexingService.shared.indexBook(books[index])
+        bookModel.userRating = clampedRating
+        try context.save()
 
-        // 4. Notify UI
+        // Update Spotlight
+        SpotlightIndexingService.shared.indexBook(bookModel.asBook)
+
+        // Invalidate cache and notify UI
+        cachedBooks = nil
         NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Book rating updated successfully")
     }
 
-    /// Update current page atomically across all storage layers
+    /// Update current page in SwiftData
     func updateCurrentPage(_ bookId: String, page: Int) async throws {
         logger.info("📖 Updating current page: \(bookId) → \(page)")
 
-        // 1. Update UserDefaults
-        var books = loadBooks()
-        guard let index = books.firstIndex(where: { $0.id == bookId }) else {
-            throw LibraryError.bookNotFound(bookId)
-        }
-
         let validPage = max(0, page)
-        books[index].currentPage = validPage
 
-        // Auto-mark as Read at 100%
-        if let pageCount = books[index].pageCount, pageCount > 0, validPage >= pageCount {
-            books[index].readingStatus = .read
-        }
-
-        try saveBooks(books)
-
-        // 2. Update SwiftData
         let context = ModelContext(modelContainer)
         let descriptor = FetchDescriptor<BookModel>(
             predicate: #Predicate { $0.id == bookId }
         )
 
-        if let bookModel = try? context.fetch(descriptor).first {
-            bookModel.currentPage = validPage
-            if let pageCount = bookModel.pageCount, pageCount > 0, validPage >= pageCount {
-                bookModel.readingStatus = ReadingStatus.read.rawValue
-            }
-            try context.save()
-            logger.debug("  ✅ Updated SwiftData")
+        guard let bookModel = try context.fetch(descriptor).first else {
+            throw LibraryError.bookNotFound(bookId)
         }
 
-        // 3. Notify UI
+        bookModel.currentPage = validPage
+
+        // Auto-mark as Read at 100%
+        if let pageCount = bookModel.pageCount, pageCount > 0, validPage >= pageCount {
+            bookModel.readingStatus = ReadingStatus.read.rawValue
+        }
+
+        try context.save()
+
+        // Invalidate cache and notify UI
+        cachedBooks = nil
         NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
         logger.info("✅ Current page updated successfully")
-    }
-
-    /// Sync a single BookModel's mutable fields to UserDefaults
-    func syncBookModelToUserDefaults(_ bookModel: BookModel) {
-        var books = loadBooks()
-
-        if let index = books.firstIndex(where: { $0.id == bookModel.id }) {
-            // Update mutable fields from SwiftData → UserDefaults
-            books[index].currentPage = max(books[index].currentPage, bookModel.currentPage)
-            books[index].readingStatus = ReadingStatus(rawValue: bookModel.readingStatus) ?? books[index].readingStatus
-            if let rating = bookModel.userRating {
-                books[index].userRating = rating
-            }
-            if let notes = bookModel.userNotes, !notes.isEmpty {
-                books[index].userNotes = notes
-            }
-            if let coverURL = bookModel.coverImageURL {
-                books[index].coverImageURL = coverURL
-            }
-        } else {
-            // Book exists in SwiftData but not UserDefaults — add it
-            books.append(bookModel.asBook)
-        }
-
-        try? saveBooks(books)
-    }
-
-    /// Reconcile UserDefaults and SwiftData on startup
-    /// Rule: currentPage = max(both), other mutable fields = SwiftData wins
-    func reconcileStores() {
-        logger.info("🔄 Reconciling UserDefaults ↔ SwiftData...")
-
-        let context = ModelContext(modelContainer)
-        var udBooks = loadBooks()
-        let descriptor = FetchDescriptor<BookModel>()
-
-        guard let sdBooks = try? context.fetch(descriptor) else {
-            logger.warning("⚠️ Could not fetch SwiftData books for reconciliation")
-            return
-        }
-
-        var udChanged = false
-        var sdChanged = false
-
-        // Pass 1: Sync SwiftData → UserDefaults
-        for sdBook in sdBooks {
-            if let udIndex = udBooks.firstIndex(where: { $0.id == sdBook.id }) {
-                // Reconcile mutable fields
-                let maxPage = max(udBooks[udIndex].currentPage, sdBook.currentPage)
-                if udBooks[udIndex].currentPage != maxPage {
-                    udBooks[udIndex].currentPage = maxPage
-                    udChanged = true
-                }
-                if sdBook.currentPage != maxPage {
-                    sdBook.currentPage = maxPage
-                    sdChanged = true
-                }
-
-                // SwiftData wins for status/rating/notes
-                let sdStatus = ReadingStatus(rawValue: sdBook.readingStatus) ?? .wantToRead
-                if udBooks[udIndex].readingStatus != sdStatus {
-                    udBooks[udIndex].readingStatus = sdStatus
-                    udChanged = true
-                }
-                if let sdRating = sdBook.userRating, udBooks[udIndex].userRating != sdRating {
-                    udBooks[udIndex].userRating = sdRating
-                    udChanged = true
-                }
-                if let sdNotes = sdBook.userNotes, !sdNotes.isEmpty, udBooks[udIndex].userNotes != sdNotes {
-                    udBooks[udIndex].userNotes = sdNotes
-                    udChanged = true
-                }
-            } else {
-                // Book in SwiftData but not UserDefaults — add it
-                udBooks.append(sdBook.asBook)
-                udChanged = true
-                logger.debug("  ➕ Added SwiftData-only book to UserDefaults: \(sdBook.title)")
-            }
-        }
-
-        // Pass 2: Sync UserDefaults → SwiftData (books that exist only in UD)
-        for udBook in udBooks {
-            let bookId = udBook.id
-            if !sdBooks.contains(where: { $0.id == bookId }) {
-                // Book in UserDefaults but not SwiftData — create BookModel
-                let newModel = BookModel(from: udBook)
-                context.insert(newModel)
-                sdChanged = true
-                logger.debug("  ➕ Created SwiftData BookModel from UserDefaults: \(udBook.title)")
-            }
-        }
-
-        // Save changes
-        if udChanged {
-            try? saveBooks(udBooks)
-            logger.info("  ✅ UserDefaults updated during reconciliation")
-        }
-        if sdChanged {
-            try? context.save()
-            logger.info("  ✅ SwiftData updated during reconciliation")
-        }
-
-        let totalBooks = udBooks.count
-        logger.info("🔄 Reconciliation complete: \(totalBooks) books in sync")
     }
 
     // MARK: - Delete Operations
@@ -363,37 +334,30 @@ final class LibraryService {
     func deleteBook(_ bookId: String) async throws {
         logger.info("🗑️ Deleting book: \(bookId)")
 
-        // 1. Delete from UserDefaults
-        var books = loadBooks()
-        guard let index = books.firstIndex(where: { $0.id == bookId }) else {
-            throw LibraryError.bookNotFound(bookId)
-        }
-
-        let removedBook = books.remove(at: index)
-        try saveBooks(books)
-
-        // 2. Delete from SwiftData with CASCADE
         let context = ModelContext(modelContainer)
         let descriptor = FetchDescriptor<BookModel>(
             predicate: #Predicate { $0.id == bookId }
         )
 
-        if let bookModel = try? context.fetch(descriptor).first {
-            // SwiftData cascade rules on BookModel handle related data deletion
-            // (notes, quotes, questions, sessions all have deleteRule: .cascade)
-            context.delete(bookModel)
-            try context.save()
-
-            logger.info("  ✅ Deleted from SwiftData with cascade")
+        guard let bookModel = try context.fetch(descriptor).first else {
+            throw LibraryError.bookNotFound(bookId)
         }
 
-        // 3. Remove from Spotlight
+        let title = bookModel.title
+
+        // SwiftData cascade rules handle related data deletion
+        // (notes, quotes, questions, sessions all have deleteRule: .cascade)
+        context.delete(bookModel)
+        try context.save()
+
+        // Remove from Spotlight
         SpotlightIndexingService.shared.deindexBook(bookId)
 
-        // 4. Notify UI
+        // Invalidate cache and notify UI
+        cachedBooks = nil
         NotificationCenter.default.post(name: .refreshLibrary, object: nil)
 
-        logger.info("✅ Book deleted successfully: '\(removedBook.title)'")
+        logger.info("✅ Book deleted successfully: '\(title)'")
     }
 
     // MARK: - Search Operations
@@ -623,20 +587,6 @@ final class LibraryService {
     }
 
     // MARK: - Helper Methods
-
-    private func saveBooks(_ books: [Book]) throws {
-        let encoded = try JSONEncoder().encode(books)
-        userDefaults.set(encoded, forKey: booksKey)
-
-        // Invalidate cache
-        cachedBooks = books
-        lastLoadTime = Date()
-
-        // Force sync
-        userDefaults.synchronize()
-
-        logger.debug("💾 Saved \(books.count) books to UserDefaults")
-    }
 
     private func generateStandardMarkdown(book: Book, quotes: [CapturedQuote], notes: [CapturedNote]) -> String {
         var markdown = "# \(book.title)\n\n"

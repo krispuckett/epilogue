@@ -24,49 +24,37 @@ struct LogPagesIntent: AppIntent {
             throw IntentError.message("No book selected. Please specify which book you're reading.")
         }
 
-        // Update book progress in UserDefaults
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              var books = try? JSONDecoder().decode([Book].self, from: data) else {
-            throw IntentError.message("Could not load your library")
-        }
-
-        guard let index = books.firstIndex(where: { $0.id == bookEntity.id }) else {
+        // Load book from SwiftData
+        guard let targetBook = LibraryService.shared.findBook(id: bookEntity.id) else {
             throw IntentError.message("Book not found in library")
         }
 
-        // Update page count
-        let oldPage = books[index].currentPage
-        books[index].currentPage = min(oldPage + pageCount, books[index].pageCount ?? oldPage + pageCount)
-        let newPage = books[index].currentPage
+        // Calculate new page
+        let oldPage = targetBook.currentPage
+        let newPage = min(oldPage + pageCount, targetBook.pageCount ?? oldPage + pageCount)
 
         // Check if book is now finished
-        let isNowFinished = if let totalPages = books[index].pageCount {
+        let isNowFinished = if let totalPages = targetBook.pageCount {
             newPage >= totalPages
         } else {
             false
         }
 
-        if isNowFinished && books[index].readingStatus != .read {
-            books[index].readingStatus = .read
-        }
+        // Update in SwiftData
+        try await LibraryService.shared.updateCurrentPage(bookEntity.id, page: newPage)
 
-        // Save back to UserDefaults
-        if let encoded = try? JSONEncoder().encode(books) {
-            UserDefaults.standard.set(encoded, forKey: "com.epilogue.savedBooks")
-            UserDefaults.standard.synchronize()
+        if isNowFinished && targetBook.readingStatus != .read {
+            try await LibraryService.shared.updateBookStatus(bookEntity.id, status: .read)
         }
-
-        // Sync to SwiftData to prevent desync
-        try? await LibraryService.shared.updateCurrentPage(bookEntity.id, page: newPage)
 
         // Create message
         var message = "Logged \(pageCount) pages for \(bookEntity.title)"
-        if let totalPages = books[index].pageCount {
+        if let totalPages = targetBook.pageCount {
             let percentage = Int((Double(newPage) / Double(totalPages)) * 100)
             message += ". You're \(percentage)% done!"
 
             if isNowFinished {
-                message += " 🎉 Congratulations, you finished the book!"
+                message += " Congratulations, you finished the book!"
             }
         } else {
             message += ". You're now on page \(newPage)."

@@ -19,10 +19,7 @@ struct SearchQuotesIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<[QuoteEntity]> & ProvidesDialog {
         // Load books for context
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data) else {
-            throw IntentError.message("Could not load library")
-        }
+        let books = LibraryService.shared.loadBooks()
 
         // Fetch all quotes from SwiftData
         guard let container = try? ModelContainer(

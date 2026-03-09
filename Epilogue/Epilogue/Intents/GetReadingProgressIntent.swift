@@ -14,15 +14,14 @@ struct GetReadingProgressIntent: AppIntent {
         Summary("Get reading progress for \(\.$book)")
     }
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let bookEntity = book else {
             throw IntentError.message("No book selected")
         }
 
-        // Load books from UserDefaults
-        guard let data = UserDefaults.standard.data(forKey: "com.epilogue.savedBooks"),
-              let books = try? JSONDecoder().decode([Book].self, from: data),
-              let targetBook = books.first(where: { $0.id == bookEntity.id }) else {
+        // Load book from SwiftData
+        guard let targetBook = LibraryService.shared.findBook(id: bookEntity.id) else {
             throw IntentError.message("Book not found in library")
         }
 
