@@ -16,16 +16,19 @@ struct CoverClassifier {
         let averageChroma: Double          // Mean chroma across image
         let hueRange: Double               // Range of hues present (0-360)
         let dominantLightness: Double      // Weighted average lightness
+        let dominantHues: [Double]         // Top hue centers in degrees, sorted by pixel area
 
         /// Human-readable summary
         var summary: String {
-            """
+            let hueStr = dominantHues.map { String(format: "%.0f°", $0) }.joined(separator: ", ")
+            return """
             Cover Classification: \(coverType.rawValue)
               Dark pixels: \(String(format: "%.1f%%", darkPixelPercentage * 100))
               Light pixels: \(String(format: "%.1f%%", lightPixelPercentage * 100))
               Avg chroma: \(String(format: "%.3f", averageChroma))
               Hue range: \(String(format: "%.0f°", hueRange))
               Dominant lightness: \(String(format: "%.2f", dominantLightness))
+              Dominant hues: [\(hueStr)]
             """
         }
     }
@@ -73,7 +76,8 @@ struct CoverClassifier {
                 lightPixelPercentage: 0,
                 averageChroma: 0.1,
                 hueRange: 180,
-                dominantLightness: 0.5
+                dominantLightness: 0.5,
+                dominantHues: []
             )
         }
 
@@ -140,7 +144,8 @@ struct CoverClassifier {
                 lightPixelPercentage: 0,
                 averageChroma: 0.1,
                 hueRange: 180,
-                dominantLightness: 0.5
+                dominantLightness: 0.5,
+                dominantHues: []
             )
         }
 
@@ -154,6 +159,9 @@ struct CoverClassifier {
 
         // Calculate hue range
         let hueRange = calculateHueRange(histogram: hueHistogram)
+
+        // Extract dominant hues sorted by pixel area
+        let dominantHues = extractDominantHues(histogram: hueHistogram)
 
         // Determine cover type
         let coverType = determineCoverType(
@@ -169,7 +177,8 @@ struct CoverClassifier {
             lightPixelPercentage: lightPercentage,
             averageChroma: avgChroma,
             hueRange: hueRange,
-            dominantLightness: dominantL
+            dominantLightness: dominantL,
+            dominantHues: dominantHues
         )
     }
 
@@ -203,6 +212,51 @@ struct CoverClassifier {
 
         // Range is 360 - largest gap
         return Double((36 - maxGap) * 10)
+    }
+
+    /// Extract top dominant hues from the histogram, sorted by pixel count descending.
+    /// Returns hue centers in degrees (e.g., [140, 60, 240] = green, gold, blue).
+    private static func extractDominantHues(histogram: [Int], maxHues: Int = 4) -> [Double] {
+        // Merge adjacent buckets to form hue clusters (avoids splitting one color across buckets)
+        var clusters: [(hueCenter: Double, count: Int)] = []
+        var visited = Set<Int>()
+
+        // Sort buckets by count descending
+        let sortedBuckets = histogram.enumerated()
+            .filter { $0.element > 0 }
+            .sorted { $0.element > $1.element }
+
+        for (bucket, count) in sortedBuckets {
+            guard !visited.contains(bucket) else { continue }
+
+            // Merge with adjacent buckets
+            var totalCount = count
+            var weightedHue: Double = Double(bucket) * 10 * Double(count)
+            visited.insert(bucket)
+
+            // Check neighbors (wrapping around 360°)
+            for offset in [-1, 1, -2, 2] {
+                let neighbor = (bucket + offset + 36) % 36
+                if !visited.contains(neighbor) && histogram[neighbor] > 0 {
+                    let neighborCount = histogram[neighbor]
+                    // Only merge if neighbor is at least 20% of current peak
+                    if neighborCount >= count / 5 {
+                        totalCount += neighborCount
+                        weightedHue += Double(neighbor) * 10 * Double(neighborCount)
+                        visited.insert(neighbor)
+                    }
+                }
+            }
+
+            let center = weightedHue / Double(totalCount)
+            clusters.append((hueCenter: center.truncatingRemainder(dividingBy: 360), count: totalCount))
+        }
+
+        // Sort by pixel count and return top hues
+        return clusters
+            .sorted { $0.count > $1.count }
+            .prefix(maxHues)
+            .map { $0.hueCenter }
     }
 
     /// Determine cover type from metrics

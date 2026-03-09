@@ -102,40 +102,244 @@ struct UnifiedAtmosphericGradient: View {
     }
 
     var body: some View {
-        let config = preset.config
-
         GeometryReader { geometry in
             ZStack {
-                // Base: Pure black
                 Color.black
                     .ignoresSafeArea()
 
-                // Main gradient layer
-                mainGradientLayer(config: config, geometry: geometry)
-
-                // Accent radial layer (depth)
-                if config.accentOpacity > 0 {
-                    accentLayer(config: config)
+                if preset == .atmospheric {
+                    // v2: Multi-layer cover-type-aware atmospheric rendering
+                    atmosphericLayers(geometry: geometry)
+                } else {
+                    // Other presets: simple gradient rendering
+                    simpleGradientLayer(config: preset.config, geometry: geometry)
+                    if preset.config.accentOpacity > 0 {
+                        simpleAccentLayer(config: preset.config)
+                    }
                 }
 
-                // Voice pulse overlay
+                // Voice pulse overlay (all presets)
                 if audioLevel > 0.3 {
                     voicePulseOverlay
                 }
 
                 // Subtle noise texture
-                if config.noiseOpacity > 0 {
-                    noiseTexture(opacity: config.noiseOpacity)
-                }
+                noiseTexture(opacity: 0.04)
             }
         }
         .ignoresSafeArea()
     }
 
-    // MARK: - Gradient Layers
+    // MARK: - Atmospheric Layers (v2 — cover-type-aware)
 
     @ViewBuilder
-    private func mainGradientLayer(config: GradientConfig, geometry: GeometryProxy) -> some View {
+    private func atmosphericLayers(geometry: GeometryProxy) -> some View {
+        let voiceBoost = 1.0 + Double(audioLevel) * 0.5
+        let voiceScale = 1.0 + Double(audioLevel) * 0.08
+
+        // Layer 1: Primary cascade — cover-type-aware stop distribution
+        primaryCascade(voiceBoost: voiceBoost)
+            .blur(radius: 35 - Double(audioLevel) * 8)
+            .scaleEffect(voiceScale)
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.1), value: audioLevel)
+
+        // Layer 2: Accent bloom — radiates from cover area, not a corner
+        accentBloom
+
+        // Layer 3: Harmony depth — complementary wash adds tonal depth
+        harmonyDepthLayer
+
+        // Layer 4: Analogous edge tint — subtle warmth at margins
+        analogousEdgeTint
+    }
+
+    // MARK: - Layer 1: Primary Cascade
+
+    @ViewBuilder
+    private func primaryCascade(voiceBoost: Double) -> some View {
+        let i = intensity * voiceBoost
+
+        LinearGradient(
+            stops: coverTypeStops(intensity: i),
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    /// Cover-type-aware gradient stops — each type has different
+    /// reach, opacity curve, and color role separation.
+    private func coverTypeStops(intensity i: Double) -> [Gradient.Stop] {
+        switch palette.coverType {
+        case .dark:
+            // Dark covers: Strong primary, long reach, accent punches through mid-section
+            return [
+                .init(color: palette.primary.color.opacity(i * 0.95), location: 0.0),
+                .init(color: palette.secondary.color.opacity(i * 0.78), location: 0.14),
+                .init(color: palette.accent.color.opacity(i * 0.58), location: 0.30),
+                .init(color: palette.background.color.opacity(i * 0.32), location: 0.50),
+                .init(color: Color.clear, location: 0.72)
+            ]
+        case .vibrant:
+            // Vibrant: Restrained elegance — shorter reach, gentle opacity curve
+            return [
+                .init(color: palette.primary.color.opacity(i * 0.82), location: 0.0),
+                .init(color: palette.secondary.color.opacity(i * 0.58), location: 0.18),
+                .init(color: palette.accent.color.opacity(i * 0.32), location: 0.35),
+                .init(color: Color.clear, location: 0.52)
+            ]
+        case .muted:
+            // Muted: Push harder — wider reach, higher opacity to compensate
+            return [
+                .init(color: palette.primary.color.opacity(i * 0.92), location: 0.0),
+                .init(color: palette.secondary.color.opacity(i * 0.75), location: 0.16),
+                .init(color: palette.accent.color.opacity(i * 0.55), location: 0.34),
+                .init(color: palette.background.color.opacity(i * 0.30), location: 0.55),
+                .init(color: Color.clear, location: 0.75)
+            ]
+        case .light:
+            // Light: Deeper tones to avoid washout, moderate reach
+            return [
+                .init(color: palette.primary.color.opacity(i * 0.88), location: 0.0),
+                .init(color: palette.secondary.color.opacity(i * 0.68), location: 0.16),
+                .init(color: palette.accent.color.opacity(i * 0.42), location: 0.32),
+                .init(color: Color.clear, location: 0.55)
+            ]
+        case .monochromatic:
+            // Monochromatic: Standard reach, harmony layers do the heavy lifting
+            return [
+                .init(color: palette.primary.color.opacity(i * 0.88), location: 0.0),
+                .init(color: palette.secondary.color.opacity(i * 0.70), location: 0.16),
+                .init(color: palette.accent.color.opacity(i * 0.45), location: 0.34),
+                .init(color: palette.background.color.opacity(i * 0.22), location: 0.52),
+                .init(color: Color.clear, location: 0.68)
+            ]
+        case .balanced:
+            // Balanced: Confident standard
+            return [
+                .init(color: palette.primary.color.opacity(i * 0.90), location: 0.0),
+                .init(color: palette.secondary.color.opacity(i * 0.72), location: 0.16),
+                .init(color: palette.accent.color.opacity(i * 0.48), location: 0.33),
+                .init(color: palette.background.color.opacity(i * 0.25), location: 0.52),
+                .init(color: Color.clear, location: 0.70)
+            ]
+        }
+    }
+
+    // MARK: - Layer 2: Accent Bloom
+
+    /// Accent color radiates from the cover area (top-center),
+    /// not from a fixed corner. Intensity varies by cover type.
+    @ViewBuilder
+    private var accentBloom: some View {
+        let bloomConfig = accentBloomConfig
+
+        // Inner concentrated bloom
+        RadialGradient(
+            colors: [
+                palette.accent.color.opacity(bloomConfig.innerOpacity * intensity),
+                palette.accent.color.opacity(bloomConfig.outerOpacity * intensity),
+                Color.clear
+            ],
+            center: UnitPoint(x: 0.5, y: 0.22),
+            startRadius: 20,
+            endRadius: bloomConfig.radius
+        )
+        .blur(radius: 30)
+        .ignoresSafeArea()
+
+        // Wider secondary bloom using vibrant primary for depth
+        RadialGradient(
+            colors: [
+                palette.vibrantPrimary.color.opacity(bloomConfig.outerOpacity * 0.8 * intensity),
+                Color.clear
+            ],
+            center: UnitPoint(x: 0.4, y: 0.18),
+            startRadius: 60,
+            endRadius: bloomConfig.radius * 1.2
+        )
+        .blur(radius: 40)
+        .ignoresSafeArea()
+    }
+
+    private var accentBloomConfig: (innerOpacity: Double, outerOpacity: Double, radius: CGFloat) {
+        switch palette.coverType {
+        case .dark:          return (0.45, 0.18, 300)  // Strong glow — the signature v2 look
+        case .muted:         return (0.38, 0.14, 280)  // Noticeable life
+        case .monochromatic: return (0.35, 0.12, 270)  // Compensate for limited hue variety
+        case .balanced:      return (0.30, 0.10, 260)
+        case .light:         return (0.25, 0.08, 240)
+        case .vibrant:       return (0.18, 0.06, 220)  // Restrained — already colorful
+        }
+    }
+
+    // MARK: - Layer 3: Harmony Depth
+
+    /// Complementary color wash in the mid-section creates tonal depth
+    /// that v1's single-palette gradient structurally cannot achieve.
+    @ViewBuilder
+    private var harmonyDepthLayer: some View {
+        let complementaryOpacity: Double = {
+            switch palette.coverType {
+            case .dark:          return 0.25
+            case .muted:         return 0.28
+            case .monochromatic: return 0.30  // Most benefit — adds hue variety
+            case .balanced:      return 0.20
+            case .light:         return 0.15
+            case .vibrant:       return 0.10  // Just a hint
+            }
+        }()
+
+        // Primary complementary wash — offset right of center
+        RadialGradient(
+            colors: [
+                palette.complementary.color.opacity(complementaryOpacity * intensity),
+                palette.complementary.color.opacity(complementaryOpacity * 0.3 * intensity),
+                Color.clear
+            ],
+            center: UnitPoint(x: 0.78, y: 0.35),
+            startRadius: 30,
+            endRadius: 280
+        )
+        .blur(radius: 45)
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Layer 4: Analogous Edge Tint
+
+    /// Analogous color at the left edge adds warmth and dimensionality.
+    /// For monochromatic covers this is especially important — it's the only
+    /// source of hue variety in the gradient.
+    @ViewBuilder
+    private var analogousEdgeTint: some View {
+        let tintOpacity: Double = {
+            switch palette.coverType {
+            case .monochromatic: return 0.25  // Critical for single-hue covers
+            case .muted:         return 0.22
+            case .dark:          return 0.18
+            case .balanced:      return 0.15
+            case .light:         return 0.12
+            case .vibrant:       return 0.08
+            }
+        }()
+
+        // Left edge: analogous warmth
+        LinearGradient(
+            colors: [
+                palette.analogous.color.opacity(tintOpacity * intensity),
+                Color.clear
+            ],
+            startPoint: .leading,
+            endPoint: UnitPoint(x: 0.45, y: 0.5)
+        )
+        .blur(radius: 40)
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Simple Gradient (non-atmospheric presets)
+
+    @ViewBuilder
+    private func simpleGradientLayer(config: GradientConfig, geometry: GeometryProxy) -> some View {
         let colors = config.useVibrantColors
             ? [palette.vibrantPrimary, palette.vibrantSecondary]
             : [palette.primary, palette.secondary, palette.accent, palette.background]
@@ -144,12 +348,14 @@ struct UnifiedAtmosphericGradient: View {
         let voiceScale = 1.0 + Double(audioLevel) * 0.1
 
         LinearGradient(
-            stops: generateStops(
-                colors: colors,
-                distribution: config.stopDistribution,
-                opacities: config.opacities,
-                intensity: intensity * voiceBoost
-            ),
+            stops: config.stopDistribution.enumerated().map { index, location in
+                let colorIndex = min(index, colors.count - 1)
+                let opacity = index < config.opacities.count ? config.opacities[index] : 0.0
+                return Gradient.Stop(
+                    color: colors[colorIndex].color.opacity(opacity * intensity * voiceBoost),
+                    location: location
+                )
+            },
             startPoint: .top,
             endPoint: .bottom
         )
@@ -159,24 +365,8 @@ struct UnifiedAtmosphericGradient: View {
         .animation(.easeInOut(duration: 0.1), value: audioLevel)
     }
 
-    private func generateStops(
-        colors: [OKLCHColor],
-        distribution: [Double],
-        opacities: [Double],
-        intensity: Double
-    ) -> [Gradient.Stop] {
-        distribution.enumerated().map { index, location in
-            let colorIndex = min(index, colors.count - 1)
-            let opacity = index < opacities.count ? opacities[index] : 0.0
-            return Gradient.Stop(
-                color: colors[colorIndex].color.opacity(opacity * intensity),
-                location: location
-            )
-        }
-    }
-
     @ViewBuilder
-    private func accentLayer(config: GradientConfig) -> some View {
+    private func simpleAccentLayer(config: GradientConfig) -> some View {
         RadialGradient(
             colors: [
                 palette.accent.color.opacity(config.accentOpacity * intensity),
@@ -189,6 +379,8 @@ struct UnifiedAtmosphericGradient: View {
         .blur(radius: 50)
         .ignoresSafeArea()
     }
+
+    // MARK: - Shared Layers
 
     @ViewBuilder
     private var voicePulseOverlay: some View {

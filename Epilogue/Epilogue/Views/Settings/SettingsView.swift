@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("audioFeedback") private var audioFeedback = false
     @AppStorage("alwaysShowInput") private var alwaysShowInput = false
     @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
+    @AppStorage("atmosphereEngineV2") private var atmosphereEngineV2 = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -357,6 +358,33 @@ struct SettingsView: View {
                             }
                         }
                         .tint(.orange)
+
+                        Toggle(isOn: $atmosphereEngineV2) {
+                            HStack {
+                                Image(systemName: "paintpalette.fill")
+                                    .foregroundColor(.cyan)
+                                VStack(alignment: .leading) {
+                                    Text("Atmosphere Engine v2")
+                                        .foregroundColor(.cyan)
+                                    Text("OKLCH perceptual gradients")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .tint(.cyan)
+                        .onChange(of: atmosphereEngineV2) { _, enabled in
+                            #if DEBUG
+                            print("🎨 Atmosphere Engine v2 \(enabled ? "enabled" : "disabled")")
+                            #endif
+                            if enabled {
+                                SensoryFeedback.success()
+                                // Clear palette caches so v2 extractions run fresh
+                                Task {
+                                    AtmosphereEngine.shared.clearAll()
+                                }
+                            }
+                        }
 
                         Button {
                             Task { @MainActor in

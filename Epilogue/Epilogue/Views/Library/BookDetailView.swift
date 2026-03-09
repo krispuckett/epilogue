@@ -114,10 +114,10 @@ struct BookDetailView: View {
     
     // Color extraction
     @State private var colorPalette: ColorPalette?
+    @State private var displayPalette: DisplayPalette?
     @State private var isExtractingColors = false
     @State private var hasLowResColors = false
     @State private var hasHighResColors = false
-    // Remove DisplayColorScheme - we don't need it
     
     // Settings
     @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
@@ -410,11 +410,24 @@ struct BookDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var backgroundGradient: some View {
-        BookAtmosphericGradientView(
-            colorPalette: colorPalette ?? generatePlaceholderPalette(),
-            intensity: gradientIntensity
-        )
+        Group {
+            if AtmosphereEngine.isEnabled, let dp = displayPalette {
+                // v2: OKLCH perceptual gradient with cover-type-aware enhancement
+                UnifiedAtmosphericGradient(
+                    palette: dp,
+                    preset: .atmospheric,
+                    intensity: gradientIntensity
+                )
+            } else {
+                // v1: Legacy HSB enhancement
+                BookAtmosphericGradientView(
+                    colorPalette: colorPalette ?? generatePlaceholderPalette(),
+                    intensity: gradientIntensity
+                )
+            }
+        }
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .opacity(gradientOpacity)
@@ -2108,9 +2121,31 @@ struct BookDetailView: View {
     private func extractColorsFromDisplayedImage(_ displayedImage: UIImage) async {
         // Check cache first - use localId like AmbientMode does
         let bookID = book.localId.uuidString
+
+        // Atmosphere Engine v2 path
+        if AtmosphereEngine.isEnabled {
+            if let dp = await AtmosphereEngine.shared.extractDisplayPalette(
+                from: displayedImage,
+                bookID: bookID,
+                coverURL: book.coverImageURL
+            ) {
+                self.displayPalette = dp
+                self.colorPalette = dp.toLegacy()
+                return
+            }
+            // Fall through to legacy path if v2 extraction fails
+        }
+
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
+
+                // Upgrade to DisplayPalette if v2 is on
+                if AtmosphereEngine.isEnabled {
+                    self.displayPalette = AtmosphereEngine.shared.upgradeToDisplayPalette(
+                        cachedPalette, coverImage: displayedImage, bookID: bookID
+                    )
+                }
 
                 // Save cached colors to BookModel for widgets if not already saved
                 if let bookModel = bookModel, bookModel.extractedColors == nil || bookModel.extractedColors?.isEmpty == true {
@@ -2242,9 +2277,32 @@ struct BookDetailView: View {
     private func extractColorsFromCover() async {
         // Check cache first - use localId like AmbientMode does
         let bookID = book.localId.uuidString
+
+        // Atmosphere Engine v2: try full pipeline first when enabled
+        if AtmosphereEngine.isEnabled, let coverURL = book.coverImageURL {
+            if let dp = await AtmosphereEngine.shared.extractDisplayPalette(
+                bookID: bookID,
+                coverURL: coverURL
+            ) {
+                self.displayPalette = dp
+                self.colorPalette = dp.toLegacy()
+                #if DEBUG
+                print("🎨 Atmosphere v2 pipeline complete for: \(book.title) [\(dp.coverType.rawValue)]")
+                #endif
+                return
+            }
+        }
+
         if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
             await MainActor.run {
                 self.colorPalette = cachedPalette
+
+                // Upgrade to DisplayPalette if v2 is on
+                if AtmosphereEngine.isEnabled {
+                    self.displayPalette = AtmosphereEngine.shared.upgradeToDisplayPalette(
+                        cachedPalette, coverImage: nil, bookID: bookID
+                    )
+                }
 
                 // Save cached colors to BookModel for widgets if not already saved
                 if let bookModel = bookModel, bookModel.extractedColors == nil || bookModel.extractedColors?.isEmpty == true {

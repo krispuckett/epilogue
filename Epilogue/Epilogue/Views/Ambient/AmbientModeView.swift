@@ -900,18 +900,35 @@ struct AmbientModeView: View {
                 if let book = currentBookContext {
                     // Use book-specific gradient with extracted colors
                     let palette = colorPalette ?? generatePlaceholderPalette(for: book)
-                    BookAtmosphericGradientView(
-                        colorPalette: palette, 
-                        intensity: gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85),
-                        audioLevel: isRecording ? audioLevel : 0
-                    )
-                    .ignoresSafeArea(.all)
-                    .allowsHitTesting(false)
-                    .opacity(gradientOpacity)
-                    // Only animate opacity, not position or scale
-                    .animation(.easeInOut(duration: 1.0), value: gradientOpacity)
-                    .transition(.opacity) // Simple opacity transition
-                    .id(book.localId)
+                    let ambientIntensity = gradientIntensity * (isRecording ? 0.9 + Double(audioLevel) * 0.3 : 0.85)
+                    let ambientAudio: Float = isRecording ? audioLevel : 0
+
+                    if AtmosphereEngine.isEnabled {
+                        UnifiedAtmosphericGradient(
+                            legacyPalette: palette,
+                            preset: .atmospheric,
+                            intensity: ambientIntensity,
+                            audioLevel: ambientAudio
+                        )
+                        .ignoresSafeArea(.all)
+                        .allowsHitTesting(false)
+                        .opacity(gradientOpacity)
+                        .animation(.easeInOut(duration: 1.0), value: gradientOpacity)
+                        .transition(.opacity)
+                        .id(book.localId)
+                    } else {
+                        BookAtmosphericGradientView(
+                            colorPalette: palette,
+                            intensity: ambientIntensity,
+                            audioLevel: ambientAudio
+                        )
+                        .ignoresSafeArea(.all)
+                        .allowsHitTesting(false)
+                        .opacity(gradientOpacity)
+                        .animation(.easeInOut(duration: 1.0), value: gradientOpacity)
+                        .transition(.opacity)
+                        .id(book.localId)
+                    }
                 } else {
                     // Default warm ambient gradient with smooth fade
                     AmbientChatGradientView()

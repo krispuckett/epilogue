@@ -33,52 +33,54 @@ enum CoverType: String, Codable, CaseIterable {
     var enhancementConfig: OKLCHColor.EnhancementConfig {
         switch self {
         case .dark:
-            // Dark covers - moderate boost, visible but not neon
+            // Dark covers — lift accents so they pop against the void.
+            // Higher minLightness forces dim reds/blues into visible range.
             return OKLCHColor.EnhancementConfig(
-                chromaMultiplier: 1.2,
-                minLightness: 0.45,
-                maxLightness: 0.80,
-                maxChroma: 0.32
+                chromaMultiplier: 1.35,
+                minLightness: 0.50,
+                maxLightness: 0.82,
+                maxChroma: 0.34
             )
         case .light:
-            // Light covers - boost to make colors pop
-            return OKLCHColor.EnhancementConfig(
-                chromaMultiplier: 1.25,
-                minLightness: 0.40,
-                maxLightness: 0.75,
-                maxChroma: 0.30
-            )
-        case .vibrant:
-            // Already vibrant - slight reduction
-            return OKLCHColor.EnhancementConfig(
-                chromaMultiplier: 1.0,
-                minLightness: 0.42,
-                maxLightness: 0.78,
-                maxChroma: 0.30
-            )
-        case .muted:
-            // Muted covers need real boost
-            return OKLCHColor.EnhancementConfig(
-                chromaMultiplier: 1.4,
-                minLightness: 0.45,
-                maxLightness: 0.80,
-                maxChroma: 0.32
-            )
-        case .monochromatic:
-            // Single-hue - moderate enhancement
+            // Light covers — deepen slightly so gradient isn't washed out
             return OKLCHColor.EnhancementConfig(
                 chromaMultiplier: 1.2,
-                minLightness: 0.42,
-                maxLightness: 0.82,
+                minLightness: 0.35,
+                maxLightness: 0.70,
                 maxChroma: 0.28
             )
-        case .balanced:
-            // Standard enhancement
+        case .vibrant:
+            // Already saturated — restrained elegance. Slight chroma *reduction*
+            // prevents neon while preserving the cover's natural punch.
             return OKLCHColor.EnhancementConfig(
-                chromaMultiplier: 1.2,
-                minLightness: 0.42,
-                maxLightness: 0.78,
+                chromaMultiplier: 0.95,
+                minLightness: 0.40,
+                maxLightness: 0.75,
+                maxChroma: 0.28
+            )
+        case .muted:
+            // Muted covers need real lift to have any gradient presence
+            return OKLCHColor.EnhancementConfig(
+                chromaMultiplier: 1.5,
+                minLightness: 0.48,
+                maxLightness: 0.82,
+                maxChroma: 0.34
+            )
+        case .monochromatic:
+            // Single-hue — moderate boost, rely on harmony colors for variety
+            return OKLCHColor.EnhancementConfig(
+                chromaMultiplier: 1.25,
+                minLightness: 0.45,
+                maxLightness: 0.80,
                 maxChroma: 0.30
+            )
+        case .balanced:
+            // Standard treatment
+            return OKLCHColor.EnhancementConfig(
+                chromaMultiplier: 1.25,
+                minLightness: 0.44,
+                maxLightness: 0.78,
+                maxChroma: 0.32
             )
         }
     }
@@ -127,7 +129,7 @@ public struct DisplayPalette: Codable, Equatable {
     let version: Int
 
     /// Current cache version - increment when algorithm changes
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     // MARK: - Initialization
 

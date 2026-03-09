@@ -46,6 +46,9 @@ enum FeatureFlag: String, CaseIterable {
     case imagePreloading = "feature.performance.image_preloading"
     case backgroundSync = "feature.performance.background_sync"
 
+    // Visual Features
+    case atmosphereEngineV2 = "feature.visual.atmosphere_v2"
+
     // Experimental Features
     case experimentalGestures = "feature.experimental.gestures"
     case experimentalAnimations = "feature.experimental.animations"
@@ -68,6 +71,7 @@ enum FeatureFlag: String, CaseIterable {
         case .aggressiveCaching: return true
         case .imagePreloading: return true
         case .backgroundSync: return false
+        case .atmosphereEngineV2: return false
         case .experimentalGestures: return false
         case .experimentalAnimations: return false
         case .experimentalCustomCamera: return false
@@ -91,6 +95,7 @@ enum FeatureFlag: String, CaseIterable {
         case .aggressiveCaching: return "Aggressive Caching"
         case .imagePreloading: return "Image Preloading"
         case .backgroundSync: return "Background Sync"
+        case .atmosphereEngineV2: return "Atmosphere Engine v2"
         case .experimentalGestures: return "Experimental Gestures"
         case .experimentalAnimations: return "Experimental Animations"
         case .experimentalCustomCamera: return "Custom Camera (Text Capture)"
@@ -340,6 +345,11 @@ final class FeatureFlags {
 
     var isCustomCameraEnabled: Bool {
         isEnabled(.experimentalCustomCamera)
+    }
+
+    var isAtmosphereV2Enabled: Bool {
+        // Check both feature flag and Gandalf AppStorage toggle
+        UserDefaults.standard.bool(forKey: "atmosphereEngineV2")
     }
 }
 
