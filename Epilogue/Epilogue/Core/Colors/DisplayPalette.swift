@@ -165,6 +165,26 @@ public struct DisplayPalette: Codable, Equatable {
         self.version = Self.currentVersion
     }
 
+    // MARK: - Role Accessors
+
+    /// Glow role — higher-lightness cousin of primary for bloom effects
+    var glow: OKLCHColor {
+        OKLCHColor(
+            lightness: min(primary.lightness * 1.35, 0.80),
+            chroma: min(primary.chroma * 1.1, 0.25),
+            hue: primary.hue + 5
+        )
+    }
+
+    /// Neutral role — low-chroma support tone for fades
+    var neutral: OKLCHColor {
+        OKLCHColor(
+            lightness: primary.lightness * 0.65,
+            chroma: min(primary.chroma * 0.25, 0.04),
+            hue: primary.hue
+        )
+    }
+
     // MARK: - Gradient Convenience
 
     /// Colors for standard atmospheric gradient (top to bottom)

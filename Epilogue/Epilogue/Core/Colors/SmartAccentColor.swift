@@ -231,8 +231,52 @@ struct SmartAccentColor {
     /// Default accent color (warm orange)
     static let defaultAccent = DesignSystem.Colors.primaryAccent
     
+    // MARK: - Backdrop-Aware Accent (v2)
+
+    /// Score an accent against the actual rendered backdrop, not just source palette.
+    /// Returns separate accent targets for different UI contexts.
+    static func scoredAccents(from palette: DisplayPalette) -> AccentTargets {
+        let backdrop = palette.primary // Dominant background color
+
+        // Interactive tint — needs highest contrast for tappable elements
+        let interactiveTint = OKLCHColor.accentAgainstBackdrop(
+            backdrop: backdrop,
+            preferredHue: palette.accent.hue,
+            minContrast: 4.5,
+            chromaBound: 0.10...0.28
+        ).color
+
+        // Quote highlight — warm, slightly lower contrast OK
+        let quoteHighlight = OKLCHColor.accentAgainstBackdrop(
+            backdrop: backdrop,
+            preferredHue: palette.accent.hue + 15, // Slight warm shift
+            minContrast: 3.0,
+            chromaBound: 0.08...0.22
+        ).color
+
+        // Button foreground — must work on glass surfaces
+        let buttonForeground = OKLCHColor.accentAgainstBackdrop(
+            backdrop: OKLCHColor(lightness: 0.3, chroma: 0.02, hue: 0), // Dark glass assumption
+            preferredHue: palette.accent.hue,
+            minContrast: 4.5,
+            chromaBound: 0.12...0.30
+        ).color
+
+        return AccentTargets(
+            interactiveTint: interactiveTint,
+            quoteHighlight: quoteHighlight,
+            buttonForeground: buttonForeground
+        )
+    }
+
+    struct AccentTargets {
+        let interactiveTint: Color
+        let quoteHighlight: Color
+        let buttonForeground: Color
+    }
+
     // MARK: - Debug
-    
+
     /// Debug description of color analysis
     static func debugAnalysis(_ analysis: ColorAnalysis) -> String {
         """

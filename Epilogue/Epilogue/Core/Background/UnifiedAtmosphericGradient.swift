@@ -86,19 +86,46 @@ struct UnifiedAtmosphericGradient: View {
     let preset: GradientPreset
     let intensity: Double
     let audioLevel: Float
+    var coverImage: UIImage? = nil
+    var qualityScore: PaletteQualityScore? = nil
 
     @State private var pulseAnimation = false
+    @State private var breathePhase: Double = 0
+
+    private var useMeshRenderer: Bool {
+        UserDefaults.standard.bool(forKey: "feature.gradient.mesh_renderer")
+    }
+
+    private var useCoverTexture: Bool {
+        UserDefaults.standard.bool(forKey: "feature.gradient.cover_texture_fallback")
+    }
+
+    private var useAmbientBreathing: Bool {
+        UserDefaults.standard.bool(forKey: "feature.gradient.ambient_breathing")
+    }
+
+    private var useLegibility: Bool {
+        UserDefaults.standard.bool(forKey: "feature.gradient.legibility_layers")
+    }
+
+    private var useDebugOverlay: Bool {
+        UserDefaults.standard.bool(forKey: "feature.gradient.debug_overlay")
+    }
 
     init(
         palette: DisplayPalette,
         preset: GradientPreset = .atmospheric,
         intensity: Double = 1.0,
-        audioLevel: Float = 0
+        audioLevel: Float = 0,
+        coverImage: UIImage? = nil,
+        qualityScore: PaletteQualityScore? = nil
     ) {
         self.palette = palette
         self.preset = preset
         self.intensity = intensity
         self.audioLevel = audioLevel
+        self.coverImage = coverImage
+        self.qualityScore = qualityScore
     }
 
     var body: some View {
@@ -108,8 +135,34 @@ struct UnifiedAtmosphericGradient: View {
                     .ignoresSafeArea()
 
                 if preset == .atmospheric {
-                    // v2: Multi-layer cover-type-aware atmospheric rendering
-                    atmosphericLayers(geometry: geometry)
+                    // Check for cover-as-texture fallback first
+                    if useCoverTexture, let score = qualityScore, let image = coverImage,
+                       score.confidenceTier == .veryLow || score.confidenceTier == .low {
+                        if score.confidenceTier == .veryLow {
+                            // Full texture — bypass extraction entirely
+                            CoverTextureRenderer(coverImage: image, intensity: intensity)
+                        } else {
+                            // Blended — texture + atmosphere
+                            BlendedAtmosphereRenderer(
+                                coverImage: image,
+                                palette: palette,
+                                confidence: score.composite,
+                                intensity: intensity,
+                                audioLevel: audioLevel
+                            )
+                        }
+                    } else if useMeshRenderer {
+                        // MeshGradient renderer
+                        meshGradientLayer(geometry: geometry)
+                    } else {
+                        // Standard multi-layer atmospheric rendering
+                        atmosphericLayers(geometry: geometry)
+                    }
+
+                    // Ambient breathing overlay
+                    if useAmbientBreathing && audioLevel < 0.1 {
+                        ambientBreathingOverlay
+                    }
                 } else {
                     // Other presets: simple gradient rendering
                     simpleGradientLayer(config: preset.config, geometry: geometry)
@@ -123,8 +176,21 @@ struct UnifiedAtmosphericGradient: View {
                     voicePulseOverlay
                 }
 
+                // Legibility layers
+                if useLegibility && preset == .atmospheric {
+                    LegibilityLayerView(
+                        profile: LegibilityProfile.compute(palette: palette, context: .detail)
+                    )
+                }
+
                 // Subtle noise texture
                 noiseTexture(opacity: 0.04)
+
+                // Debug overlay (Gandalf mode)
+                if useDebugOverlay {
+                    GradientDebugOverlay(palette: palette, qualityScore: qualityScore)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
             }
         }
         .ignoresSafeArea()
@@ -145,13 +211,16 @@ struct UnifiedAtmosphericGradient: View {
             .animation(.easeInOut(duration: 0.1), value: audioLevel)
 
         // Layer 2: Accent bloom — radiates from cover area, not a corner
-        accentBloom
+        if UserDefaults.standard.object(forKey: "feature.gradient.accent_bloom") == nil || UserDefaults.standard.bool(forKey: "feature.gradient.accent_bloom") {
+            accentBloom
+        }
 
         // Layer 3: Harmony depth — complementary wash adds tonal depth
-        harmonyDepthLayer
-
         // Layer 4: Analogous edge tint — subtle warmth at margins
-        analogousEdgeTint
+        if UserDefaults.standard.object(forKey: "feature.gradient.harmony_layers") == nil || UserDefaults.standard.bool(forKey: "feature.gradient.harmony_layers") {
+            harmonyDepthLayer
+            analogousEdgeTint
+        }
     }
 
     // MARK: - Layer 1: Primary Cascade
@@ -334,6 +403,89 @@ struct UnifiedAtmosphericGradient: View {
         )
         .blur(radius: 40)
         .ignoresSafeArea()
+    }
+
+    // MARK: - MeshGradient Renderer (Phase 3)
+
+    @ViewBuilder
+    private func meshGradientLayer(geometry: GeometryProxy) -> some View {
+        let voiceBoost = 1.0 + Double(audioLevel) * 0.5
+        let breathX = sin(breathePhase) * 0.02
+        let breathY = cos(breathePhase * 0.7) * 0.015
+
+        // 3×3 mesh with colors derived from palette roles in OKLCH
+        // Pre-calculate intermediates to guarantee perceptually even transitions
+        let mid1 = OKLCHColorSpace.interpolate(from: palette.primary, to: palette.secondary, t: 0.5)
+        let mid2 = OKLCHColorSpace.interpolate(from: palette.accent, to: palette.background, t: 0.5)
+        let center = OKLCHColorSpace.interpolate(from: mid1, to: palette.complementary, t: 0.3)
+
+        MeshGradient(
+            width: 3,
+            height: 3,
+            points: [
+                // Top row
+                SIMD2<Float>(0.0, 0.0),
+                SIMD2<Float>(0.5 + Float(breathX), 0.0),
+                SIMD2<Float>(1.0, 0.0),
+                // Middle row
+                SIMD2<Float>(0.0, 0.5 + Float(breathY)),
+                SIMD2<Float>(0.5 + Float(breathX * 0.5), 0.5 + Float(breathY * 0.7)),
+                SIMD2<Float>(1.0, 0.5 - Float(breathY)),
+                // Bottom row
+                SIMD2<Float>(0.0, 1.0),
+                SIMD2<Float>(0.5 - Float(breathX), 1.0),
+                SIMD2<Float>(1.0, 1.0)
+            ],
+            colors: [
+                // Top row: primary → accent → secondary
+                palette.primary.color.opacity(intensity * 0.9 * voiceBoost),
+                palette.accent.color.opacity(intensity * 0.7 * voiceBoost),
+                palette.secondary.color.opacity(intensity * 0.85 * voiceBoost),
+                // Middle row: analogous → center blend → complementary
+                palette.analogous.color.opacity(intensity * 0.6 * voiceBoost),
+                center.color.opacity(intensity * 0.5 * voiceBoost),
+                palette.complementary.color.opacity(intensity * 0.4 * voiceBoost),
+                // Bottom row: fade to dark
+                palette.background.color.opacity(intensity * 0.3 * voiceBoost),
+                mid2.color.opacity(intensity * 0.15 * voiceBoost),
+                Color.clear
+            ]
+        )
+        .ignoresSafeArea()
+        .onAppear { startBreathing() }
+        .onDisappear { breathePhase = 0 }
+    }
+
+    // MARK: - Ambient Breathing
+
+    @ViewBuilder
+    private var ambientBreathingOverlay: some View {
+        // Subtle luminance/chroma drift when idle
+        let breathIntensity = sin(breathePhase * 0.5) * 0.03 + 0.02
+
+        RadialGradient(
+            colors: [
+                palette.glow.color.opacity(breathIntensity * intensity),
+                Color.clear
+            ],
+            center: UnitPoint(
+                x: 0.5 + sin(breathePhase * 0.3) * 0.1,
+                y: 0.3 + cos(breathePhase * 0.2) * 0.08
+            ),
+            startRadius: 50,
+            endRadius: 350
+        )
+        .blur(radius: 60)
+        .ignoresSafeArea()
+        .blendMode(.plusLighter)
+        .onAppear { startBreathing() }
+    }
+
+    private func startBreathing() {
+        // Continuous slow animation
+        withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
+            breathePhase = .pi * 2
+        }
     }
 
     // MARK: - Simple Gradient (non-atmospheric presets)

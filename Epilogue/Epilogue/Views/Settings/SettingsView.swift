@@ -16,6 +16,16 @@ struct SettingsView: View {
     @AppStorage("alwaysShowInput") private var alwaysShowInput = false
     @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
     @AppStorage("atmosphereEngineV2") private var atmosphereEngineV2 = false
+    @AppStorage("feature.gradient.harmony_layers") private var harmonyLayersEnabled = true
+    @AppStorage("feature.gradient.accent_bloom") private var accentBloomEnabled = true
+    @AppStorage("feature.gradient.mesh_renderer") private var meshRendererEnabled = false
+    @AppStorage("feature.gradient.cover_texture_fallback") private var coverTextureEnabled = false
+    @AppStorage("feature.gradient.ambient_breathing") private var ambientBreathingEnabled = false
+    @AppStorage("feature.gradient.unified_extractor") private var unifiedExtractorEnabled = true
+    @AppStorage("feature.gradient.saliency_extraction") private var saliencyEnabled = true
+    @AppStorage("feature.gradient.confidence_scoring") private var confidenceScoringEnabled = true
+    @AppStorage("feature.gradient.legibility_layers") private var legibilityLayersEnabled = false
+    @AppStorage("feature.gradient.debug_overlay") private var debugOverlayEnabled = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -359,6 +369,12 @@ struct SettingsView: View {
                         }
                         .tint(.orange)
 
+                    } header: {
+                        Text("Developer")
+                    }
+
+                    // MARK: - Gradient Lab
+                    Section {
                         Toggle(isOn: $atmosphereEngineV2) {
                             HStack {
                                 Image(systemName: "paintpalette.fill")
@@ -366,7 +382,7 @@ struct SettingsView: View {
                                 VStack(alignment: .leading) {
                                     Text("Atmosphere Engine v2")
                                         .foregroundColor(.cyan)
-                                    Text("OKLCH perceptual gradients")
+                                    Text("Unified OKLCH gradient pipeline")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -379,13 +395,20 @@ struct SettingsView: View {
                             #endif
                             if enabled {
                                 SensoryFeedback.success()
-                                // Clear palette caches so v2 extractions run fresh
                                 Task {
                                     AtmosphereEngine.shared.clearAll()
                                 }
                             }
                         }
 
+                        if atmosphereEngineV2 {
+                            gradientLabToggles
+                        }
+                    } header: {
+                        Label("Gradient Lab", systemImage: "paintpalette")
+                    }
+
+                    Section {
                         Button {
                             Task { @MainActor in
                                 // Safety check before migration
@@ -1260,6 +1283,39 @@ struct SettingsView: View {
                 print("✅ [SETTINGS] Force re-enrichment complete")
                 #endif
             }
+        }
+    }
+    // MARK: - Gradient Lab Toggles (extracted to help type-checker)
+
+    @ViewBuilder
+    private var gradientLabToggles: some View {
+        Group {
+            Toggle("Harmony Layers", isOn: $harmonyLayersEnabled)
+                .foregroundColor(.secondary)
+            Toggle("Accent Bloom", isOn: $accentBloomEnabled)
+                .foregroundColor(.secondary)
+            Toggle("MeshGradient Renderer", isOn: $meshRendererEnabled)
+                .foregroundColor(.secondary)
+            Toggle("Cover-as-Texture Fallback", isOn: $coverTextureEnabled)
+                .foregroundColor(.secondary)
+            Toggle("Ambient Breathing", isOn: $ambientBreathingEnabled)
+                .foregroundColor(.secondary)
+        }
+        Group {
+            Divider()
+            Toggle("Unified Extractor", isOn: $unifiedExtractorEnabled)
+                .foregroundColor(.secondary)
+            Toggle("Vision Saliency", isOn: $saliencyEnabled)
+                .foregroundColor(.secondary)
+            Toggle("Confidence Scoring", isOn: $confidenceScoringEnabled)
+                .foregroundColor(.secondary)
+        }
+        Group {
+            Divider()
+            Toggle("Legibility Layers", isOn: $legibilityLayersEnabled)
+                .foregroundColor(.secondary)
+            Toggle("Debug Overlay", isOn: $debugOverlayEnabled)
+                .foregroundColor(.secondary)
         }
     }
 }

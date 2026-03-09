@@ -351,6 +351,262 @@ class MarkdownExporter {
         return markdown
     }
 
+    // MARK: - Book Export
+
+    /// Export a complete BookModel with all notes, quotes, questions, and session summary
+    static func exportBook(
+        _ book: BookModel,
+        options: ExportOptions
+    ) -> String {
+        switch options.format {
+        case .standard:
+            return exportBookStandard(book, options: options)
+        case .obsidian:
+            return exportBookObsidian(book, options: options)
+        case .notion:
+            return exportBookNotion(book, options: options)
+        }
+    }
+
+    private static func exportBookStandard(_ book: BookModel, options: ExportOptions) -> String {
+        var md = ""
+
+        md += "# \(book.title)\n\n"
+        md += "**Author:** \(book.author)\n"
+        if let isbn = book.isbn { md += "**ISBN:** \(isbn)\n" }
+        if let year = book.publishedYear { md += "**Published:** \(year)\n" }
+        if let pages = book.pageCount { md += "**Pages:** \(pages)\n" }
+        md += "**Status:** \(book.readingStatus)\n"
+        if let rating = book.userRating {
+            md += "**Rating:** \(String(format: "%.1f", rating))/5\n"
+        }
+        if book.currentPage > 0 {
+            md += "**Progress:** Page \(book.currentPage)"
+            if let total = book.pageCount, total > 0 {
+                md += " of \(total) (\(Int(Double(book.currentPage) / Double(total) * 100))%)"
+            }
+            md += "\n"
+        }
+        md += "**Added:** \(formatDate(book.dateAdded))\n"
+        md += "\n"
+
+        // Description
+        if let desc = book.userDescription ?? book.desc, !desc.isEmpty {
+            md += "## Description\n\n\(desc)\n\n"
+        }
+
+        // Quotes
+        let quotes = (book.quotes ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !quotes.isEmpty {
+            md += "## Quotes (\(quotes.count))\n\n"
+            for quote in quotes {
+                md += exportQuoteInline(quote, options: options)
+                md += "\n"
+            }
+        }
+
+        // Notes
+        let notes = (book.notes ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !notes.isEmpty {
+            md += "## Notes (\(notes.count))\n\n"
+            for note in notes {
+                md += exportNoteInline(note, options: options)
+                md += "\n"
+            }
+        }
+
+        // Questions
+        let questions = (book.questions ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !questions.isEmpty {
+            md += "## Questions (\(questions.count))\n\n"
+            for question in questions {
+                if let content = question.content {
+                    md += "**Q:** \(content)\n"
+                    if let answer = question.answer {
+                        md += "**A:** \(answer)\n"
+                    }
+                    if options.includePageNumber, let page = question.pageNumber {
+                        md += "*Page \(page)*\n"
+                    }
+                    md += "\n"
+                }
+            }
+        }
+
+        // Reading Sessions
+        let sessions = (book.readingSessions ?? []).sorted { $0.startDate > $1.startDate }
+        if !sessions.isEmpty {
+            md += "## Reading Sessions (\(sessions.count))\n\n"
+            let totalMinutes = sessions.reduce(0.0) { $0 + $1.duration } / 60.0
+            let totalPages = sessions.reduce(0) { $0 + $1.pagesRead }
+            md += "**Total time:** \(Int(totalMinutes)) minutes\n"
+            md += "**Total pages:** \(totalPages)\n\n"
+            for session in sessions {
+                let mins = Int(session.duration / 60)
+                md += "- \(formatDate(session.startDate)): \(mins) min, \(session.pagesRead) pages"
+                md += " (p. \(session.startPage)–\(session.endPage))\n"
+            }
+            md += "\n"
+        }
+
+        md += "---\n*Exported from Epilogue on \(formatDate(Date()))*\n"
+        return md
+    }
+
+    private static func exportBookObsidian(_ book: BookModel, options: ExportOptions) -> String {
+        var md = ""
+
+        // YAML frontmatter
+        md += "---\n"
+        md += "title: \"\(book.title)\"\n"
+        md += "author: \"\(book.author)\"\n"
+        if let isbn = book.isbn { md += "isbn: \"\(isbn)\"\n" }
+        if let year = book.publishedYear { md += "published: \(year)\n" }
+        if let pages = book.pageCount { md += "pages: \(pages)\n" }
+        md += "status: \"\(book.readingStatus)\"\n"
+        if let rating = book.userRating {
+            md += "rating: \(String(format: "%.1f", rating))\n"
+        }
+        md += "date_added: \(formatDateISO(book.dateAdded))\n"
+
+        var tags: [String] = ["book"]
+        tags.append(book.author.lowercased().replacingOccurrences(of: " ", with: "-"))
+        if let themes = book.keyThemes {
+            tags.append(contentsOf: themes.map { $0.lowercased().replacingOccurrences(of: " ", with: "-") })
+        }
+        md += "tags: [\(tags.joined(separator: ", "))]\n"
+        md += "---\n\n"
+
+        // Body
+        md += "# \(book.title)\n\n"
+
+        if let desc = book.userDescription ?? book.desc, !desc.isEmpty {
+            md += "> \(desc)\n\n"
+        }
+
+        // Quotes
+        let quotes = (book.quotes ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !quotes.isEmpty {
+            md += "## Quotes\n\n"
+            for quote in quotes {
+                md += exportQuoteInline(quote, options: options)
+                md += "\n"
+            }
+        }
+
+        // Notes
+        let notes = (book.notes ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !notes.isEmpty {
+            md += "## Notes\n\n"
+            for note in notes {
+                md += exportNoteInline(note, options: options)
+                md += "\n"
+            }
+        }
+
+        // Questions
+        let questions = (book.questions ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !questions.isEmpty {
+            md += "## Questions\n\n"
+            for question in questions {
+                if let content = question.content {
+                    md += "- **Q:** \(content)\n"
+                    if let answer = question.answer {
+                        md += "  **A:** \(answer)\n"
+                    }
+                }
+            }
+            md += "\n"
+        }
+
+        return md
+    }
+
+    private static func exportBookNotion(_ book: BookModel, options: ExportOptions) -> String {
+        var md = ""
+
+        md += "# \(book.title)\n\n"
+
+        // Metadata table
+        md += "| Property | Value |\n"
+        md += "|----------|-------|\n"
+        md += "| Author | \(book.author) |\n"
+        if let isbn = book.isbn { md += "| ISBN | \(isbn) |\n" }
+        if let year = book.publishedYear { md += "| Published | \(year) |\n" }
+        if let pages = book.pageCount { md += "| Pages | \(pages) |\n" }
+        md += "| Status | \(book.readingStatus) |\n"
+        if let rating = book.userRating {
+            md += "| Rating | \(String(format: "%.1f", rating))/5 |\n"
+        }
+        md += "| Added | \(formatDate(book.dateAdded)) |\n"
+        md += "\n"
+
+        if let desc = book.userDescription ?? book.desc, !desc.isEmpty {
+            md += "## Description\n\n\(desc)\n\n"
+        }
+
+        let quotes = (book.quotes ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !quotes.isEmpty {
+            md += "## Quotes\n\n"
+            for quote in quotes {
+                md += exportQuoteInline(quote, options: options)
+                md += "\n"
+            }
+        }
+
+        let notes = (book.notes ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+        if !notes.isEmpty {
+            md += "## Notes\n\n"
+            for note in notes {
+                md += exportNoteInline(note, options: options)
+                md += "\n"
+            }
+        }
+
+        return md
+    }
+
+    // MARK: - Inline Helpers (for book-level export)
+
+    private static func exportQuoteInline(_ quote: CapturedQuote, options: ExportOptions) -> String {
+        var md = ""
+        let text = quote.text ?? ""
+        md += "> \"\(text)\"\n"
+        if options.includePageNumber, let page = quote.pageNumber {
+            md += "> — Page \(page)\n"
+        }
+        if let notes = quote.notes, !notes.isEmpty {
+            md += "\n**Note:** \(notes)\n"
+        }
+        if options.includeDateTime, let ts = quote.timestamp {
+            md += "*\(formatDate(ts))*\n"
+        }
+        return md
+    }
+
+    private static func exportNoteInline(_ note: CapturedNote, options: ExportOptions) -> String {
+        var md = ""
+        let content = note.content ?? ""
+        let title = IntelligentTitleGenerator.generateTitle(from: content, maxLength: 50)
+        md += "### \(title)\n\n"
+        md += "\(content)\n"
+        if options.includePageNumber, let page = note.pageNumber {
+            md += "\n*Page \(page)*"
+        }
+        if options.includeDateTime, let ts = note.timestamp {
+            md += "  *\(formatDate(ts))*"
+        }
+        md += "\n"
+        return md
+    }
+
+    static func generateFilename(for book: BookModel) -> String {
+        let sanitized = book.title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: " -")
+        return "\(sanitized) - \(book.author).md"
+    }
+
     // MARK: - Filename Generation
 
     static func generateFilename(for note: CapturedNote) -> String {

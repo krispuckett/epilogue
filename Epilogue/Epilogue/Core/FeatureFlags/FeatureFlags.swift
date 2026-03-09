@@ -46,8 +46,18 @@ enum FeatureFlag: String, CaseIterable {
     case imagePreloading = "feature.performance.image_preloading"
     case backgroundSync = "feature.performance.background_sync"
 
-    // Visual Features
+    // Visual Features — Gradient System v2
     case atmosphereEngineV2 = "feature.visual.atmosphere_v2"
+    case gradientHarmonyLayers = "feature.gradient.harmony_layers"
+    case gradientAccentBloom = "feature.gradient.accent_bloom"
+    case gradientMeshRenderer = "feature.gradient.mesh_renderer"
+    case gradientCoverTextureFallback = "feature.gradient.cover_texture_fallback"
+    case gradientAmbientBreathing = "feature.gradient.ambient_breathing"
+    case gradientUnifiedExtractor = "feature.gradient.unified_extractor"
+    case gradientSaliencyExtraction = "feature.gradient.saliency_extraction"
+    case gradientConfidenceScoring = "feature.gradient.confidence_scoring"
+    case gradientLegibilityLayers = "feature.gradient.legibility_layers"
+    case gradientDebugOverlay = "feature.gradient.debug_overlay"
 
     // Experimental Features
     case experimentalGestures = "feature.experimental.gestures"
@@ -72,6 +82,16 @@ enum FeatureFlag: String, CaseIterable {
         case .imagePreloading: return true
         case .backgroundSync: return false
         case .atmosphereEngineV2: return false
+        case .gradientHarmonyLayers: return true
+        case .gradientAccentBloom: return true
+        case .gradientMeshRenderer: return false
+        case .gradientCoverTextureFallback: return false
+        case .gradientAmbientBreathing: return false
+        case .gradientUnifiedExtractor: return true
+        case .gradientSaliencyExtraction: return true
+        case .gradientConfidenceScoring: return true
+        case .gradientLegibilityLayers: return false
+        case .gradientDebugOverlay: return false
         case .experimentalGestures: return false
         case .experimentalAnimations: return false
         case .experimentalCustomCamera: return false
@@ -96,6 +116,16 @@ enum FeatureFlag: String, CaseIterable {
         case .imagePreloading: return "Image Preloading"
         case .backgroundSync: return "Background Sync"
         case .atmosphereEngineV2: return "Atmosphere Engine v2"
+        case .gradientHarmonyLayers: return "Harmony Layers"
+        case .gradientAccentBloom: return "Accent Bloom"
+        case .gradientMeshRenderer: return "MeshGradient Renderer"
+        case .gradientCoverTextureFallback: return "Cover-as-Texture Fallback"
+        case .gradientAmbientBreathing: return "Ambient Breathing Motion"
+        case .gradientUnifiedExtractor: return "Unified Extractor"
+        case .gradientSaliencyExtraction: return "Vision Saliency"
+        case .gradientConfidenceScoring: return "Confidence Scoring"
+        case .gradientLegibilityLayers: return "Legibility Layers"
+        case .gradientDebugOverlay: return "Debug Overlay"
         case .experimentalGestures: return "Experimental Gestures"
         case .experimentalAnimations: return "Experimental Animations"
         case .experimentalCustomCamera: return "Custom Camera (Text Capture)"

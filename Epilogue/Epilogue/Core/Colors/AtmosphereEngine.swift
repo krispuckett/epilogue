@@ -20,6 +20,15 @@ final class AtmosphereEngine {
     /// In-memory DisplayPalette cache (keyed by bookID)
     private let displayPaletteCache = NSCache<NSString, DisplayPaletteWrapper>()
 
+    /// Unified extractor for v2 pipeline
+    private let atmosphereExtractor = AtmosphereExtractor()
+
+    /// Whether to use the unified extractor (Gandalf toggle)
+    private var useUnifiedExtractor: Bool {
+        let key = "feature.gradient.unified_extractor"
+        return UserDefaults.standard.object(forKey: key) == nil || UserDefaults.standard.bool(forKey: key)
+    }
+
     /// Whether v2 atmosphere engine is enabled (Gandalf toggle)
     static var isEnabled: Bool {
         UserDefaults.standard.bool(forKey: "atmosphereEngineV2")
@@ -130,6 +139,59 @@ final class AtmosphereEngine {
             return nil
         }
 
+        // v2 path: Use unified extractor with saliency + confidence
+        if Self.isEnabled && useUnifiedExtractor {
+            return await runUnifiedPipeline(image: image, bookID: bookID, coverURL: coverURL)
+        }
+
+        // v1 legacy path: OKLABColorExtractor → CoverClassifier → DisplayPalette
+        return await runLegacyPipeline(image: image, cgImage: cgImage, bookID: bookID, coverURL: coverURL)
+    }
+
+    /// v2 unified pipeline: AtmosphereExtractor with saliency + confidence scoring
+    private func runUnifiedPipeline(
+        image: UIImage,
+        bookID: String,
+        coverURL: String?
+    ) async -> DisplayPalette? {
+        guard let model = await atmosphereExtractor.extract(from: image, bookID: bookID) else {
+            logger.warning("Unified extraction failed for \(bookID), falling back to legacy")
+            guard let cgImage = image.cgImage else { return nil }
+            return await runLegacyPipeline(image: image, cgImage: cgImage, bookID: bookID, coverURL: coverURL)
+        }
+
+        let displayPalette = model.toDisplayPalette()
+
+        // Log quality metrics
+        let metrics = GradientQualityMetrics.from(
+            bookID: bookID,
+            palette: displayPalette,
+            qualityScore: model.qualityScore,
+            usedSaliency: model.qualityScore.extractionPath == .saliency
+        )
+        GradientMetricsStore.shared.log(metrics)
+
+        // Cache
+        displayPaletteCache.setObject(
+            DisplayPaletteWrapper(displayPalette),
+            forKey: bookID as NSString
+        )
+        await saveDisplayPaletteToDisk(displayPalette, bookID: bookID)
+
+        // Also cache legacy palette for backward compat
+        let legacyPalette = displayPalette.toLegacy()
+        await BookColorPaletteCache.shared.cachePalette(legacyPalette, for: bookID, coverURL: coverURL)
+
+        return displayPalette
+    }
+
+    /// v1 legacy pipeline: OKLABColorExtractor → CoverClassifier → DisplayPalette
+    private func runLegacyPipeline(
+        image: UIImage,
+        cgImage: CGImage,
+        bookID: String,
+        coverURL: String?
+    ) async -> DisplayPalette? {
         // Step 1: Extract raw colors using existing OKLABColorExtractor
         let extractor = OKLABColorExtractor()
         let rawPalette: ColorPalette
@@ -156,8 +218,6 @@ final class AtmosphereEngine {
         #endif
 
         // Step 3: Reorder palette colors to match actual pixel dominance
-        // The OKLABColorExtractor's local-maxima can pick minority colors as primary.
-        // The classifier's hue histogram tells us what ACTUALLY dominates the cover.
         let reorderedColors = reorderByDominantHue(
             colors: [
                 rawPalette.primary.oklch,
@@ -176,8 +236,7 @@ final class AtmosphereEngine {
         }
         #endif
 
-        // Step 4: Convert to OKLCH and build DisplayPalette
-        // DisplayPalette init automatically applies cover-type-driven enhancement
+        // Step 4: Build DisplayPalette
         let displayPalette = DisplayPalette(
             primary: reorderedColors[0],
             secondary: reorderedColors[1],
@@ -188,20 +247,25 @@ final class AtmosphereEngine {
             extractionConfidence: rawPalette.extractionQuality
         )
 
-        // Step 4: Cache the result
+        // Log metrics for legacy path too
+        let legacyScore = PaletteQualityScore.fromLegacy(rawPalette.extractionQuality)
+        let metrics = GradientQualityMetrics.from(
+            bookID: bookID,
+            palette: displayPalette,
+            qualityScore: legacyScore
+        )
+        GradientMetricsStore.shared.log(metrics)
+
+        // Cache
         displayPaletteCache.setObject(
             DisplayPaletteWrapper(displayPalette),
             forKey: bookID as NSString
         )
-
-        // Step 5: Persist to disk
         await saveDisplayPaletteToDisk(displayPalette, bookID: bookID)
-
-        // Step 6: Also cache legacy palette for backward compatibility
         await BookColorPaletteCache.shared.cachePalette(rawPalette, for: bookID, coverURL: coverURL)
 
         #if DEBUG
-        logger.info("✅ Atmosphere Engine: \(displayPalette)")
+        logger.info("✅ Atmosphere Engine (legacy): \(displayPalette)")
         #endif
 
         return displayPalette

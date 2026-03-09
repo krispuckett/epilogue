@@ -413,6 +413,159 @@ extension OKLCHColor {
     }
 }
 
+// MARK: - OKLCH-First Helpers (Phase 4a)
+
+extension OKLCHColor {
+    /// Find a color that preserves hue while meeting a contrast constraint against a backdrop.
+    /// Solves for lightness and chroma that keep the hue recognizable.
+    func preserveHue(
+        targetLightness: Double? = nil,
+        targetChroma: Double? = nil,
+        minContrastAgainst backdrop: OKLCHColor? = nil,
+        minContrast: Double = 4.5
+    ) -> OKLCHColor {
+        var L = targetLightness ?? lightness
+        let C = targetChroma ?? chroma
+
+        // If contrast constraint given, adjust lightness to meet it
+        if let bg = backdrop {
+            let bgL = bg.lightness
+            // Need: |L1 - L2| sufficient for contrast
+            // Simplified: ensure at least 0.3 lightness difference for ~4.5:1
+            let minDiff = 0.3 * (minContrast / 4.5)
+            if abs(L - bgL) < minDiff {
+                // Push away from backdrop
+                L = bgL > 0.5 ? max(bgL - minDiff, 0.1) : min(bgL + minDiff, 0.9)
+            }
+        }
+
+        return OKLCHColor(lightness: L, chroma: C, hue: hue)
+    }
+
+    /// Generate an equal-hue tonal ladder for gradient stops.
+    /// Returns `steps` colors at the given hue, evenly spaced in lightness.
+    static func tonalLadder(
+        hue: Double,
+        steps: Int = 5,
+        lightnessRange: ClosedRange<Double> = 0.2...0.8,
+        chroma: Double = 0.10
+    ) -> [OKLCHColor] {
+        guard steps > 1 else {
+            return [OKLCHColor(lightness: (lightnessRange.lowerBound + lightnessRange.upperBound) / 2, chroma: chroma, hue: hue)]
+        }
+        let step = (lightnessRange.upperBound - lightnessRange.lowerBound) / Double(steps - 1)
+        return (0..<steps).map { i in
+            OKLCHColor(
+                lightness: lightnessRange.lowerBound + step * Double(i),
+                chroma: chroma,
+                hue: hue
+            )
+        }
+    }
+
+    /// Solve for the best accent color against a rendered backdrop.
+    /// Maximizes chromatic impact while ensuring minimum contrast.
+    static func accentAgainstBackdrop(
+        backdrop: OKLCHColor,
+        preferredHue: Double? = nil,
+        minContrast: Double = 3.0,
+        chromaBound: ClosedRange<Double> = 0.08...0.30
+    ) -> OKLCHColor {
+        let hue = preferredHue ?? (backdrop.hue + 180).truncatingRemainder(dividingBy: 360) // Default: complementary
+        let bgL = backdrop.lightness
+
+        // Target lightness that ensures contrast
+        let targetL: Double
+        if bgL > 0.5 {
+            targetL = max(bgL - 0.35, 0.25)
+        } else {
+            targetL = min(bgL + 0.35, 0.75)
+        }
+
+        // Maximize chroma within bounds
+        let targetC = chromaBound.upperBound
+
+        return OKLCHColor(lightness: targetL, chroma: targetC, hue: hue)
+    }
+}
+
+// MARK: - Display P3 Support
+
+extension OKLCHColorSpace {
+    /// Convert OKLCH to Display P3 CGColor for wide-gamut rendering.
+    /// Falls back to sRGB if P3 is not available.
+    static func toDisplayP3(_ oklch: OKLCHColor) -> CGColor {
+        let lab = oklchToOKLab(L: oklch.lightness, C: oklch.chroma, H: oklch.hue)
+        let linearRGB = oklabToLinearRGB(L: lab.L, a: lab.a, b: lab.b)
+
+        // Apply sRGB gamma (P3 uses the same transfer function as sRGB)
+        let r = linearToSrgb(max(0, min(1, linearRGB.r)))
+        let g = linearToSrgb(max(0, min(1, linearRGB.g)))
+        let b = linearToSrgb(max(0, min(1, linearRGB.b)))
+
+        if let p3Space = CGColorSpace(name: CGColorSpace.displayP3) {
+            let components: [CGFloat] = [r, g, b, 1.0]
+            if let cgColor = CGColor(colorSpace: p3Space, components: components) {
+                return cgColor
+            }
+        }
+
+        // Fallback to sRGB
+        let srgb = toSRGBComponents(oklch)
+        return CGColor(red: srgb.r, green: srgb.g, blue: srgb.b, alpha: 1.0)
+    }
+
+    /// Convert OKLCH to SwiftUI Color in Display P3 color space
+    static func toDisplayP3Color(_ oklch: OKLCHColor) -> Color {
+        Color(cgColor: toDisplayP3(oklch))
+    }
+
+    /// Improved gamut mapping with clip-vs-project escape hatch.
+    /// Per W3C/Chris Lilley guidance: project toward lower chroma first,
+    /// but if clip-vs-project ΔE is below threshold, choose clipped result
+    /// to preserve vividness.
+    static func improvedGamutMap(_ oklch: OKLCHColor, threshold: Double = 0.02) -> OKLCHColor {
+        let lab = oklchToOKLab(L: oklch.lightness, C: oklch.chroma, H: oklch.hue)
+        let rgb = oklabToLinearRGB(L: lab.L, a: lab.a, b: lab.b)
+
+        // If already in gamut, return as-is
+        if rgb.r >= 0 && rgb.r <= 1 && rgb.g >= 0 && rgb.g <= 1 && rgb.b >= 0 && rgb.b <= 1 {
+            return oklch
+        }
+
+        // Clipped result
+        let clippedR = max(0, min(1, rgb.r))
+        let clippedG = max(0, min(1, rgb.g))
+        let clippedB = max(0, min(1, rgb.b))
+        let clippedLab = linearRGBToOKLab(r: clippedR, g: clippedG, b: clippedB)
+        let clippedOKLCH = oklabToOKLCH(L: clippedLab.L, a: clippedLab.a, b: clippedLab.b)
+
+        // Projected result (binary search for max in-gamut chroma)
+        var lo: Double = 0
+        var hi = oklch.chroma
+        for _ in 0..<16 {
+            let mid = (lo + hi) / 2
+            let testLab = oklchToOKLab(L: oklch.lightness, C: mid, H: oklch.hue)
+            let testRGB = oklabToLinearRGB(L: testLab.L, a: testLab.a, b: testLab.b)
+            if testRGB.r >= -0.001 && testRGB.r <= 1.001 &&
+               testRGB.g >= -0.001 && testRGB.g <= 1.001 &&
+               testRGB.b >= -0.001 && testRGB.b <= 1.001 {
+                lo = mid
+            } else {
+                hi = mid
+            }
+        }
+        let projected = OKLCHColor(lightness: oklch.lightness, chroma: lo, hue: oklch.hue)
+
+        // If clip and project are very close, prefer clip (preserves vividness)
+        if clippedOKLCH.distance(to: projected) < threshold {
+            return clippedOKLCH
+        }
+
+        return projected
+    }
+}
+
 // MARK: - Debug Description
 
 extension OKLCHColor: CustomStringConvertible {

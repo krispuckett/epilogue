@@ -205,6 +205,7 @@ struct BookDetailView: View {
     @State private var showingSessionSavedToast = false
     @State private var showingQuoteCapture = false
     @State private var showingNoteCapture = false
+    @State private var showingBookExport = false
 
     // Re-entry intelligence
     @State private var showReEntryCard = false
@@ -412,22 +413,11 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var backgroundGradient: some View {
-        Group {
-            if AtmosphereEngine.isEnabled, let dp = displayPalette {
-                // v2: OKLCH perceptual gradient with cover-type-aware enhancement
-                UnifiedAtmosphericGradient(
-                    palette: dp,
-                    preset: .atmospheric,
-                    intensity: gradientIntensity
-                )
-            } else {
-                // v1: Legacy HSB enhancement
-                BookAtmosphericGradientView(
-                    colorPalette: colorPalette ?? generatePlaceholderPalette(),
-                    intensity: gradientIntensity
-                )
-            }
-        }
+        BookAtmosphericGradientView(
+            colorPalette: colorPalette ?? generatePlaceholderPalette(),
+            displayPalette: displayPalette,
+            intensity: gradientIntensity
+        )
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .opacity(gradientOpacity)
@@ -642,6 +632,18 @@ struct BookDetailView: View {
             libraryViewModel.currentDetailBook = nil
         }
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    showingBookExport = true
+                    SensoryFeedback.light()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .accessibilityLabel("Export book")
+            }
+
             // Reading status pill (exact copy from header)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -790,6 +792,11 @@ struct BookDetailView: View {
                         }
                     }
                 )
+            }
+        }
+        .sheet(isPresented: $showingBookExport) {
+            if let bookModel = bookModel {
+                BookExportSheet(book: bookModel)
             }
         }
         .sheet(isPresented: $showReEntryCard) {

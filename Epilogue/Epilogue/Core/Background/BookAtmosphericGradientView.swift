@@ -1,35 +1,83 @@
 import SwiftUI
 
-/// Apple Music-style atmospheric gradient background for book views
+/// Atmospheric gradient background for book views.
+///
+/// This is the single entry point for all atmospheric gradients.
+/// When Atmosphere Engine v2 is enabled, delegates to `UnifiedAtmosphericGradient`.
+/// When v2 is off, renders using the legacy HSB enhancement path.
 struct BookAtmosphericGradientView: View {
     let colorPalette: ColorPalette
+    var displayPalette: DisplayPalette?
     let intensity: Double
     let audioLevel: Float
-    
-    @State private var gradientOffset: CGFloat = 0
-    @State private var displayedPalette: ColorPalette?
-    @State private var pulseAnimation = false
-    
-    init(colorPalette: ColorPalette, intensity: Double = 1.0, audioLevel: Float = 0) {
+
+    init(
+        colorPalette: ColorPalette,
+        displayPalette: DisplayPalette? = nil,
+        intensity: Double = 1.0,
+        audioLevel: Float = 0
+    ) {
         self.colorPalette = colorPalette
+        self.displayPalette = displayPalette
         self.intensity = intensity
         self.audioLevel = audioLevel
     }
-    
+
+    var body: some View {
+        if let dp = displayPalette {
+            // v2: Pre-extracted DisplayPalette — full OKLCH atmospheric rendering
+            UnifiedAtmosphericGradient(
+                palette: dp,
+                preset: .atmospheric,
+                intensity: intensity,
+                audioLevel: audioLevel
+            )
+        } else if AtmosphereEngine.isEnabled {
+            // v2 without DisplayPalette: convert from legacy ColorPalette
+            UnifiedAtmosphericGradient(
+                legacyPalette: colorPalette,
+                preset: .atmospheric,
+                intensity: intensity,
+                audioLevel: audioLevel
+            )
+        } else {
+            // v1: Legacy HSB enhancement rendering
+            LegacyAtmosphericGradient(
+                colorPalette: colorPalette,
+                intensity: intensity,
+                audioLevel: audioLevel
+            )
+        }
+    }
+}
+
+// MARK: - Convenience Transition
+
+/// Temporary typealias for easier migration
+typealias BookGradientView = BookAtmosphericGradientView
+
+// MARK: - Legacy Atmospheric Gradient (v1)
+
+/// Legacy gradient renderer preserved for v1 fallback.
+/// Uses HSB color enhancement with monochromatic safety.
+private struct LegacyAtmosphericGradient: View {
+    let colorPalette: ColorPalette
+    let intensity: Double
+    let audioLevel: Float
+
+    @State private var displayedPalette: ColorPalette?
+    @State private var pulseAnimation = false
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Black base layer
                 Color.black
                     .ignoresSafeArea()
-                
-                // Single direction gradient - no mirroring, with intensity control
-                if let palette = displayedPalette {
-                    // Voice-responsive gradient
-                    let voiceBoost = 1.0 + Double(audioLevel) * 0.5 // 0-50% boost based on voice
-                    let voiceScale = 1.0 + Double(audioLevel) * 0.1 // Subtle scale effect
 
-                    // Main gradient - balanced depth and vibrancy
+                if let palette = displayedPalette {
+                    let voiceBoost = 1.0 + Double(audioLevel) * 0.5
+                    let voiceScale = 1.0 + Double(audioLevel) * 0.1
+
                     LinearGradient(
                         stops: [
                             .init(color: palette.primary.opacity(intensity * voiceBoost), location: 0.0),
@@ -47,7 +95,6 @@ struct BookAtmosphericGradientView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     .animation(.easeInOut(duration: 0.1), value: audioLevel)
 
-                    // Subtle accent layer - adds depth without being overpowering
                     RadialGradient(
                         colors: [
                             palette.accent.opacity(intensity * 0.15),
@@ -59,8 +106,7 @@ struct BookAtmosphericGradientView: View {
                     )
                     .blur(radius: 50)
                     .ignoresSafeArea()
-                    
-                    // Voice-responsive pulse overlay
+
                     if audioLevel > 0.3 {
                         RadialGradient(
                             colors: [
@@ -79,18 +125,16 @@ struct BookAtmosphericGradientView: View {
                         .onDisappear { pulseAnimation = false }
                     }
                 }
-                
-                // Subtle noise texture overlay
+
                 Rectangle()
                     .fill(.ultraThinMaterial)
-                    .opacity(0.05) // Very subtle texture
+                    .opacity(0.05)
                     .ignoresSafeArea()
                     .blendMode(.plusLighter)
             }
         }
         .onAppear {
             displayedPalette = processColors(colorPalette)
-            startSubtleAnimation()
         }
         .onChange(of: colorPalette) { _, newPalette in
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -98,114 +142,22 @@ struct BookAtmosphericGradientView: View {
             }
         }
     }
-    
-    /// Create gradient stops with non-linear distribution
-    private func createGradientStops(from palette: ColorPalette) -> [Gradient.Stop] {
-        let colors = getProcessedColors(from: palette)
-        
-        // Extremely light and simple gradient
-        return [
-            .init(color: colors.primary.opacity(0.3), location: 0.0),
-            .init(color: colors.primary.opacity(0.15), location: 0.2),
-            .init(color: Color.clear, location: 0.5)
-        ]
-    }
-    
-    /// Get processed colors with proper contrast
-    private func getProcessedColors(from palette: ColorPalette) -> (primary: Color, secondary: Color, accent: Color, background: Color) {
-        // For monochromatic palettes, ensure we have variation
-        if palette.isMonochromatic {
-            return createMonochromaticVariations(from: palette.primary)
-        }
-        
-        // Ensure minimum brightness differences
-        var colors = [palette.primary, palette.secondary, palette.accent, palette.background]
-        colors = ensureContrast(colors)
-        
-        return (colors[0], colors[1], colors[2], colors[3])
-    }
-    
-    /// Create subtle variations for monochromatic covers
-    private func createMonochromaticVariations(from baseColor: Color) -> (primary: Color, secondary: Color, accent: Color, background: Color) {
-        let uiColor = UIColor(baseColor)
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        // Create variations with subtle hue shifts
-        let primary = baseColor
-        let secondary = Color(hue: Double(hue + 0.02), saturation: Double(saturation * 0.8), brightness: Double(brightness * 0.9))
-        let accent = Color(hue: Double(hue - 0.02), saturation: Double(saturation * 0.9), brightness: Double(brightness * 0.8))
-        let background = Color(hue: Double(hue), saturation: Double(saturation * 0.6), brightness: Double(brightness * 0.6))
-        
-        return (primary, secondary, accent, background)
-    }
-    
-    /// Ensure minimum 30% brightness difference between colors
-    private func ensureContrast(_ colors: [Color]) -> [Color] {
-        var processedColors = colors
-        let minDifference: CGFloat = 0.3
-        
-        for i in 1..<processedColors.count {
-            let prevBrightness = getBrightness(processedColors[i-1])
-            var currBrightness = getBrightness(processedColors[i])
-            
-            // If too similar, adjust brightness
-            if abs(prevBrightness - currBrightness) < minDifference {
-                if prevBrightness > 0.5 {
-                    // Make current darker
-                    currBrightness = max(0, prevBrightness - minDifference)
-                } else {
-                    // Make current lighter
-                    currBrightness = min(1, prevBrightness + minDifference)
-                }
-                
-                processedColors[i] = adjustBrightness(processedColors[i], to: currBrightness)
-            }
-        }
-        
-        return processedColors
-    }
-    
-    /// Get brightness value from color
-    private func getBrightness(_ color: Color) -> CGFloat {
-        let uiColor = UIColor(color)
-        var brightness: CGFloat = 0
-        uiColor.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
-        return brightness
-    }
-    
-    /// Adjust color brightness to target value
-    private func adjustBrightness(_ color: Color, to targetBrightness: CGFloat) -> Color {
-        let uiColor = UIColor(color)
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        
-        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(targetBrightness), opacity: Double(alpha))
-    }
-    
-    /// Process colors - enhance them like ambient chat (restored from 73e8793)
+
+    // MARK: - Legacy HSB Enhancement
+
     private func processColors(_ palette: ColorPalette) -> ColorPalette {
-        return ColorPalette(
+        ColorPalette(
             primary: enhanceColor(palette.primary),
             secondary: enhanceColor(palette.secondary),
             accent: enhanceColor(palette.accent),
-            background: enhanceColor(palette.background),  // Restored: use same enhancement for all
+            background: enhanceColor(palette.background),
             textColor: palette.textColor,
             luminance: palette.luminance,
             isMonochromatic: palette.isMonochromatic,
             extractionQuality: palette.extractionQuality
         )
     }
-    
-    /// Enhance color - EXACT same as ambient chat
+
     private func enhanceColor(_ color: Color) -> Color {
         let uiColor = UIColor(color)
         var hue: CGFloat = 0
@@ -215,26 +167,12 @@ struct BookAtmosphericGradientView: View {
 
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
 
-        // 1.3x saturation - balanced between 1.2 (too washed) and 1.4 (too intense)
-        saturation = min(saturation * 1.3, 1.0)  // Boost vibrancy
-        brightness = max(brightness, 0.45)        // Minimum brightness
+        saturation = min(saturation * 1.3, 1.0)
+        brightness = max(brightness, 0.45)
 
         return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(brightness))
     }
-    
-    /// Start subtle 30-second animation
-    private func startSubtleAnimation() {
-        // DISABLED: This animation causes high CPU usage
-        // withAnimation(.easeInOut(duration: 30).repeatForever(autoreverses: true)) {
-        //     gradientOffset = 0.1 // Subtle movement
-        // }
-    }
 }
-
-// MARK: - Convenience Transition
-
-/// Temporary typealias for easier migration
-typealias BookGradientView = BookAtmosphericGradientView
 
 // MARK: - Preview
 
