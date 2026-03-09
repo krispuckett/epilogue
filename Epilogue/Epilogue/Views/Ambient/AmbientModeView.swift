@@ -624,24 +624,13 @@ struct AmbientModeView: View {
                 stopRecording()
             }
         }
-        // Camera temporarily disabled due to memory issues
-        /*
         .sheet(isPresented: $showImagePicker) {
-            SnapshotTextSelector(
-                isPresented: $showImagePicker,
-                onQuoteSaved: { text, pageNumber in
-                    // Save quote with attribution
-                    saveQuoteWithAttribution(text, pageNumber: pageNumber)
-                },
-                onQuestionAsked: { text in
-                    // Ask Perplexity about the selected text
-                    Task {
-                        await askPerplexityAboutText(text)
-                    }
-                }
-            )
+            CameraCapture { image in
+                guard let image = image else { return }
+                capturedImage = image
+                processImageForText(image)
+            }
         }
-        */
         .sheet(isPresented: $showQuoteHighlighter) {
             QuoteHighlighterView(
                 image: capturedImage,
@@ -2418,7 +2407,12 @@ struct AmbientModeView: View {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 showSaveAnimation = true
             }
-            
+
+            // Push capture count to Live Activity
+            Task {
+                await LiveActivityLifecycleManager.shared.updateContent(capturedCount: savedItemsCount)
+            }
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 withAnimation {
                     showSaveAnimation = false

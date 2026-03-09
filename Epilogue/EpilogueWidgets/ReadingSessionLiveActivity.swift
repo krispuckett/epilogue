@@ -55,6 +55,7 @@ struct ReadingSessionLiveActivity: Widget {
                             Text("\(context.state.pagesRead)p")
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.secondary)
+                                .contentTransition(.numericText())
                         }
                     }
                 }
@@ -92,6 +93,7 @@ struct ReadingSessionLiveActivity: Widget {
                                             .font(.system(size: 8))
                                         Text("\(context.state.capturedCount)")
                                             .font(.system(size: 10, weight: .semibold))
+                                            .contentTransition(.numericText())
                                     }
                                     .foregroundStyle(accent)
                                 }
@@ -120,31 +122,25 @@ struct ReadingSessionLiveActivity: Widget {
                         // Action bar
                         HStack(spacing: 0) {
                             Link(destination: URL(string: "epilogue://ambient/voice-capture")!) {
-                                actionPill(icon: "waveform", label: "Listen", color: accent)
+                                actionPill(icon: "waveform", label: "Listen", color: .orange)
                             }
 
                             Spacer()
 
                             Link(destination: URL(string: "epilogue://ambient/ocr")!) {
-                                actionPill(icon: "text.quote", label: "Quote", color: accent)
+                                actionPill(icon: "text.quote", label: "Quote", color: .orange)
                             }
 
                             Spacer()
 
                             Link(destination: URL(string: "epilogue://ambient/ai-chat")!) {
-                                VStack(spacing: 3) {
-                                    orbView(path: context.attributes.orbImagePath, color: accent, size: 22)
-                                    Text("Ask")
-                                        .font(.system(size: 9, weight: .medium))
-                                        .foregroundStyle(accent)
-                                }
-                                .frame(minWidth: 48)
+                                actionPill(icon: "ellipsis.bubble", label: "Ask", color: .orange)
                             }
 
                             Spacer()
 
                             Link(destination: URL(string: "epilogue://ambient/end-session")!) {
-                                actionPill(icon: "stop.fill", label: "End", color: .red)
+                                actionPill(icon: "stop.fill", label: "End", color: .orange)
                             }
                         }
                         .padding(.horizontal, 2)
@@ -159,6 +155,7 @@ struct ReadingSessionLiveActivity: Widget {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 14, height: 20)
                         .clipShape(RoundedRectangle(cornerRadius: 2))
+                        .shadow(color: accent.opacity(0.5), radius: 3, x: 0, y: 0)
                 } else {
                     orbView(path: context.attributes.orbImagePath, color: accent, size: 16)
                 }
@@ -167,6 +164,7 @@ struct ReadingSessionLiveActivity: Widget {
                     HStack(spacing: 2) {
                         Text("\(context.state.capturedCount)")
                             .font(.system(size: 12, weight: .semibold))
+                            .contentTransition(.numericText())
                         Image(systemName: "quote.bubble.fill")
                             .font(.system(size: 8))
                     }
@@ -242,12 +240,14 @@ struct ReadingSessionLiveActivity: Widget {
                         Label("\(context.state.capturedCount) captured", systemImage: "quote.bubble.fill")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(accent)
+                            .contentTransition(.numericText())
                     }
 
                     if context.state.pagesRead > 0 {
                         Label("\(context.state.pagesRead) pages", systemImage: "book.pages")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.cyan)
+                            .contentTransition(.numericText())
                     }
                 }
             }
@@ -280,32 +280,25 @@ struct ReadingSessionLiveActivity: Widget {
             // Quick actions
             HStack(spacing: 0) {
                 Link(destination: URL(string: "epilogue://ambient/voice-capture")!) {
-                    lockScreenAction(icon: "waveform", color: accent)
+                    lockScreenAction(icon: "waveform", color: .orange)
                 }
 
                 Spacer()
 
                 Link(destination: URL(string: "epilogue://ambient/ocr")!) {
-                    lockScreenAction(icon: "text.quote", color: accent)
+                    lockScreenAction(icon: "text.quote", color: .orange)
                 }
 
                 Spacer()
 
                 Link(destination: URL(string: "epilogue://ambient/ai-chat")!) {
-                    orbView(path: context.attributes.orbImagePath, color: accent, size: 28)
-                        .frame(width: 36, height: 36)
+                    lockScreenAction(icon: "ellipsis.bubble", color: .orange)
                 }
 
                 Spacer()
 
                 Link(destination: URL(string: "epilogue://ambient/end-session")!) {
-                    Text("End")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(Color.red.opacity(0.15))
-                        .clipShape(Capsule())
+                    lockScreenAction(icon: "stop.fill", color: .orange)
                 }
             }
             .padding(.top, 2)

@@ -217,6 +217,11 @@ extension AmbientModeView {
                             print("📖 Updated current page to: \(pageNumber)")
                             #endif
 
+                            // Push page update to Live Activity
+                            Task {
+                                await LiveActivityLifecycleManager.shared.updateContent(pagesRead: pageNumber)
+                            }
+
                             // Show subtle feedback
                             withAnimation(DesignSystem.Animation.easeStandard) {
                                 savedItemType = "Page \(pageNumber)"
@@ -476,6 +481,11 @@ extension AmbientModeView {
         savedItemType = "Quote"
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             showSaveAnimation = true
+        }
+
+        // Push capture count to Live Activity
+        Task {
+            await LiveActivityLifecycleManager.shared.updateContent(capturedCount: savedItemsCount)
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
