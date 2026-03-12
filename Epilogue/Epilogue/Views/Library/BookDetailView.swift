@@ -124,7 +124,9 @@ struct BookDetailView: View {
     @AppStorage("enableAnimations") private var enableAnimations = true
     @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
 
-    // Fluid Gradient Experiment
+    // Animated backgrounds (user-facing toggle, default ON)
+    @AppStorage("enableAnimatedBackgrounds") private var enableAnimatedBackgrounds = true
+    // Fluid Lab (developer only)
     @AppStorage("gandalfMode") private var gandalfMode = false
     @AppStorage("fluidGradientExperiment") private var fluidGradientExperiment = false
     @State private var fluidConfig = FluidAmbientConfig.golden
@@ -420,7 +422,8 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var backgroundGradient: some View {
-        if gandalfMode && fluidGradientExperiment {
+        if enableAnimatedBackgrounds {
+            // Fluid Ambient — animated gradient with golden motion params
             FluidAmbientGradientView(
                 colorSet: fluidColorSet,
                 config: $fluidConfig
@@ -439,12 +442,12 @@ struct BookDetailView: View {
                 }
             }
             .onChange(of: displayPalette?.coverType) { _, _ in
-                // Only update colors when palette changes — don't override golden config
                 if let dp = displayPalette {
                     fluidColorSet = FluidLabColorSet.from(dp)
                 }
             }
         } else {
+            // Static gradient — beautiful but no motion
             BookAtmosphericGradientView(
                 colorPalette: colorPalette ?? generatePlaceholderPalette(),
                 displayPalette: displayPalette,

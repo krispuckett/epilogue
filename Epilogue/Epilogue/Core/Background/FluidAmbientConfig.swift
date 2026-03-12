@@ -230,16 +230,16 @@ struct FluidAmbientConfig {
     static let golden = FluidAmbientConfig(
         colorIntensity: 0.991, noiseAmplitude: 0.223,
         darkFadeStart: 0.392, accentInfluence: 0.457,
-        secondarySpread: 0.337, noiseScale: 5.000,
-        warpIntensity: 0.582, animationSpeed: 0.594,
-        originX: 0.340, originY: 0.380,
+        secondarySpread: 0.337, noiseScale: 3.096,
+        warpIntensity: 0.450, animationSpeed: 0.494,
+        originX: 0.340, originY: 0.451,
         backgroundBlend: 0.085, complementaryMix: 0.449,
-        grainAmount: 0.002, vignetteStrength: 0.380,
-        contrast: 1.562, saturationBoost: 1.007,
-        rippleIntensity: 0.300, rippleFrequency: 6.934,
-        rippleSpeed: 3.152,
+        grainAmount: 0.002, vignetteStrength: 0.598,
+        contrast: 1.562, saturationBoost: 1.163,
+        rippleIntensity: 0.300, rippleFrequency: 10.704,
+        rippleSpeed: 2.240,
         colorTemperature: 0.031, bloomStrength: 0.097,
-        brightnessBoost: 1.180, swirlAmount: 0.000,
+        brightnessBoost: 1.180, swirlAmount: 0.860,
         fadeExponent: 0.537
     )
 }

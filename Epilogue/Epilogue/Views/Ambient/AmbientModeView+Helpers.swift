@@ -617,9 +617,10 @@ extension AmbientModeView {
         transcriptionFadeTimer = nil
         voiceManager.stopListening()
 
-        // End processor session
+        // End processor session AND live activity
         Task {
             _ = await processor.endSession()
+            await AmbientLiveActivityManager.shared.endActivity()
         }
 
         // Dismiss the view immediately using coordinator

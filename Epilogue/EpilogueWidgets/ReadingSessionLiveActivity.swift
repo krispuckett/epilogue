@@ -38,109 +38,108 @@ struct ReadingSessionLiveActivity: Widget {
             let accent = accentColor(from: context.state.coverAccentHex)
 
             return DynamicIsland {
-                // MARK: Expanded — Leading (empty, lets center fill toward it)
+                // MARK: Expanded — Leading
                 DynamicIslandExpandedRegion(.leading) {
-                    Color.clear.frame(width: 0)
+                    bookCoverView(path: context.attributes.coverImagePath,
+                                  accentHex: context.state.coverAccentHex,
+                                  width: 34, height: 48)
+                    .padding(.leading, 2)
                 }
 
                 // MARK: Expanded — Trailing (Timer)
                 DynamicIslandExpandedRegion(.trailing) {
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: .trailing, spacing: 3) {
                         Text(context.attributes.startTime, style: .timer)
-                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 15, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.trailing)
 
-                        if context.state.pagesRead > 0 {
-                            Text("\(context.state.pagesRead)p")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .contentTransition(.numericText())
+                        if context.state.isListening {
+                            HStack(spacing: 3) {
+                                Circle()
+                                    .fill(.green)
+                                    .frame(width: 4, height: 4)
+                                Text("LIVE")
+                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.green)
+                            }
                         }
                     }
                 }
 
-                // MARK: Expanded — Center (Cover + Title + Stats)
+                // MARK: Expanded — Center (Title + Stats)
                 DynamicIslandExpandedRegion(.center) {
-                    HStack(spacing: 10) {
-                        bookCoverView(path: context.attributes.coverImagePath,
-                                      accentHex: context.state.coverAccentHex,
-                                      width: 34, height: 48)
+                    VStack(alignment: .leading, spacing: 5) {
+                        if let book = context.state.bookTitle {
+                            Text(book)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                        }
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let book = context.state.bookTitle {
-                                Text(book)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
+                        HStack(spacing: 10) {
+                            if context.state.capturedCount > 0 {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "quote.bubble.fill")
+                                        .font(.system(size: 8))
+                                    Text("\(context.state.capturedCount)")
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .contentTransition(.numericText())
+                                }
+                                .foregroundStyle(accent)
                             }
 
-                            HStack(spacing: 8) {
-                                if context.state.isListening {
-                                    HStack(spacing: 3) {
-                                        Circle()
-                                            .fill(.green)
-                                            .frame(width: 5, height: 5)
-                                        Text("Live")
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundStyle(.green)
-                                    }
+                            if context.state.pagesRead > 0 {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "book.pages")
+                                        .font(.system(size: 8))
+                                    Text("\(context.state.pagesRead)p")
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .contentTransition(.numericText())
                                 }
-
-                                if context.state.capturedCount > 0 {
-                                    HStack(spacing: 2) {
-                                        Image(systemName: "quote.bubble.fill")
-                                            .font(.system(size: 8))
-                                        Text("\(context.state.capturedCount)")
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .contentTransition(.numericText())
-                                    }
-                                    .foregroundStyle(accent)
-                                }
+                                .foregroundStyle(.white.opacity(0.5))
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                // MARK: Expanded — Bottom (Quick Actions)
+                // MARK: Expanded — Bottom (Nudge + Actions)
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 0) {
-                        // Nudge banner (above actions)
-                        if let nudge = context.state.nudgeMessage,
-                           let icon = context.state.nudgeIcon {
-                            HStack(spacing: 4) {
-                                Image(systemName: icon)
-                                    .font(.system(size: 9))
+                    VStack(spacing: 6) {
+                        // Nudge banner
+                        if let nudge = context.state.nudgeMessage {
+                            HStack(spacing: 5) {
+                                if let icon = context.state.nudgeIcon {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 9, weight: .medium))
+                                }
                                 Text(nudge)
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                             }
-                            .foregroundStyle(accent)
-                            .padding(.bottom, 6)
+                            .foregroundStyle(accent.opacity(0.9))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 5)
+                            .padding(.horizontal, 10)
+                            .background(accent.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
 
                         // Action bar
                         HStack(spacing: 0) {
                             Link(destination: URL(string: "epilogue://ambient/voice-capture")!) {
-                                actionPill(icon: "waveform", label: "Listen", color: .orange)
+                                actionPill(icon: "waveform", label: "Listen", color: accent)
                             }
-
                             Spacer()
-
                             Link(destination: URL(string: "epilogue://ambient/ocr")!) {
-                                actionPill(icon: "text.quote", label: "Quote", color: .orange)
+                                actionPill(icon: "text.quote", label: "Quote", color: accent)
                             }
-
                             Spacer()
-
                             Link(destination: URL(string: "epilogue://ambient/ai-chat")!) {
-                                actionPill(icon: "ellipsis.bubble", label: "Ask", color: .orange)
+                                actionPill(icon: "ellipsis.bubble", label: "Ask", color: accent)
                             }
-
                             Spacer()
-
                             Link(destination: URL(string: "epilogue://ambient/end-session")!) {
-                                actionPill(icon: "stop.fill", label: "End", color: .orange)
+                                actionPill(icon: "stop.fill", label: "End", color: .white.opacity(0.4))
                             }
                         }
                         .padding(.horizontal, 2)
@@ -163,7 +162,7 @@ struct ReadingSessionLiveActivity: Widget {
                 if context.state.capturedCount > 0 {
                     HStack(spacing: 2) {
                         Text("\(context.state.capturedCount)")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .contentTransition(.numericText())
                         Image(systemName: "quote.bubble.fill")
                             .font(.system(size: 8))
@@ -199,14 +198,16 @@ struct ReadingSessionLiveActivity: Widget {
     private func lockScreenView(context: ActivityViewContext<AmbientActivityAttributes>) -> some View {
         let accent = accentColor(from: context.state.coverAccentHex)
 
-        VStack(alignment: .leading, spacing: 10) {
-            // Header: cover + title + timer
-            HStack(spacing: 10) {
+        VStack(spacing: 0) {
+            // Header row
+            HStack(alignment: .top, spacing: 12) {
+                // Book cover
                 bookCoverView(path: context.attributes.coverImagePath,
                               accentHex: context.state.coverAccentHex,
-                              width: 36, height: 52)
+                              width: 38, height: 54)
 
-                VStack(alignment: .leading, spacing: 3) {
+                // Title + metadata
+                VStack(alignment: .leading, spacing: 4) {
                     if let book = context.state.bookTitle {
                         Text(book)
                             .font(.system(size: 15, weight: .semibold))
@@ -214,97 +215,109 @@ struct ReadingSessionLiveActivity: Widget {
                             .lineLimit(1)
                     }
 
+                    // Timer
                     Text(context.attributes.startTime, style: .timer)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
 
                 Spacer()
 
+                // Live indicator
                 if context.state.isListening {
-                    HStack(spacing: 4) {
+                    VStack(spacing: 3) {
                         Circle()
                             .fill(.green)
                             .frame(width: 6, height: 6)
-                        Text("Live")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.green)
+                        Text("LIVE")
+                            .font(.system(size: 7, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.green.opacity(0.8))
                     }
+                    .padding(.top, 4)
                 }
             }
 
-            // Stats strip
+            // Stats row
             if context.state.capturedCount > 0 || context.state.pagesRead > 0 {
-                HStack(spacing: 14) {
+                HStack(spacing: 16) {
                     if context.state.capturedCount > 0 {
-                        Label("\(context.state.capturedCount) captured", systemImage: "quote.bubble.fill")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(accent)
-                            .contentTransition(.numericText())
+                        HStack(spacing: 4) {
+                            Image(systemName: "quote.bubble.fill")
+                                .font(.system(size: 9))
+                            Text("\(context.state.capturedCount) captured")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .contentTransition(.numericText())
+                        }
+                        .foregroundStyle(accent)
                     }
 
                     if context.state.pagesRead > 0 {
-                        Label("\(context.state.pagesRead) pages", systemImage: "book.pages")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.cyan)
-                            .contentTransition(.numericText())
+                        HStack(spacing: 4) {
+                            Image(systemName: "book.pages")
+                                .font(.system(size: 9))
+                            Text("\(context.state.pagesRead) pages")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .contentTransition(.numericText())
+                        }
+                        .foregroundStyle(.white.opacity(0.45))
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 10)
             }
 
             // Nudge card
-            if let nudge = context.state.nudgeMessage,
-               let icon = context.state.nudgeIcon {
+            if let nudge = context.state.nudgeMessage {
                 HStack(spacing: 6) {
-                    Image(systemName: icon)
-                        .font(.system(size: 11))
+                    if let icon = context.state.nudgeIcon {
+                        Image(systemName: icon)
+                            .font(.system(size: 10, weight: .medium))
+                    }
                     Text(nudge)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
                     Spacer()
                 }
-                .foregroundStyle(accent)
+                .foregroundStyle(accent.opacity(0.9))
                 .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(accent.opacity(0.12))
+                .padding(.vertical, 7)
+                .background(accent.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(accent.opacity(0.15), lineWidth: 0.5)
+                )
+                .padding(.top, 10)
             }
 
             // Transcript preview
             if !context.state.lastTranscript.isEmpty {
                 Text(context.state.lastTranscript)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.35))
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
             }
 
-            // Quick actions
-            HStack(spacing: 0) {
+            // Action buttons
+            HStack(spacing: 8) {
                 Link(destination: URL(string: "epilogue://ambient/voice-capture")!) {
-                    lockScreenAction(icon: "waveform", color: .orange)
+                    lockScreenAction(icon: "waveform", label: "Listen", color: accent)
                 }
-
-                Spacer()
-
                 Link(destination: URL(string: "epilogue://ambient/ocr")!) {
-                    lockScreenAction(icon: "text.quote", color: .orange)
+                    lockScreenAction(icon: "text.quote", label: "Quote", color: accent)
                 }
-
-                Spacer()
-
                 Link(destination: URL(string: "epilogue://ambient/ai-chat")!) {
-                    lockScreenAction(icon: "ellipsis.bubble", color: .orange)
+                    lockScreenAction(icon: "ellipsis.bubble", label: "Ask", color: accent)
                 }
-
-                Spacer()
-
                 Link(destination: URL(string: "epilogue://ambient/end-session")!) {
-                    lockScreenAction(icon: "stop.fill", color: .orange)
+                    lockScreenAction(icon: "stop.fill", label: "End", color: .white.opacity(0.35))
                 }
             }
-            .padding(.top, 2)
+            .padding(.top, 12)
         }
-        .padding(14)
-        .activityBackgroundTint(.black.opacity(0.9))
+        .padding(16)
+        .activityBackgroundTint(.black.opacity(0.85))
     }
 
     // MARK: - Orb View (pre-rendered Metal snapshot or SwiftUI fallback)
@@ -312,14 +325,12 @@ struct ReadingSessionLiveActivity: Widget {
     @ViewBuilder
     private func orbView(path: String?, color: Color, size: CGFloat) -> some View {
         if let path = path, let uiImage = UIImage(contentsOfFile: path) {
-            // Pre-rendered Metal shader snapshot
             Image(uiImage: uiImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: size, height: size)
                 .clipShape(Circle())
         } else {
-            // SwiftUI fallback approximation
             staticOrbFallback(color: color, size: size)
         }
     }
@@ -375,12 +386,12 @@ struct ReadingSessionLiveActivity: Widget {
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         } else {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(accentColor(from: accentHex).opacity(0.25))
+                .fill(accentColor(from: accentHex).opacity(0.2))
                 .frame(width: width, height: height)
                 .overlay(
                     Image(systemName: "book.fill")
                         .font(.system(size: width * 0.35))
-                        .foregroundStyle(accentColor(from: accentHex))
+                        .foregroundStyle(accentColor(from: accentHex).opacity(0.6))
                 )
         }
     }
@@ -389,22 +400,33 @@ struct ReadingSessionLiveActivity: Widget {
     private func actionPill(icon: String, label: String, color: Color) -> some View {
         VStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .medium))
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
+            Text(label.uppercased())
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
         }
         .foregroundStyle(color)
         .frame(minWidth: 48)
     }
 
     @ViewBuilder
-    private func lockScreenAction(icon: String, color: Color) -> some View {
-        Image(systemName: icon)
-            .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(color)
-            .frame(width: 36, height: 36)
-            .background(color.opacity(0.12))
-            .clipShape(Circle())
+    private func lockScreenAction(icon: String, label: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(color)
+                .frame(width: 36, height: 36)
+                .background(color.opacity(0.1))
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(color.opacity(0.15), lineWidth: 0.5)
+                )
+
+            Text(label.uppercased())
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundStyle(color.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Utilities

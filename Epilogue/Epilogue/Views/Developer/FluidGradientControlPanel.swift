@@ -85,29 +85,6 @@ struct FluidGradientControlPanel: View {
 
     private var titleBar: some View {
         HStack(spacing: 10) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-
-            Text("Fluid Lab")
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.85))
-
-            Spacer()
-
-            // Expand/collapse indicator
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
-            }
-
             // Close button
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -115,10 +92,62 @@ struct FluidGradientControlPanel: View {
                 }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(width: 28, height: 28)
+                    .background(.white.opacity(0.1), in: Circle())
+            }
+
+            Spacer()
+
+            Text("Fluid Lab")
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.85))
+
+            Spacer()
+
+            HStack(spacing: 12) {
+                // Export
+                Button {
+                    UIPasteboard.general.string = config.exportString
+                    showExportCopied = true
+                    SensoryFeedback.success()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showExportCopied = false
+                    }
+                } label: {
+                    Image(systemName: showExportCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(showExportCopied ? .green : .white.opacity(0.5))
+                        .frame(width: 28, height: 28)
+                        .background(.white.opacity(0.1), in: Circle())
+                }
+
+                // Reset to golden
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        config = .golden
+                    }
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(width: 28, height: 28)
+                        .background(.white.opacity(0.1), in: Circle())
+                }
+
+                // Expand/collapse
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(width: 28, height: 28)
+                        .background(.white.opacity(0.1), in: Circle())
+                }
             }
         }
         .padding(.horizontal, 20)
@@ -128,65 +157,62 @@ struct FluidGradientControlPanel: View {
     // MARK: - Scroll Content
 
     private var scrollContent: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: 22) {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 2) {
                 colorPicker
 
-                dialGroup("Color") {
-                    dial("Intensity", value: $config.colorIntensity, range: 0.1...1.0)
-                    dial("Accent", value: $config.accentInfluence, range: 0.0...0.8)
-                    dial("Secondary", value: $config.secondarySpread, range: 0.0...0.8)
+                paramSection("Color") {
+                    paramSlider("Intensity", value: $config.colorIntensity, range: 0.1...1.0)
+                    paramSlider("Accent", value: $config.accentInfluence, range: 0.0...0.8)
+                    paramSlider("Secondary", value: $config.secondarySpread, range: 0.0...0.8)
+                    paramSlider("Temperature", value: $config.colorTemperature, range: -0.5...0.5)
                 }
 
-                dialGroup("Warmth") {
-                    dial("Temperature", value: $config.colorTemperature, range: -0.5...0.5)
+                paramSection("Noise") {
+                    paramSlider("Amplitude", value: $config.noiseAmplitude, range: 0.0...0.25)
+                    paramSlider("Scale", value: $config.noiseScale, range: 1.0...5.0)
+                    paramSlider("Warp", value: $config.warpIntensity, range: 0.2...3.0)
+                    paramSlider("Swirl", value: $config.swirlAmount, range: 0.0...2.0)
                 }
 
-                dialGroup("Noise") {
-                    dial("Amplitude", value: $config.noiseAmplitude, range: 0.0...0.25)
-                    dial("Scale", value: $config.noiseScale, range: 1.0...5.0)
-                    dial("Warp", value: $config.warpIntensity, range: 0.2...3.0)
-                    dial("Swirl", value: $config.swirlAmount, range: 0.0...2.0)
+                paramSection("Origin") {
+                    paramSlider("X", value: $config.originX, range: 0.0...1.0)
+                    paramSlider("Y", value: $config.originY, range: 0.0...1.0)
                 }
 
-                dialGroup("Origin") {
-                    dial("X", value: $config.originX, range: 0.0...1.0)
-                    dial("Y", value: $config.originY, range: 0.0...1.0)
+                paramSection("Color Mix") {
+                    paramSlider("Background", value: $config.backgroundBlend, range: 0.0...0.6)
+                    paramSlider("Complement", value: $config.complementaryMix, range: 0.0...0.5)
                 }
 
-                dialGroup("Extra Colors") {
-                    dial("Background", value: $config.backgroundBlend, range: 0.0...0.6)
-                    dial("Complement", value: $config.complementaryMix, range: 0.0...0.5)
+                paramSection("Ripple") {
+                    paramSlider("Intensity", value: $config.rippleIntensity, range: 0.0...0.3)
+                    paramSlider("Frequency", value: $config.rippleFrequency, range: 5.0...40.0)
+                    paramSlider("Speed", value: $config.rippleSpeed, range: 0.5...8.0)
                 }
 
-                dialGroup("Ripple") {
-                    dial("Intensity", value: $config.rippleIntensity, range: 0.0...0.3)
-                    dial("Frequency", value: $config.rippleFrequency, range: 5.0...40.0)
-                    dial("Speed", value: $config.rippleSpeed, range: 0.5...8.0)
+                paramSection("Fade") {
+                    paramSlider("Dark Start", value: $config.darkFadeStart, range: 0.1...0.6)
+                    paramSlider("Vignette", value: $config.vignetteStrength, range: 0.0...1.0)
+                    paramSlider("Exponent", value: $config.fadeExponent, range: 0.5...3.0)
                 }
 
-                dialGroup("Fade") {
-                    dial("Dark Start", value: $config.darkFadeStart, range: 0.1...0.6)
-                    dial("Vignette", value: $config.vignetteStrength, range: 0.0...1.0)
-                    dial("Exponent", value: $config.fadeExponent, range: 0.5...3.0)
+                paramSection("Post Processing") {
+                    paramSlider("Contrast", value: $config.contrast, range: 0.5...2.0)
+                    paramSlider("Saturation", value: $config.saturationBoost, range: 0.5...2.0)
+                    paramSlider("Grain", value: $config.grainAmount, range: 0.0...0.08)
+                    paramSlider("Bloom", value: $config.bloomStrength, range: 0.0...0.4)
+                    paramSlider("Brightness", value: $config.brightnessBoost, range: 0.5...2.0)
                 }
 
-                dialGroup("Post") {
-                    dial("Contrast", value: $config.contrast, range: 0.5...2.0)
-                    dial("Saturation", value: $config.saturationBoost, range: 0.5...2.0)
-                    dial("Grain", value: $config.grainAmount, range: 0.0...0.08)
-                    dial("Bloom", value: $config.bloomStrength, range: 0.0...0.4)
-                    dial("Brightness", value: $config.brightnessBoost, range: 0.5...2.0)
-                }
-
-                dialGroup("Motion") {
-                    dial("Speed", value: $config.animationSpeed, range: 0.0...3.0)
+                paramSection("Motion") {
+                    paramSlider("Speed", value: $config.animationSpeed, range: 0.0...3.0)
                 }
 
                 presetButtons
-                exportSection
+                reExtractButton
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 40)
         }
@@ -243,7 +269,11 @@ struct FluidGradientControlPanel: View {
 
     private var colorPicker: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("PALETTE")
+            Text("PALETTE")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.35))
+                .tracking(1.5)
+                .padding(.top, 12)
 
             // Role assignment row
             HStack(spacing: 8) {
@@ -361,92 +391,48 @@ struct FluidGradientControlPanel: View {
         }
     }
 
-    // MARK: - Dial Components
+    // MARK: - Section & Slider (Orb Lab pattern)
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
-            .foregroundStyle(.white.opacity(0.35))
-            .tracking(1.5)
-    }
+    private func paramSection(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.35))
+                .tracking(1.5)
+                .padding(.top, 12)
+                .padding(.bottom, 2)
 
-    @ViewBuilder
-    private func dialGroup(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(title.uppercased())
             content()
         }
     }
 
-    @ViewBuilder
-    private func dial(_ label: String, value: Binding<Float>, range: ClosedRange<Float>) -> some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                Spacer()
-                Text(String(format: "%.2f", value.wrappedValue))
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
+    private func paramSlider(_ label: String, value: Binding<Float>, range: ClosedRange<Float>) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.6))
+                .frame(width: 100, alignment: .leading)
 
-            // Custom slider with 22pt thumb and 44pt touch target
-            GeometryReader { geo in
-                let trackWidth = geo.size.width
-                let normalized = CGFloat(
-                    (value.wrappedValue - range.lowerBound)
-                    / (range.upperBound - range.lowerBound)
-                )
-                let thumbCenter = max(11, min(trackWidth - 11, trackWidth * normalized))
+            Slider(value: value, in: range)
+                .tint(.white.opacity(0.4))
 
-                ZStack(alignment: .leading) {
-                    // Track background
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(.white.opacity(0.08))
-                        .frame(height: 6)
-                        .frame(maxWidth: .infinity)
-
-                    // Active fill
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.25), .white.opacity(0.45)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(6, thumbCenter), height: 6)
-
-                    // Thumb — 22pt visible, 44pt hit area
-                    Circle()
-                        .fill(.white)
-                        .frame(width: 22, height: 22)
-                        .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                        .position(x: thumbCenter, y: 22)
-                }
-                .frame(height: 44)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { drag in
-                            let fraction = Float(
-                                max(0, min(1, drag.location.x / trackWidth))
-                            )
-                            value.wrappedValue = range.lowerBound
-                                + fraction * (range.upperBound - range.lowerBound)
-                        }
-                )
-            }
-            .frame(height: 44)
+            Text(String(format: "%.3f", value.wrappedValue))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 50, alignment: .trailing)
         }
+        .frame(height: 28)
     }
 
     // MARK: - Presets
 
     private var presetButtons: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("PRESETS")
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PRESETS")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.35))
+                .tracking(1.5)
+                .padding(.top, 12)
 
             LazyVGrid(
                 columns: [
@@ -537,50 +523,25 @@ struct FluidGradientControlPanel: View {
         }
     }
 
-    // MARK: - Export
+    // MARK: - Re-extract
 
-    private var exportSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("EXPORT")
-
-            HStack(spacing: 10) {
-                // Copy params button
-                Button {
-                    UIPasteboard.general.string = config.exportString
-                    withAnimation(.spring(response: 0.3)) {
-                        showExportCopied = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        withAnimation { showExportCopied = false }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: showExportCopied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 11, weight: .bold))
-                        Text(showExportCopied ? "Copied!" : "Copy Params")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    }
-                    .foregroundStyle(.white.opacity(0.75))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                }
-
-                // Re-extract button
-                if let reExtract = onReExtract {
+    private var reExtractButton: some View {
+        Group {
+            if let reExtract = onReExtract {
+                paramSection("Actions") {
                     Button {
                         reExtract()
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.trianglehead.2.clockwise")
                                 .font(.system(size: 11, weight: .bold))
-                            Text("Re-extract")
+                            Text("Re-extract Colors")
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         }
                         .foregroundStyle(.white.opacity(0.75))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
             }

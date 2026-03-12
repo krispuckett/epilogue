@@ -6,7 +6,27 @@ import simd
 struct MetalShaderView: UIViewRepresentable {
     @Binding var isPressed: Bool
     let size: CGSize
-    let accentColor: Color = DesignSystem.Colors.primaryAccent // Theme-aware color
+    let accentColor: Color
+    var config: OrbShaderConfig?
+    var iterations: Int32?
+
+    init(isPressed: Binding<Bool>, size: CGSize,
+         accentColor: Color = DesignSystem.Colors.primaryAccent,
+         config: OrbShaderConfig? = nil,
+         iterations: Int32? = nil) {
+        self._isPressed = isPressed
+        self.size = size
+        self.accentColor = accentColor
+        self.config = config
+        self.iterations = iterations
+    }
+
+    /// Auto LOD: scale iterations to pixel size when not explicitly set.
+    private var resolvedIterations: Int32 {
+        if let explicit = iterations { return explicit }
+        let pixelSize = max(size.width, size.height) * UIScreen.main.scale
+        return Int32(max(10, min(36, Int(pixelSize / 3))))
+    }
 
     class Coordinator: NSObject, MTKViewDelegate {
         var parent: MetalShaderView
@@ -15,7 +35,7 @@ struct MetalShaderView: UIViewRepresentable {
         init(_ parent: MetalShaderView) {
             self.parent = parent
             super.init()
-            renderer = OrbMetalRenderer()
+            renderer = OrbMetalRenderer(iterations: parent.resolvedIterations)
         }
 
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
@@ -25,7 +45,9 @@ struct MetalShaderView: UIViewRepresentable {
         func draw(in view: MTKView) {
             guard let renderer = renderer else { return }
             renderer.isPressed = parent.isPressed
-            // Pass theme color to renderer
+            if let cfg = parent.config {
+                renderer.config = cfg
+            }
             let uiColor = UIColor(parent.accentColor)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -49,11 +71,13 @@ struct MetalShaderView: UIViewRepresentable {
 
         mtkView.device = device
         mtkView.delegate = context.coordinator
-        mtkView.preferredFramesPerSecond = 60
+
+        // FPS throttle: small orbs (< 60pt) get 30fps, larger get 60fps
+        mtkView.preferredFramesPerSecond = size.width <= 60 ? 30 : 60
         mtkView.isPaused = false
         mtkView.enableSetNeedsDisplay = false
 
-        // Proper configuration for transparency
+        // Transparency
         mtkView.isOpaque = false
         mtkView.backgroundColor = .clear
         mtkView.layer.backgroundColor = UIColor.clear.cgColor
@@ -76,16 +100,21 @@ class OrbMetalRenderer: NSObject {
     private var commandQueue: MTLCommandQueue?
     private var pipelineState: MTLRenderPipelineState?
     private var startTime = CACurrentMediaTime()
-
-    // Texture management
     private var currentSize: CGSize = .zero
+
+    // Smooth press interpolation
+    private var smoothedPress: Float = 0.0
 
     // Parameters
     var isPressed: Bool = false
-    var themeColor: SIMD3<Float> = SIMD3<Float>(1.0, 0.549, 0.259) // #FF8C42 exact
-    var fogAmount: Float = 0.0  // Start with no fog for simplicity
+    var themeColor: SIMD3<Float> = SIMD3<Float>(1.0, 0.549, 0.259)
+    var config: OrbShaderConfig = .golden
 
-    override init() {
+    private let iterations: Int32
+
+    init(iterations: Int32 = 20, config: OrbShaderConfig = .golden) {
+        self.iterations = iterations
+        self.config = config
         super.init()
         setupMetal()
     }
@@ -100,176 +129,27 @@ class OrbMetalRenderer: NSObject {
         self.device = device
         commandQueue = device.makeCommandQueue()
 
-        // Ambient Wave shader - high quality production version
-        let shaderSource = """
-        #include <metal_stdlib>
-        using namespace metal;
-
-        struct VertexOut {
-            float4 position [[position]];
-            float2 texCoord;
-        };
-
-        vertex VertexOut vertexShader(uint vertexID [[vertex_id]]) {
-            float2 positions[6] = {
-                float2(-1.0, -1.0), float2( 1.0, -1.0), float2(-1.0,  1.0),
-                float2( 1.0, -1.0), float2( 1.0,  1.0), float2(-1.0,  1.0)
-            };
-
-            VertexOut out;
-            out.position = float4(positions[vertexID], 0.0, 1.0);
-            out.texCoord = (positions[vertexID] + 1.0) * 0.5;
-            out.texCoord.y = 1.0 - out.texCoord.y;
-            return out;
+        guard let library = device.makeDefaultLibrary() else {
+            #if DEBUG
+            print("Default Metal library not found")
+            #endif
+            return
         }
-
-        constant float PI = 3.14159265359;
-        constant float TAU = 6.28318530718;
-        constant float ITERATIONS = 36.0;
-        constant float SPEED = 2.40;
-        constant float CIRCLE_SIZE = 0.19;
-        constant float FREQ_MIX = 0.20;
-        constant float BLOOM_INTENSITY = 0.53;
-        constant float SMOOTHING = 1.45;
-        constant float ROTATION_BASE = 0.17;
-
-        float3 pal(float t, float3 a, float3 b, float3 c, float3 d) {
-            return a + b * cos(TAU * (c * t + d));
-        }
-
-        float3 Tonemap_Reinhard(float3 x) {
-            x *= 4.0;
-            return x / (1.0 + x);
-        }
-
-        float sdCircle(float2 st, float r) {
-            return length(st) - r;
-        }
-
-        float2 turb(float2 pos, float t, float it, float md, float2 mPos) {
-            float2x2 rot = float2x2(0.6, -0.8, 0.8, 0.6);
-            float freq = 2.0 + (15.0 - 2.0) * FREQ_MIX;
-            float amp = 0.27 * md;
-            float xp = 1.4;
-            float time = t * 0.4;
-
-            for(float i = 0.0; i < 4.0; i++) {
-                float2 s = sin(freq * ((pos - mPos) * rot) + (i * time + it));
-                pos += amp * rot[0] * s / freq;
-                rot = rot * float2x2(0.6, -0.8, 0.8, 0.6);
-                amp *= max(s.y, s.x);
-                freq *= xp;
-            }
-            return pos;
-        }
-
-        float luma(float3 color) {
-            return dot(color, float3(0.299, 0.587, 0.114));
-        }
-
-        uint2 pcg2d(uint2 v) {
-            v = v * 1664525u + 1013904223u;
-            v.x += v.y * v.y * 1664525u + 1013904223u;
-            v.y += v.x * v.x * 1664525u + 1013904223u;
-            v ^= v >> 16u;
-            v.x += v.y * v.y * 1664525u + 1013904223u;
-            v.y += v.x * v.x * 1664525u + 1013904223u;
-            return v;
-        }
-
-        float randFibo(float2 p) {
-            uint2 v = as_type<uint2>(p);
-            v = pcg2d(v);
-            uint r = v.x ^ v.y;
-            return float(r) / float(0xffffffffu);
-        }
-
-        fragment float4 fragmentShader(VertexOut in [[stage_in]],
-                                     constant float &time [[buffer(0)]],
-                                     constant float2 &resolution [[buffer(1)]],
-                                     constant float &pressed [[buffer(2)]],
-                                     constant float3 &themeColor [[buffer(3)]]) {
-            float2 uv = in.texCoord;
-
-            float3 pp = float3(0.0);
-            float3 bloom = float3(0.0);
-            float t = time * SPEED;
-
-            float2 aspect = float2(resolution.x / resolution.y, 1.0);
-            float2 mousePos = float2(0.0);
-            float2 uPos = float2(0.5, 0.5);  // CENTERED
-            float2 pos = (uv * aspect - uPos * aspect);
-            float md = 1.0;
-
-            float rotationAngle = (ROTATION_BASE + t * 0.07) * -2.0 * PI;
-            float2x2 rotMatrix = float2x2(cos(rotationAngle), -sin(rotationAngle),
-                                           sin(rotationAngle), cos(rotationAngle));
-            pos = rotMatrix * pos;
-
-            float bm = 0.05;
-            float2 prevPos = turb(pos, t, -1.0 / ITERATIONS, md, mousePos);
-            float spacing = TAU;
-
-            for(float i = 1.0; i < ITERATIONS + 1.0; i++) {
-                float iter = i / ITERATIONS;
-                float2 st = turb(pos, t, iter * spacing, md, mousePos);
-
-                float d = abs(sdCircle(st, CIRCLE_SIZE));
-                float pd = distance(st, prevPos);
-                prevPos = st;
-
-                float dynamicBlur = exp2(pd * 2.0 * 1.442695) - 1.0;
-                float ds = smoothstep(0.0, 0.02 * bm + max(dynamicBlur * SMOOTHING, 0.001), d);
-
-                float3 color = pal(
-                    iter * 0.19 + 1.0,
-                    float3(0.5),
-                    float3(0.5),
-                    float3(1.0),
-                    float3(0.0, 0.24313725, 0.23137255)
-                );
-
-                float invd = 1.0 / max(d + dynamicBlur, 0.001);
-                pp += (ds - 1.0) * color;
-                bloom += clamp(invd * BLOOM_INTENSITY, 0.0, 250.0) * color;
-            }
-
-            pp *= 1.0 / ITERATIONS;
-            bloom = bloom / (bloom + 2e4);
-
-            float3 color = (-pp + bloom * 3.0 * BLOOM_INTENSITY);
-            color *= 1.2;
-            color += (randFibo(in.position.xy) - 0.5) / 255.0;
-            color = Tonemap_Reinhard(color);
-
-            // Apply theme color with saturation boost
-            color *= themeColor * 1.5;
-
-            float pressBoost = mix(1.0, 1.3, pressed);
-            color *= pressBoost;
-
-            float2 center = uv - 0.5;
-            float dist = length(center);
-            float circleMask = 1.0 - smoothstep(0.42, 0.52, dist);  // Even larger visible area
-
-            float luminance = luma(color);
-            float alpha = circleMask * smoothstep(0.0, 0.2, luminance);
-
-            return float4(color, alpha);
-        }
-        """
 
         do {
-            let library = try device.makeLibrary(source: shaderSource, options: nil)
-            let vertexFunction = library.makeFunction(name: "vertexShader")
-            let fragmentFunction = library.makeFunction(name: "fragmentShader")
+            let constants = MTLFunctionConstantValues()
+            var iters = iterations
+            constants.setConstantValue(&iters, type: .int, index: 0)
+
+            let vertexFunction = library.makeFunction(name: "ambientOrbVertex")
+            let fragmentFunction = try library.makeFunction(name: "ambientOrbFragment",
+                                                            constantValues: constants)
 
             let pipelineDescriptor = MTLRenderPipelineDescriptor()
             pipelineDescriptor.vertexFunction = vertexFunction
             pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb
 
-            // Standard alpha blending (not premultiplied)
             pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
             pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
             pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
@@ -288,8 +168,26 @@ class OrbMetalRenderer: NSObject {
         currentSize = size
     }
 
+    private func encodeUniforms(to encoder: MTLRenderCommandEncoder, time: Float, resolution: SIMD2<Float>) {
+        var t = time
+        var res = resolution
+
+        // Smooth press: interpolate toward target each frame
+        let targetPress: Float = isPressed ? 1.0 : 0.0
+        smoothedPress += (targetPress - smoothedPress) * config.pressSmoothing
+        var pressValue = smoothedPress
+
+        var color = themeColor
+        var configCopy = config
+
+        encoder.setFragmentBytes(&t, length: MemoryLayout<Float>.size, index: 0)
+        encoder.setFragmentBytes(&res, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
+        encoder.setFragmentBytes(&pressValue, length: MemoryLayout<Float>.size, index: 2)
+        encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD3<Float>>.size, index: 3)
+        encoder.setFragmentBytes(&configCopy, length: MemoryLayout<OrbShaderConfig>.stride, index: 4)
+    }
+
     func draw(in view: MTKView) {
-        // Check if size changed
         if currentSize != view.drawableSize {
             viewSizeChanged(to: view.drawableSize)
         }
@@ -302,7 +200,6 @@ class OrbMetalRenderer: NSObject {
             return
         }
 
-        // Clear to fully transparent
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].storeAction = .store
@@ -313,17 +210,9 @@ class OrbMetalRenderer: NSObject {
 
         renderEncoder.setRenderPipelineState(pipelineState)
 
-        // Pass uniforms
         let currentTime = Float(CACurrentMediaTime() - startTime)
-        var time = currentTime
-        var resolution = SIMD2<Float>(Float(view.drawableSize.width), Float(view.drawableSize.height))
-        var pressed = Float(isPressed ? 1.0 : 0.0)
-        var themeColorCopy = themeColor
-
-        renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.size, index: 0)
-        renderEncoder.setFragmentBytes(&resolution, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
-        renderEncoder.setFragmentBytes(&pressed, length: MemoryLayout<Float>.size, index: 2)
-        renderEncoder.setFragmentBytes(&themeColorCopy, length: MemoryLayout<SIMD3<Float>>.size, index: 3)
+        let resolution = SIMD2<Float>(Float(view.drawableSize.width), Float(view.drawableSize.height))
+        encodeUniforms(to: renderEncoder, time: currentTime, resolution: resolution)
 
         renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         renderEncoder.endEncoding()
@@ -332,8 +221,7 @@ class OrbMetalRenderer: NSObject {
         commandBuffer.commit()
     }
 
-    /// Renders a single frame of the orb to a UIImage for use in widgets/Live Activities.
-    /// Uses a fixed time value for a deterministic "hero" frame.
+    /// Renders a single frame to UIImage for widgets/Live Activities.
     func renderToImage(size: CGSize, atTime time: Float = 2.5) -> UIImage? {
         guard let device = device,
               let commandQueue = commandQueue,
@@ -344,8 +232,7 @@ class OrbMetalRenderer: NSObject {
 
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm_srgb,
-            width: width,
-            height: height,
+            width: width, height: height,
             mipmapped: false
         )
         descriptor.usage = [.renderTarget, .shaderRead]
@@ -360,18 +247,10 @@ class OrbMetalRenderer: NSObject {
         rpd.colorAttachments[0].storeAction = .store
 
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: rpd) else { return nil }
-
         encoder.setRenderPipelineState(pipelineState)
 
-        var t = time
-        var res = SIMD2<Float>(Float(width), Float(height))
-        var pressed: Float = 0
-        var color = themeColor
-
-        encoder.setFragmentBytes(&t, length: MemoryLayout<Float>.size, index: 0)
-        encoder.setFragmentBytes(&res, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
-        encoder.setFragmentBytes(&pressed, length: MemoryLayout<Float>.size, index: 2)
-        encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD3<Float>>.size, index: 3)
+        let resolution = SIMD2<Float>(Float(width), Float(height))
+        encodeUniforms(to: encoder, time: time, resolution: resolution)
 
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         encoder.endEncoding()
@@ -379,14 +258,12 @@ class OrbMetalRenderer: NSObject {
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
 
-        // Read pixels from texture
         let bytesPerRow = 4 * width
         var bytes = [UInt8](repeating: 0, count: bytesPerRow * height)
         texture.getBytes(&bytes, bytesPerRow: bytesPerRow,
                          from: MTLRegion(origin: .init(), size: .init(width: width, height: height, depth: 1)),
                          mipmapLevel: 0)
 
-        // Create CGImage from BGRA pixel data
         guard let dataProvider = CGDataProvider(data: Data(bytes) as CFData),
               let cgImage = CGImage(
                   width: width, height: height,
@@ -401,7 +278,6 @@ class OrbMetalRenderer: NSObject {
         return UIImage(cgImage: cgImage)
     }
 
-    // Render to a custom texture (for exporting)
     func renderToTexture(_ texture: MTLTexture, commandQueue: MTLCommandQueue, size: CGSize) {
         guard let pipelineState = pipelineState,
               let commandBuffer = commandQueue.makeCommandBuffer() else {
@@ -420,17 +296,9 @@ class OrbMetalRenderer: NSObject {
 
         renderEncoder.setRenderPipelineState(pipelineState)
 
-        // Pass uniforms
         let currentTime = Float(CACurrentMediaTime() - startTime)
-        var time = currentTime
-        var resolution = SIMD2<Float>(Float(size.width), Float(size.height))
-        var pressed = Float(isPressed ? 1.0 : 0.0)
-        var themeColorCopy = themeColor
-
-        renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.size, index: 0)
-        renderEncoder.setFragmentBytes(&resolution, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
-        renderEncoder.setFragmentBytes(&pressed, length: MemoryLayout<Float>.size, index: 2)
-        renderEncoder.setFragmentBytes(&themeColorCopy, length: MemoryLayout<SIMD3<Float>>.size, index: 3)
+        let resolution = SIMD2<Float>(Float(size.width), Float(size.height))
+        encodeUniforms(to: renderEncoder, time: currentTime, resolution: resolution)
 
         renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         renderEncoder.endEncoding()
@@ -454,13 +322,11 @@ struct AmbientOrbButton: View {
 
     var body: some View {
         Button(action: action) {
-            // Just the Metal shader with NO background or glass
             MetalShaderView(isPressed: $isPressed, size: CGSize(width: size, height: size))
                 .frame(width: size, height: size)
                 .clipShape(Circle())
         }
         .buttonStyle(OrbButtonStyle(isPressed: $isPressed))
-        // NO glass effect - let the shader be completely transparent
     }
 }
 

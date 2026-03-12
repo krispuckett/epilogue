@@ -1391,15 +1391,15 @@ struct AmbientModeView: View {
                     
                     // Single morphing container that expands/contracts
                     ZStack {
-                        // Unified morphing background - subtle dark fill, no glass overlay
-                        RoundedRectangle(
-                            cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32,
-                            style: .continuous
-                        )
-                        .fill(Color.white.opacity(inputMode == .textInput || !isVoiceModeEnabled ? 0.08 : 0))
+                        // Unified morphing background with Liquid Glass
+                        Color.clear
                         .frame(
                             width: inputMode == .textInput || !isVoiceModeEnabled ? geometry.size.width - 60 : 64,
                             height: inputMode == .textInput || !isVoiceModeEnabled ? textFieldHeight : 64
+                        )
+                        .glassEffect(
+                            .regular.tint(.black.opacity(0.15)),
+                            in: .rect(cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32)
                         )
                         .allowsHitTesting(false)
                         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: inputMode)

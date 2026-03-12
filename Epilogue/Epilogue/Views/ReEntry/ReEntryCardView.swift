@@ -71,10 +71,7 @@ struct ReEntryCardView: View {
             }
             .padding(DesignSystem.Spacing.md)
         }
-        .background(
-            DesignSystem.Colors.surfaceBackground
-                .ignoresSafeArea()
-        )
+        .glassEffect(.regular.tint(.black.opacity(0.3)))
     }
 
     // MARK: - Header
