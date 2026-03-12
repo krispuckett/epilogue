@@ -2775,3 +2775,1410 @@ static half3 bcs_hsb2rgb(half3 c) {
 
     return color;
 }
+
+// ============================================================================
+// MARK: - MESH BACKGROUND GENERATORS
+// These shaders sample colors from the book cover image and use them
+// to generate procedural animated backgrounds
+// ============================================================================
+
+// Shared helper: sample a blurred region from the cover (average of nearby pixels)
+static half3 bcs_sampleRegion(SwiftUI::Layer layer, float2 center, float2 size, float radius) {
+    half3 total = half3(0.0h);
+    float samples = 0.0;
+    for (float dy = -radius; dy <= radius; dy += radius * 0.5) {
+        for (float dx = -radius; dx <= radius; dx += radius * 0.5) {
+            float2 pos = clamp(center + float2(dx, dy), float2(0.0), size);
+            total += layer.sample(pos).rgb;
+            samples += 1.0;
+        }
+    }
+    return total / half(samples);
+}
+
+// MARK: - Mesh Gradient
+// Samples a 3x3 grid of colors from the cover and creates a flowing
+// animated mesh gradient — like iOS MeshGradient but derived from the actual cover
+
+[[ stitchable ]] half4 bcs_meshGradient(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float warpAmount,    // 0-1: how much the mesh points move
+    float smoothness,    // 1-5: interpolation smoothness
+    float speed,         // 0.2-3: animation speed
+    float satBoost       // 0-1: saturation enhancement
+) {
+    float2 uv = position / size;
+    float sR = size.y * 0.08; // sample radius for blurring
+
+    // Sample 9 colors from cover in a 3x3 grid
+    half3 colors[9];
+    colors[0] = bcs_sampleRegion(layer, float2(size.x * 0.15, size.y * 0.15), size, sR);
+    colors[1] = bcs_sampleRegion(layer, float2(size.x * 0.50, size.y * 0.15), size, sR);
+    colors[2] = bcs_sampleRegion(layer, float2(size.x * 0.85, size.y * 0.15), size, sR);
+    colors[3] = bcs_sampleRegion(layer, float2(size.x * 0.15, size.y * 0.50), size, sR);
+    colors[4] = bcs_sampleRegion(layer, float2(size.x * 0.50, size.y * 0.50), size, sR);
+    colors[5] = bcs_sampleRegion(layer, float2(size.x * 0.85, size.y * 0.50), size, sR);
+    colors[6] = bcs_sampleRegion(layer, float2(size.x * 0.15, size.y * 0.85), size, sR);
+    colors[7] = bcs_sampleRegion(layer, float2(size.x * 0.50, size.y * 0.85), size, sR);
+    colors[8] = bcs_sampleRegion(layer, float2(size.x * 0.85, size.y * 0.85), size, sR);
+
+    // Animate mesh control points with noise
+    float2 warpedUV = uv;
+    float n1 = bcs_fbm(uv * 2.0 + float2(time * speed * 0.15, time * speed * 0.1), 3);
+    float n2 = bcs_fbm(uv * 2.0 + float2(-time * speed * 0.12, time * speed * 0.18) + 5.0, 3);
+    warpedUV += float2(n1 - 0.5, n2 - 0.5) * warpAmount * 0.4;
+
+    // Bilinear interpolation across the 3x3 grid
+    float gx = clamp(warpedUV.x * 2.0, 0.0, 2.0); // 0-2 across 3 columns
+    float gy = clamp(warpedUV.y * 2.0, 0.0, 2.0); // 0-2 across 3 rows
+
+    int cx = min(int(gx), 1);
+    int cy = min(int(gy), 1);
+    float fx = fract(gx);
+    float fy = fract(gy);
+
+    // Smooth interpolation
+    float sfx = pow(fx, smoothness) / (pow(fx, smoothness) + pow(1.0 - fx, smoothness));
+    float sfy = pow(fy, smoothness) / (pow(fy, smoothness) + pow(1.0 - fy, smoothness));
+
+    // Get 4 corner colors for this cell
+    half3 tl = colors[cy * 3 + cx];
+    half3 tr = colors[cy * 3 + cx + 1];
+    half3 bl = colors[(cy + 1) * 3 + cx];
+    half3 br = colors[(cy + 1) * 3 + cx + 1];
+
+    // Bilinear blend
+    half3 top = mix(tl, tr, half(sfx));
+    half3 bot = mix(bl, br, half(sfx));
+    half3 result = mix(top, bot, half(sfy));
+
+    // Saturation boost
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.0h + half(satBoost));
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Cover-Derived Atmospheric Backgrounds
+// Effects below transform the actual book cover image into atmospheric backgrounds.
+// They sample and warp the cover's own pixels — not just its colors.
+
+// MARK: - Dream Blur
+// The cover image dissolves into a soft, breathing, domain-warped blur.
+// Like seeing the cover through frosted glass that slowly shifts.
+
+[[ stitchable ]] half4 bcs_dreamBlur(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float blurRadius,    // 20-120: how blurred/dissolved the cover becomes
+    float warpStrength,  // 0-1: how much the blur field warps
+    float breatheSpeed,  // 0.2-2: speed of the breathing motion
+    float satBoost       // 0-1: saturation enhancement
+) {
+    float2 uv = position / size;
+
+    // Domain warp — the cover image flows organically
+    float warp1 = bcs_fbm(uv * 2.0 + float2(time * breatheSpeed * 0.07, time * breatheSpeed * 0.05), 4);
+    float warp2 = bcs_fbm(uv * 2.0 + float2(time * breatheSpeed * -0.06, time * breatheSpeed * 0.08) + 50.0, 4);
+
+    float2 warpOffset = float2(warp1, warp2) * warpStrength * 0.3;
+    float2 warpedUV = uv + warpOffset;
+
+    // Multi-sample blur at warped position — sample the cover in a wide radius
+    half3 result = half3(0.0h);
+    float totalWeight = 0.0;
+    float radius = blurRadius;
+    int samples = 0;
+
+    // Gaussian-weighted multi-sample from the actual cover
+    for (float dy = -3.0; dy <= 3.0; dy += 1.0) {
+        for (float dx = -3.0; dx <= 3.0; dx += 1.0) {
+            float2 offset = float2(dx, dy) * radius * 0.33;
+            float2 samplePos = warpedUV * size + offset;
+            samplePos = clamp(samplePos, float2(0.0), size);
+
+            float weight = exp(-(dx * dx + dy * dy) * 0.18);
+            result += layer.sample(samplePos).rgb * half(weight);
+            totalWeight += weight;
+            samples++;
+        }
+    }
+    result /= half(totalWeight);
+
+    // Second pass — even softer layer blended on top for dreamy quality
+    half3 deep = half3(0.0h);
+    float deepWeight = 0.0;
+    float2 deepWarp = uv + warpOffset * 1.5;
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 offset = float2(dx, dy) * radius * 0.7;
+            float2 samplePos = deepWarp * size + offset;
+            samplePos = clamp(samplePos, float2(0.0), size);
+            float weight = exp(-(dx * dx + dy * dy) * 0.3);
+            deep += layer.sample(samplePos).rgb * half(weight);
+            deepWeight += weight;
+        }
+    }
+    deep /= half(deepWeight);
+
+    // Blend sharp and deep blur based on position
+    float blendFactor = 0.5 + 0.2 * sin(uv.y * 3.0 + time * breatheSpeed * 0.3);
+    result = mix(result, deep, half(blendFactor));
+
+    // Saturation boost
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.0h + half(satBoost) * 0.8h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Liquid Bloom
+// The cover image melts and blooms outward like ink dropped in water.
+// Pixels from the cover smear radially from center with organic turbulence.
+
+[[ stitchable ]] half4 bcs_liquidBloom(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float bloomRadius,   // 0.1-0.8: how far the bloom spreads
+    float turbulence,    // 0-1: organic distortion amount
+    float flowSpeed,     // 0.2-2: speed of the liquid flow
+    float colorIntensity // 0.5-2: vibrancy of the result
+) {
+    float2 uv = position / size;
+    float2 center = float2(0.5, 0.5);
+    float2 fromCenter = uv - center;
+    float dist = length(fromCenter);
+    float angle = atan2(fromCenter.y, fromCenter.x);
+
+    // Turbulent angle and distance distortion
+    float turbAngle = bcs_fbm(float2(angle * 2.0 + time * flowSpeed * 0.1, dist * 3.0), 4) * turbulence * 1.5;
+    float turbDist = bcs_fbm(float2(dist * 4.0, angle + time * flowSpeed * 0.15), 4) * turbulence * 0.3;
+
+    // Remap — pull pixels inward (sample from cover center outward)
+    float remappedDist = dist * (1.0 - bloomRadius * 0.6) + turbDist;
+    float remappedAngle = angle + turbAngle * (0.3 + dist * 0.5);
+
+    float2 sampleUV = center + float2(
+        cos(remappedAngle) * remappedDist,
+        sin(remappedAngle) * remappedDist
+    );
+
+    // Multi-sample for softness at the warped position
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = 10.0 + dist * 40.0; // more blur at edges
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 offset = float2(dx, dy) * blur * 0.4;
+            float2 sp = clamp(sampleUV * size + offset, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Edge vignette — darker at periphery
+    float vignette = 1.0 - smoothstep(0.3, 0.9, dist);
+    result *= half(0.5 + vignette * 0.5);
+
+    // Color intensity boost
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, half(colorIntensity));
+    result = max(result, 0.02h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Heat Mirage
+// The cover image shimmers like a desert mirage — vertical ripples
+// distort the cover as if seen through rising heat waves.
+
+[[ stitchable ]] half4 bcs_heatMirage(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float distortion,   // 5-60: pixel displacement amount
+    float waveScale,    // 2-15: density of heat waves
+    float riseSpeed,    // 0.5-3: speed of rising heat
+    float blurAmount    // 0-1: atmospheric blur
+) {
+    float2 uv = position / size;
+
+    // Heat shimmer — vertical waves rising upward
+    float shimmer1 = sin(uv.x * waveScale * 6.28 + time * riseSpeed * 2.0 +
+                        bcs_valueNoise(float2(uv.x * 5.0, time * 0.5)) * 3.0);
+    float shimmer2 = sin(uv.x * waveScale * 4.0 + time * riseSpeed * 1.5 + 1.5);
+    float shimmer3 = bcs_valueNoise(float2(uv.x * waveScale * 2.0, uv.y * 3.0 - time * riseSpeed));
+
+    // Combine shimmer layers
+    float totalShimmer = shimmer1 * 0.5 + shimmer2 * 0.3 + shimmer3 * 0.4;
+
+    // Displacement increases toward top (heat rises)
+    float heightFactor = pow(1.0 - uv.y, 0.8);
+    float2 displacement = float2(
+        totalShimmer * distortion * heightFactor * 0.5,
+        (shimmer3 - 0.5) * distortion * heightFactor * 0.3
+    );
+
+    float2 samplePos = position + displacement;
+    samplePos = clamp(samplePos, float2(0.0), size);
+
+    // Sample with slight blur for atmospheric haze
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = 1.0 + blurAmount * 15.0 * heightFactor;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(samplePos + float2(dx, dy) * blur, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.3);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Slight warm tint to enhance heat feeling
+    result.r = min(result.r * 1.05h, 1.0h);
+    result.b *= 0.95h;
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Radial Smear
+// The cover radiates outward from center in streaks, like a long-exposure
+// zoom blur. The cover's composition bleeds in all directions.
+
+[[ stitchable ]] half4 bcs_radialSmear(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float smearLength,  // 0.05-0.4: length of radial streaks
+    float rotation,     // 0-1: rotational component to the smear
+    float pulseSpeed,   // 0.2-2: pulsing animation speed
+    float clarity       // 0-1: 0 = fully smeared, 1 = mix with original
+) {
+    float2 uv = position / size;
+    float2 center = float2(0.5, 0.5);
+    float2 fromCenter = uv - center;
+    float dist = length(fromCenter);
+    float angle = atan2(fromCenter.y, fromCenter.x);
+
+    // Pulsing smear intensity
+    float pulse = 0.7 + 0.3 * sin(time * pulseSpeed * 0.5);
+    float smear = smearLength * pulse;
+
+    // Accumulate samples along the radial direction
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    int stepCount = 16;
+
+    for (int i = 0; i < stepCount; i++) {
+        float t = float(i) / float(stepCount - 1); // 0 to 1
+        float sampleDist = dist * (1.0 - smear * t);
+
+        // Add rotational twist
+        float sampleAngle = angle + rotation * t * 0.5 * dist;
+
+        float2 sampleUV = center + float2(
+            cos(sampleAngle) * sampleDist,
+            sin(sampleAngle) * sampleDist
+        );
+
+        float2 sp = clamp(sampleUV * size, float2(0.0), size);
+
+        // Weight — center samples stronger
+        float w = 1.0 - t * 0.5;
+        result += layer.sample(sp).rgb * half(w);
+        totalW += w;
+    }
+    result /= half(totalW);
+
+    // Mix with original based on clarity
+    half4 original = layer.sample(clamp(position, float2(0.0), size));
+    result = mix(result, original.rgb, half(clarity * 0.7));
+
+    // Slight vignette
+    float vignette = 1.0 - smoothstep(0.4, 1.0, dist * 1.2);
+    result *= half(0.6 + vignette * 0.4);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Chromatic Fog
+// The cover dissolves into colored fog — each RGB channel warps independently,
+// creating a soft chromatic separation that feels like colored mist.
+
+[[ stitchable ]] half4 bcs_chromaticFog(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float fogDensity,    // 20-100: blur/fog amount
+    float separation,    // 0-30: RGB channel separation distance
+    float driftSpeed,    // 0.2-2: fog movement speed
+    float depth          // 0.3-1: how deep into fog
+) {
+    float2 uv = position / size;
+
+    // Each color channel gets its own domain warp
+    float warpR1 = bcs_fbm(uv * 1.8 + float2(time * driftSpeed * 0.06, 0.0), 3);
+    float warpR2 = bcs_fbm(uv * 1.8 + float2(0.0, time * driftSpeed * 0.07), 3);
+
+    float warpG1 = bcs_fbm(uv * 1.8 + float2(time * driftSpeed * -0.05, 0.0) + 30.0, 3);
+    float warpG2 = bcs_fbm(uv * 1.8 + float2(0.0, time * driftSpeed * -0.06) + 30.0, 3);
+
+    float warpB1 = bcs_fbm(uv * 1.8 + float2(0.0, time * driftSpeed * 0.08) + 60.0, 3);
+    float warpB2 = bcs_fbm(uv * 1.8 + float2(time * driftSpeed * -0.07, 0.0) + 60.0, 3);
+
+    // Offset each channel independently
+    float2 uvR = uv + float2(warpR1, warpR2) * 0.15 * depth + float2(separation / size.x, 0.0);
+    float2 uvG = uv + float2(warpG1, warpG2) * 0.15 * depth;
+    float2 uvB = uv + float2(warpB1, warpB2) * 0.15 * depth + float2(0.0, separation / size.y);
+
+    // Blur-sample each channel from the actual cover
+    float blur = fogDensity;
+    half rChannel = 0.0h;
+    half gChannel = 0.0h;
+    half bChannel = 0.0h;
+    float totalW = 0.0;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 offset = float2(dx, dy) * blur * 0.4;
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+
+            float2 spR = clamp(uvR * size + offset, float2(0.0), size);
+            float2 spG = clamp(uvG * size + offset, float2(0.0), size);
+            float2 spB = clamp(uvB * size + offset, float2(0.0), size);
+
+            rChannel += layer.sample(spR).r * half(w);
+            gChannel += layer.sample(spG).g * half(w);
+            bChannel += layer.sample(spB).b * half(w);
+            totalW += w;
+        }
+    }
+
+    half3 result = half3(rChannel, gChannel, bChannel) / half(totalW);
+
+    // Slight brightness lift to keep it atmospheric
+    result = max(result * 1.1h, 0.02h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Watercolor Bleed
+// The cover image bleeds as if painted in watercolor — edges dissolve,
+// colors run into each other, with wet paper texture.
+
+[[ stitchable ]] half4 bcs_watercolorBleed(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float bleedAmount,   // 10-80: how much colors bleed
+    float wetness,       // 0-1: how wet/active the bleeding is
+    float paperGrain,    // 0-1: paper texture visibility
+    float flowAngle      // 0-6.28: direction gravity pulls the paint
+) {
+    float2 uv = position / size;
+
+    // Flow direction (gravity for the paint)
+    float2 flowDir = float2(cos(flowAngle), sin(flowAngle));
+
+    // Watercolor warp — paint flowing along paper grain
+    float grain1 = bcs_fbm(uv * 8.0 + time * wetness * 0.03, 5);
+    float grain2 = bcs_fbm(uv * 8.0 + float2(50.0, 50.0) + time * wetness * 0.025, 5);
+
+    // The warp follows gravity direction but is perturbed by paper grain
+    float2 warp = flowDir * grain1 * bleedAmount * 0.015
+                + float2(grain2 - 0.5, grain1 - 0.5) * bleedAmount * 0.008;
+
+    float2 samplePos = position + warp;
+    samplePos = clamp(samplePos, float2(0.0), size);
+
+    // Soft multi-sample at warped position
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = bleedAmount * 0.5;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            // Bias samples in flow direction
+            float2 offset = float2(dx, dy) * blur * 0.5 + flowDir * float2(dx, dy).x * blur * 0.3;
+            float2 sp = clamp(samplePos + offset, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.2);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Paper texture — subtle granularity
+    float paper = bcs_fbm(uv * 40.0, 4);
+    result *= half(1.0 - paperGrain * 0.15 + paper * paperGrain * 0.2);
+
+    // Watercolor edge darkening — where paint pools at boundaries
+    float edge = abs(grain1 - 0.5) * 2.0;
+    edge = pow(edge, 2.0);
+    result *= half(1.0 - edge * wetness * 0.15);
+
+    // Slight desaturation for watercolor feel
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(result, half3(lum), 0.1h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Plasma Flow
+// The cover dissolves into flowing plasma — the image's own pixels stretch
+// and curl along organic flow lines, like the cover is being stirred.
+
+[[ stitchable ]] half4 bcs_plasmaFlow(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float curlStrength,   // 0.05-0.4: strength of the curl/flow
+    float flowScale,      // 1-5: scale of flow patterns
+    float speed,          // 0.2-2: animation speed
+    float mixSharpness    // 0-1: 0 = fully flowed, 1 = mix in some original
+) {
+    float2 uv = position / size;
+
+    // Curl noise field — creates swirling flow
+    float2 curlUV = uv * flowScale;
+    float n1 = bcs_fbm(curlUV + float2(time * speed * 0.05, 0.0), 4);
+    float n2 = bcs_fbm(curlUV + float2(0.0, time * speed * 0.05) + 100.0, 4);
+
+    // Curl: derivative of noise gives divergence-free flow
+    float eps = 0.01;
+    float dndy = bcs_fbm(curlUV + float2(0.0, eps) + float2(time * speed * 0.05, 0.0), 4) - n1;
+    float dndx = bcs_fbm(curlUV + float2(eps, 0.0) + float2(0.0, time * speed * 0.05) + 100.0, 4) - n2;
+
+    // Curl direction (perpendicular to gradient)
+    float2 curl = float2(dndy, -dndx) / eps;
+    curl = curl * curlStrength;
+
+    // Apply flow displacement to sample position
+    float2 flowedUV = uv + curl;
+
+    // Additional domain warp for extra organic feel
+    float warp = bcs_fbm(flowedUV * 3.0 + time * speed * 0.03, 3);
+    flowedUV += float2(warp - 0.5, warp - 0.5) * curlStrength * 0.3;
+
+    // Sample the cover at the flowed position with blur
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = 8.0 + curlStrength * 30.0;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(flowedUV * size + float2(dx, dy) * blur * 0.4, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Mix in original cover at center for anchoring
+    half4 original = layer.sample(clamp(position, float2(0.0), size));
+    float centerDist = length(uv - float2(0.5, 0.5));
+    float centerMix = smoothstep(0.5, 0.0, centerDist) * mixSharpness;
+    result = mix(result, original.rgb, half(centerMix * 0.5));
+
+    // Subtle saturation boost
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.3h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Tilt Shift
+// Miniature/diorama effect — the cover stays sharp in a band but blurs
+// heavily above and below, with boosted saturation for toy-like quality.
+
+[[ stitchable ]] half4 bcs_tiltShift(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float focusCenter,   // 0.2-0.8: where the sharp band is (y position)
+    float focusWidth,    // 0.05-0.3: width of the sharp band
+    float maxBlur,       // 20-80: maximum blur at edges
+    float saturation     // 1-2: color boost for miniature effect
+) {
+    float2 uv = position / size;
+
+    // Distance from focus band
+    float focusDist = abs(uv.y - focusCenter);
+    float blurFactor = smoothstep(focusWidth * 0.5, focusWidth * 0.5 + 0.2, focusDist);
+
+    // Subtle horizontal breathing
+    float breathe = sin(time * 0.3) * 0.02;
+    float2 baseUV = uv + float2(breathe, 0.0);
+
+    // Variable blur based on distance from focus
+    float blur = blurFactor * maxBlur;
+
+    half3 result;
+
+    if (blur < 1.0) {
+        // In focus — sample directly
+        result = layer.sample(clamp(baseUV * size, float2(0.0), size)).rgb;
+    } else {
+        // Out of focus — progressive blur
+        result = half3(0.0h);
+        float totalW = 0.0;
+
+        for (float dy = -3.0; dy <= 3.0; dy += 1.0) {
+            for (float dx = -3.0; dx <= 3.0; dx += 1.0) {
+                float2 sp = clamp(baseUV * size + float2(dx, dy) * blur * 0.3, float2(0.0), size);
+                float w = exp(-(dx*dx + dy*dy) * 0.15);
+                result += layer.sample(sp).rgb * half(w);
+                totalW += w;
+            }
+        }
+        result /= half(totalW);
+    }
+
+    // Saturation boost for miniature quality
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, half(saturation));
+
+    // Subtle vignette
+    float2 vig = uv * (1.0 - uv);
+    float vigFactor = pow(vig.x * vig.y * 15.0, 0.3);
+    result *= half(vigFactor);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Echo Trails
+// The cover image echoes outward in ghostly copies that trail off
+// at different angles, like seeing the cover's spirit leave its body.
+
+[[ stitchable ]] half4 bcs_echoTrails(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float trailCount,    // 2-8: number of echo ghosts
+    float trailSpread,   // 0.02-0.15: how far apart echoes are
+    float fadeRate,       // 0.3-0.8: how quickly echoes fade
+    float driftAngle     // 0-6.28: direction echoes drift
+) {
+    float2 uv = position / size;
+
+    // Base image — slightly blurred
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    for (float dy = -1.0; dy <= 1.0; dy += 1.0) {
+        for (float dx = -1.0; dx <= 1.0; dx += 1.0) {
+            float2 sp = clamp(position + float2(dx, dy) * 3.0, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.5);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Animated drift direction
+    float animAngle = driftAngle + sin(time * 0.3) * 0.3;
+    float2 drift = float2(cos(animAngle), sin(animAngle));
+
+    // Layer echoes behind the original
+    int echoes = min(int(trailCount), 8);
+    for (int i = 1; i <= echoes; i++) {
+        float t = float(i);
+        float alpha = pow(1.0 - fadeRate, t); // exponential fade
+
+        // Each echo is offset along the drift direction
+        float2 echoOffset = drift * t * trailSpread;
+
+        // Add slight noise-based wobble per echo
+        float wobble = bcs_valueNoise(float2(t * 7.0, time * 0.5));
+        echoOffset += float2(wobble - 0.5, wobble - 0.5) * 0.02;
+
+        float2 echoUV = uv - echoOffset;
+
+        // Blur increases with echo distance
+        float echoBlur = 5.0 + t * 8.0;
+        half3 echo = half3(0.0h);
+        float eW = 0.0;
+        for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+            for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+                float2 sp = clamp(echoUV * size + float2(dx, dy) * echoBlur * 0.4, float2(0.0), size);
+                float w = exp(-(dx*dx + dy*dy) * 0.3);
+                echo += layer.sample(sp).rgb * half(w);
+                eW += w;
+            }
+        }
+        echo /= half(eW);
+
+        // Additive blend for ghostly glow
+        result += echo * half(alpha * 0.25);
+    }
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Fractal Mirror
+// The cover is reflected and tiled in kaleidoscopic fashion,
+// creating mandala-like patterns from the cover's own imagery.
+
+[[ stitchable ]] half4 bcs_fractalMirror(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float segments,     // 2-12: number of kaleidoscope segments
+    float zoom,         // 0.5-3: zoom into the pattern
+    float rotationSpeed, // 0-1: rotation animation speed
+    float blendSoft     // 0-1: softness of the mirrored sampling
+) {
+    float2 uv = position / size;
+    float2 center = float2(0.5, 0.5);
+    float2 fromCenter = uv - center;
+
+    float dist = length(fromCenter);
+    float angle = atan2(fromCenter.y, fromCenter.x);
+
+    // Animated rotation
+    angle += time * rotationSpeed * 0.2;
+
+    // Kaleidoscope fold — mirror the angle into segments
+    float segAngle = 6.28318 / segments;
+    angle = fmod(abs(angle), segAngle);
+
+    // Mirror every other segment
+    float segIndex = floor(abs(atan2(fromCenter.y, fromCenter.x) + time * rotationSpeed * 0.2) / segAngle);
+    if (fmod(segIndex, 2.0) > 0.5) {
+        angle = segAngle - angle;
+    }
+
+    // Reconstruct UV from polar coords, zoomed
+    float2 mirroredUV = center + float2(cos(angle), sin(angle)) * dist * zoom;
+
+    // Wrap UV to stay within cover bounds
+    mirroredUV = fract(mirroredUV);
+
+    // Sample with optional softness
+    float blur = 1.0 + blendSoft * 12.0;
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+
+    for (float dy = -1.5; dy <= 1.5; dy += 1.0) {
+        for (float dx = -1.5; dx <= 1.5; dx += 1.0) {
+            float2 sp = fract(mirroredUV + float2(dx, dy) * blur / size) * size;
+            sp = clamp(sp, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.3);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Subtle center glow from cover
+    float centerGlow = exp(-dist * dist * 6.0) * 0.15;
+    half3 centerSample = layer.sample(center * size).rgb;
+    result += centerSample * half(centerGlow);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Liquid Silk
+// The cover melts into flowing silk ribbons — multiple warped copies of the
+// cover blend together at different flow speeds, creating iridescent layers.
+
+[[ stitchable ]] half4 bcs_liquidSilk(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float ribbonCount,  // 2-6: number of flowing layers
+    float flowSpeed,    // 0.2-2: speed of silk flow
+    float warpAmount,   // 0.05-0.3: displacement per ribbon
+    float blendMode     // 0-1: 0 = screen blend, 1 = overlay blend
+) {
+    float2 uv = position / size;
+    half3 result = half3(0.0h);
+
+    int layers = min(int(ribbonCount), 6);
+
+    for (int i = 0; i < layers; i++) {
+        float fi = float(i);
+        float phase = fi * 2.39996; // golden angle
+
+        // Each ribbon flows in a slightly different direction
+        float angle = phase + time * flowSpeed * 0.05 * (1.0 + fi * 0.3);
+        float2 flowDir = float2(cos(angle), sin(angle));
+
+        // Domain warp for this ribbon — organic displacement
+        float w1 = bcs_fbm(uv * (2.0 + fi * 0.5) + flowDir * time * flowSpeed * 0.04 + fi * 10.0, 4);
+        float w2 = bcs_fbm(uv * (2.0 + fi * 0.5) + flowDir * time * flowSpeed * 0.03 + fi * 20.0 + 50.0, 4);
+
+        float2 warpedUV = uv + float2(w1 - 0.5, w2 - 0.5) * warpAmount * (1.0 + fi * 0.3);
+
+        // Blur-sample the cover at this warped position
+        half3 ribbon = half3(0.0h);
+        float totalW = 0.0;
+        float blur = 15.0 + fi * 8.0;
+
+        for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+            for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+                float2 sp = clamp(warpedUV * size + float2(dx, dy) * blur * 0.35, float2(0.0), size);
+                float w = exp(-(dx*dx + dy*dy) * 0.22);
+                ribbon += layer.sample(sp).rgb * half(w);
+                totalW += w;
+            }
+        }
+        ribbon /= half(totalW);
+
+        // Boost saturation per ribbon
+        half lum = dot(ribbon, half3(0.299h, 0.587h, 0.114h));
+        ribbon = mix(half3(lum), ribbon, 1.3h + half(fi) * 0.1h);
+
+        // Blend ribbons together
+        float alpha = 1.0 / float(layers);
+        if (blendMode < 0.5) {
+            // Screen blend — lighter, luminous
+            result = result + ribbon * half(alpha) - result * ribbon * half(alpha);
+        } else {
+            // Overlay blend — richer contrast
+            half3 base = result;
+            half3 over = ribbon;
+            half3 blended;
+            blended.r = base.r < 0.5h ? 2.0h * base.r * over.r : 1.0h - 2.0h * (1.0h - base.r) * (1.0h - over.r);
+            blended.g = base.g < 0.5h ? 2.0h * base.g * over.g : 1.0h - 2.0h * (1.0h - base.g) * (1.0h - over.g);
+            blended.b = base.b < 0.5h ? 2.0h * base.b * over.b : 1.0h - 2.0h * (1.0h - base.b) * (1.0h - over.b);
+            result = mix(result, blended, half(alpha * 1.5));
+        }
+    }
+
+    result = clamp(result, 0.0h, 1.0h);
+    return half4(result, 1.0h);
+}
+
+// MARK: - Molten Glass
+// The cover melts as if behind warped glass — multiple refraction layers
+// create depth and liquid movement. Thick, syrupy distortion.
+
+[[ stitchable ]] half4 bcs_moltenGlass(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float viscosity,     // 0.5-3: how thick/syrupy the glass feels
+    float refraction,    // 10-80: displacement amount
+    float heatDistort,   // 0-1: additional heat-shimmer on top
+    float clarity        // 0-1: mix back in sharp original
+) {
+    float2 uv = position / size;
+
+    // Primary glass warp — thick, slow, organic
+    float g1 = bcs_fbm(uv * 1.5 + float2(time * 0.03 / viscosity, time * 0.02 / viscosity), 5);
+    float g2 = bcs_fbm(uv * 1.5 + float2(time * -0.025 / viscosity, time * 0.035 / viscosity) + 40.0, 5);
+
+    // Secondary layer — finer detail
+    float g3 = bcs_fbm(uv * 4.0 + float2(g1, g2) * 0.5 + time * 0.01, 4);
+    float g4 = bcs_fbm(uv * 4.0 + float2(g2, g1) * 0.5 + time * 0.015 + 80.0, 4);
+
+    float2 displacement = float2(
+        (g1 - 0.5 + (g3 - 0.5) * 0.3) * refraction,
+        (g2 - 0.5 + (g4 - 0.5) * 0.3) * refraction
+    );
+
+    // Heat shimmer on top
+    if (heatDistort > 0.01) {
+        float heat = sin(uv.x * 20.0 + time * 2.0 + g1 * 5.0) * heatDistort * 3.0;
+        displacement.y += heat;
+    }
+
+    float2 samplePos = position + displacement;
+    samplePos = clamp(samplePos, float2(0.0), size);
+
+    // Blur-sample for glass softness
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = 8.0 + refraction * 0.2;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(samplePos + float2(dx, dy) * blur * 0.4, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Slight chromatic separation through glass
+    float2 rOffset = displacement * 1.03;
+    float2 bOffset = displacement * 0.97;
+    half rShift = layer.sample(clamp(position + rOffset, float2(0.0), size)).r;
+    half bShift = layer.sample(clamp(position + bOffset, float2(0.0), size)).b;
+    result.r = mix(result.r, rShift, 0.15h);
+    result.b = mix(result.b, bShift, 0.15h);
+
+    // Mix in sharp original
+    if (clarity > 0.01) {
+        half3 sharp = layer.sample(clamp(position, float2(0.0), size)).rgb;
+        result = mix(result, sharp, half(clarity * 0.6));
+    }
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Ink Diffusion
+// The cover spreads like ink dropped into still water — concentric rings of
+// the cover's pixels ripple outward while blurring and blending.
+
+[[ stitchable ]] half4 bcs_inkDiffusion(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float spreadRate,    // 0.1-0.5: how far the ink has spread
+    float ringCount,     // 1-5: concentric diffusion rings
+    float turbulence,    // 0-1: organic irregularity
+    float saturation     // 0.5-2: color vibrancy
+) {
+    float2 uv = position / size;
+    float2 center = float2(0.5, 0.5);
+    float dist = length(uv - center);
+    float angle = atan2(uv.y - center.y, uv.x - center.x);
+
+    // Concentric ring modulation — pixels compress/expand in rings
+    float ringPhase = dist * ringCount * 6.28 - time * 0.3;
+    float ringMod = sin(ringPhase) * 0.5 + 0.5;
+
+    // Turbulent displacement along rings
+    float turbAngle = bcs_fbm(float2(angle * 3.0 + time * 0.1, dist * 5.0), 4) * turbulence;
+    float turbDist = bcs_fbm(float2(dist * 4.0 + time * 0.08, angle * 2.0), 4) * turbulence * 0.15;
+
+    // Remap distance — ink compression toward center
+    float remapped = dist * (1.0 - spreadRate * 0.4) + ringMod * spreadRate * 0.1 + turbDist;
+    float remappedAngle = angle + turbAngle * 0.4;
+
+    float2 sampleUV = center + float2(cos(remappedAngle), sin(remappedAngle)) * remapped;
+
+    // Progressive blur — more at edges (ink has diffused more)
+    float blur = 5.0 + dist * 50.0 * spreadRate;
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(sampleUV * size + float2(dx, dy) * blur * 0.4, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    // Ink edge darkening at ring boundaries
+    float ringEdge = abs(sin(ringPhase)) * 0.1;
+    result *= half(1.0 - ringEdge);
+
+    // Saturation
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, half(saturation));
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Magnetic Fluid
+// The cover's pixels flow along magnetic field lines — ferrofluid effect.
+// Pixels stretch into organic tendrils following invisible field lines.
+
+[[ stitchable ]] half4 bcs_magneticFluid(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float fieldStrength,  // 0.05-0.3: how strongly pixels follow field lines
+    float poleCount,      // 2-6: number of magnetic poles
+    float flowSpeed,      // 0.2-2: animation speed
+    float blurring        // 5-40: blur amount
+) {
+    float2 uv = position / size;
+
+    // Compute magnetic field from multiple poles
+    float2 fieldDir = float2(0.0);
+
+    int poles = min(int(poleCount), 6);
+    for (int i = 0; i < poles; i++) {
+        float fi = float(i);
+        float pAngle = fi / float(poles) * 6.28 + time * flowSpeed * 0.05 * (1.0 + fi * 0.2);
+        float2 polePos = float2(0.5 + cos(pAngle) * 0.3, 0.5 + sin(pAngle) * 0.3);
+
+        float2 toPole = polePos - uv;
+        float poleDist = length(toPole) + 0.01;
+
+        float polarity = (fmod(fi, 2.0) < 1.0) ? 1.0 : -1.0;
+
+        float2 fieldContrib = toPole / (poleDist * poleDist * 10.0) * polarity;
+        float2 curlContrib = float2(-toPole.y, toPole.x) / (poleDist * poleDist * 15.0);
+        fieldDir += fieldContrib + curlContrib * 0.5;
+    }
+
+    float fieldMag = length(fieldDir);
+    if (fieldMag > 0.001) {
+        fieldDir = normalize(fieldDir) * min(fieldMag, 2.0);
+    }
+
+    float2 sampleUV = uv + fieldDir * fieldStrength;
+
+    float noise = bcs_fbm(uv * 5.0 + time * flowSpeed * 0.02, 3);
+    sampleUV += float2(noise - 0.5, noise - 0.5) * fieldStrength * 0.2;
+
+    // Directional blur along field lines
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float2 blurDir = fieldDir * blurring * 0.3;
+    float2 perpDir = float2(-fieldDir.y, fieldDir.x) * blurring * 0.15;
+
+    for (float t = -2.0; t <= 2.0; t += 1.0) {
+        for (float p = -1.0; p <= 1.0; p += 1.0) {
+            float2 sp = clamp((sampleUV + blurDir * t * 0.01 + perpDir * p * 0.01) * size, float2(0.0), size);
+            float w = exp(-(t*t + p*p) * 0.3);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    result *= half(1.0 + fieldMag * 0.1);
+    return half4(clamp(result, 0.0h, 1.0h), 1.0h);
+}
+
+// MARK: - Liquid Marble
+// The cover swirls into marble patterns — two fluid layers mix like
+// oil and water, creating organic veining from the cover's own pixels.
+
+[[ stitchable ]] half4 bcs_liquidMarble(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float veinScale,     // 1-8: scale of marble veining
+    float swirl,         // 0.1-0.5: swirl intensity
+    float mixRatio,      // 0-1: balance between two fluid layers
+    float smoothness     // 10-60: blur/blending amount
+) {
+    float2 uv = position / size;
+
+    float flow1 = bcs_fbm(uv * veinScale + float2(time * 0.03, time * 0.02), 5);
+    float flow2 = bcs_fbm(uv * veinScale + float2(time * -0.025, time * 0.04) + 50.0, 5);
+
+    float swirlAngle = (flow1 - 0.5) * swirl * 6.28;
+    float2 fromCenter = uv - float2(0.5, 0.5);
+    float2 rotated = float2(
+        fromCenter.x * cos(swirlAngle) - fromCenter.y * sin(swirlAngle),
+        fromCenter.x * sin(swirlAngle) + fromCenter.y * cos(swirlAngle)
+    );
+    float2 swirlUV = float2(0.5, 0.5) + rotated;
+
+    float2 uvA = swirlUV + float2(flow1 - 0.5, flow2 - 0.5) * 0.2;
+    float2 uvB = swirlUV + float2(flow2 - 0.5, flow1 - 0.5) * 0.2;
+
+    half3 fluidA = half3(0.0h);
+    half3 fluidB = half3(0.0h);
+    float totalW = 0.0;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 offset = float2(dx, dy) * smoothness * 0.35;
+            float w = exp(-(dx*dx + dy*dy) * 0.22);
+
+            float2 spA = clamp(uvA * size + offset, float2(0.0), size);
+            float2 spB = clamp(uvB * size + offset, float2(0.0), size);
+
+            fluidA += layer.sample(spA).rgb * half(w);
+            fluidB += layer.sample(spB).rgb * half(w);
+            totalW += w;
+        }
+    }
+    fluidA /= half(totalW);
+    fluidB /= half(totalW);
+
+    float veinNoise = bcs_fbm(uv * veinScale * 2.0 + float2(flow1, flow2) * 1.5, 6);
+    float vein = smoothstep(mixRatio - 0.15, mixRatio + 0.15, veinNoise);
+
+    half3 result = mix(fluidA, fluidB, half(vein));
+
+    float veinEdge = 1.0 - abs(veinNoise - mixRatio) * 3.0;
+    veinEdge = max(veinEdge, 0.0);
+    result *= half(1.0 - veinEdge * 0.12);
+
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.25h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Horizon Melt
+// The cover stretches vertically as if melting at the horizon —
+// sky above, reflection below, the image smears at the split.
+
+[[ stitchable ]] half4 bcs_horizonMelt(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float horizonY,     // 0.3-0.7: where the horizon line sits
+    float meltAmount,   // 10-80: vertical smear distance
+    float waveSpeed,    // 0.2-2: undulation speed
+    float reflection    // 0-1: reflection intensity below horizon
+) {
+    float2 uv = position / size;
+
+    float horizDist = uv.y - horizonY;
+    float absDist = abs(horizDist);
+    float stretch = pow(absDist, 0.7) * meltAmount;
+
+    float wave = sin(uv.x * 8.0 + time * waveSpeed) * 0.3
+               + sin(uv.x * 13.0 + time * waveSpeed * 0.7 + 1.5) * 0.2
+               + bcs_valueNoise(float2(uv.x * 5.0, time * waveSpeed * 0.3)) * 0.3;
+
+    float2 sampleUV = uv;
+    if (horizDist > 0.0) {
+        sampleUV.y = horizonY + absDist * 0.3;
+    } else {
+        sampleUV.y = horizonY - absDist * 0.3;
+    }
+    sampleUV.x += wave * absDist * 0.05;
+
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = 3.0 + stretch;
+
+    for (float dy = -3.0; dy <= 3.0; dy += 1.0) {
+        for (float dx = -1.0; dx <= 1.0; dx += 1.0) {
+            float2 sp = clamp(sampleUV * size + float2(dx * blur * 0.2, dy * blur * 0.4), float2(0.0), size);
+            float w = exp(-(dx*dx * 0.3 + dy*dy * 0.15));
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    if (horizDist < 0.0) {
+        result *= half(0.4 + reflection * 0.5);
+        result.b = min(result.b * 1.1h, 1.0h);
+    }
+
+    float horizGlow = exp(-horizDist * horizDist * 200.0) * 0.15;
+    half3 horizColor = bcs_sampleRegion(layer, float2(size.x * 0.5, horizonY * size.y), size, size.x * 0.2);
+    result += horizColor * half(horizGlow);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Fluid Mesh
+// Dense grid sampling with flowing interpolation — a more liquid mesh gradient.
+
+[[ stitchable ]] half4 bcs_fluidMesh(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float gridSize,      // 3-8: mesh grid density
+    float fluidity,      // 0.1-0.5: how much grid points move
+    float blendRadius,   // 1-5: softness of cell blending
+    float satBoost       // 0-1: saturation enhancement
+) {
+    float2 uv = position / size;
+
+    half3 result = half3(0.0h);
+    float totalWeight = 0.0;
+    int gridN = max(int(gridSize), 3);
+
+    for (int gy = 0; gy < gridN; gy++) {
+        for (int gx = 0; gx < gridN; gx++) {
+            float2 gridPos = float2(
+                (float(gx) + 0.5) / float(gridN),
+                (float(gy) + 0.5) / float(gridN)
+            );
+
+            float seed = float(gy * gridN + gx) * 3.17;
+            float flowX = bcs_fbm(float2(seed, time * 0.05), 3) - 0.5;
+            float flowY = bcs_fbm(float2(seed + 50.0, time * 0.04), 3) - 0.5;
+            gridPos += float2(flowX, flowY) * fluidity;
+
+            float2 delta = uv - gridPos;
+            float dist = length(delta);
+            float weight = exp(-dist * dist * gridSize * gridSize / (blendRadius * blendRadius));
+
+            if (weight > 0.001) {
+                float2 samplePos = clamp(gridPos * size, float2(0.0), size);
+                half3 color = bcs_sampleRegion(layer, samplePos, size, size.y * 0.06);
+                result += color * half(weight);
+                totalWeight += weight;
+            }
+        }
+    }
+
+    if (totalWeight > 0.001) {
+        result /= half(totalWeight);
+    }
+
+    float noise = bcs_valueNoise(uv * 30.0 + time * 0.1);
+    result *= half(0.95 + noise * 0.1);
+
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.0h + half(satBoost) * 0.8h);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Gravity Pool
+// Pixels are pulled toward orbiting gravity wells, pooling and blending.
+
+[[ stitchable ]] half4 bcs_gravityPool(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float pullStrength,  // 0.05-0.3: how strongly pixels are pulled
+    float wellCount,     // 1-4: number of gravity centers
+    float orbitSpeed,    // 0.1-1: how fast wells orbit
+    float softness       // 10-50: blur/blending
+) {
+    float2 uv = position / size;
+    float2 totalPull = float2(0.0);
+
+    int wells = min(int(wellCount), 4);
+    for (int i = 0; i < wells; i++) {
+        float fi = float(i);
+        float wAngle = fi / float(wells) * 6.28 + time * orbitSpeed * 0.1;
+        float2 wellPos = float2(0.5 + cos(wAngle) * 0.25, 0.5 + sin(wAngle) * 0.25);
+        float2 toWell = wellPos - uv;
+        float wellDist = length(toWell) + 0.01;
+        float gravity = pullStrength / (wellDist + 0.1);
+        totalPull += normalize(toWell) * gravity;
+    }
+
+    float2 sampleUV = uv + totalPull;
+
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(sampleUV * size + float2(dx, dy) * softness * 0.35, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.22);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    float minWellDist = 10.0;
+    for (int i = 0; i < wells; i++) {
+        float fi = float(i);
+        float wAngle = fi / float(wells) * 6.28 + time * orbitSpeed * 0.1;
+        float2 wellPos = float2(0.5 + cos(wAngle) * 0.25, 0.5 + sin(wAngle) * 0.25);
+        minWellDist = min(minWellDist, length(uv - wellPos));
+    }
+    float poolGlow = exp(-minWellDist * minWellDist * 15.0) * 0.1;
+    result *= half(1.0 + poolGlow);
+
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.2h);
+
+    return half4(clamp(result, 0.0h, 1.0h), 1.0h);
+}
+
+// MARK: - Smoke Dissolve
+// The cover dissolves into wisps of smoke rising upward.
+
+[[ stitchable ]] half4 bcs_smokeDissolve(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float dissolveAmount,  // 0-1: how dissolved the image is
+    float curlScale,       // 2-8: scale of smoke curls
+    float riseSpeed,       // 0.5-3: how fast smoke rises
+    float smokeDensity     // 0.3-1: smoke opacity/density
+) {
+    float2 uv = position / size;
+
+    float smokeNoise = bcs_fbm(float2(uv.x * curlScale, uv.y * curlScale - time * riseSpeed * 0.05), 5);
+    float smokeNoise2 = bcs_fbm(float2(uv.x * curlScale * 1.5 + 30.0, uv.y * curlScale * 1.5 - time * riseSpeed * 0.06), 4);
+
+    float dissolveMask = smokeNoise * 0.6 + smokeNoise2 * 0.4;
+    float dissolveEdge = (1.0 - uv.y) * 0.7 + dissolveMask * 0.3;
+
+    float2 sampleUV = uv;
+    float smokeLift = max(dissolveAmount - dissolveEdge, 0.0) * 2.0;
+    sampleUV.y -= smokeLift * 0.1;
+    sampleUV.x += (smokeNoise - 0.5) * smokeLift * 0.15;
+
+    float blur = 3.0 + smokeLift * 40.0;
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(sampleUV * size + float2(dx, dy) * blur * 0.4, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    float wispFade = exp(-smokeLift * 2.0);
+    half3 smokeColor = result * half(0.3 + wispFade * 0.7);
+    result = mix(smokeColor, result, half(1.0 - smokeLift * 0.5));
+
+    float emberEdge = smoothstep(dissolveAmount - 0.05, dissolveAmount, dissolveEdge)
+                    * smoothstep(dissolveAmount + 0.08, dissolveAmount, dissolveEdge);
+    half3 avgColor = bcs_sampleRegion(layer, float2(size.x * 0.5, size.y * 0.5), size, size.y * 0.15);
+    result += max(avgColor, half3(0.3h, 0.15h, 0.05h)) * half(emberEdge * 0.5);
+
+    return half4(result, 1.0h);
+}
+
+// MARK: - Tidal Pull
+// Horizontal waves stretch and compress the cover cyclically, like breathing.
+
+[[ stitchable ]] half4 bcs_tidalPull(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float amplitude,     // 10-60: wave displacement
+    float frequency,     // 1-6: wave density
+    float speed,         // 0.3-2: wave speed
+    float verticalMix    // 0-1: add vertical waves too
+) {
+    float2 uv = position / size;
+
+    float wave1 = sin(uv.y * frequency * 6.28 + time * speed) * amplitude;
+    float wave2 = sin(uv.y * frequency * 4.0 + time * speed * 0.7 + 2.0) * amplitude * 0.5;
+    float wave3 = bcs_valueNoise(float2(uv.y * frequency * 2.0, time * speed * 0.3)) * amplitude * 0.6;
+    float xDisp = wave1 + wave2 + wave3;
+
+    float yDisp = 0.0;
+    if (verticalMix > 0.01) {
+        float vwave1 = sin(uv.x * frequency * 5.0 + time * speed * 0.8 + 1.0);
+        float vwave2 = bcs_valueNoise(float2(uv.x * frequency * 3.0, time * speed * 0.4));
+        yDisp = (vwave1 * 0.6 + vwave2 * 0.4) * amplitude * verticalMix * 0.5;
+    }
+
+    float2 samplePos = position + float2(xDisp, yDisp);
+    samplePos = clamp(samplePos, float2(0.0), size);
+
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+    float blur = 5.0 + amplitude * 0.15;
+
+    for (float dy = -2.0; dy <= 2.0; dy += 1.0) {
+        for (float dx = -2.0; dx <= 2.0; dx += 1.0) {
+            float2 sp = clamp(samplePos + float2(dx, dy) * blur * 0.35, float2(0.0), size);
+            float w = exp(-(dx*dx + dy*dy) * 0.25);
+            result += layer.sample(sp).rgb * half(w);
+            totalW += w;
+        }
+    }
+    result /= half(totalW);
+
+    return half4(result, 1.0h);
+}
+
+// =============================================================================
+// MARK: - Advanced Cover Gradient Generators
+// Each treats the book cover as DNA — extracting its unique color composition
+// and spatial relationships to generate one-of-a-kind living gradients.
+// =============================================================================
+
+// MARK: - Gaussian Splats
+// Reconstruct the cover from overlapping soft gaussian dots, creating
+// a pointillist gradient. Each splat picks up color from its cover position.
+// The result is impressionistic — a soft, painterly gradient field.
+
+[[ stitchable ]] half4 bcs_gaussianSplats(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 size,
+    float time,
+    float splatDensity,  // 4-12: grid density of splat centers
+    float splatRadius,   // 0.03-0.15: size of each splat
+    float jitter,        // 0-1: randomness of splat placement
+    float satBoost       // 0-1: saturation enhancement
+) {
+    float2 uv = position / size;
+    float aspect = size.x / size.y;
+
+    half3 result = half3(0.0h);
+    float totalW = 0.0;
+
+    int gridN = max(int(splatDensity), 4);
+
+    // Accumulate contributions from nearby splats
+    float2 gridUV = uv * float(gridN);
+    float2 baseCell = floor(gridUV);
+
+    // Search extended neighborhood for overlapping splats
+    for (int dy = -2; dy <= 2; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+            float2 cell = baseCell + float2(float(dx), float(dy));
+
+            // Splat center with jitter
+            float seed1 = bcs_hash(cell);
+            float seed2 = bcs_hash(cell + 200.0);
+            float2 splatCenter = cell + 0.5
+                + float2(seed1 - 0.5, seed2 - 0.5) * jitter;
+
+            // Gentle animation
+            splatCenter.x += sin(time * 0.05 + seed1 * 30.0) * jitter * 0.2;
+            splatCenter.y += cos(time * 0.04 + seed2 * 30.0) * jitter * 0.2;
+
+            // Distance to splat center
+            float2 delta = gridUV - splatCenter;
+            delta.x *= aspect;
+            float dist = length(delta);
+
+            // Gaussian weight
+            float radius = splatRadius * float(gridN) * (0.7 + seed1 * 0.6);
+            float w = exp(-dist * dist / (radius * radius));
+
+            if (w > 0.001) {
+                // Sample cover at splat's position
+                float2 coverUV = clamp(splatCenter / float(gridN), float2(0.0), float2(1.0));
+                half3 splatColor = bcs_sampleRegion(layer, coverUV * size, size, size.y * 0.05);
+                result += splatColor * half(w);
+                totalW += w;
+            }
+        }
+    }
+
+    if (totalW > 0.001) {
+        result /= half(totalW);
+    }
+
+    // Saturation boost
+    half lum = dot(result, half3(0.299h, 0.587h, 0.114h));
+    result = mix(half3(lum), result, 1.0h + half(satBoost) * 0.8h);
+
+    return half4(result, 1.0h);
+}
+
+// (End of cover gradient generators)

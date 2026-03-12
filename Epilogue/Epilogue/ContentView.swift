@@ -176,16 +176,17 @@ struct ContentView: View {
                 isInputFocused: $isInputFocused
             )
         }
-        // Return card overlay - animates from Dynamic Island on cold launch
-        .overlay {
-            if showReturnCard {
-                ReturnCardOverlay {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        showReturnCard = false
-                    }
-                    ReturnCardManager.shared.markCardShown()
-                }
-            }
+        // Welcome back sheet - half-sheet on cold launch (24+ hours away)
+        .sheet(isPresented: $showReturnCard, onDismiss: {
+            ReturnCardManager.shared.markCardShown()
+        }) {
+            WelcomeBackSheet(onContinueReading: { book in
+                // Navigate to the book detail
+                navigationCoordinator.navigateToBook(book.id)
+            })
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.ultraThinMaterial)
         }
         // Dynamic Island Toast - taller format for quick returns
         .dynamicIslandToast(isPresented: $showDynamicIslandToast) {
@@ -235,25 +236,23 @@ struct ContentView: View {
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
 
             if ReturnCardManager.shared.shouldShowReturnCard {
-                logger.info("🎴 Cold start detected - starting Welcome Back Live Activity")
+                logger.info("🎴 Cold start detected (24+ hour absence) - showing return card")
 
-                // Find currently reading book
+                // Show the full return card overlay
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showReturnCard = true
+                }
+            } else if ReturnCardManager.shared.shouldShowInlineCard {
+                logger.info("🎴 Quick return detected (1-24 hours) - showing Dynamic Island toast")
+
+                // Find currently reading book for toast
                 let descriptor = FetchDescriptor<BookModel>(
                     predicate: #Predicate { $0.readingStatus == "Currently Reading" },
                     sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
                 )
 
                 if let book = try? modelContext.fetch(descriptor).first {
-                    // Start Live Activity in Dynamic Island
                     WelcomeBackActivityManager.shared.startActivity(for: book)
-                } else {
-                    // Fallback: any book
-                    let anyBookDescriptor = FetchDescriptor<BookModel>(
-                        sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
-                    )
-                    if let book = try? modelContext.fetch(anyBookDescriptor).first {
-                        WelcomeBackActivityManager.shared.startActivity(for: book)
-                    }
                 }
             }
         }

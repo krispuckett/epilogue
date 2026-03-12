@@ -135,11 +135,19 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     .replacingOccurrences(of: "\"", with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                // Best query: title + author (+ year if available for disambiguation)
+                // Best query: title + author in author field (+ year if available)
                 if let year = year {
                     queries.append("intitle:\"\(cleanTitle)\" inauthor:\"\(cleanAuthor)\" \(year)")
                 }
                 queries.append("intitle:\"\(cleanTitle)\" inauthor:\"\(cleanAuthor)\"")
+
+                // Critical fallback: name as FREE TEXT (not inauthor:)
+                // This catches translators, editors, foreword writers — anyone in subtitle/description
+                // e.g. "The Odyssey" by Mendelsohn → Homer is author, Mendelsohn is in subtitle
+                if let year = year {
+                    queries.append("intitle:\"\(cleanTitle)\" \"\(cleanAuthor)\" \(year)")
+                }
+                queries.append("intitle:\"\(cleanTitle)\" \"\(cleanAuthor)\"")
             }
 
             // Title + year — critical for disambiguating classic works with many editions
@@ -434,7 +442,9 @@ class EnhancedGoogleBooksService: GoogleBooksService {
             let volumeInfo = item.volumeInfo
             let book = item.book
             let titleLower = volumeInfo.title.lowercased()
+            let subtitleLower = volumeInfo.subtitle?.lowercased() ?? ""
             let authorLower = volumeInfo.authors?.joined(separator: " ").lowercased() ?? ""
+            let descriptionLower = volumeInfo.description?.lowercased() ?? ""
 
             // --- Cover & ISBN ---
             let hasCover = book.coverImageURL != nil && !(book.coverImageURL?.isEmpty ?? true)
@@ -466,7 +476,7 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                     score += Double(targetWords.intersection(bookWords).count * 10)
                 }
 
-                // Author match
+                // Author match — also checks subtitle & description for translators/editors
                 if let targetAuthor = parsed.author {
                     let targetLower = targetAuthor.lowercased()
                     if authorLower == targetLower {
@@ -475,6 +485,18 @@ class EnhancedGoogleBooksService: GoogleBooksService {
                         score += 80
                     } else if let lastName = targetLower.split(separator: " ").last, authorLower.contains(lastName) {
                         score += 40
+                    }
+                    // Translator/editor/contributor: name in subtitle (e.g. "A New Translation by Daniel Mendelsohn")
+                    else if subtitleLower.contains(targetLower) {
+                        score += 120
+                    } else if let lastName = targetLower.split(separator: " ").last, subtitleLower.contains(lastName) {
+                        score += 80
+                    }
+                    // Last resort: name appears in description
+                    else if descriptionLower.contains(targetLower) {
+                        score += 40
+                    } else if let lastName = targetLower.split(separator: " ").last, descriptionLower.contains(lastName) {
+                        score += 20
                     }
                 }
 

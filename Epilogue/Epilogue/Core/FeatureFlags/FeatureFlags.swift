@@ -50,7 +50,6 @@ enum FeatureFlag: String, CaseIterable {
     case atmosphereEngineV2 = "feature.visual.atmosphere_v2"
     case gradientHarmonyLayers = "feature.gradient.harmony_layers"
     case gradientAccentBloom = "feature.gradient.accent_bloom"
-    case gradientMeshRenderer = "feature.gradient.mesh_renderer"
     case gradientCoverTextureFallback = "feature.gradient.cover_texture_fallback"
     case gradientAmbientBreathing = "feature.gradient.ambient_breathing"
     case gradientUnifiedExtractor = "feature.gradient.unified_extractor"
@@ -84,7 +83,6 @@ enum FeatureFlag: String, CaseIterable {
         case .atmosphereEngineV2: return false
         case .gradientHarmonyLayers: return true
         case .gradientAccentBloom: return true
-        case .gradientMeshRenderer: return false
         case .gradientCoverTextureFallback: return false
         case .gradientAmbientBreathing: return false
         case .gradientUnifiedExtractor: return true
@@ -118,7 +116,6 @@ enum FeatureFlag: String, CaseIterable {
         case .atmosphereEngineV2: return "Atmosphere Engine v2"
         case .gradientHarmonyLayers: return "Harmony Layers"
         case .gradientAccentBloom: return "Accent Bloom"
-        case .gradientMeshRenderer: return "MeshGradient Renderer"
         case .gradientCoverTextureFallback: return "Cover-as-Texture Fallback"
         case .gradientAmbientBreathing: return "Ambient Breathing Motion"
         case .gradientUnifiedExtractor: return "Unified Extractor"

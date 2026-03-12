@@ -97,41 +97,46 @@ struct SimpleQuoteCard: View {
                 .accessibilityHidden(true)
             
             // Quote content with drop cap
-            HStack(alignment: .top, spacing: 0) {
-                // Drop cap (proportionally smaller)
+            HStack(alignment: .top, spacing: 2) {
+                // Drop cap — sized to span ~2 lines of body text
+                let dropCapSize: CGFloat = sizeCategory.isAccessibilitySize ? 38 : 30
+                let bodySize: CGFloat = sizeCategory.isAccessibilitySize ? 24 : 18
+
                 if searchQuery.isEmpty {
                     Text(firstLetter)
-                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 56 : 44))
+                        .font(.custom("Georgia", size: dropCapSize))
                         .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                        .padding(.trailing, 4)
-                        .offset(y: -6)
+                        .frame(alignment: .topLeading)
+                        .padding(.trailing, 2)
+                        .offset(y: -2)
                 } else {
                     GeorgiaHighlightedText(
                         text: firstLetter,
                         query: searchQuery,
-                        fontSize: sizeCategory.isAccessibilitySize ? 56 : 44
+                        fontSize: dropCapSize
                     )
-                    .padding(.trailing, 4)
-                    .offset(y: -6)
+                    .frame(alignment: .topLeading)
+                    .padding(.trailing, 2)
+                    .offset(y: -2)
                 }
 
-                // Rest of quote (18px body for better readability)
+                // Rest of quote
                 if searchQuery.isEmpty {
                     Text(restOfContent)
-                        .font(.custom("Georgia", size: sizeCategory.isAccessibilitySize ? 24 : 18))
+                        .font(.custom("Georgia", size: bodySize))
                         .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
                         .lineSpacing(sizeCategory.isAccessibilitySize ? 10 : 6)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 6)
+                        .padding(.top, 2)
                 } else {
                     GeorgiaHighlightedText(
                         text: restOfContent,
                         query: searchQuery,
-                        fontSize: sizeCategory.isAccessibilitySize ? 24 : 18,
+                        fontSize: bodySize,
                         lineSpacing: sizeCategory.isAccessibilitySize ? 10 : 6
                     )
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+                    .padding(.top, 2)
                 }
             }
             .padding(.top, 16)

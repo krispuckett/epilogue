@@ -123,6 +123,13 @@ struct BookDetailView: View {
     @AppStorage("gradientIntensity") private var gradientIntensity: Double = 1.0
     @AppStorage("enableAnimations") private var enableAnimations = true
     @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
+
+    // Fluid Gradient Experiment
+    @AppStorage("gandalfMode") private var gandalfMode = false
+    @AppStorage("fluidGradientExperiment") private var fluidGradientExperiment = false
+    @State private var fluidConfig = FluidAmbientConfig.golden
+    @State private var fluidColorSet = FluidLabColorSet.fallback
+    @State private var showFluidControls = false
     
     // Fixed colors for Claude voice mode style (always white text on dark background)
     private var textColor: Color {
@@ -413,16 +420,113 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var backgroundGradient: some View {
-        BookAtmosphericGradientView(
-            colorPalette: colorPalette ?? generatePlaceholderPalette(),
-            displayPalette: displayPalette,
-            intensity: gradientIntensity
-        )
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .opacity(gradientOpacity)
-        .animation(.easeOut(duration: 0.3), value: gradientOpacity)
-        .id(book.id)
+        if gandalfMode && fluidGradientExperiment {
+            FluidAmbientGradientView(
+                colorSet: fluidColorSet,
+                config: $fluidConfig
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .opacity(gradientOpacity)
+            .animation(.easeOut(duration: 0.3), value: gradientOpacity)
+            .id(book.id)
+            .onAppear {
+                // Only update colors — keep golden motion params intact
+                if let dp = displayPalette {
+                    fluidColorSet = FluidLabColorSet.from(dp)
+                } else if let cp = colorPalette {
+                    fluidColorSet = FluidLabColorSet.from(cp)
+                }
+            }
+            .onChange(of: displayPalette?.coverType) { _, _ in
+                // Only update colors when palette changes — don't override golden config
+                if let dp = displayPalette {
+                    fluidColorSet = FluidLabColorSet.from(dp)
+                }
+            }
+        } else {
+            BookAtmosphericGradientView(
+                colorPalette: colorPalette ?? generatePlaceholderPalette(),
+                displayPalette: displayPalette,
+                intensity: gradientIntensity,
+                coverImage: coverImage
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .opacity(gradientOpacity)
+            .animation(.easeOut(duration: 0.3), value: gradientOpacity)
+            .id(book.id)
+        }
+    }
+
+    // MARK: - Fluid Gradient Lab Overlay
+
+    @ViewBuilder
+    private var fluidLabOverlay: some View {
+        ZStack {
+            // Control panel (when visible)
+            if showFluidControls {
+                FluidGradientControlPanel(
+                    config: $fluidConfig,
+                    colorSet: $fluidColorSet,
+                    isPresented: $showFluidControls,
+                    availableColors: displayPalette?.allPaletteColors ?? [],
+                    onReExtract: {
+                        Task {
+                            // Clear cached palettes so extraction runs fresh
+                            AtmosphereEngine.shared.invalidate(bookID: book.id)
+                            await BookColorPaletteCache.shared.invalidatePalette(for: book.id)
+
+                            if let coverURL = book.coverImageURL {
+                                if let dp = await AtmosphereEngine.shared.extractDisplayPalette(
+                                    bookID: book.id,
+                                    coverURL: coverURL
+                                ) {
+                                    await MainActor.run {
+                                        displayPalette = dp
+                                        fluidColorSet = FluidLabColorSet.from(dp)
+                                        fluidConfig = FluidAmbientConfig(for: dp.coverType)
+                                    }
+                                }
+                            } else if let img = coverImage {
+                                if let dp = await AtmosphereEngine.shared.extractDisplayPalette(
+                                    from: img,
+                                    bookID: book.id
+                                ) {
+                                    await MainActor.run {
+                                        displayPalette = dp
+                                        fluidColorSet = FluidLabColorSet.from(dp)
+                                        fluidConfig = FluidAmbientConfig(for: dp.coverType)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            // Floating toggle button (bottom-right)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            showFluidControls.toggle()
+                        }
+                    } label: {
+                        Image(systemName: showFluidControls ? "slider.horizontal.below.square.and.square.filled" : "slider.horizontal.3")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .frame(width: 38, height: 38)
+                            .glassEffect(.regular.tint(.black.opacity(0.3)), in: Circle())
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 16)
+                }
+            }
+        }
+        .allowsHitTesting(true)
     }
 
     @ViewBuilder
@@ -613,6 +717,13 @@ struct BookDetailView: View {
             VStack(spacing: 0) {
                 sessionHUD
                 contentScrollView
+            }
+
+            // Fluid Gradient Experiment: floating lab button + control panel
+            // Top-level z-index — covers everything except book cover/gradient above it
+            if gandalfMode && fluidGradientExperiment {
+                fluidLabOverlay
+                    .ignoresSafeArea(.all)
             }
         }
         .navigationBarTitleDisplayMode(.inline)

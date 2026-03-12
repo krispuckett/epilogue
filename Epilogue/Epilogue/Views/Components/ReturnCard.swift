@@ -1,508 +1,251 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Animation Phase
-enum ReturnCardAnimationPhase: Equatable {
-    case hidden      // At Dynamic Island, pill shape, opacity 0
-    case appearing   // Growing pill, opacity 1
-    case dropping    // Moving to center
-    case expanded    // Full card size, content visible
-    case dismissing  // Reverse back to island
-}
-
-// MARK: - Return Card Overlay
-/// Overlay that manages the return card animation from Dynamic Island
-struct ReturnCardOverlay: View {
+// MARK: - Welcome Back Sheet (Half-sheet, WhatsNew design language)
+struct WelcomeBackSheet: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    // Query for currently reading books
     @Query(
         filter: #Predicate<BookModel> { $0.readingStatus == "Currently Reading" },
         sort: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
     ) private var currentlyReadingBooks: [BookModel]
 
-    // Fallback: any book with cover data
     @Query(
         sort: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
     ) private var allBooks: [BookModel]
 
-    @State private var phase: ReturnCardAnimationPhase = .hidden
-    @State private var colorPalette: ColorPalette?
-    @State private var contentOpacity: Double = 0
+    let onContinueReading: ((BookModel) -> Void)?
 
-    let onDismiss: () -> Void
-
-    // Dynamic Island dimensions (approximate for iPhone 14 Pro+)
-    private let islandWidth: CGFloat = 126
-    private let islandHeight: CGFloat = 37
-    private let islandY: CGFloat = 60
-
-    // Card dimensions
-    private let cardWidth: CGFloat = 320
-    private let cardHeight: CGFloat = 420
+    @State private var quote = LiteraryQuotes.randomQuote()
 
     private var currentBook: BookModel? {
-        // First try currently reading with cover
-        if let book = currentlyReadingBooks.first(where: { $0.coverImageData != nil }) {
-            return book
-        }
-        // Fallback to any book with cover
-        return allBooks.first(where: { $0.coverImageData != nil })
+        currentlyReadingBooks.first ?? allBooks.first
     }
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Dimming background
-                Color.black
-                    .opacity(dimmingOpacity)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        dismiss()
-                    }
-
-                // The morphing card
-                if let book = currentBook {
-                    morphingCard(book: book, in: geometry)
-                        .position(cardPosition(in: geometry))
-                        .onTapGesture {
-                            dismiss()
-                        }
-                } else {
-                    // Debug: No book found - show message and auto-dismiss
-                    Text("No book with cover found")
-                        .foregroundStyle(.white.opacity(0.6))
-                        .task {
-                            #if DEBUG
-                            print("🎴 ReturnCard: No book found. Currently reading: \(currentlyReadingBooks.count), All books: \(allBooks.count)")
-                            for book in allBooks.prefix(3) {
-                                print("  - \(book.title): hasCover=\(book.coverImageData != nil), status=\(book.readingStatus)")
-                            }
-                            #endif
-                            // Auto-dismiss after brief delay
-                            try? await Task.sleep(nanoseconds: 1_000_000_000)
-                            dismiss()
-                        }
-                }
-            }
-        }
-        .ignoresSafeArea()
-        .task {
-            await extractColors()
-            startAnimation()
-        }
-    }
-
-    // MARK: - Morphing Card
-
-    @ViewBuilder
-    private func morphingCard(book: BookModel, in geometry: GeometryProxy) -> some View {
-        ZStack {
-            // Atmospheric gradient background
-            atmosphericGradient
-                .blur(radius: 30)
-
-            // Card content
-            ReturnCardContent(
-                book: book,
-                colorPalette: colorPalette,
-                contentOpacity: contentOpacity
-            )
-        }
-        .frame(width: currentWidth, height: currentHeight)
-        .clipShape(RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [.white.opacity(0.3), .white.opacity(0.1), .white.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(shadowOpacity), radius: 40, y: 20)
-        .opacity(cardOpacity)
-        .scaleEffect(cardScale)
-    }
-
-    // MARK: - Atmospheric Gradient
-
-    private var atmosphericGradient: some View {
-        Group {
-            if let palette = colorPalette {
-                let colors = [palette.primary, palette.secondary, palette.accent, palette.background]
-                let enhanced = colors.map { enhanceColor($0) }
-
-                LinearGradient(
-                    stops: [
-                        .init(color: enhanced[0].opacity(1.0), location: 0.0),
-                        .init(color: enhanced[1].opacity(0.8), location: 0.15),
-                        .init(color: enhanced[2].opacity(0.5), location: 0.3),
-                        .init(color: enhanced[3].opacity(0.3), location: 0.45),
-                        .init(color: Color.clear, location: 0.55)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            } else {
-                LinearGradient(
-                    colors: [.purple.opacity(0.6), .blue.opacity(0.4), .black],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
-    }
-
-    private func enhanceColor(_ color: Color) -> Color {
-        let uiColor = UIColor(color)
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-
-        let enhancedSaturation = min(saturation * 1.4, 1.0)
-        let enhancedBrightness = max(brightness, 0.4)
-
-        return Color(hue: Double(hue), saturation: Double(enhancedSaturation), brightness: Double(enhancedBrightness))
-    }
-
-    // MARK: - Animation Properties
-
-    private var currentWidth: CGFloat {
-        switch phase {
-        case .hidden, .appearing:
-            return islandWidth
-        case .dropping:
-            return cardWidth * 0.6
-        case .expanded:
-            return cardWidth
-        case .dismissing:
-            return islandWidth
-        }
-    }
-
-    private var currentHeight: CGFloat {
-        switch phase {
-        case .hidden, .appearing:
-            return islandHeight
-        case .dropping:
-            return cardHeight * 0.4
-        case .expanded:
-            return cardHeight
-        case .dismissing:
-            return islandHeight
-        }
-    }
-
-    private var currentCornerRadius: CGFloat {
-        switch phase {
-        case .hidden, .appearing, .dismissing:
-            return islandHeight / 2 // Pill shape
-        case .dropping:
-            return 28
-        case .expanded:
-            return 24
-        }
-    }
-
-    private func cardPosition(in geometry: GeometryProxy) -> CGPoint {
-        let centerX = geometry.size.width / 2
-        let centerY = geometry.size.height / 2
-
-        switch phase {
-        case .hidden, .appearing:
-            return CGPoint(x: centerX, y: islandY)
-        case .dropping:
-            return CGPoint(x: centerX, y: centerY * 0.7)
-        case .expanded:
-            return CGPoint(x: centerX, y: centerY)
-        case .dismissing:
-            return CGPoint(x: centerX, y: islandY)
-        }
-    }
-
-    private var cardOpacity: Double {
-        switch phase {
-        case .hidden:
-            return 0
-        case .appearing, .dropping, .expanded:
-            return 1
-        case .dismissing:
-            return 0
-        }
-    }
-
-    private var cardScale: CGFloat {
-        switch phase {
-        case .hidden:
-            return 0.8
-        case .appearing, .dropping, .expanded:
-            return 1.0
-        case .dismissing:
-            return 0.8
-        }
-    }
-
-    private var dimmingOpacity: Double {
-        switch phase {
-        case .hidden, .appearing:
-            return 0
-        case .dropping:
-            return 0.4
-        case .expanded:
-            return 0.7
-        case .dismissing:
-            return 0
-        }
-    }
-
-    private var shadowOpacity: Double {
-        switch phase {
-        case .hidden, .appearing, .dismissing:
-            return 0
-        case .dropping:
-            return 0.3
-        case .expanded:
-            return 0.5
-        }
-    }
-
-    // MARK: - Animation Sequence
-
-    private func startAnimation() {
-        // Phase 1: Appear at island
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            phase = .appearing
-        }
-
-        // Phase 2: Drop down
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                phase = .dropping
-            }
-        }
-
-        // Phase 3: Expand to full size
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                phase = .expanded
-            }
-        }
-
-        // Phase 4: Fade in content
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                contentOpacity = 1.0
-            }
-        }
-    }
-
-    private func dismiss() {
-        SensoryFeedback.light()
-
-        // Fade out content first
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.9)) {
-            contentOpacity = 0
-        }
-
-        // Then morph back to island
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                phase = .dismissing
-            }
-        }
-
-        // Complete dismissal
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            onDismiss()
-        }
-    }
-
-    // MARK: - Color Extraction
-
-    private func extractColors() async {
-        guard let book = currentBook,
-              let imageData = book.coverImageData,
-              let image = UIImage(data: imageData) else {
-            return
-        }
-
-        let extractor = OKLABColorExtractor()
-        if let palette = try? await extractor.extractPalette(from: image, imageSource: "return_card") {
-            await MainActor.run {
-                colorPalette = palette
-            }
-        }
-    }
-}
-
-// MARK: - Return Card Content
-/// The actual content inside the return card
-struct ReturnCardContent: View {
-    let book: BookModel
-    let colorPalette: ColorPalette?
-    let contentOpacity: Double
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12:
-            return "Good morning"
-        case 12..<17:
-            return "Good afternoon"
-        case 17..<21:
-            return "Good evening"
-        default:
-            return "Welcome back"
+        case 5..<12: return "Good morning"
+        case 12..<17: return "Good afternoon"
+        case 17..<21: return "Good evening"
+        default: return "Welcome back"
         }
     }
 
-    private var subGreeting: String {
-        "Picking up where you left off"
+    private var timeAwayFormatted: String {
+        let lastActive = UserDefaults.standard.double(forKey: "returnCard.lastActiveTimestamp")
+        guard lastActive > 0 else { return "—" }
+        let seconds = Date().timeIntervalSince1970 - lastActive
+        let hours = Int(seconds / 3600)
+        let days = hours / 24
+        if days > 0 { return "\(days)d" }
+        else if hours > 0 { return "\(hours)h" }
+        else { return "<1h" }
     }
 
     private var progressPercent: Double {
-        guard let totalPages = book.pageCount, totalPages > 0 else { return 0 }
+        guard let book = currentBook,
+              let totalPages = book.pageCount, totalPages > 0 else { return 0 }
         return Double(book.currentPage) / Double(totalPages)
     }
 
-    private var bookCoverImage: UIImage? {
-        guard let data = book.coverImageData else { return nil }
-        return UIImage(data: data)
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Background — matches WhatsNew/SessionSummary
+                minimalGradientBackground
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Header with book
+                        headerSection
+                            .padding(.top, 20)
+                            .padding(.bottom, 24)
+
+                        // Reading stats
+                        metricsSection
+                            .padding(.bottom, 28)
+
+                        // Quote card
+                        quoteCard
+                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                            .padding(.bottom, 28)
+
+                        // CTA button
+                        if currentBook != nil {
+                            continueReadingButton
+                                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                                .padding(.bottom, 32)
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            .navigationTitle(greeting)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                }
+            }
+        }
     }
 
-    var body: some View {
-        VStack(spacing: 24) {
-            // Greeting
-            VStack(spacing: 8) {
-                Text(greeting)
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+    // MARK: - Background
 
-                Text(subGreeting)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .opacity(contentOpacity)
+    private var minimalGradientBackground: some View {
+        ZStack {
+            AmbientChatGradientView()
+                .opacity(0.4)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
 
-            // Book info
-            VStack(spacing: 16) {
+            Color.black.opacity(0.15)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: - Header (Book Cover + Title)
+
+    private var headerSection: some View {
+        VStack(spacing: 16) {
+            if let book = currentBook {
                 // Book cover
-                if let image = bookCoverImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
+                if let coverURL = book.coverImageURL {
+                    SharedBookCoverView(
+                        coverURL: coverURL,
+                        width: 80,
+                        height: 120
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.medium))
+                    .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
                 }
 
-                // Book title and progress
                 VStack(spacing: 6) {
                     Text(book.title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .lineLimit(2)
+                        .font(.system(size: 20, weight: .bold, design: .default))
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .padding(.horizontal, 32)
 
                     Text(book.author)
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.6))
-
-                    // Progress indicator
-                    progressBar
-                        .padding(.top, 8)
+                        .font(.system(size: 14, weight: .medium, design: .default))
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
             }
-            .opacity(contentOpacity)
-
-            // Reading streak badge (if applicable)
-            if let streak = readingStreak, streak > 0 {
-                streakBadge(days: streak)
-                    .opacity(contentOpacity)
-            }
         }
-        .padding(32)
     }
 
-    // MARK: - Progress Bar
+    // MARK: - Metrics (matches session summary)
 
-    private var progressBar: some View {
+    private var metricsSection: some View {
+        HStack(spacing: 24) {
+            metricItem(value: "\(Int(progressPercent * 100))%", label: "PROGRESS")
+
+            if let book = currentBook, book.pageCount != nil {
+                metricItem(value: "\(book.currentPage)", label: "PAGE")
+            }
+
+            metricItem(value: timeAwayFormatted, label: "AWAY")
+        }
+        .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+    }
+
+    private func metricItem(value: String, label: String) -> some View {
         VStack(spacing: 4) {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Background track
-                    Capsule()
-                        .fill(.white.opacity(0.15))
-                        .frame(height: 4)
+            Text(value)
+                .font(.system(size: 24, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.95))
 
-                    // Progress fill
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.9), .white.opacity(0.6)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width * progressPercent, height: 4)
-                }
-            }
-            .frame(height: 4)
-            .frame(width: 160)
-
-            Text("\(Int(progressPercent * 100))% complete")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .tracking(1.5)
         }
     }
 
-    // MARK: - Streak Badge
+    // MARK: - Quote Card
 
-    private func streakBadge(days: Int) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.orange)
+    private var quoteCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("INSPIRATION")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .tracking(1.2)
 
-            Text("\(days) day streak")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
+                Spacer()
+            }
+
+            Text("\u{201C}\(quote.text)\u{201D}")
+                .font(.custom("Georgia", size: 16))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineSpacing(6)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("— \(quote.author)")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .kerning(0.8)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(DesignSystem.Spacing.cardPadding)
         .background(
-            Capsule()
-                .fill(.white.opacity(0.1))
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                .fill(Color.white.opacity(0.02))
         )
         .overlay(
-            Capsule()
-                .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
         )
     }
 
-    // MARK: - Reading Streak (placeholder - would need actual streak data)
+    // MARK: - Continue Reading CTA
 
-    private var readingStreak: Int? {
-        // TODO: Get actual reading streak from ReadingStreakManager or similar
-        // For now, return nil to hide the badge
-        nil
+    private var continueReadingButton: some View {
+        Button {
+            SensoryFeedback.light()
+            if let book = currentBook {
+                onContinueReading?(book)
+            }
+            dismiss()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "book.fill")
+                    .font(.system(size: 15, weight: .medium))
+
+                Text("Continue Reading")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .glassEffect(
+                .regular.tint(DesignSystem.Colors.primaryAccent.opacity(0.3)),
+                in: Capsule()
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
+// MARK: - Legacy Alias (backward compatibility)
+typealias ReturnCardOverlay = WelcomeBackSheet
+
 // MARK: - Preview
 #Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-
-        ReturnCardOverlay {
-            print("Dismissed!")
+    Text("Library")
+        .sheet(isPresented: .constant(true)) {
+            WelcomeBackSheet(onContinueReading: nil)
+                .presentationDetents([.medium])
+                .presentationBackground(.ultraThinMaterial)
+                .modelContainer(for: BookModel.self)
         }
-    }
-    .modelContainer(for: BookModel.self)
 }

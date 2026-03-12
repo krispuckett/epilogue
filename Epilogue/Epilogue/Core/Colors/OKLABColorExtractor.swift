@@ -175,38 +175,69 @@ public class OKLABColorExtractor {
         #endif
         
         #if DEBUG
-        print("  Building histogram from \(width * height) pixels...")
+        print("  Building contrast-aware histogram from \(width * height) pixels...")
         #endif
-        // First pass: Build 3D histogram
+        // First pass: Build 3D histogram with edge-contrast weighting.
+        // Pixels on high-contrast edges (text, borders, decorative elements)
+        // get boosted weight so minority colors like gold text on green
+        // aren't drowned by the dominant background.
+        let edgeBoost = 8  // How much to boost edge-adjacent pixels
+        let contrastThreshold = 80  // RGB delta sum threshold for "high contrast"
+
         for y in 0..<height {
             for x in 0..<width {
                 let offset = (y * bytesPerRow) + (x * bytesPerPixel)
                 guard offset + 3 < pixelData.count else { continue }
-                
+
                 let r = pixelData[offset]
                 let g = pixelData[offset + 1]
                 let b = pixelData[offset + 2]
                 let a = pixelData[offset + 3]
-                
+
                 // Skip transparent
                 if a < 128 { continue }
-                
+
                 let totalBrightness = Int(r) + Int(g) + Int(b)
-                
+
                 // Skip truly black pixels but keep dark colors
                 if totalBrightness < 30 {
                     blackPixels += 1
                     continue
                 }
-                
+
                 totalValidPixels += 1
-                
+
+                // Check right neighbor for contrast (cheap — one comparison per pixel)
+                var weight = 1
+                if x + 1 < width {
+                    let nOffset = offset + bytesPerPixel
+                    if nOffset + 2 < pixelData.count {
+                        let dr = abs(Int(r) - Int(pixelData[nOffset]))
+                        let dg = abs(Int(g) - Int(pixelData[nOffset + 1]))
+                        let db = abs(Int(b) - Int(pixelData[nOffset + 2]))
+                        if dr + dg + db > contrastThreshold {
+                            weight = edgeBoost
+                        }
+                    }
+                }
+                // Also check pixel below for vertical edges (text horizontals)
+                if weight == 1 && y + 1 < height {
+                    let nOffset = ((y + 1) * bytesPerRow) + (x * bytesPerPixel)
+                    if nOffset + 2 < pixelData.count {
+                        let dr = abs(Int(r) - Int(pixelData[nOffset]))
+                        let dg = abs(Int(g) - Int(pixelData[nOffset + 1]))
+                        let db = abs(Int(b) - Int(pixelData[nOffset + 2]))
+                        if dr + dg + db > contrastThreshold {
+                            weight = edgeBoost
+                        }
+                    }
+                }
+
                 // Map to cube coordinates
                 let cubeR = Int(r) * cubeSize / 256
                 let cubeG = Int(g) * cubeSize / 256
                 let cubeB = Int(b) * cubeSize / 256
-                
-                let weight = 1
+
                 colorCube[cubeR][cubeG][cubeB] += weight
             }
         }
@@ -296,17 +327,19 @@ public class OKLABColorExtractor {
             }
         }
         
-        // Sort by visual importance (prioritize frequency for better color selection)
-        colorPeaks.sort { peak1, peak2 in
-            // For non-dark covers, prioritize frequency over distinctiveness
-            if !isDarkCover {
-                return peak1.count > peak2.count  // Sort by frequency first!
-            } else {
-                // For dark covers, still use combined score
+        // Sort by visual importance with chromatic diversity
+        if isDarkCover {
+            colorPeaks.sort { peak1, peak2 in
                 let score1 = Double(peak1.count) * peak1.distinctiveness
                 let score2 = Double(peak2.count) * peak2.distinctiveness
                 return score1 > score2
             }
+        } else {
+            // Diversity-aware greedy selection for non-dark covers.
+            // Ensures chromatically distinct minority colors (like gold text on green)
+            // get promoted instead of being buried by pixel-count-dominant hues.
+            colorPeaks.sort { $0.count > $1.count } // Initial frequency sort
+            colorPeaks = diverseColorSelection(from: colorPeaks, count: max(colorPeaks.count, 10))
         }
         
         #if DEBUG
@@ -650,25 +683,34 @@ public class OKLABColorExtractor {
                 primary = sortedPeaks[safe: 0]?.color ?? UIColor.orange
             }
 
-            // Secondary: next vibrant or next in frequency
+            // Secondary: vibrant peak most distant from primary (not just next by frequency)
             let secondary: UIColor
             if vibrantPeaks.count > 1 {
-                secondary = vibrantPeaks[1].color
+                // Find vibrant peak that maximizes distance from primary
+                let bestSecondary = vibrantPeaks.dropFirst().max(by: { p1, p2 in
+                    colorDistance(p1.color, primary) < colorDistance(p2.color, primary)
+                })
+                secondary = bestSecondary?.color ?? vibrantPeaks[1].color
+            } else if let next = sortedPeaks.first(where: { colorDistance($0.color, primary) > 0.15 }) {
+                secondary = next.color
             } else if let next = sortedPeaks.first(where: { $0.color != primary }) {
                 secondary = next.color
             } else {
                 secondary = primary
             }
 
-            // Accent: find most saturated color for visual pop
+            // Accent: maximize saturation × distance from primary AND secondary.
+            // This catches gold on green, red on blue, etc.
             let accent: UIColor
-            if let mostSaturated = sortedPeaks.max(by: { peak1, peak2 in
+            if let bestAccent = sortedPeaks.max(by: { peak1, peak2 in
                 var s1: CGFloat = 0, s2: CGFloat = 0
                 peak1.color.getHue(nil, saturation: &s1, brightness: nil, alpha: nil)
                 peak2.color.getHue(nil, saturation: &s2, brightness: nil, alpha: nil)
-                return s1 < s2
+                let dist1 = min(colorDistance(peak1.color, primary), colorDistance(peak1.color, secondary))
+                let dist2 = min(colorDistance(peak2.color, primary), colorDistance(peak2.color, secondary))
+                return Double(s1) * dist1 < Double(s2) * dist2
             }) {
-                accent = mostSaturated.color
+                accent = bestAccent.color
             } else {
                 accent = secondary
             }
@@ -725,6 +767,76 @@ public class OKLABColorExtractor {
 
             return (primary, secondary, accent, background)
         }
+    }
+
+    // MARK: - Chromatic Diversity Selection
+
+    /// HSB-based color distance with heavy hue weighting.
+    /// Gold (hue ~45°) vs green (hue ~120°) = large distance.
+    /// Two shades of green = small distance.
+    nonisolated private func colorDistance(_ c1: UIColor, _ c2: UIColor) -> Double {
+        var h1: CGFloat = 0, s1: CGFloat = 0, b1: CGFloat = 0
+        var h2: CGFloat = 0, s2: CGFloat = 0, b2: CGFloat = 0
+        c1.getHue(&h1, saturation: &s1, brightness: &b1, alpha: nil)
+        c2.getHue(&h2, saturation: &s2, brightness: &b2, alpha: nil)
+
+        // Hue is circular (0-1), compute shortest arc distance
+        let hueDist = min(abs(h1 - h2), 1.0 - abs(h1 - h2))
+        let satDist = abs(s1 - s2)
+        let briDist = abs(b1 - b2)
+
+        // Hue difference matters most for palette diversity
+        return Double(hueDist * 2.0 + satDist + briDist * 0.5)
+    }
+
+    /// Greedy diversity-aware reordering of color peaks.
+    /// Keeps the dominant color first, then iteratively picks the next peak
+    /// that best combines frequency AND chromatic distance from already-picked colors.
+    /// This promotes high-contrast minority colors (gold text on green, white on dark)
+    /// without demoting the area-dominant color from primary position.
+    nonisolated private func diverseColorSelection(
+        from peaks: [(color: UIColor, count: Int, distinctiveness: Double)],
+        count: Int
+    ) -> [(color: UIColor, count: Int, distinctiveness: Double)] {
+        guard peaks.count > 1 else { return peaks }
+
+        let targetCount = min(count, peaks.count)
+        var selected = [peaks[0]] // Dominant color stays first
+        var remaining = Array(peaks.dropFirst())
+        let maxCount = Double(peaks[0].count)
+
+        while selected.count < targetCount && !remaining.isEmpty {
+            var bestIdx = 0
+            var bestScore = -1.0
+
+            for (idx, peak) in remaining.enumerated() {
+                // How frequent is this color? (0-1)
+                let freqScore = Double(peak.count) / max(maxCount, 1.0)
+
+                // How different is it from everything already selected?
+                let minDist = selected.map { sel in
+                    colorDistance(peak.color, sel.color)
+                }.min() ?? 0.0
+
+                // Combined score: frequency dominates, but distance gives a real boost.
+                // A gold color at 3% pixels but max distance from greens:
+                //   freqScore = 0.03, minDist ≈ 0.6 → score = 0.03 + 0.24 = 0.27
+                // Another green at 20% pixels but low distance:
+                //   freqScore = 0.20, minDist ≈ 0.05 → score = 0.20 + 0.02 = 0.22
+                // Gold wins! That's exactly what we want.
+                let score = freqScore + minDist * 0.4
+
+                if score > bestScore {
+                    bestScore = score
+                    bestIdx = idx
+                }
+            }
+
+            selected.append(remaining[bestIdx])
+            remaining.remove(at: bestIdx)
+        }
+
+        return selected
     }
 
     // Create a deep tinted background based on an accent color

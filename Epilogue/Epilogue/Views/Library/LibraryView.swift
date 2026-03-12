@@ -1926,7 +1926,30 @@ class LibraryViewModel {
             descriptor.fetchLimit = 1000
             let bookModels = try context.fetch(descriptor)
 
-            var convertedBooks = bookModels.map { $0.asBook }
+            // Deduplicate by book ID — the SwiftData migration created ghost entries
+            var seenIds = Set<String>()
+            var uniqueModels = [BookModel]()
+            for model in bookModels {
+                if seenIds.insert(model.id).inserted {
+                    uniqueModels.append(model)
+                } else {
+                    // Mark duplicate as not in library so it doesn't come back
+                    model.isInLibrary = false
+                    #if DEBUG
+                    print("  🗑️ Removed duplicate BookModel: \(model.title) (id: \(model.id))")
+                    #endif
+                }
+            }
+
+            // Save dedup cleanup
+            if uniqueModels.count < bookModels.count {
+                try? context.save()
+                #if DEBUG
+                print("  🧹 Cleaned up \(bookModels.count - uniqueModels.count) duplicate books")
+                #endif
+            }
+
+            var convertedBooks = uniqueModels.map { $0.asBook }
 
             // Apply custom sort order if exists
             if let orderData = userDefaults.data(forKey: bookOrderKey),
@@ -1936,7 +1959,7 @@ class LibraryViewModel {
 
             self.books = convertedBooks
             #if DEBUG
-            print("  ✅ Loaded \(convertedBooks.count) books from SwiftData")
+            print("  ✅ Loaded \(convertedBooks.count) books from SwiftData (deduped from \(bookModels.count))")
             #endif
         } catch {
             #if DEBUG

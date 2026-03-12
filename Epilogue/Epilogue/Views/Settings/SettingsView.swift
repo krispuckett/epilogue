@@ -18,7 +18,6 @@ struct SettingsView: View {
     @AppStorage("atmosphereEngineV2") private var atmosphereEngineV2 = false
     @AppStorage("feature.gradient.harmony_layers") private var harmonyLayersEnabled = true
     @AppStorage("feature.gradient.accent_bloom") private var accentBloomEnabled = true
-    @AppStorage("feature.gradient.mesh_renderer") private var meshRendererEnabled = false
     @AppStorage("feature.gradient.cover_texture_fallback") private var coverTextureEnabled = false
     @AppStorage("feature.gradient.ambient_breathing") private var ambientBreathingEnabled = false
     @AppStorage("feature.gradient.unified_extractor") private var unifiedExtractorEnabled = true
@@ -26,6 +25,7 @@ struct SettingsView: View {
     @AppStorage("feature.gradient.confidence_scoring") private var confidenceScoringEnabled = true
     @AppStorage("feature.gradient.legibility_layers") private var legibilityLayersEnabled = false
     @AppStorage("feature.gradient.debug_overlay") private var debugOverlayEnabled = false
+    @AppStorage("fluidGradientExperiment") private var fluidGradientExperiment = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -404,6 +404,9 @@ struct SettingsView: View {
                         if atmosphereEngineV2 {
                             gradientLabToggles
                         }
+
+                        fluidGradientToggle
+
                     } header: {
                         Label("Gradient Lab", systemImage: "paintpalette")
                     }
@@ -469,12 +472,12 @@ struct SettingsView: View {
 
                         Button {
                             dismiss()
-                            // Post notification to trigger modal overlay
+                            // Post notification to trigger welcome back sheet
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 NotificationCenter.default.post(name: .showReturnCard, object: nil)
                             }
                         } label: {
-                            Label("Test Modal (Full Card)", systemImage: "rectangle.portrait.inset.filled")
+                            Label("Test Welcome Back Sheet", systemImage: "hand.wave.fill")
                                 .foregroundStyle(.mint)
                         }
 
@@ -1288,13 +1291,29 @@ struct SettingsView: View {
     // MARK: - Gradient Lab Toggles (extracted to help type-checker)
 
     @ViewBuilder
+    private var fluidGradientToggle: some View {
+        Toggle(isOn: $fluidGradientExperiment) {
+            HStack {
+                Image(systemName: "drop.halffull")
+                    .foregroundColor(.indigo)
+                VStack(alignment: .leading) {
+                    Text("Fluid Gradient")
+                        .foregroundColor(.indigo)
+                    Text("Domain-warped FBM noise experiment")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .tint(.indigo)
+    }
+
+    @ViewBuilder
     private var gradientLabToggles: some View {
         Group {
             Toggle("Harmony Layers", isOn: $harmonyLayersEnabled)
                 .foregroundColor(.secondary)
             Toggle("Accent Bloom", isOn: $accentBloomEnabled)
-                .foregroundColor(.secondary)
-            Toggle("MeshGradient Renderer", isOn: $meshRendererEnabled)
                 .foregroundColor(.secondary)
             Toggle("Cover-as-Texture Fallback", isOn: $coverTextureEnabled)
                 .foregroundColor(.secondary)

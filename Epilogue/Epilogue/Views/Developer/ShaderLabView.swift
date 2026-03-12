@@ -217,6 +217,141 @@ struct ShaderLabView: View {
     @State private var shatterPrism: Float = 0.5
     @State private var shatterSpread: Float = 0.0
 
+    // --- Atmospheric Background Generators ---
+
+    // Mesh Gradient
+    @State private var meshWarp: Float = 0.5
+    @State private var meshSmoothness: Float = 2.0
+    @State private var meshSpeed: Float = 1.0
+    @State private var meshSatBoost: Float = 0.4
+
+    // Dream Blur
+    @State private var dreamBlurRadius: Float = 60.0
+    @State private var dreamWarpStrength: Float = 0.5
+    @State private var dreamBreatheSpeed: Float = 1.0
+    @State private var dreamSatBoost: Float = 0.4
+
+    // Liquid Bloom
+    @State private var bloomRadius: Float = 0.4
+    @State private var bloomTurbulence: Float = 0.5
+    @State private var bloomFlowSpeed: Float = 1.0
+    @State private var bloomColorIntensity: Float = 1.2
+
+    // Heat Mirage
+    @State private var mirageDistortion: Float = 25.0
+    @State private var mirageWaveScale: Float = 6.0
+    @State private var mirageRiseSpeed: Float = 1.5
+    @State private var mirageBlur: Float = 0.4
+
+    // Radial Smear
+    @State private var smearLength: Float = 0.2
+    @State private var smearRotation: Float = 0.3
+    @State private var smearPulseSpeed: Float = 1.0
+    @State private var smearClarity: Float = 0.2
+
+    // Chromatic Fog
+    @State private var fogDensity: Float = 50.0
+    @State private var fogSeparation: Float = 15.0
+    @State private var fogDriftSpeed: Float = 1.0
+    @State private var fogDepth: Float = 0.6
+
+    // Watercolor Bleed
+    @State private var wcBleedAmount: Float = 40.0
+    @State private var watercolorWetness: Float = 0.6
+    @State private var watercolorGrain: Float = 0.4
+    @State private var watercolorFlowAngle: Float = 1.57
+
+    // Plasma Flow
+    @State private var plasmaCurl: Float = 0.2
+    @State private var plasmaFlowScale: Float = 3.0
+    @State private var plasmaSpeed: Float = 1.0
+    @State private var plasmaMixSharp: Float = 0.3
+
+    // Tilt Shift
+    @State private var tiltFocusCenter: Float = 0.5
+    @State private var tiltFocusWidth: Float = 0.15
+    @State private var tiltMaxBlur: Float = 50.0
+    @State private var tiltSaturation: Float = 1.4
+
+    // Echo Trails
+    @State private var echoTrailCount: Float = 5.0
+    @State private var echoTrailSpread: Float = 0.06
+    @State private var echoFadeRate: Float = 0.5
+    @State private var echoDriftAngle: Float = 0.785
+
+    // Fractal Mirror
+    @State private var fractalSegments: Float = 6.0
+    @State private var fractalZoom: Float = 1.5
+    @State private var fractalRotation: Float = 0.3
+    @State private var fractalSoftness: Float = 0.3
+
+    // Liquid Silk
+    @State private var silkRibbons: Float = 4.0
+    @State private var silkFlowSpeed: Float = 1.0
+    @State private var silkWarpAmt: Float = 0.15
+    @State private var silkBlendMode: Float = 0.0
+
+    // Molten Glass
+    @State private var moltenViscosity: Float = 1.5
+    @State private var moltenRefraction: Float = 40.0
+    @State private var moltenHeat: Float = 0.3
+    @State private var moltenClarity: Float = 0.2
+
+    // Ink Diffusion
+    @State private var inkSpread: Float = 0.3
+    @State private var inkRings: Float = 3.0
+    @State private var inkTurbulence: Float = 0.5
+    @State private var inkSaturation: Float = 1.2
+
+    // Magnetic Fluid
+    @State private var magFieldStrength: Float = 0.15
+    @State private var magPoles: Float = 3.0
+    @State private var magFlowSpeed: Float = 1.0
+    @State private var magBlur: Float = 20.0
+
+    // Liquid Marble
+    @State private var marbleVeinScale: Float = 4.0
+    @State private var marbleSwirl: Float = 0.3
+    @State private var marbleMixRatio: Float = 0.5
+    @State private var marbleSmoothness: Float = 30.0
+
+    // Horizon Melt
+    @State private var horizonY: Float = 0.45
+    @State private var horizonMelt: Float = 40.0
+    @State private var horizonWaveSpeed: Float = 1.0
+    @State private var horizonReflection: Float = 0.6
+
+    // Fluid Mesh
+    @State private var fluidGridSize: Float = 5.0
+    @State private var fluidFluidity: Float = 0.3
+    @State private var fluidBlendRadius: Float = 3.0
+    @State private var fluidSatBoost: Float = 0.4
+
+    // Gravity Pool
+    @State private var gpPullStrength: Float = 0.15
+    @State private var gpWellCount: Float = 3.0
+    @State private var gpOrbitSpeed: Float = 0.5
+    @State private var gpSoftness: Float = 25.0
+
+    // Smoke Dissolve
+    @State private var sdDissolve: Float = 0.4
+    @State private var sdCurlScale: Float = 4.0
+    @State private var sdRiseSpeed: Float = 1.5
+    @State private var sdDensity: Float = 0.7
+
+    // Tidal Pull
+    @State private var tpAmplitude: Float = 30.0
+    @State private var tpFrequency: Float = 3.0
+    @State private var tpSpeed: Float = 1.0
+    @State private var tpVerticalMix: Float = 0.3
+
+    // Gaussian Splats
+    @State private var splatDensity: Float = 6.0
+    @State private var splatRadius: Float = 0.08
+    @State private var splatJitter: Float = 0.6
+    @State private var splatSat: Float = 0.4
+
+
     enum ShaderEffect: String, CaseIterable {
         case luminousPool = "Pool"
         case etherealAura = "Aura"
@@ -250,6 +385,29 @@ struct ShaderLabView: View {
         case geometricWarp = "Droste"
         case noirSketch = "Noir"
         case shatterGlass = "Shatter"
+        // Atmospheric Background Generators
+        case meshGradient = "Mesh"
+        case dreamBlur = "Dream"
+        case liquidBloom = "Bloom"
+        case heatMirage = "Mirage"
+        case radialSmear = "Smear"
+        case chromaticFog = "Fog"
+        case watercolorBleed = "Watercolor"
+        case plasmaFlow = "Plasma"
+        case tiltShift = "Tilt"
+        case echoTrails = "Echo BG"
+        case fractalMirror = "Fractal"
+        case liquidSilk = "Silk"
+        case moltenGlass = "Molten"
+        case inkDiffusion = "Ink BG"
+        case magneticFluid = "Ferrofluid"
+        case liquidMarble = "Marble"
+        case horizonMelt = "Horizon"
+        case fluidMesh = "Fluid"
+        case gravityPool = "Pool BG"
+        case smokeDissolve = "Dissolve"
+        case tidalPull = "Tidal"
+        case gaussianSplats = "Splats"
     }
 
     private var booksWithCovers: [BookModel] {
@@ -328,7 +486,19 @@ struct ShaderLabView: View {
     // MARK: - Cover with Shader
 
     private var isFullScreenEffect: Bool {
-        activeEffect == .luminousPool || activeEffect == .etherealAura
+        switch activeEffect {
+        case .luminousPool, .etherealAura,
+             .meshGradient, .dreamBlur, .liquidBloom, .heatMirage,
+             .radialSmear, .chromaticFog, .watercolorBleed, .plasmaFlow,
+             .tiltShift, .echoTrails, .fractalMirror,
+             .liquidSilk, .moltenGlass, .inkDiffusion, .magneticFluid,
+             .liquidMarble, .horizonMelt, .fluidMesh, .gravityPool,
+             .smokeDissolve, .tidalPull,
+             .gaussianSplats:
+            return true
+        default:
+            return false
+        }
     }
 
     @ViewBuilder
@@ -431,6 +601,336 @@ struct ShaderLabView: View {
                             .float(auraHueShift)
                         ),
                         maxSampleOffset: CGSize(width: 25, height: 25)
+                    )
+                }
+
+            case .meshGradient:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_meshGradient(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(meshWarp),
+                            .float(meshSmoothness),
+                            .float(meshSpeed),
+                            .float(meshSatBoost)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .dreamBlur:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_dreamBlur(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(dreamBlurRadius),
+                            .float(dreamWarpStrength),
+                            .float(dreamBreatheSpeed),
+                            .float(dreamSatBoost)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .liquidBloom:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_liquidBloom(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(bloomRadius),
+                            .float(bloomTurbulence),
+                            .float(bloomFlowSpeed),
+                            .float(bloomColorIntensity)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .heatMirage:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_heatMirage(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(mirageDistortion),
+                            .float(mirageWaveScale),
+                            .float(mirageRiseSpeed),
+                            .float(mirageBlur)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .radialSmear:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_radialSmear(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(smearLength),
+                            .float(smearRotation),
+                            .float(smearPulseSpeed),
+                            .float(smearClarity)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .chromaticFog:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_chromaticFog(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(fogDensity),
+                            .float(fogSeparation),
+                            .float(fogDriftSpeed),
+                            .float(fogDepth)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .watercolorBleed:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_watercolorBleed(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(wcBleedAmount),
+                            .float(watercolorWetness),
+                            .float(watercolorGrain),
+                            .float(watercolorFlowAngle)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .plasmaFlow:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_plasmaFlow(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(plasmaCurl),
+                            .float(plasmaFlowScale),
+                            .float(plasmaSpeed),
+                            .float(plasmaMixSharp)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .tiltShift:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_tiltShift(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(tiltFocusCenter),
+                            .float(tiltFocusWidth),
+                            .float(tiltMaxBlur),
+                            .float(tiltSaturation)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .echoTrails:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_echoTrails(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(echoTrailCount),
+                            .float(echoTrailSpread),
+                            .float(echoFadeRate),
+                            .float(echoDriftAngle)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .fractalMirror:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_fractalMirror(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(fractalSegments),
+                            .float(fractalZoom),
+                            .float(fractalRotation),
+                            .float(fractalSoftness)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .liquidSilk:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_liquidSilk(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(silkRibbons),
+                            .float(silkFlowSpeed),
+                            .float(silkWarpAmt),
+                            .float(silkBlendMode)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .moltenGlass:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_moltenGlass(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(moltenViscosity),
+                            .float(moltenRefraction),
+                            .float(moltenHeat),
+                            .float(moltenClarity)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .inkDiffusion:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_inkDiffusion(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(inkSpread),
+                            .float(inkRings),
+                            .float(inkTurbulence),
+                            .float(inkSaturation)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .magneticFluid:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_magneticFluid(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(magFieldStrength),
+                            .float(magPoles),
+                            .float(magFlowSpeed),
+                            .float(magBlur)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .liquidMarble:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_liquidMarble(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(marbleVeinScale),
+                            .float(marbleSwirl),
+                            .float(marbleMixRatio),
+                            .float(marbleSmoothness)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .horizonMelt:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_horizonMelt(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(horizonY),
+                            .float(horizonMelt),
+                            .float(horizonWaveSpeed),
+                            .float(horizonReflection)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .fluidMesh:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_fluidMesh(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(fluidGridSize),
+                            .float(fluidFluidity),
+                            .float(fluidBlendRadius),
+                            .float(fluidSatBoost)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .gravityPool:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_gravityPool(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(gpPullStrength),
+                            .float(gpWellCount),
+                            .float(gpOrbitSpeed),
+                            .float(gpSoftness)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .smokeDissolve:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_smokeDissolve(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(sdDissolve),
+                            .float(sdCurlScale),
+                            .float(sdRiseSpeed),
+                            .float(sdDensity)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .tidalPull:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_tidalPull(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(tpAmplitude),
+                            .float(tpFrequency),
+                            .float(tpSpeed),
+                            .float(tpVerticalMix)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
+                    )
+                }
+
+            case .gaussianSplats:
+                base.visualEffect { content, proxy in
+                    content.layerEffect(
+                        ShaderLibrary.bcs_gaussianSplats(
+                            .float2(proxy.size),
+                            .float(time),
+                            .float(splatDensity),
+                            .float(splatRadius),
+                            .float(splatJitter),
+                            .float(splatSat)
+                        ),
+                        maxSampleOffset: CGSize(width: 1, height: 1)
                     )
                 }
 
@@ -921,7 +1421,14 @@ struct ShaderLabView: View {
                     )
                 }
 
-            case .luminousPool, .etherealAura:
+            case .luminousPool, .etherealAura,
+                 .meshGradient, .dreamBlur, .liquidBloom, .heatMirage,
+                 .radialSmear, .chromaticFog, .watercolorBleed, .plasmaFlow,
+                 .tiltShift, .echoTrails, .fractalMirror,
+             .liquidSilk, .moltenGlass, .inkDiffusion, .magneticFluid,
+             .liquidMarble, .horizonMelt, .fluidMesh, .gravityPool,
+             .smokeDissolve, .tidalPull,
+             .gaussianSplats:
                 // Full-screen mode
                 base
             }
@@ -1175,6 +1682,141 @@ struct ShaderLabView: View {
                         slider("Refraction", $shatterRefraction, 0...20)
                         slider("Prism", $shatterPrism, 0...1)
                         slider("Spread", $shatterSpread, 0...1)
+
+                    // --- Atmospheric Background Generators ---
+
+                    case .meshGradient:
+                        slider("Warp", $meshWarp, 0...1)
+                        slider("Smoothness", $meshSmoothness, 1...5)
+                        slider("Speed", $meshSpeed, 0.2...3)
+                        slider("Saturation", $meshSatBoost, 0...1)
+
+                    case .dreamBlur:
+                        slider("Blur", $dreamBlurRadius, 20...120)
+                        slider("Warp", $dreamWarpStrength, 0...1)
+                        slider("Breathe", $dreamBreatheSpeed, 0.2...2)
+                        slider("Saturation", $dreamSatBoost, 0...1)
+
+                    case .liquidBloom:
+                        slider("Bloom", $bloomRadius, 0.1...0.8)
+                        slider("Turbulence", $bloomTurbulence, 0...1)
+                        slider("Flow", $bloomFlowSpeed, 0.2...2)
+                        slider("Vibrancy", $bloomColorIntensity, 0.5...2)
+
+                    case .heatMirage:
+                        slider("Distortion", $mirageDistortion, 5...60)
+                        slider("Waves", $mirageWaveScale, 2...15)
+                        slider("Rise Speed", $mirageRiseSpeed, 0.5...3)
+                        slider("Haze", $mirageBlur, 0...1)
+
+                    case .radialSmear:
+                        slider("Smear", $smearLength, 0.05...0.4)
+                        slider("Rotation", $smearRotation, 0...1)
+                        slider("Pulse", $smearPulseSpeed, 0.2...2)
+                        slider("Clarity", $smearClarity, 0...1)
+
+                    case .chromaticFog:
+                        slider("Density", $fogDensity, 20...100)
+                        slider("Separation", $fogSeparation, 0...30)
+                        slider("Drift", $fogDriftSpeed, 0.2...2)
+                        slider("Depth", $fogDepth, 0.3...1)
+
+                    case .watercolorBleed:
+                        slider("Bleed", $wcBleedAmount, 10...80)
+                        slider("Wetness", $watercolorWetness, 0...1)
+                        slider("Paper", $watercolorGrain, 0...1)
+                        slider("Flow Angle", $watercolorFlowAngle, 0...6.28)
+
+                    case .plasmaFlow:
+                        slider("Curl", $plasmaCurl, 0.05...0.4)
+                        slider("Scale", $plasmaFlowScale, 1...5)
+                        slider("Speed", $plasmaSpeed, 0.2...2)
+                        slider("Original Mix", $plasmaMixSharp, 0...1)
+
+                    case .tiltShift:
+                        slider("Focus Y", $tiltFocusCenter, 0.2...0.8)
+                        slider("Focus Width", $tiltFocusWidth, 0.05...0.3)
+                        slider("Blur", $tiltMaxBlur, 20...80)
+                        slider("Saturation", $tiltSaturation, 1...2)
+
+                    case .echoTrails:
+                        slider("Echoes", $echoTrailCount, 2...8)
+                        slider("Spread", $echoTrailSpread, 0.02...0.15)
+                        slider("Fade", $echoFadeRate, 0.3...0.8)
+                        slider("Direction", $echoDriftAngle, 0...6.28)
+
+                    case .fractalMirror:
+                        slider("Segments", $fractalSegments, 2...12)
+                        slider("Zoom", $fractalZoom, 0.5...3)
+                        slider("Rotation", $fractalRotation, 0...1)
+                        slider("Softness", $fractalSoftness, 0...1)
+
+                    case .liquidSilk:
+                        slider("Ribbons", $silkRibbons, 2...6)
+                        slider("Flow", $silkFlowSpeed, 0.2...2)
+                        slider("Warp", $silkWarpAmt, 0.05...0.3)
+                        slider("Blend", $silkBlendMode, 0...1)
+
+                    case .moltenGlass:
+                        slider("Viscosity", $moltenViscosity, 0.5...3)
+                        slider("Refraction", $moltenRefraction, 10...80)
+                        slider("Heat", $moltenHeat, 0...1)
+                        slider("Clarity", $moltenClarity, 0...1)
+
+                    case .inkDiffusion:
+                        slider("Spread", $inkSpread, 0.1...0.5)
+                        slider("Rings", $inkRings, 1...5)
+                        slider("Turbulence", $inkTurbulence, 0...1)
+                        slider("Saturation", $inkSaturation, 0.5...2)
+
+                    case .magneticFluid:
+                        slider("Field", $magFieldStrength, 0.05...0.3)
+                        slider("Poles", $magPoles, 2...6)
+                        slider("Flow", $magFlowSpeed, 0.2...2)
+                        slider("Blur", $magBlur, 5...40)
+
+                    case .liquidMarble:
+                        slider("Veins", $marbleVeinScale, 1...8)
+                        slider("Swirl", $marbleSwirl, 0.1...0.5)
+                        slider("Mix", $marbleMixRatio, 0...1)
+                        slider("Smooth", $marbleSmoothness, 10...60)
+
+                    case .horizonMelt:
+                        slider("Horizon", $horizonY, 0.3...0.7)
+                        slider("Melt", $horizonMelt, 10...80)
+                        slider("Waves", $horizonWaveSpeed, 0.2...2)
+                        slider("Reflect", $horizonReflection, 0...1)
+
+                    case .fluidMesh:
+                        slider("Grid", $fluidGridSize, 3...8)
+                        slider("Fluidity", $fluidFluidity, 0.1...0.5)
+                        slider("Blend", $fluidBlendRadius, 1...5)
+                        slider("Saturation", $fluidSatBoost, 0...1)
+
+                    case .gravityPool:
+                        slider("Pull", $gpPullStrength, 0.05...0.3)
+                        slider("Wells", $gpWellCount, 1...4)
+                        slider("Orbit", $gpOrbitSpeed, 0.1...1)
+                        slider("Softness", $gpSoftness, 10...50)
+
+                    case .smokeDissolve:
+                        slider("Dissolve", $sdDissolve, 0...1)
+                        slider("Curl Scale", $sdCurlScale, 2...8)
+                        slider("Rise", $sdRiseSpeed, 0.5...3)
+                        slider("Density", $sdDensity, 0.3...1)
+
+                    case .tidalPull:
+                        slider("Amplitude", $tpAmplitude, 10...60)
+                        slider("Frequency", $tpFrequency, 1...6)
+                        slider("Speed", $tpSpeed, 0.3...2)
+                        slider("Vertical", $tpVerticalMix, 0...1)
+
+                    case .gaussianSplats:
+                        slider("Density", $splatDensity, 2...12)
+                        slider("Radius", $splatRadius, 0.02...0.2)
+                        slider("Jitter", $splatJitter, 0...1)
+                        slider("Saturation", $splatSat, 0...1)
+
                     }
                 }
                 .padding(.horizontal, 16)

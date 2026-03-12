@@ -131,6 +131,7 @@ struct GoogleBookItem: Codable, Identifiable {
 
 struct VolumeInfo: Codable {
     let title: String
+    let subtitle: String?
     let authors: [String]?
     let publishedDate: String?
     let description: String?

@@ -10,17 +10,20 @@ struct BookAtmosphericGradientView: View {
     var displayPalette: DisplayPalette?
     let intensity: Double
     let audioLevel: Float
+    var coverImage: UIImage?
 
     init(
         colorPalette: ColorPalette,
         displayPalette: DisplayPalette? = nil,
         intensity: Double = 1.0,
-        audioLevel: Float = 0
+        audioLevel: Float = 0,
+        coverImage: UIImage? = nil
     ) {
         self.colorPalette = colorPalette
         self.displayPalette = displayPalette
         self.intensity = intensity
         self.audioLevel = audioLevel
+        self.coverImage = coverImage
     }
 
     var body: some View {
@@ -30,7 +33,8 @@ struct BookAtmosphericGradientView: View {
                 palette: dp,
                 preset: .atmospheric,
                 intensity: intensity,
-                audioLevel: audioLevel
+                audioLevel: audioLevel,
+                coverImage: coverImage
             )
         } else if AtmosphereEngine.isEnabled {
             // v2 without DisplayPalette: convert from legacy ColorPalette

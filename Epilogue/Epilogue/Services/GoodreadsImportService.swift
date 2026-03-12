@@ -1137,6 +1137,7 @@ class GoodreadsImportService: ObservableObject {
                     id: book.id,
                     volumeInfo: VolumeInfo(
                         title: book.title,
+                        subtitle: nil,
                         authors: book.authors,
                         publishedDate: book.publishedYear,
                         description: book.description,
@@ -1203,6 +1204,7 @@ class GoodreadsImportService: ObservableObject {
                 id: book.id,
                 volumeInfo: VolumeInfo(
                     title: book.title,
+                    subtitle: nil,
                     authors: book.authors,
                     publishedDate: book.publishedYear,
                     description: book.description,
@@ -1240,6 +1242,7 @@ class GoodreadsImportService: ObservableObject {
                 id: book.id,
                 volumeInfo: VolumeInfo(
                     title: book.title,
+                    subtitle: nil,
                     authors: book.authors,
                     publishedDate: book.publishedYear,
                     description: book.description,
@@ -1980,6 +1983,7 @@ class GoodreadsImportService: ObservableObject {
             id: bookModel.id,
             volumeInfo: VolumeInfo(
                 title: bookModel.title,
+                subtitle: nil,
                 authors: bookModel.author.components(separatedBy: ", "),
                 publishedDate: bookModel.publishedYear,
                 description: bookModel.desc,
@@ -2019,6 +2023,7 @@ class GoodreadsImportService: ObservableObject {
                     id: book.id,
                     volumeInfo: VolumeInfo(
                         title: book.title,
+                        subtitle: nil,
                         authors: book.authors,
                         publishedDate: book.publishedYear,
                         description: book.description,
@@ -2054,6 +2059,7 @@ class GoodreadsImportService: ObservableObject {
                 id: book.id,
                 volumeInfo: VolumeInfo(
                     title: book.title,
+                    subtitle: nil,
                     authors: book.authors,
                     publishedDate: book.publishedYear,
                     description: book.description,

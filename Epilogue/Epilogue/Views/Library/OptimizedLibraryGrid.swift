@@ -24,57 +24,27 @@ struct OptimizedLibraryGrid: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 32) {
                 ForEach(Array(books.enumerated()), id: \.element.localId) { index, book in
-                        ZStack {
-                            // Placeholder for dragged item
-                            if draggedBook?.id == book.id {
-                                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                                    .fill(Color.white.opacity(0.1))
-                                    .frame(height: 250)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
-                                            .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.5), lineWidth: 2)
-                                    )
-                            } else {
-                                OptimizedGridItem(
-                                    book: book,
-                                    viewModel: viewModel,
-                                    highlightedBookId: highlightedBookId,
-                                    onChangeCover: onChangeCover,
-                                    isDraggable: viewModel.isReorderMode,
-                                    isBeingDragged: draggedBook?.id == book.id
+                    ZStack {
+                        if draggedBook?.id == book.id {
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                .fill(Color.white.opacity(0.1))
+                                .frame(height: 250)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card)
+                                        .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.5), lineWidth: 2)
                                 )
-                                // Drag and drop disabled to prevent bugs
-                                // .opacity(draggedBook?.id == book.id ? 0.01 : 1)
-                                // .scaleEffect(targetIndex == index && draggedBook != nil ? 1.05 : 1.0)
-                                // .animation(.spring(response: 0.3, dampingFraction: 0.7), value: targetIndex)
-                                // .draggable(book) {
-                                //     DragPreview(book: book, viewModel: viewModel)
-                                //         .onAppear {
-                                //             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                //                 draggedBook = book
-                                //             }
-                                //         }
-                                // }
-                                // .dropDestination(for: Book.self) { items, location in
-                                //     guard let droppedBook = items.first,
-                                //           let fromIndex = books.firstIndex(where: { $0.id == droppedBook.id }),
-                                //           let toIndex = books.firstIndex(where: { $0.id == book.id }) else {
-                                //         return false
-                                //     }
-                                //
-                                //     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                //         viewModel.moveBook(fromIndex: fromIndex, toIndex: toIndex)
-                                //     }
-                                //     return true
-                                // } isTargeted: { isTargeted in
-                                //     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                //         targetIndex = isTargeted ? index : nil
-                                //     }
-                                // }
-                            }
+                        } else {
+                            OptimizedGridItem(
+                                book: book,
+                                viewModel: viewModel,
+                                highlightedBookId: highlightedBookId,
+                                onChangeCover: onChangeCover,
+                                isDraggable: viewModel.isReorderMode,
+                                isBeingDragged: draggedBook?.id == book.id
+                            )
                         }
-                        .id(book.localId)
-                        // No transition on load to prevent horizontal expansion
+                    }
+                    .id(book.localId)
                 }
             }
             .padding(.horizontal)
