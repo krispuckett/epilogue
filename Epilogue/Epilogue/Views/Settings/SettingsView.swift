@@ -26,6 +26,7 @@ struct SettingsView: View {
     @AppStorage("feature.gradient.legibility_layers") private var legibilityLayersEnabled = false
     @AppStorage("feature.gradient.debug_overlay") private var debugOverlayEnabled = false
     @AppStorage("fluidGradientExperiment") private var fluidGradientExperiment = false
+    @AppStorage("enableAnimatedBackgrounds") private var enableAnimatedBackgrounds = true
 
     @State private var showingDeleteConfirmation = false
     @State private var showingExportSuccess = false
@@ -105,6 +106,15 @@ struct SettingsView: View {
                     .accessibilityLabel("Gradient theme, currently \(ThemeManager.shared.currentTheme.displayName)")
                     .accessibilityHint("Double tap to change gradient theme")
                     .accessibilityIdentifier("settings.gradientTheme")
+
+                    Toggle(isOn: $enableAnimatedBackgrounds) {
+                        Label("Animated Backgrounds", systemImage: "waveform.path")
+                            .foregroundStyle(ThemeManager.shared.currentTheme.primaryAccent)
+                    }
+                    .tint(ThemeManager.shared.currentTheme.primaryAccent)
+                    .accessibilityLabel("Animated Backgrounds")
+                    .accessibilityHint("When off, book backgrounds use static gradients")
+                    .accessibilityIdentifier("settings.animatedBackgrounds")
                 } header: {
                     Text(L10n.Settings.Section.appearance)
                 }
@@ -354,6 +364,8 @@ struct SettingsView: View {
                             .padding(.vertical, 4)
                         }
 
+                        BlurRevealToggle()
+
                         Toggle(isOn: $socialFeaturesEnabled) {
                             HStack {
                                 Image(systemName: "figure.2")
@@ -529,6 +541,8 @@ struct SettingsView: View {
                             Label("Shader Lab", systemImage: "cube.transparent")
                                 .foregroundStyle(.cyan)
                         }
+
+                        orbLabLink
 
                         Button {
                             SensoryFeedback.light()
@@ -1290,6 +1304,15 @@ struct SettingsView: View {
     }
     // MARK: - Gradient Lab Toggles (extracted to help type-checker)
 
+    private var orbLabLink: some View {
+        NavigationLink {
+            OrbLabView()
+        } label: {
+            Label("Orb Lab", systemImage: "circle.hexagongrid.fill")
+                .foregroundStyle(.orange)
+        }
+    }
+
     @ViewBuilder
     private var fluidGradientToggle: some View {
         Toggle(isOn: $fluidGradientExperiment) {
@@ -1474,5 +1497,27 @@ struct EpiloguePlusUpsellCard: View {
                 .foregroundStyle(.white.opacity(0.9))
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+// MARK: - Blur Reveal Toggle (extracted to avoid type-checker overflow)
+private struct BlurRevealToggle: View {
+    @AppStorage("blurRevealNotes") private var blurRevealNotes = false
+
+    var body: some View {
+        Toggle(isOn: $blurRevealNotes) {
+            HStack {
+                Image(systemName: "text.below.photo")
+                    .foregroundColor(.cyan)
+                VStack(alignment: .leading) {
+                    Text("Blur Reveal Notes")
+                        .foregroundColor(.cyan)
+                    Text("Smooth height + fade expand animation")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .tint(.cyan)
     }
 }

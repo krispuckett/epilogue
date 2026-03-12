@@ -1704,6 +1704,10 @@ private struct NoteCardView: View {
     @State private var isExpanded = false
     @State private var showingSessionSummary = false
     @State private var contentHeight: CGFloat = 0
+    @State private var expandProgress: CGFloat = 0  // 0 = collapsed, 1 = expanded
+    @State private var collapsedHeight: CGFloat = 0
+    @State private var fullHeight: CGFloat = 0
+    @AppStorage("blurRevealNotes") private var blurRevealEnabled = false
 
     // MARK: - Constants (Steve would approve these numbers)
     private let lineHeight: CGFloat = 27  // 16pt font + 6pt line spacing + 5pt padding
@@ -1764,8 +1768,15 @@ private struct NoteCardView: View {
             // Show "Show Less" pill when expanded
             if isExpanded && contentTier.needsExpansionUI {
                 Button {
-                    withAnimation(DesignSystem.Animation.springStandard) {
-                        isExpanded = false
+                    if blurRevealEnabled {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                            expandProgress = 0
+                            isExpanded = false
+                        }
+                    } else {
+                        withAnimation(DesignSystem.Animation.springStandard) {
+                            isExpanded = false
+                        }
                     }
                     SensoryFeedback.light()
                 } label: {
@@ -1824,22 +1835,102 @@ private struct NoteCardView: View {
     // MARK: - Content Text with Character-Based Measurement
     @ViewBuilder
     private var contentText: some View {
-        if searchQuery.isEmpty {
-            FormattedNoteText(
-                markdown: note.content,
-                fontSize: 16,
-                lineSpacing: 6
-            )
-            .lineLimit(isExpanded ? nil : previewLineLimit)
-            .foregroundStyle(.white.opacity(0.95))
+        if blurRevealEnabled && contentTier.needsExpansionUI {
+            blurRevealContent
         } else {
-            HighlightedText(
-                text: note.content,
-                query: searchQuery,
-                baseColor: .white.opacity(0.95),
-                font: .system(size: 16)
-            )
-            .lineLimit(isExpanded ? nil : previewLineLimit)
+            // Original lineLimit approach
+            if searchQuery.isEmpty {
+                FormattedNoteText(
+                    markdown: note.content,
+                    fontSize: 16,
+                    lineSpacing: 6
+                )
+                .lineLimit(isExpanded ? nil : previewLineLimit)
+                .foregroundStyle(.white.opacity(0.95))
+            } else {
+                HighlightedText(
+                    text: note.content,
+                    query: searchQuery,
+                    baseColor: .white.opacity(0.95),
+                    font: .system(size: 16)
+                )
+                .lineLimit(isExpanded ? nil : previewLineLimit)
+            }
+        }
+    }
+
+    // MARK: - Blur Reveal Content (Progressive blur + fade)
+    @ViewBuilder
+    private var blurRevealContent: some View {
+        let collapsedH = lineHeight * CGFloat(previewLineLimit)
+        let targetH = max(fullHeight, collapsedH)
+        let currentH = collapsedH + (targetH - collapsedH) * expandProgress
+        let fadeAmount = 1.0 - expandProgress  // 1 when collapsed, 0 when expanded
+
+        ZStack(alignment: .top) {
+            // Layer 0: Sharp text (top portion — always visible)
+            noteTextLayer
+                .mask(alignment: .top) {
+                    VStack(spacing: 0) {
+                        Color.white
+                            .frame(height: max(0, currentH * 0.5))
+                        LinearGradient(colors: [.white, .white.opacity(1 - fadeAmount)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: currentH * 0.5)
+                    }
+                }
+
+            // Layer 1: Light blur (middle band — fades in when collapsed)
+            if fadeAmount > 0.01 {
+                noteTextLayer
+                    .blur(radius: 3 * fadeAmount)
+                    .mask(alignment: .top) {
+                        VStack(spacing: 0) {
+                            Color.clear
+                                .frame(height: currentH * 0.45)
+                            LinearGradient(colors: [.clear, .white, .white],
+                                           startPoint: .top, endPoint: .bottom)
+                                .frame(height: currentH * 0.35)
+                            Color.clear
+                                .frame(height: currentH * 0.2)
+                        }
+                    }
+                    .opacity(fadeAmount)
+
+                // Layer 2: Heavy blur (bottom edge — strongest fade)
+                noteTextLayer
+                    .blur(radius: 8 * fadeAmount)
+                    .mask(alignment: .top) {
+                        VStack(spacing: 0) {
+                            Color.clear
+                                .frame(height: currentH * 0.65)
+                            LinearGradient(colors: [.clear, .white, .clear],
+                                           startPoint: .top, endPoint: .bottom)
+                                .frame(height: currentH * 0.35)
+                        }
+                    }
+                    .opacity(fadeAmount * 0.7)
+            }
+        }
+        .frame(height: currentH, alignment: .top)
+        .clipped()
+    }
+
+    // Shared text layer for blur reveal (avoids repeating the text builder)
+    @ViewBuilder
+    private var noteTextLayer: some View {
+        FormattedNoteText(
+            markdown: note.content,
+            fontSize: 16,
+            lineSpacing: 6
+        )
+        .foregroundStyle(.white.opacity(0.95))
+        .fixedSize(horizontal: false, vertical: true)
+        .background(GeometryReader { geo in
+            Color.clear.preference(key: FullHeightKey.self, value: geo.size.height)
+        })
+        .onPreferenceChange(FullHeightKey.self) { height in
+            if height > 0 { fullHeight = height }
         }
     }
 
@@ -1983,6 +2074,7 @@ private struct NoteCardView: View {
             estimateContentHeight()
         }
         .animation(.easeInOut(duration: 0.3), value: isExpanded)
+        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: expandProgress)
         .animation(DesignSystem.Animation.springStandard, value: capturedNote?.isFavorite)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(makeAccessibilityLabel())
@@ -1990,8 +2082,16 @@ private struct NoteCardView: View {
         .accessibilityAddTraits(.isButton)
         // Tap to expand inline (all tiers)
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                isExpanded.toggle()
+            if blurRevealEnabled && contentTier.needsExpansionUI {
+                let expanding = expandProgress < 0.5
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    expandProgress = expanding ? 1 : 0
+                    isExpanded = expanding
+                }
+            } else {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isExpanded.toggle()
+                }
             }
             SensoryFeedback.light()
         }
@@ -2039,5 +2139,13 @@ private struct NoteCardView: View {
         case .long:
             return "Double tap to view full note in reading mode. Long press for full screen view"
         }
+    }
+}
+
+// MARK: - Preference Key for Blur Reveal Height Measurement
+private struct FullHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
