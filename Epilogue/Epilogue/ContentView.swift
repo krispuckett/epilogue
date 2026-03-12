@@ -235,24 +235,12 @@ struct ContentView: View {
             // Small delay to let SwiftData query complete
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
 
-            if ReturnCardManager.shared.shouldShowReturnCard {
-                logger.info("🎴 Cold start detected (24+ hour absence) - showing return card")
+            if ReturnCardManager.shared.shouldShowReturnCard
+                || ReturnCardManager.shared.shouldShowInlineCard {
+                logger.info("🎴 Return detected - showing Welcome Back sheet")
 
-                // Show the full return card overlay
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     showReturnCard = true
-                }
-            } else if ReturnCardManager.shared.shouldShowInlineCard {
-                logger.info("🎴 Quick return detected (1-24 hours) - showing Dynamic Island toast")
-
-                // Find currently reading book for toast
-                let descriptor = FetchDescriptor<BookModel>(
-                    predicate: #Predicate { $0.readingStatus == "Currently Reading" },
-                    sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
-                )
-
-                if let book = try? modelContext.fetch(descriptor).first {
-                    WelcomeBackActivityManager.shared.startActivity(for: book)
                 }
             }
         }
