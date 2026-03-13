@@ -24,13 +24,29 @@ struct CompactNoteCard: View {
                     .scaleEffect(isPressed ? 0.95 : 1.0)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    // Note content
+                    // Note content — gradient fade instead of hard truncation
                     Text(note.content ?? "")
                         .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .mask(alignment: .top) {
+                            VStack(spacing: 0) {
+                                Color.white.frame(height: 22)
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .white, location: 0),
+                                        .init(color: .white.opacity(0.3), location: 0.5),
+                                        .init(color: .clear, location: 1.0)
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                                .frame(height: 20)
+                            }
+                        }
+                        .frame(height: 42, alignment: .top)
+                        .clipped()
 
                     // Metadata
                     HStack(spacing: 8) {
@@ -145,14 +161,30 @@ struct CompactQuoteCard: View {
                     .scaleEffect(isPressed ? 0.95 : 1.0)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    // Quote text
+                    // Quote text — gradient fade instead of hard truncation
                     Text(quote.text ?? "")
                         .font(.system(size: 14, weight: .regular, design: .serif))
                         .italic()
                         .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .mask(alignment: .top) {
+                            VStack(spacing: 0) {
+                                Color.white.frame(height: 22)
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .white, location: 0),
+                                        .init(color: .white.opacity(0.3), location: 0.5),
+                                        .init(color: .clear, location: 1.0)
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                                .frame(height: 20)
+                            }
+                        }
+                        .frame(height: 42, alignment: .top)
+                        .clipped()
 
                     // Metadata
                     HStack(spacing: 8) {

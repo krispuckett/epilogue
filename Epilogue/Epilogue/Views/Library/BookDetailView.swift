@@ -1259,25 +1259,33 @@ struct BookDetailView: View {
                         .lineSpacing(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    // Fallback to Google Books description
-                    if summaryExpanded {
-                        Text(description)
-                            .font(.system(size: 15))
-                            .foregroundColor(textColor.opacity(0.85))
-                            .lineSpacing(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .transition(.opacity)
-                    } else {
-                        Text(description)
-                            .font(.system(size: 15))
-                            .foregroundColor(textColor.opacity(0.85))
-                            .lineSpacing(8)
-                            .lineLimit(4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .transition(.opacity)
-                    }
+                    // Fallback to Google Books description — gradient fade
+                    Text(description)
+                        .font(.system(size: 15))
+                        .foregroundColor(textColor.opacity(0.85))
+                        .lineSpacing(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .mask(alignment: .top) {
+                            if summaryExpanded {
+                                Color.white
+                            } else {
+                                VStack(spacing: 0) {
+                                    Color.white.frame(height: 60)
+                                    LinearGradient(
+                                        stops: [
+                                            .init(color: .white, location: 0),
+                                            .init(color: .white.opacity(0.4), location: 0.5),
+                                            .init(color: .clear, location: 1.0)
+                                        ],
+                                        startPoint: .top, endPoint: .bottom
+                                    )
+                                    .frame(height: 40)
+                                }
+                            }
+                        }
+                        .frame(maxHeight: summaryExpanded ? nil : 100, alignment: .top)
+                        .clipped()
                 }
             }
             .animation(hasAppeared ? .easeInOut(duration: 0.2) : nil, value: summaryExpanded)

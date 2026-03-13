@@ -10,6 +10,9 @@ struct SimpleQuoteCard: View {
     @State private var showDate = false
     @State private var showingSessionSummary = false
     @State private var showingReaderMode = false
+    @State private var isQuoteExpanded = false
+    @State private var expandProgress: CGFloat = 0
+    @State private var fullQuoteHeight: CGFloat = 0
 
     // Convenience initializer for backward compatibility
     init(note: Note, capturedQuote: CapturedQuote? = nil, searchQuery: String = "") {
@@ -24,10 +27,8 @@ struct SimpleQuoteCard: View {
     }
 
     private var previewContent: String {
-        guard isVeryLongQuote else { return note.content }
-        // Show first ~400 characters
-        let index = note.content.index(note.content.startIndex, offsetBy: min(400, note.content.count))
-        return String(note.content[..<index])
+        // Always return full content — gradient fade handles truncation visually
+        note.content
     }
 
     var firstLetter: String {
@@ -96,79 +97,37 @@ struct SimpleQuoteCard: View {
                 .frame(height: 0)
                 .accessibilityHidden(true)
             
-            // Quote content with drop cap
-            HStack(alignment: .top, spacing: 2) {
-                // Drop cap — sized to span ~2 lines of body text
-                let dropCapSize: CGFloat = sizeCategory.isAccessibilitySize ? 38 : 30
-                let bodySize: CGFloat = sizeCategory.isAccessibilitySize ? 24 : 18
+            // Quote content with drop cap + gradient fade for long quotes
+            quoteContentView
+                .padding(.top, 16)
 
-                if searchQuery.isEmpty {
-                    Text(firstLetter)
-                        .font(.custom("Georgia", size: dropCapSize))
-                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                        .frame(alignment: .topLeading)
-                        .padding(.trailing, 2)
-                        .offset(y: -2)
-                } else {
-                    GeorgiaHighlightedText(
-                        text: firstLetter,
-                        query: searchQuery,
-                        fontSize: dropCapSize
-                    )
-                    .frame(alignment: .topLeading)
-                    .padding(.trailing, 2)
-                    .offset(y: -2)
-                }
-
-                // Rest of quote
-                if searchQuery.isEmpty {
-                    Text(restOfContent)
-                        .font(.custom("Georgia", size: bodySize))
-                        .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
-                        .lineSpacing(sizeCategory.isAccessibilitySize ? 10 : 6)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 2)
-                } else {
-                    GeorgiaHighlightedText(
-                        text: restOfContent,
-                        query: searchQuery,
-                        fontSize: bodySize,
-                        lineSpacing: sizeCategory.isAccessibilitySize ? 10 : 6
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-                }
-            }
-            .padding(.top, 16)
-
-            // "Continue Reading" button for very long quotes
+            // Expand/collapse pill for very long quotes
             if isVeryLongQuote {
                 HStack {
                     Spacer()
-                    Button {
-                        showingReaderMode = true
-                        SensoryFeedback.light()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("Continue Reading")
-                                .font(.system(size: 13, weight: .medium, design: .default))
-                            Image(systemName: "book.fill")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(DesignSystem.Colors.primaryAccent.opacity(0.12))
-                        .overlay {
-                            Capsule().stroke(DesignSystem.Colors.primaryAccent.opacity(0.4), lineWidth: 0.5)
-                        }
-                        .clipShape(Capsule())
+                    HStack(spacing: 4) {
+                        Text(isQuoteExpanded ? "Show Less" : "Show More")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .contentTransition(.numericText())
+                        Image(systemName: isQuoteExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                            .contentTransition(.symbolEffect(.replace))
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassEffect(in: .capsule)
                     Spacer()
                 }
-                .padding(.top, 24)
-                .transition(.scale.combined(with: .opacity))
+                .padding(.top, 12)
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                        isQuoteExpanded.toggle()
+                        expandProgress = isQuoteExpanded ? 1 : 0
+                    }
+                    SensoryFeedback.light()
+                }
             }
 
             // Attribution section
@@ -267,5 +226,87 @@ struct SimpleQuoteCard: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
         return formatter.string(from: date)
+    }
+
+    // MARK: - Quote Content with Gradient Fade
+    @ViewBuilder
+    private var quoteContentView: some View {
+        let dropCapSize: CGFloat = sizeCategory.isAccessibilitySize ? 38 : 30
+        let bodySize: CGFloat = sizeCategory.isAccessibilitySize ? 24 : 18
+        let lineH: CGFloat = bodySize + (sizeCategory.isAccessibilitySize ? 10 : 6) + 4
+        let collapsedH: CGFloat = lineH * 6  // ~6 lines collapsed
+        let targetH = max(fullQuoteHeight, collapsedH + 1)
+        let currentH = collapsedH + (targetH - collapsedH) * expandProgress
+        let fadeZone = min(50, collapsedH * 0.4) * (1 - expandProgress)
+
+        let quoteBody = HStack(alignment: .top, spacing: 2) {
+            if searchQuery.isEmpty {
+                Text(firstLetter)
+                    .font(.custom("Georgia", size: dropCapSize))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    .frame(alignment: .topLeading)
+                    .padding(.trailing, 2)
+                    .offset(y: -2)
+            } else {
+                GeorgiaHighlightedText(text: firstLetter, query: searchQuery, fontSize: dropCapSize)
+                    .frame(alignment: .topLeading)
+                    .padding(.trailing, 2)
+                    .offset(y: -2)
+            }
+
+            if searchQuery.isEmpty {
+                Text(restOfContent)
+                    .font(.custom("Georgia", size: bodySize))
+                    .foregroundStyle(Color(red: 0.98, green: 0.97, blue: 0.96))
+                    .lineSpacing(sizeCategory.isAccessibilitySize ? 10 : 6)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+            } else {
+                GeorgiaHighlightedText(
+                    text: restOfContent, query: searchQuery,
+                    fontSize: bodySize,
+                    lineSpacing: sizeCategory.isAccessibilitySize ? 10 : 6
+                )
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+            }
+        }
+
+        if isVeryLongQuote {
+            quoteBody
+                .background(GeometryReader { geo in
+                    Color.clear.preference(key: QuoteHeightKey.self, value: geo.size.height)
+                })
+                .onPreferenceChange(QuoteHeightKey.self) { h in
+                    if h > 0 { fullQuoteHeight = h }
+                }
+                .mask(alignment: .top) {
+                    VStack(spacing: 0) {
+                        Color.white
+                            .frame(height: max(0, currentH - fadeZone))
+                        LinearGradient(
+                            stops: [
+                                .init(color: .white, location: 0),
+                                .init(color: .white.opacity(0.4), location: 0.5),
+                                .init(color: .clear, location: 1.0)
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                        .frame(height: max(0, fadeZone))
+                    }
+                }
+                .frame(height: currentH, alignment: .top)
+                .clipped()
+                .animation(.spring(response: 0.5, dampingFraction: 0.85), value: expandProgress)
+        } else {
+            quoteBody
+        }
+    }
+}
+
+private struct QuoteHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

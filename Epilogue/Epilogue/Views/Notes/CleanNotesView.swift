@@ -1707,7 +1707,8 @@ private struct NoteCardView: View {
     @State private var expandProgress: CGFloat = 0  // 0 = collapsed, 1 = expanded
     @State private var collapsedHeight: CGFloat = 0
     @State private var fullHeight: CGFloat = 0
-    @AppStorage("blurRevealNotes") private var blurRevealEnabled = false
+    @AppStorage("blurRevealNotes") private var blurRevealEnabled = true
+    @Namespace private var pillMorph
 
     // MARK: - Constants (Steve would approve these numbers)
     private let lineHeight: CGFloat = 27  // 16pt font + 6pt line spacing + 5pt padding
@@ -1859,79 +1860,42 @@ private struct NoteCardView: View {
         }
     }
 
-    // MARK: - Blur Reveal Content (Progressive blur + fade)
+    // MARK: - Blur Reveal Content (gradient fade into glass)
     @ViewBuilder
     private var blurRevealContent: some View {
         let collapsedH = lineHeight * CGFloat(previewLineLimit)
-        let targetH = max(fullHeight, collapsedH)
+        let targetH = max(fullHeight, collapsedH + 1)
         let currentH = collapsedH + (targetH - collapsedH) * expandProgress
-        let fadeAmount = 1.0 - expandProgress  // 1 when collapsed, 0 when expanded
+        // Fade zone shrinks to 0 when fully expanded
+        let fadeZone = min(40, collapsedH * 0.5) * (1 - expandProgress)
 
-        ZStack(alignment: .top) {
-            // Layer 0: Sharp text (top portion — always visible)
-            noteTextLayer
-                .mask(alignment: .top) {
-                    VStack(spacing: 0) {
-                        Color.white
-                            .frame(height: max(0, currentH * 0.5))
-                        LinearGradient(colors: [.white, .white.opacity(1 - fadeAmount)],
-                                       startPoint: .top, endPoint: .bottom)
-                            .frame(height: currentH * 0.5)
-                    }
-                }
-
-            // Layer 1: Light blur (middle band — fades in when collapsed)
-            if fadeAmount > 0.01 {
-                noteTextLayer
-                    .blur(radius: 3 * fadeAmount)
-                    .mask(alignment: .top) {
-                        VStack(spacing: 0) {
-                            Color.clear
-                                .frame(height: currentH * 0.45)
-                            LinearGradient(colors: [.clear, .white, .white],
-                                           startPoint: .top, endPoint: .bottom)
-                                .frame(height: currentH * 0.35)
-                            Color.clear
-                                .frame(height: currentH * 0.2)
-                        }
-                    }
-                    .opacity(fadeAmount)
-
-                // Layer 2: Heavy blur (bottom edge — strongest fade)
-                noteTextLayer
-                    .blur(radius: 8 * fadeAmount)
-                    .mask(alignment: .top) {
-                        VStack(spacing: 0) {
-                            Color.clear
-                                .frame(height: currentH * 0.65)
-                            LinearGradient(colors: [.clear, .white, .clear],
-                                           startPoint: .top, endPoint: .bottom)
-                                .frame(height: currentH * 0.35)
-                        }
-                    }
-                    .opacity(fadeAmount * 0.7)
+        FormattedNoteText(markdown: note.content, fontSize: 16, lineSpacing: 6)
+            .foregroundStyle(.white.opacity(0.95))
+            .fixedSize(horizontal: false, vertical: true)
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: FullHeightKey.self, value: geo.size.height)
+            })
+            .onPreferenceChange(FullHeightKey.self) { h in
+                if h > 0 { fullHeight = h }
             }
-        }
-        .frame(height: currentH, alignment: .top)
-        .clipped()
-    }
-
-    // Shared text layer for blur reveal (avoids repeating the text builder)
-    @ViewBuilder
-    private var noteTextLayer: some View {
-        FormattedNoteText(
-            markdown: note.content,
-            fontSize: 16,
-            lineSpacing: 6
-        )
-        .foregroundStyle(.white.opacity(0.95))
-        .fixedSize(horizontal: false, vertical: true)
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: FullHeightKey.self, value: geo.size.height)
-        })
-        .onPreferenceChange(FullHeightKey.self) { height in
-            if height > 0 { fullHeight = height }
-        }
+            .mask(alignment: .top) {
+                VStack(spacing: 0) {
+                    Color.white
+                        .frame(height: max(0, currentH - fadeZone))
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0),
+                            .init(color: .white.opacity(0.4), location: 0.5),
+                            .init(color: .clear, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: max(0, fadeZone))
+                }
+            }
+            .frame(height: currentH, alignment: .top)
+            .clipped()
     }
 
     private func estimateContentHeight() {
@@ -2018,28 +1982,51 @@ private struct NoteCardView: View {
     // MARK: - Card Content Layout
     @ViewBuilder
     private var cardContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header - shows when expanded with smooth fade
-            if isExpanded {
-                dateHeader
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+        if blurRevealEnabled && contentTier.needsExpansionUI {
+            // Blur reveal mode — fixed layout, no conditional view insertion
+            VStack(alignment: .leading, spacing: 12) {
+                blurRevealContent
 
-            // Content - simple lineLimit change
-            contentText
-
-            // Expansion indicator - fades out smoothly
-            if !isExpanded && contentTier.needsExpansionUI {
+                // Morph pill — single view, content transitions
                 HStack {
                     Spacer()
-                    expansionIndicator
-                        .padding(.top, 4)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    HStack(spacing: 4) {
+                        Text(isExpanded ? "Show Less" : "Show More")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .contentTransition(.numericText())
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(DesignSystem.Colors.primaryAccent.opacity(0.6))
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassEffect(in: .capsule)
                     Spacer()
                 }
-            }
 
-            bookContext
+                bookContext
+            }
+        } else {
+            // Standard mode — original conditional layout
+            VStack(alignment: .leading, spacing: 12) {
+                if isExpanded {
+                    dateHeader
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                contentText
+                if !isExpanded && contentTier.needsExpansionUI {
+                    HStack {
+                        Spacer()
+                        expansionIndicator
+                            .padding(.top, 4)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        Spacer()
+                    }
+                }
+                bookContext
+            }
         }
     }
 
@@ -2086,7 +2073,7 @@ private struct NoteCardView: View {
                 let expanding = expandProgress < 0.5
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                     expandProgress = expanding ? 1 : 0
-                    isExpanded = expanding
+                    isExpanded = expanding  // Drives pill morph transition
                 }
             } else {
                 withAnimation(.easeInOut(duration: 0.3)) {
