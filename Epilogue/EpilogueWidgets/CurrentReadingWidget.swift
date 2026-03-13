@@ -7,8 +7,15 @@
 
 import WidgetKit
 import SwiftUI
+import AppIntents
 
-struct CurrentReadingProvider: TimelineProvider {
+// MARK: - Widget Configuration Intent
+struct CurrentReadingIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Current Reading"
+    static var description: IntentDescription = "Shows your current reading progress"
+}
+
+struct CurrentReadingProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> CurrentReadingEntry {
         CurrentReadingEntry(
             date: Date(),
@@ -21,15 +28,13 @@ struct CurrentReadingProvider: TimelineProvider {
         )
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (CurrentReadingEntry) -> ()) {
-        let entry = fetchCurrentBook() ?? placeholder(in: context)
-        completion(entry)
+    func snapshot(for configuration: CurrentReadingIntent, in context: Context) async -> CurrentReadingEntry {
+        fetchCurrentBook() ?? placeholder(in: context)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+    func timeline(for configuration: CurrentReadingIntent, in context: Context) async -> Timeline<CurrentReadingEntry> {
         let entry = fetchCurrentBook() ?? placeholder(in: context)
-        let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
-        completion(timeline)
+        return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
     }
 
     private func fetchCurrentBook() -> CurrentReadingEntry? {
@@ -104,18 +109,28 @@ struct CurrentReadingWidgetView: View {
                 MediumView(entry: entry)
             case .systemLarge:
                 LargeView(entry: entry)
+            case .accessoryCircular:
+                ReadingProgressCircularView(entry: entry)
+            case .accessoryRectangular:
+                CurrentBookRectangularView(entry: entry)
+            case .accessoryInline:
+                ReadingProgressInlineView(entry: entry)
             default:
                 SmallView(entry: entry)
             }
         }
         .containerBackground(for: .widget) {
-            ZStack {
-                Color.black
-                Self.atmosphericGradient(colors: entry.colors)
+            if family == .accessoryCircular || family == .accessoryRectangular || family == .accessoryInline {
+                AccessoryWidgetBackground()
+            } else {
+                ZStack {
+                    Color.black
+                    Self.atmosphericGradient(colors: entry.colors)
+                }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
         }
-        .widgetURL(URL(string: "epilogue://continueReading"))  // Fallback for iOS 16
+        .widgetURL(URL(string: "epilogue://continueReading"))
     }
 
     // MARK: - Small Widget
@@ -466,11 +481,14 @@ struct CurrentReadingWidget: Widget {
     let kind: String = "CurrentReadingWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CurrentReadingProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: CurrentReadingIntent.self, provider: CurrentReadingProvider()) { entry in
             CurrentReadingWidgetView(entry: entry)
         }
         .configurationDisplayName("Currently Reading")
         .description("Track your reading progress")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([
+            .systemSmall, .systemMedium, .systemLarge,
+            .accessoryCircular, .accessoryRectangular, .accessoryInline
+        ])
     }
 }

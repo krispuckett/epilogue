@@ -7,21 +7,26 @@
 
 import WidgetKit
 import SwiftUI
+import AppIntents
 
-struct AmbientModeProvider: TimelineProvider {
+// MARK: - Widget Configuration Intent
+struct AmbientModeIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Ambient Mode"
+    static var description: IntentDescription = "Quick launch ambient reading mode"
+}
+
+struct AmbientModeProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> AmbientModeEntry {
         AmbientModeEntry(date: Date())
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (AmbientModeEntry) -> ()) {
-        let entry = placeholder(in: context)
-        completion(entry)
+    func snapshot(for configuration: AmbientModeIntent, in context: Context) async -> AmbientModeEntry {
+        AmbientModeEntry(date: Date())
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        let entry = placeholder(in: context)
-        let timeline = Timeline(entries: [entry], policy: .never)
-        completion(timeline)
+    func timeline(for configuration: AmbientModeIntent, in context: Context) async -> Timeline<AmbientModeEntry> {
+        let entry = AmbientModeEntry(date: Date())
+        return Timeline(entries: [entry], policy: .never)
     }
 }
 
@@ -141,7 +146,7 @@ struct AmbientModeWidget: Widget {
     let kind: String = "AmbientModeWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: AmbientModeProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: AmbientModeIntent.self, provider: AmbientModeProvider()) { entry in
             AmbientModeWidgetView(entry: entry)
         }
         .configurationDisplayName("Ambient Mode")

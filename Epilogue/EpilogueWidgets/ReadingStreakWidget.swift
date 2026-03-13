@@ -7,24 +7,30 @@
 
 import WidgetKit
 import SwiftUI
+import AppIntents
 
-struct ReadingStreakProvider: TimelineProvider {
+// MARK: - Widget Configuration Intent
+struct ReadingStreakIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Reading Streak"
+    static var description: IntentDescription = "Shows your daily reading streak"
+}
+
+struct ReadingStreakProvider: AppIntentTimelineProvider {
     private let sharedDefaults = UserDefaults(suiteName: "group.com.epilogue.app")
 
     func placeholder(in context: Context) -> ReadingStreakEntry {
         ReadingStreakEntry(date: Date(), streakDays: 0)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (ReadingStreakEntry) -> ()) {
+    func snapshot(for configuration: ReadingStreakIntent, in context: Context) async -> ReadingStreakEntry {
         let streak = sharedDefaults?.integer(forKey: "readingStreakDays") ?? 0
-        completion(ReadingStreakEntry(date: Date(), streakDays: streak))
+        return ReadingStreakEntry(date: Date(), streakDays: streak)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+    func timeline(for configuration: ReadingStreakIntent, in context: Context) async -> Timeline<ReadingStreakEntry> {
         let streak = sharedDefaults?.integer(forKey: "readingStreakDays") ?? 0
         let entry = ReadingStreakEntry(date: Date(), streakDays: streak)
-        let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
-        completion(timeline)
+        return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
     }
 }
 
@@ -35,8 +41,30 @@ struct ReadingStreakEntry: TimelineEntry {
 
 struct ReadingStreakWidgetView: View {
     var entry: ReadingStreakProvider.Entry
+    @Environment(\.widgetFamily) var family
 
     var body: some View {
+        if family == .accessoryCircular {
+            streakCircularView
+        } else {
+            streakSmallView
+        }
+    }
+
+    private var streakCircularView: some View {
+        VStack(spacing: 1) {
+            Text("\(entry.streakDays)")
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+            Text("days")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .containerBackground(for: .widget) {
+            AccessoryWidgetBackground()
+        }
+    }
+
+    private var streakSmallView: some View {
         VStack(spacing: 8) {
             Spacer()
 
@@ -106,11 +134,11 @@ struct ReadingStreakWidget: Widget {
     let kind: String = "ReadingStreakWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: ReadingStreakProvider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: ReadingStreakIntent.self, provider: ReadingStreakProvider()) { entry in
             ReadingStreakWidgetView(entry: entry)
         }
         .configurationDisplayName("Reading Streak")
         .description("Track your daily reading habit")
-        .supportedFamilies([.systemSmall])
+        .supportedFamilies([.systemSmall, .accessoryCircular])
     }
 }

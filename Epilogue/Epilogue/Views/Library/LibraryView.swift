@@ -11,6 +11,7 @@ struct LibraryView: View {
     @State private var searchText = ""
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @AppStorage("libraryReadFilter") private var readFilter: ReadFilter = .all
+    @AppStorage("librarySortOption") private var sortOption: SortOption = .dateAdded
     @Namespace private var viewModeAnimation
     @Namespace private var listTransition
     @State private var showingCoverPicker = false
@@ -37,18 +38,6 @@ struct LibraryView: View {
     @State private var pendingReviewCount: Int = 0
     @State private var cachedFilteredBooks: [Book] = []
 
-    // MARK: - Reading Activity Card
-    // Query recent reading sessions to find the last book the user was actually reading
-    @Query(
-        sort: [SortDescriptor(\ReadingSession.startDate, order: .reverse)]
-    ) private var recentSessions: [ReadingSession]
-
-    @Query(
-        filter: #Predicate<BookModel> { $0.readingStatus == "Currently Reading" },
-        sort: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
-    ) private var currentlyReadingBooks: [BookModel]
-    @State private var showInlineActivityCard = false
-    
     #if DEBUG
     @State private var frameDrops = 0
     @State private var performanceTimer: Timer?
@@ -56,6 +45,24 @@ struct LibraryView: View {
     
     enum ViewMode: String {
         case grid, list
+    }
+
+    enum SortOption: String, CaseIterable {
+        case dateAdded = "Date Added"
+        case title = "Title"
+        case author = "Author"
+        case rating = "Rating"
+
+        var displayName: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .dateAdded: return "calendar"
+            case .title: return "textformat"
+            case .author: return "person"
+            case .rating: return "star"
+            }
+        }
     }
 
     enum ReadFilter: String, CaseIterable {
@@ -107,14 +114,25 @@ struct LibraryView: View {
             books = books.filter { $0.readingStatus == .read }
         }
 
-        // Sort to put currently reading books first
+        // Sort: currently reading always floats to top, then apply user's sort
         books.sort { book1, book2 in
+            // Currently reading books always first
             if book1.readingStatus == .currentlyReading && book2.readingStatus != .currentlyReading {
                 return true
             } else if book1.readingStatus != .currentlyReading && book2.readingStatus == .currentlyReading {
                 return false
             }
-            return book1.dateAdded > book2.dateAdded
+            // Secondary sort by user preference
+            switch sortOption {
+            case .dateAdded:
+                return book1.dateAdded > book2.dateAdded
+            case .title:
+                return book1.title.localizedCaseInsensitiveCompare(book2.title) == .orderedAscending
+            case .author:
+                return book1.author.localizedCaseInsensitiveCompare(book2.author) == .orderedAscending
+            case .rating:
+                return (book1.userRating ?? 0) > (book2.userRating ?? 0)
+            }
         }
 
         return books
@@ -138,41 +156,6 @@ struct LibraryView: View {
             NotificationCenter.default.post(name: .refreshLibrary, object: nil)
             SensoryFeedback.light()
         }
-    }
-
-    // MARK: - Inline Reading Card Helper
-
-    private func findMatchingBook(for localId: String) -> Book? {
-        for vmBook in viewModel.books {
-            if vmBook.localId.uuidString == localId {
-                return vmBook
-            }
-        }
-        return nil
-    }
-
-    @ViewBuilder
-    private func inlineReadingCard(for bookModel: BookModel) -> some View {
-        ReadingActivityCard(
-            book: bookModel,
-            onContinue: {
-                // Navigate to book detail
-                if let foundBook = findMatchingBook(for: bookModel.localId) {
-                    selectedBookForNavigation = foundBook
-                    navigateToBookDetail = true
-                }
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showInlineActivityCard = false
-                }
-                ReturnCardManager.shared.markInlineShown()
-            },
-            onDismiss: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showInlineActivityCard = false
-                }
-                ReturnCardManager.shared.markInlineShown()
-            }
-        )
     }
 
     /// Unified book addition: syncs both UserDefaults (legacy) and SwiftData (modern)
@@ -489,6 +472,20 @@ struct LibraryView: View {
                     }
                 }
 
+                // Sort options
+                Section {
+                    Picker("Sort By", selection: $sortOption.animation(DesignSystem.Animation.springStandard)) {
+                        ForEach(SortOption.allCases, id: \.self) { option in
+                            Label(option.displayName, systemImage: option.icon)
+                                .tag(option)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .onChange(of: sortOption) { _, _ in
+                        SensoryFeedback.light()
+                    }
+                }
+
                 // Read status filter
                 Section {
                     Picker("Filter", selection: $readFilter.animation(DesignSystem.Animation.springStandard)) {
@@ -728,34 +725,9 @@ struct LibraryView: View {
             .environment(viewModel)
     }
     
-    // Find the book from the most recent reading session (not just most recently added)
-    private var currentReadingBook: BookModel? {
-        // First, try to find a book from recent sessions that's still being read
-        for session in recentSessions {
-            if let book = session.bookModel,
-               book.readingStatus == ReadingStatus.currentlyReading.rawValue,
-               book.coverImageData != nil {
-                return book
-            }
-        }
-        // Fallback: any currently reading book with a cover
-        return currentlyReadingBooks.first(where: { $0.coverImageData != nil })
-    }
-
     @ViewBuilder
     private var mainContent: some View {
         VStack(spacing: 0) {
-            // MARK: - Inline Reading Activity Card (OUTSIDE ScrollView for performance)
-            if showInlineActivityCard, let currentBook = currentReadingBook {
-                inlineReadingCard(for: currentBook)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
-            }
-
             ScrollView {
                 VStack(spacing: 0) {
                     if viewModel.isLoading {
@@ -790,17 +762,6 @@ struct LibraryView: View {
             .scrollDismissesKeyboard(.immediately)
             .refreshable {
                 await refreshLibrary()
-            }
-        }
-        .task {
-            // Check if we should show the inline activity card
-            if ReturnCardManager.shared.shouldShowInlineCard,
-               currentReadingBook != nil {
-                // Small delay for smoother appearance after view loads
-                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    showInlineActivityCard = true
-                }
             }
         }
     }
@@ -888,12 +849,6 @@ struct LibraryView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .forceShowInlineActivityCard)) { _ in
-            // Developer option: force show inline activity card
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                showInlineActivityCard = true
-            }
-        }
         .modifier(GlassToastModifier(isShowing: $showingBookAddedToast, message: toastMessage))
         #if DEBUG
         .onAppear {
@@ -912,6 +867,7 @@ struct LibraryView: View {
         }
         .onChange(of: searchText) { _, _ in recomputeFilteredBooks() }
         .onChange(of: readFilter) { _, _ in recomputeFilteredBooks() }
+        .onChange(of: sortOption) { _, _ in recomputeFilteredBooks() }
         .onChange(of: viewModel.books) { _, _ in recomputeFilteredBooks() }
     }
 }
