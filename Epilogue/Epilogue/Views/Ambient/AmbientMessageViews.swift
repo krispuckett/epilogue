@@ -543,19 +543,15 @@ struct AmbientMessageThreadView: View {
     }
 
     private func formatResponseText(_ text: String) -> AttributedString {
-        // CRITICAL FIX: Preserve original formatting, only clean markdown
-        // DO NOT destroy line breaks, lists, or spacing
-        let cleanText = text
-            .replacingOccurrences(of: "**", with: "") // Remove markdown bold
-            .replacingOccurrences(of: "##", with: "") // Remove markdown headers
-
-        // Convert to AttributedString with markdown support
-        // This preserves ALL original formatting including line breaks, lists, etc.
+        // Let AttributedString handle markdown natively — it renders **bold** and ## headers correctly.
+        // Do NOT strip markdown syntax, that destroys paragraph structure.
         do {
-            return try AttributedString(markdown: cleanText)
+            return try AttributedString(
+                markdown: text,
+                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+            )
         } catch {
-            // Fallback if markdown parsing fails
-            return AttributedString(cleanText)
+            return AttributedString(text)
         }
     }
 }

@@ -1398,7 +1398,7 @@ struct AmbientModeView: View {
                             height: inputMode == .textInput || !isVoiceModeEnabled ? textFieldHeight : 64
                         )
                         .glassEffect(
-                            .regular.tint(.black.opacity(0.15)),
+                            .regular.tint(.white.opacity(0.08)),
                             in: .rect(cornerRadius: inputMode == .textInput || !isVoiceModeEnabled ? 20 : 32)
                         )
                         .allowsHitTesting(false)

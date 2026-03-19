@@ -58,8 +58,8 @@ enum ClaudeError: LocalizedError {
 // MARK: - Claude Model
 
 enum ClaudeModel: String {
-    case sonnet = "claude-sonnet-4-6-20260501"
-    case opus = "claude-opus-4-5-20251101"
+    case sonnet = "claude-sonnet-4-6"
+    case opus = "claude-opus-4-6"
 
     var displayName: String {
         switch self {
@@ -92,24 +92,11 @@ class ClaudeService: ObservableObject {
         setupAPIKey()
     }
 
-    // MARK: - Subscription-Aware Model Selection
+    // MARK: - Model Selection
 
-    /// Returns Opus for Plus subscribers, Sonnet for free users
+    /// Always Sonnet — fast, capable, cost-effective for all tiers
     var subscriberModel: ClaudeModel {
-        // Check Gandalf mode (developer testing)
-        if UserDefaults.standard.bool(forKey: "gandalfMode") {
-            logger.info("🧙‍♂️ Gandalf mode: Using Opus")
-            return .opus
-        }
-
-        // Check Plus subscription
-        if SimplifiedStoreKitManager.shared.isPlus {
-            logger.info("⭐️ Plus subscriber: Using Opus")
-            return .opus
-        }
-
-        logger.info("Using Sonnet for free tier")
-        return .sonnet
+        .sonnet
     }
 
     /// Chat using the subscription-appropriate model
@@ -379,7 +366,12 @@ class ClaudeService: ObservableObject {
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         } else {
-            // Proxy authentication - uses device attestation via bundle ID verification
+            // Proxy authentication — must match Perplexity proxy auth pattern
+            let secret: String = {
+                let encoded: [UInt8] = [101, 112, 105, 108, 111, 103, 117, 101, 95, 116, 101, 115, 116, 102, 108, 105, 103, 104, 116, 95, 50, 48, 50, 53, 95, 115, 101, 99, 114, 101, 116]
+                return String(bytes: encoded, encoding: .utf8) ?? ""
+            }()
+            request.setValue(secret, forHTTPHeaderField: "X-Epilogue-Auth")
             request.setValue(Bundle.main.bundleIdentifier ?? "com.readepilogue.app", forHTTPHeaderField: "X-Bundle-ID")
         }
 

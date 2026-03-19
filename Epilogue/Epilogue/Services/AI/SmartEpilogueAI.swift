@@ -560,7 +560,7 @@ class SmartEpilogueAI: ObservableObject {
             let response = try await ClaudeService.shared.subscriberChat(
                 message: formattedQuestion,
                 systemPrompt: buildClaudeSystemPrompt(),
-                maxTokens: 2048
+                maxTokens: 1024
             )
             lastResponse = response
             lastProvider = "Claude"
@@ -741,7 +741,7 @@ class SmartEpilogueAI: ObservableObject {
                 let stream = ClaudeService.shared.subscriberStreamChat(
                     message: formattedQuestion,
                     systemPrompt: buildClaudeSystemPrompt(),
-                    maxTokens: 2048
+                    maxTokens: 1024
                 )
 
                 for try await response in stream {
@@ -769,7 +769,7 @@ class SmartEpilogueAI: ObservableObject {
                     let stream = ClaudeService.shared.subscriberStreamChat(
                         message: formattedQuestion,
                         systemPrompt: buildClaudeSystemPrompt(),
-                        maxTokens: 2048
+                        maxTokens: 1024
                     )
 
                     for try await response in stream {
@@ -785,7 +785,7 @@ class SmartEpilogueAI: ObservableObject {
                 let stream = ClaudeService.shared.subscriberStreamChat(
                     message: formattedQuestion,
                     systemPrompt: buildClaudeSystemPrompt(),
-                    maxTokens: 2048
+                    maxTokens: 1024
                 )
 
                 for try await response in stream {
