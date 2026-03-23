@@ -23,6 +23,14 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Epilogue uses your camera to capture quotes and text from book pages</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Epilogue uses the microphone to transcribe your thoughts during reading sessions</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Epilogue uses speech recognition to transcribe your reading notes in real time</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Epilogue accesses your photo library to save and share reading snapshots</string>
 	<key>NSVisualIntelligenceUsageDescription</key>
 	<string>Epilogue uses Visual Intelligence to extract quotes and text from book pages</string>
 	<key>SKStoreKitVersion</key>
