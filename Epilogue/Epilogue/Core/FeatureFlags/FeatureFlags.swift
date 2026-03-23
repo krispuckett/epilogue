@@ -80,7 +80,7 @@ enum FeatureFlag: String, CaseIterable {
         case .aggressiveCaching: return true
         case .imagePreloading: return true
         case .backgroundSync: return false
-        case .atmosphereEngineV2: return false
+        case .atmosphereEngineV2: return true
         case .gradientHarmonyLayers: return true
         case .gradientAccentBloom: return true
         case .gradientCoverTextureFallback: return false
@@ -376,7 +376,8 @@ final class FeatureFlags {
 
     var isAtmosphereV2Enabled: Bool {
         // Check both feature flag and Gandalf AppStorage toggle
-        UserDefaults.standard.bool(forKey: "atmosphereEngineV2")
+        // Default to true so v2 is active for users who haven't toggled the setting
+        UserDefaults.standard.object(forKey: "atmosphereEngineV2") as? Bool ?? true
     }
 }
 

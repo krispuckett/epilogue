@@ -7,7 +7,7 @@ struct GradientDebugOverlay: View {
     let qualityScore: PaletteQualityScore?
 
     @AppStorage("gandalfMode") private var gandalfMode = false
-    @AppStorage("atmosphereEngineV2") private var atmosphereV2 = false
+    @AppStorage("atmosphereEngineV2") private var atmosphereV2 = true
 
     @State private var isExpanded = false
 

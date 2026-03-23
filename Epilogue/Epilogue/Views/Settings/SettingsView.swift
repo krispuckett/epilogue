@@ -15,7 +15,7 @@ struct SettingsView: View {
     @AppStorage("audioFeedback") private var audioFeedback = false
     @AppStorage("alwaysShowInput") private var alwaysShowInput = false
     @AppStorage("socialFeaturesEnabled") private var socialFeaturesEnabled = false
-    @AppStorage("atmosphereEngineV2") private var atmosphereEngineV2 = false
+    @AppStorage("atmosphereEngineV2") private var atmosphereEngineV2 = true
     @AppStorage("feature.gradient.harmony_layers") private var harmonyLayersEnabled = true
     @AppStorage("feature.gradient.accent_bloom") private var accentBloomEnabled = true
     @AppStorage("feature.gradient.cover_texture_fallback") private var coverTextureEnabled = false

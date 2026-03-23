@@ -31,7 +31,8 @@ final class AtmosphereEngine {
 
     /// Whether v2 atmosphere engine is enabled (Gandalf toggle)
     static var isEnabled: Bool {
-        UserDefaults.standard.bool(forKey: "atmosphereEngineV2")
+        // Default to true so v2 is active for users who haven't toggled the setting
+        UserDefaults.standard.object(forKey: "atmosphereEngineV2") as? Bool ?? true
     }
 
     private init() {
