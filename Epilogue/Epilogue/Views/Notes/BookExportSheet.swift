@@ -10,6 +10,7 @@ struct BookExportSheet: View {
     @State private var showingShareSheet = false
     @State private var markdownContent = ""
     @State private var filename = ""
+    @State private var exportFileURL: URL?
 
     private var itemCount: Int {
         (book.quotes?.count ?? 0) + (book.notes?.count ?? 0) + (book.questions?.count ?? 0)
@@ -110,8 +111,13 @@ struct BookExportSheet: View {
 
                         // Export button
                         Button {
-                            showingShareSheet = true
-                            SensoryFeedback.success()
+                            if let url = createTemporaryFile() {
+                                exportFileURL = url
+                                showingShareSheet = true
+                                SensoryFeedback.success()
+                            } else {
+                                SensoryFeedback.error()
+                            }
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "square.and.arrow.up")
@@ -171,7 +177,7 @@ struct BookExportSheet: View {
                 filename = MarkdownExporter.generateFilename(for: book)
             }
             .sheet(isPresented: $showingShareSheet) {
-                if let url = createTemporaryFile() {
+                if let url = exportFileURL {
                     BookExportShareSheet(items: [url])
                 }
             }

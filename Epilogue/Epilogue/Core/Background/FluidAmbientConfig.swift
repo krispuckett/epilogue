@@ -229,7 +229,7 @@ struct FluidAmbientConfig {
     /// Tuned via Fluid Lab. Test on multiple covers to validate.
     static let golden = FluidAmbientConfig(
         colorIntensity: 0.991, noiseAmplitude: 0.223,
-        darkFadeStart: 0.392, accentInfluence: 0.457,
+        darkFadeStart: 0.600, accentInfluence: 0.457,
         secondarySpread: 0.337, noiseScale: 3.096,
         warpIntensity: 0.450, animationSpeed: 0.494,
         originX: 0.340, originY: 0.451,

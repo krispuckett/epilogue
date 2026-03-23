@@ -218,13 +218,17 @@ struct BookDetailView: View {
 
     // Re-entry intelligence
     @State private var showReEntryCard = false
-    @State private var reEntryRecap: ReEntryIntelligenceService.ReEntryRecap?
+
+    /// Live book from ViewModel — reflects progress updates without full refresh
+    private var liveBook: Book {
+        libraryViewModel.books.first(where: { $0.id == book.id }) ?? book
+    }
 
     // Computed properties for book data
     private var progressPercentage: Double {
-        guard let total = book.pageCount,
+        guard let total = liveBook.pageCount,
               total > 0 else { return 0 }
-        return Double(book.currentPage) / Double(total)
+        return Double(liveBook.currentPage) / Double(total)
     }
 
     private var startReadingButton: some View {
@@ -375,12 +379,7 @@ struct BookDetailView: View {
         // Re-entry intelligence: check if user has been away 3+ days
         if let bookModel = bookModel,
            ReEntryIntelligenceService.shared.needsReEntry(for: bookModel) {
-            self.reEntryRecap = ReEntryIntelligenceService.shared.buildRecap(
-                for: bookModel, modelContext: modelContext
-            )
-            if reEntryRecap != nil {
-                self.showReEntryCard = true
-            }
+            self.showReEntryCard = true
         }
     }
 
@@ -914,22 +913,12 @@ struct BookDetailView: View {
             }
         }
         .sheet(isPresented: $showReEntryCard) {
-            if let recap = reEntryRecap {
-                ReEntryCardView(
-                    recap: recap,
-                    bookColors: bookModel?.extractedColors,
-                    onContinue: {
-                        showReEntryCard = false
-                    },
-                    onStartAmbient: {
-                        showReEntryCard = false
-                        upgradeToAmbientMode()
-                    }
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.clear)
-            }
+            WelcomeBackSheet(book: bookModel, onContinueReading: { _ in
+                showReEntryCard = false
+            })
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.clear)
         }
         .onChange(of: showReEntryCard) { _, isShowing in
             if !isShowing, let bookModel = bookModel {
@@ -1571,8 +1560,8 @@ struct BookDetailView: View {
             
             VStack(alignment: .leading, spacing: 12) {
                 if let pageCount = book.pageCount, pageCount > 0 {
-                    let pagesPerDay = max(1, book.currentPage / max(1, Calendar.current.dateComponents([.day], from: book.dateAdded, to: Date()).day ?? 1))
-                    let daysToFinish = (pageCount - book.currentPage) / max(1, pagesPerDay)
+                    let pagesPerDay = max(1, liveBook.currentPage / max(1, Calendar.current.dateComponents([.day], from: book.dateAdded, to: Date()).day ?? 1))
+                    let daysToFinish = (pageCount - liveBook.currentPage) / max(1, pagesPerDay)
                     
                     Text("At your current pace of \(pagesPerDay) pages per day")
                     .font(.system(size: 14))
@@ -1904,7 +1893,7 @@ struct BookDetailView: View {
             }
             
             let daysSinceStart = Calendar.current.dateComponents([.day], from: book.dateAdded, to: Date()).day ?? 1
-            let pagesPerDay = book.currentPage / max(1, daysSinceStart)
+            let pagesPerDay = liveBook.currentPage / max(1, daysSinceStart)
             
             HStack(spacing: 32) {
                 VStack(alignment: .leading) {

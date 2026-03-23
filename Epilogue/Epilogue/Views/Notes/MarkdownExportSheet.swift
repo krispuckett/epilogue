@@ -11,6 +11,7 @@ struct MarkdownExportSheet: View {
     @State private var showingShareSheet = false
     @State private var markdownContent = "Loading preview..."
     @State private var filename = ""
+    @State private var exportFileURL: URL?
 
     init(note: CapturedNote? = nil, quote: CapturedQuote? = nil, notes: [CapturedNote] = [], quotes: [CapturedQuote] = []) {
         self.note = note
@@ -140,8 +141,13 @@ struct MarkdownExportSheet: View {
 
                         // Export Button
                         Button {
-                            showingShareSheet = true
-                            SensoryFeedback.success()
+                            if let url = createTemporaryMarkdownFile() {
+                                exportFileURL = url
+                                showingShareSheet = true
+                                SensoryFeedback.success()
+                            } else {
+                                SensoryFeedback.error()
+                            }
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "square.and.arrow.up")
@@ -200,7 +206,7 @@ struct MarkdownExportSheet: View {
                 print("  Filename: \(filename)")
             }
             .sheet(isPresented: $showingShareSheet) {
-                if let url = createTemporaryMarkdownFile() {
+                if let url = exportFileURL {
                     ShareSheet(items: [url])
                 }
             }

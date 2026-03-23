@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Welcome Back Sheet (Half-sheet, dense data layout)
+// MARK: - Welcome Back Sheet (Half-sheet, book-aware fluid gradient)
 struct WelcomeBackSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -15,17 +15,28 @@ struct WelcomeBackSheet: View {
         sort: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
     ) private var allBooks: [BookModel]
 
-    // Last reading session for "where you left off"
     @Query(
         sort: [SortDescriptor(\ReadingSession.startDate, order: .reverse)]
     ) private var recentSessions: [ReadingSession]
 
+    /// Optional: pass a specific book (e.g. from BookDetailView).
+    /// When nil, falls back to @Query (currently reading / most recent).
+    let specificBook: BookModel?
     let onContinueReading: ((BookModel) -> Void)?
 
     @State private var quote = LiteraryQuotes.randomQuote()
 
+    // Fluid gradient state
+    @State private var fluidColorSet = FluidLabColorSet.fallback
+    @State private var fluidConfig = FluidAmbientConfig.golden
+
+    init(book: BookModel? = nil, onContinueReading: ((BookModel) -> Void)? = nil) {
+        self.specificBook = book
+        self.onContinueReading = onContinueReading
+    }
+
     private var currentBook: BookModel? {
-        currentlyReadingBooks.first ?? allBooks.first
+        specificBook ?? currentlyReadingBooks.first ?? allBooks.first
     }
 
     private var lastSession: ReadingSession? {
@@ -46,13 +57,6 @@ struct WelcomeBackSheet: View {
         else { return "< 1 hour" }
     }
 
-    private var lastSessionDate: String? {
-        guard let session = lastSession else { return nil }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: session.startDate)
-    }
-
     private var lastSessionDuration: String? {
         guard let session = lastSession else { return nil }
         let minutes = Int(session.duration / 60)
@@ -66,186 +70,214 @@ struct WelcomeBackSheet: View {
         return Double(book.currentPage) / Double(totalPages)
     }
 
+    private var coverImage: UIImage? {
+        guard let book = currentBook,
+              let data = book.coverImageData else { return nil }
+        return UIImage(data: data)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-                // Title row
-                HStack {
-                    Text("Welcome back")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
+        NavigationStack {
+            ZStack {
+                // Book-aware fluid gradient background
+                FluidAmbientGradientView(
+                    colorSet: fluidColorSet,
+                    config: $fluidConfig
+                )
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(false)
+                .id(currentBook?.id)
 
-                    Spacer()
+                // Content
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
 
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .frame(width: 28, height: 28)
-                            .background(.white.opacity(0.1), in: Circle())
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 4)
+                    // Centered content
+                    VStack(spacing: 12) {
+                        // Book cover
+                        if let image = coverImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(height: 160)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .shadow(color: .black.opacity(0.5), radius: 16, y: 8)
+                        }
 
-                // Subtitle — time away + book name
-                if let book = currentBook {
-                    HStack {
-                        Text("It's been \(timeAwayText) since your last session with ")
-                            .foregroundStyle(.white.opacity(0.6))
-                        + Text(book.title)
-                            .foregroundStyle(DesignSystem.Colors.primaryAccent)
-                            .bold()
-                    }
-                    .font(.system(size: 14))
-                    .lineLimit(2)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
-                }
+                        // Title + author
+                        if let book = currentBook {
+                            VStack(spacing: 6) {
+                                Text(book.title)
+                                    .font(.system(size: 22, weight: .semibold, design: .serif))
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
 
-                // WHERE YOU LEFT OFF section
-                if lastSession != nil || currentBook != nil {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("WHERE YOU LEFT OFF")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.35))
-                            .tracking(1.5)
+                                Text("by \(book.author)")
+                                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                                    .kerning(1.2)
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+                        }
 
-                        HStack(spacing: 16) {
-                            if let date = lastSessionDate {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                    Text(date)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.7))
+                        // Stats row — contextual, centered
+                        HStack(spacing: 32) {
+                            if let book = currentBook, let total = book.pageCount, total > 0, book.currentPage > 0 {
+                                VStack(spacing: 2) {
+                                    Text("\(Int(progressPercent * 100))%")
+                                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                    Text("COMPLETE")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.35))
+                                        .tracking(1)
                                 }
                             }
 
                             if let duration = lastSessionDuration {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "clock")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.white.opacity(0.4))
+                                VStack(spacing: 2) {
                                     Text(duration)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.7))
+                                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                    Text("LAST SESSION")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.35))
+                                        .tracking(1)
                                 }
                             }
 
-                            if let book = currentBook, let total = book.pageCount, total > 0 {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "book")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                    Text("p. \(book.currentPage) of \(total)")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.7))
+                            if let book = currentBook, let total = book.pageCount, total > 0, book.currentPage > 0 {
+                                VStack(spacing: 2) {
+                                    Text("\(total - book.currentPage)")
+                                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                    Text("PAGES LEFT")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.35))
+                                        .tracking(1)
                                 }
                             }
                         }
-
-                        // Progress bar
-                        if let book = currentBook, let total = book.pageCount, total > 0 {
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(.white.opacity(0.08))
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(DesignSystem.Colors.primaryAccent.opacity(0.6))
-                                        .frame(width: geo.size.width * progressPercent)
-                                }
-                            }
-                            .frame(height: 4)
-                            .padding(.top, 4)
-                        }
-                    }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.white.opacity(0.04))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-                }
-
-                // Quote card (compact)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("\u{201C}\(quote.text)\u{201D}")
-                        .font(.custom("Georgia", size: 14))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineSpacing(4)
-                        .lineLimit(3)
-
-                    Text("— \(quote.author)")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.white.opacity(0.03))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-
-                // CTA — prominent, full-width
-                if currentBook != nil {
-                    Button {
-                        SensoryFeedback.light()
-                        if let book = currentBook {
-                            onContinueReading?(book)
-                        }
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("Continue reading")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(DesignSystem.Colors.primaryAccent.opacity(0.85), in: RoundedRectangle(cornerRadius: 14))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
 
-                    // Secondary actions
-                    HStack(spacing: 0) {
+                        // Quote
+                        VStack(spacing: 6) {
+                            Text("\u{201C}\(quote.text)\u{201D}")
+                                .font(.custom("Georgia", size: 15))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.center)
+                                .shadow(color: .black.opacity(0.6), radius: 6, y: 2)
+
+                            Text("— \(quote.author)")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                    }
+                    .padding(.horizontal, 24)
+
+                    Spacer(minLength: 24)
+
+                    // Continue reading — glass button, bottom-pinned
+                    if currentBook != nil {
                         Button {
                             SensoryFeedback.light()
+                            if let book = currentBook {
+                                onContinueReading?(book)
+                            }
                             dismiss()
                         } label: {
-                            Text("Dismiss")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.4))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                            HStack(spacing: 6) {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 11))
+                                Text("Continue reading")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .glassEffect(.regular, in: .capsule)
+                            .overlay {
+                                Capsule().strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 20)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
                 }
+            }
+            .navigationTitle("Welcome Back")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await extractBookColors()
             }
         }
     }
 
-// MARK: - Legacy Alias (backward compatibility)
+    // MARK: - Color Extraction
+
+    private func extractBookColors() async {
+        guard let book = currentBook else { return }
+        let bookID = book.localId
+
+        // Try AtmosphereEngine first (cached DisplayPalette)
+        if AtmosphereEngine.isEnabled {
+            // Try from cover URL
+            if let coverURL = book.coverImageURL,
+               let dp = await AtmosphereEngine.shared.extractDisplayPalette(
+                   bookID: bookID,
+                   coverURL: coverURL
+               ) {
+                await MainActor.run {
+                    fluidColorSet = FluidLabColorSet.from(dp)
+                    var config = FluidAmbientConfig(for: dp.coverType)
+                    config.darkFadeStart = 0.600       // Fill the half-sheet with color
+                    config.vignetteStrength = 0.3       // Softer edge darkening for small sheet
+                    config.fadeExponent = 0.537
+                    fluidConfig = config
+                }
+                return
+            }
+
+            // Try from cover image data
+            if let image = coverImage,
+               let dp = await AtmosphereEngine.shared.extractDisplayPalette(
+                   from: image,
+                   bookID: bookID
+               ) {
+                await MainActor.run {
+                    fluidColorSet = FluidLabColorSet.from(dp)
+                    var config = FluidAmbientConfig(for: dp.coverType)
+                    config.darkFadeStart = 0.600
+                    config.vignetteStrength = 0.3
+                    config.fadeExponent = 0.537
+                    fluidConfig = config
+                }
+                return
+            }
+        }
+
+        // Fallback: cached ColorPalette
+        if let cachedPalette = await BookColorPaletteCache.shared.getCachedPalette(for: bookID) {
+            await MainActor.run {
+                fluidColorSet = FluidLabColorSet.from(cachedPalette)
+                fluidConfig.darkFadeStart = 0.600
+                fluidConfig.vignetteStrength = 0.3
+                fluidConfig.fadeExponent = 0.537
+            }
+        }
+    }
+}
+
+// MARK: - Legacy Alias
 typealias ReturnCardOverlay = WelcomeBackSheet
 
 // MARK: - Preview
@@ -254,7 +286,7 @@ typealias ReturnCardOverlay = WelcomeBackSheet
         .sheet(isPresented: .constant(true)) {
             WelcomeBackSheet(onContinueReading: nil)
                 .presentationDetents([.medium])
-                .presentationBackground(.ultraThinMaterial)
+                .presentationBackground(.clear)
                 .modelContainer(for: BookModel.self)
         }
 }

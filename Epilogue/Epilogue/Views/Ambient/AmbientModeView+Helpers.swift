@@ -8,6 +8,24 @@ private let logger = Logger(subsystem: "com.epilogue", category: "AmbientModeVie
 // MARK: - Utility & Helper Methods
 extension AmbientModeView {
 
+    // MARK: - BookModel Resolution
+
+    /// Fetch existing BookModel from SwiftData or create+insert a new one.
+    /// Prevents orphaned relationships that cause silent save failures.
+    func resolvedBookModel(for book: Book?) -> BookModel? {
+        guard let book = book else { return nil }
+        let localId = book.localId.uuidString
+        let fetchRequest = FetchDescriptor<BookModel>(
+            predicate: #Predicate { model in model.localId == localId }
+        )
+        if let existing = try? modelContext.fetch(fetchRequest).first {
+            return existing
+        }
+        let newModel = BookModel(from: book)
+        modelContext.insert(newModel)
+        return newModel
+    }
+
     // MARK: - Book Detection
 
     func handleBookDetection(_ book: Book?) {
@@ -70,7 +88,7 @@ extension AmbientModeView {
 
                 // Update the current session with the detected book
                 if let session = currentSession {
-                    session.bookModel = BookModel(from: book)
+                    session.bookModel = resolvedBookModel(for: book)
                     do {
                         try modelContext.save()
                         #if DEBUG
@@ -420,10 +438,10 @@ extension AmbientModeView {
     }
 
     func saveQuoteFromVisualIntelligence(_ text: String, pageNumber: Int?) {
-        // Create the captured quote
+        // Create the captured quote with a properly-inserted BookModel
         let capturedQuote = CapturedQuote(
             text: text,
-            book: currentBookContext.map { BookModel(from: $0) },
+            book: resolvedBookModel(for: currentBookContext),
             author: currentBookContext?.author,
             pageNumber: pageNumber,
             timestamp: Date(),
@@ -467,7 +485,7 @@ extension AmbientModeView {
             timestamp: Date(),
             messageType: .quote(CapturedQuote(
                 text: text,
-                book: currentBookContext.map { BookModel(from: $0) },
+                book: resolvedBookModel(for: currentBookContext),
                 author: currentBookContext?.author,
                 pageNumber: pageNumber,
                 timestamp: Date(),
@@ -500,10 +518,10 @@ extension AmbientModeView {
     }
 
     func saveExtractedQuote(_ text: String) {
-        // Save quote to SwiftData immediately
+        // Save quote to SwiftData immediately with a properly-inserted BookModel
         let quote = CapturedQuote(
             text: text,
-            book: currentBookContext.map { BookModel(from: $0) },
+            book: resolvedBookModel(for: currentBookContext),
             author: currentBookContext?.author,
             pageNumber: nil,
             timestamp: Date(),

@@ -186,7 +186,7 @@ struct ContentView: View {
             })
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
-            .presentationBackground(.ultraThinMaterial)
+            .presentationBackground(.clear)
         }
         // Dynamic Island Toast - taller format for quick returns
         .dynamicIslandToast(isPresented: $showDynamicIslandToast) {

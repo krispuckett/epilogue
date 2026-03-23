@@ -460,81 +460,6 @@ struct SettingsView: View {
                                 .foregroundStyle(.cyan)
                         }
 
-                        Button {
-                            SimplifiedStoreKitManager.shared.resetMonthlyCount()
-                            SensoryFeedback.light()
-                        } label: {
-                            Label("Reset Conversation Count", systemImage: "arrow.counterclockwise")
-                                .foregroundStyle(.green)
-                        }
-
-                        NavigationLink {
-                            TextAnimationExperiments()
-                        } label: {
-                            Label("Text Animation Lab", systemImage: "text.alignleft")
-                                .foregroundStyle(.orange)
-                        }
-
-                        NavigationLink {
-                            WelcomeBackCardExperiment()
-                        } label: {
-                            Label("Welcome Back Experiment", systemImage: "flask.fill")
-                                .foregroundStyle(.purple)
-                        }
-
-                        Button {
-                            dismiss()
-                            // Post notification to trigger welcome back sheet
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(name: .showReturnCard, object: nil)
-                            }
-                        } label: {
-                            Label("Test Welcome Back Sheet", systemImage: "hand.wave.fill")
-                                .foregroundStyle(.mint)
-                        }
-
-                        Button {
-                            dismiss()
-                            // Post notification to trigger Dynamic Island toast
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                ReturnCardManager.shared.forceShowToast()
-                            }
-                        } label: {
-                            Label("Test Toast (Compact)", systemImage: "capsule.portrait.topthird.filled")
-                                .foregroundStyle(.cyan)
-                        }
-
-                        Button {
-                            ReturnCardManager.shared.forceShowInline()
-                            dismiss()
-                            // Post notification to trigger inline card in library
-                            NotificationCenter.default.post(name: .forceShowInlineActivityCard, object: nil)
-                        } label: {
-                            Label("Test Inline Card", systemImage: "rectangle.topthird.inset.filled")
-                                .foregroundStyle(.teal)
-                        }
-
-                        NavigationLink {
-                            ReadingWrappedExperiment()
-                        } label: {
-                            Label("Reading Wrapped", systemImage: "gift.fill")
-                                .foregroundStyle(.pink)
-                        }
-
-                        NavigationLink {
-                            RealityBookShowcase()
-                        } label: {
-                            Label("3D Book Showcase", systemImage: "cube.fill")
-                                .foregroundStyle(.purple)
-                        }
-
-                        NavigationLink {
-                            ReadingRoomView()
-                        } label: {
-                            Label("The Reading Room", systemImage: "books.vertical.fill")
-                                .foregroundStyle(.orange)
-                        }
-
                         NavigationLink {
                             ShaderLabView()
                         } label: {
@@ -545,22 +470,13 @@ struct SettingsView: View {
                         orbLabLink
 
                         Button {
-                            SensoryFeedback.light()
                             dismiss()
-                            // Start Welcome Back Live Activity in Dynamic Island
-                            Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay for dismiss
-                                // Find a book to show
-                                let descriptor = FetchDescriptor<BookModel>(
-                                    sortBy: [SortDescriptor(\BookModel.dateAdded, order: .reverse)]
-                                )
-                                if let book = try? modelContext.fetch(descriptor).first {
-                                    WelcomeBackActivityManager.shared.startActivity(for: book)
-                                }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                NotificationCenter.default.post(name: .showReturnCard, object: nil)
                             }
                         } label: {
-                            Label("Show Welcome Back (Dynamic Island)", systemImage: "capsule.portrait.bottomhalf.filled")
-                                .foregroundStyle(.indigo)
+                            Label("Preview Welcome Back", systemImage: "hand.wave.fill")
+                                .foregroundStyle(.mint)
                         }
 
                     } header: {
