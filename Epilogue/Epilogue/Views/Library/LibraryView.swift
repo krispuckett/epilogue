@@ -1859,6 +1859,16 @@ class LibraryViewModel {
     /// Configure with SwiftData context — switches from UserDefaults to SwiftData as source of truth
     func configure(modelContext: ModelContext) {
         self.modelContext = modelContext
+
+        // One-time recovery: resurrect any BookModel that was flagged
+        // isInLibrary = false but still has user-generated content attached
+        // (notes, quotes, questions, reading sessions, ambient sessions,
+        // custom description, non-zero progress, or a user rating). These
+        // are books the old diff-based persist logic hid from the user
+        // without their intent. Safe to run before loadBooks because it
+        // only flips false → true.
+        resurrectHiddenBooksWithUserContent(context: modelContext)
+
         // loadBooksFromSwiftData sets hasLoadedFromSwiftData = true on its
         // success path. We deliberately don't set it here so that a failed
         // SwiftData load (fallback to UserDefaults) doesn't unlock the
@@ -1877,6 +1887,76 @@ class LibraryViewModel {
         #if DEBUG
         print("✅ LibraryViewModel configured with SwiftData — \(books.count) books loaded")
         #endif
+    }
+
+    /// One-time pass that re-flags `isInLibrary = true` on any BookModel
+    /// whose isInLibrary bit is false but which still has user data
+    /// attached. Intended to recover libraries wiped by the previous
+    /// diff-based persist logic.
+    ///
+    /// Bump the `restoreVersionKey` value if you need to re-run the
+    /// recovery on all devices again in the future.
+    private func resurrectHiddenBooksWithUserContent(context: ModelContext) {
+        let restoreVersionKey = "com.epilogue.library.restoreVersion"
+        let currentRestoreVersion = 1
+        if userDefaults.integer(forKey: restoreVersionKey) >= currentRestoreVersion {
+            return
+        }
+
+        do {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.isInLibrary == false }
+            )
+            let hiddenBooks = try context.fetch(descriptor)
+
+            var resurrected = 0
+            for book in hiddenBooks {
+                let hasNotes = (book.notes?.isEmpty == false)
+                let hasQuotes = (book.quotes?.isEmpty == false)
+                let hasQuestions = (book.questions?.isEmpty == false)
+                let hasAmbientSessions = (book.sessions?.isEmpty == false)
+                let hasReadingSessions = (book.readingSessions?.isEmpty == false)
+                let hasProgress = book.currentPage > 0
+                let hasRating = book.userRating != nil
+                let hasUserNotes = (book.userNotes?.isEmpty == false)
+                let hasCustomDescription = (book.userDescription?.isEmpty == false)
+                let wasRead = book.readingStatus == ReadingStatus.read.rawValue
+
+                let hasAnyUserContent =
+                    hasNotes
+                    || hasQuotes
+                    || hasQuestions
+                    || hasAmbientSessions
+                    || hasReadingSessions
+                    || hasProgress
+                    || hasRating
+                    || hasUserNotes
+                    || hasCustomDescription
+                    || wasRead
+
+                if hasAnyUserContent {
+                    book.isInLibrary = true
+                    resurrected += 1
+                    #if DEBUG
+                    print("  🪄 Resurrected '\(book.title)' by \(book.author) — had user content")
+                    #endif
+                }
+            }
+
+            if resurrected > 0 {
+                try context.save()
+                #if DEBUG
+                print("✅ Resurrected \(resurrected) book\(resurrected == 1 ? "" : "s") from hidden state")
+                #endif
+            }
+
+            userDefaults.set(currentRestoreVersion, forKey: restoreVersionKey)
+        } catch {
+            #if DEBUG
+            print("⚠️ resurrectHiddenBooksWithUserContent failed: \(error)")
+            #endif
+            // Don't set the flag — we'll try again next launch.
+        }
     }
     
     private func loadBooks() {
