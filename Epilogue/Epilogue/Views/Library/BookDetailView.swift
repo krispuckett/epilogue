@@ -262,7 +262,10 @@ struct BookDetailView: View {
             model = BookModel(from: book)
             modelContext.insert(model)
         }
-        let session = ReadingSession(bookModel: model, startPage: book.currentPage)
+        // Prefer SwiftData's current page over the struct snapshot - the struct
+        // can be stale after the user drags the progress bar.
+        let startPage = model.currentPage > 0 ? model.currentPage : book.currentPage
+        let session = ReadingSession(bookModel: model, startPage: startPage)
         modelContext.insert(session)
         try? modelContext.save()
 
@@ -543,7 +546,11 @@ struct BookDetailView: View {
             HStack(spacing: 12) {
                 // Metrics with staggered fade-in
                 HStack(spacing: 12) {
-                    metricItem(value: session.formattedDuration, label: "DURATION")
+                    // Wrap the duration in a TimelineView so it ticks every second
+                    // while the session is active (was previously static until stop).
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        metricItem(value: session.formattedDuration, label: "DURATION")
+                    }
                     .transition(.asymmetric(
                         insertion: .scale.combined(with: .opacity).animation(.spring(duration: 0.4, bounce: 0.3).delay(0.15)),
                         removal: .scale.combined(with: .opacity).animation(.spring(duration: 0.3, bounce: 0.2))
@@ -1186,7 +1193,7 @@ struct BookDetailView: View {
             if book.readingStatus == .currentlyReading {
                 // Currently Reading sections
                 
-                BookSessionHistoryCard(book: book)
+                BookSessionHistoryCard(book: book, bookModel: bookModel, colorPalette: colorPalette)
                 
                 readingInsightsSection
                 
@@ -1210,7 +1217,7 @@ struct BookDetailView: View {
                     memorableQuotesSection
                 }
                 
-                BookSessionHistoryCard(book: book)
+                BookSessionHistoryCard(book: book, bookModel: bookModel, colorPalette: colorPalette)
                 
                 readingStatsSection
             }
@@ -3162,14 +3169,12 @@ struct EndSessionSheet: View {
     let colorPalette: ColorPalette?
     @Binding var showingSessionSavedToast: Bool
 
-    @State private var pagesRead: String
+    @State private var startPage: String
     @State private var currentPage: String
-    @State private var isUpdatingFromPagesRead = false
-    @State private var isUpdatingFromCurrentPage = false
     @FocusState private var focusedField: Field?
 
     enum Field {
-        case pagesRead, currentPage
+        case startPage, currentPage
     }
 
     init(session: ReadingSession, book: Book, activeSession: Binding<ReadingSession?>, colorPalette: ColorPalette?, showingSessionSavedToast: Binding<Bool>) {
@@ -3178,8 +3183,15 @@ struct EndSessionSheet: View {
         self._activeSession = activeSession
         self.colorPalette = colorPalette
         self._showingSessionSavedToast = showingSessionSavedToast
-        _pagesRead = State(initialValue: "0")
-        _currentPage = State(initialValue: "\(session.startPage)")
+        _startPage = State(initialValue: "\(session.startPage)")
+        let endPage = max(session.endPage, session.startPage)
+        _currentPage = State(initialValue: "\(endPage)")
+    }
+
+    private var pagesReadValue: Int {
+        let start = Int(startPage) ?? session.startPage
+        let end = Int(currentPage) ?? session.endPage
+        return max(0, end - start)
     }
 
     // Enhanced color matching the gradient background
@@ -3221,44 +3233,36 @@ struct EndSessionSheet: View {
                 .padding(.top, 40)
 
                 // Inputs contained in a single glass card
-                VStack {
+                VStack(spacing: 12) {
                     HStack(spacing: 24) {
-                        // Pages Read
+                        // Start Page
                         VStack(spacing: 8) {
-                            TextField("0", text: $pagesRead)
+                            TextField("0", text: $startPage)
                                 .font(.system(size: 36, weight: .medium, design: .monospaced))
                                 .foregroundStyle(.white)
                                 .multilineTextAlignment(.center)
                                 .frame(width: 80)
-                                .focused($focusedField, equals: .pagesRead)
+                                .focused($focusedField, equals: .startPage)
                                 .keyboardType(.numberPad)
-                                .onChange(of: pagesRead) { _, newValue in
-                                    if let pages = Int(newValue), !isUpdatingFromCurrentPage {
-                                        isUpdatingFromPagesRead = true
-                                        let calculated = session.startPage + pages
-                                        currentPage = "\(calculated)"
-                                        isUpdatingFromPagesRead = false
-                                    }
-                                }
 
-                            Text("PAGES READ")
+                            Text("START PAGE")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.5))
                                 .tracking(1)
                         }
                         .padding(8)
                         .overlay {
-                            if focusedField == .pagesRead {
+                            if focusedField == .startPage {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(accentColor.opacity(0.5), lineWidth: 1)
                             }
                         }
 
-                        Image(systemName: "arrow.left.arrow.right")
+                        Image(systemName: "arrow.right")
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(.white.opacity(0.3))
 
-                        // Current Page
+                        // Current Page (end of session)
                         VStack(spacing: 8) {
                             TextField("\(session.startPage)", text: $currentPage)
                                 .font(.system(size: 36, weight: .medium, design: .monospaced))
@@ -3267,14 +3271,6 @@ struct EndSessionSheet: View {
                                 .frame(width: 80)
                                 .focused($focusedField, equals: .currentPage)
                                 .keyboardType(.numberPad)
-                                .onChange(of: currentPage) { _, newValue in
-                                    if let page = Int(newValue), !isUpdatingFromPagesRead {
-                                        isUpdatingFromCurrentPage = true
-                                        let calculated = page - session.startPage
-                                        pagesRead = "\(max(0, calculated))"
-                                        isUpdatingFromCurrentPage = false
-                                    }
-                                }
 
                             Text("CURRENT PAGE")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -3290,7 +3286,14 @@ struct EndSessionSheet: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
+                    .padding(.top, 16)
+
+                    // Pages read (derived)
+                    Text("\(pagesReadValue) page\(pagesReadValue == 1 ? "" : "s") read")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(0.5)
+                        .padding(.bottom, 16)
                 }
                 // Apply glass directly to the container (no background)
                 .glassEffect(.regular, in: .rect(cornerRadius: 16))
@@ -3314,6 +3317,8 @@ struct EndSessionSheet: View {
             .safeAreaInset(edge: .bottom) {
                 Button {
                     let finalPage = Int(currentPage) ?? session.endPage
+                    let newStart = Int(startPage) ?? session.startPage
+                    session.startPage = max(0, newStart)
                     session.endSession(at: finalPage)
                     if let bookModel = session.bookModel {
                         bookModel.currentPage = finalPage
@@ -3362,7 +3367,7 @@ struct EndSessionSheet: View {
             }
         }
         .onAppear {
-            focusedField = .pagesRead
+            focusedField = .currentPage
         }
     }
 

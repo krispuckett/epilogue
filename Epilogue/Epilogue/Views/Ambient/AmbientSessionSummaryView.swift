@@ -47,7 +47,14 @@ struct AmbientSessionSummaryView: View {
                         // Session metrics in monospace
                         metricsSection
                             .padding(.bottom, 32)
-                        
+
+                        // Empty-state for sessions with no captured content
+                        if isEmptySession {
+                            emptySessionCard
+                                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+                                .padding(.bottom, 24)
+                        }
+
                         // Primary content card - show most recent or most relevant question (book sessions only)
                         if session.bookModel != nil, let mostRelevantQuestion = findMostRelevantQuestion() {
                             primaryInsightCard(question: mostRelevantQuestion)
@@ -147,6 +154,68 @@ struct AmbientSessionSummaryView: View {
         }
     }
     
+    // MARK: - Empty Session State
+
+    private var isEmptySession: Bool {
+        let q = session.capturedQuestions?.count ?? 0
+        let qt = session.capturedQuotes?.count ?? 0
+        let n = session.capturedNotes?.count ?? 0
+        return (q + qt + n) == 0 && session.duration < 60
+    }
+
+    private var emptySessionCard: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "moon.zzz")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.white.opacity(0.5))
+
+            Text("This session didn't capture anything")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+
+            Text("It may have ended before you read, spoke, or captured a quote. You can delete it, or start a new session.")
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 4)
+
+            Button {
+                modelContext.delete(session)
+                try? modelContext.save()
+                SensoryFeedback.success()
+                if let onDismiss = onDismiss {
+                    onDismiss()
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Label("Delete Session", systemImage: "trash")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.red.opacity(0.9))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule().fill(.red.opacity(0.12))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(.red.opacity(0.3), lineWidth: 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                .fill(Color.white.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.small)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
+        )
+    }
+
     // MARK: - Book Gradient Background - EXACTLY LIKE LIBRARY VIEW
     private var minimalGradientBackground: some View {
         ZStack {
