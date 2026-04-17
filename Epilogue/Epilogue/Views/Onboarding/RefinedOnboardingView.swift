@@ -51,6 +51,16 @@ struct RefinedOnboardingView: View {
                 Color(red: 0.2, green: 0.8, blue: 0.4),  // Emerald green
                 Color(red: 0.3, green: 0.9, blue: 0.5)   // Spring green
             ]
+        ),
+        OnboardingPageData(
+            icon: "icloud.fill",
+            title: "iCloud Sync",
+            subtitle: "YOUR LIBRARY, EVERYWHERE",
+            description: "Sign in to the same iCloud account on your iPhone and iPad and Epilogue will sync your books, notes, quotes, and sessions automatically. You can check sync status anytime in Settings.",
+            gradientColors: [
+                Color(red: 0.2, green: 0.55, blue: 0.95),  // iCloud blue
+                Color(red: 0.45, green: 0.75, blue: 1.0)   // Sky
+            ]
         )
     ]
     
@@ -245,16 +255,30 @@ struct OnboardingPageContent: View {
             
             // CENTERED CONTENT
             VStack(spacing: 40) {
-                // Much larger icon without circle background
-                Image(page.icon)
-                    .renderingMode(.template)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 150, height: 150)  // Even larger
-                    .foregroundStyle(.white)
-                    .opacity(isCurrentPage ? 1 : 0)
-                    .scaleEffect(isCurrentPage ? 1 : 0.8)
-                    .animation(.easeOut(duration: 0.4), value: isCurrentPage)
+                // Much larger icon without circle background.
+                // Asset catalog icons are plain names ("glass-book-open");
+                // SF Symbols contain a "." ("icloud.fill"). Use that to
+                // pick the right Image initializer.
+                Group {
+                    if page.icon.contains(".") {
+                        Image(systemName: page.icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .fontWeight(.light)
+                            .frame(width: 130, height: 130)
+                            .foregroundStyle(.white)
+                    } else {
+                        Image(page.icon)
+                            .renderingMode(.template)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 150, height: 150)
+                            .foregroundStyle(.white)
+                    }
+                }
+                .opacity(isCurrentPage ? 1 : 0)
+                .scaleEffect(isCurrentPage ? 1 : 0.8)
+                .animation(.easeOut(duration: 0.4), value: isCurrentPage)
                 
                 // Typography matching note cards
                 VStack(spacing: 20) {

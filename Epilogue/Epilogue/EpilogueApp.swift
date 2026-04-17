@@ -531,30 +531,66 @@ struct EpilogueApp: App {
 
     @MainActor
     private func checkCloudKitStatus() {
-        // Check if CloudKit initialization failed
-        if UserDefaults.standard.bool(forKey: "cloudKitInitializationFailed") {
-            Task {
-                // Check iCloud account status
-                let container = CKContainer.default()
-                let accountStatus = try? await container.accountStatus()
-                
-                switch accountStatus {
-                case .available:
-                    // iCloud is available but CloudKit failed - might be a temporary issue
-                    cloudKitErrorMessage = "Your data couldn't sync to iCloud. Please check your internet connection and try restarting the app. Your reading data will be stored locally until sync is restored."
-                case .noAccount:
-                    cloudKitErrorMessage = "Please sign in to iCloud in Settings to sync your reading data across devices. Without iCloud, your data won't be backed up or available on other devices."
-                case .restricted:
-                    cloudKitErrorMessage = "iCloud access is restricted. Please check parental controls or device management settings."
-                case .temporarilyUnavailable:
-                    cloudKitErrorMessage = "iCloud is temporarily unavailable. Your data will sync once the service is restored."
-                default:
-                    cloudKitErrorMessage = "iCloud sync is unavailable. Please ensure you're signed into iCloud and have an internet connection."
+        let initFailed = UserDefaults.standard.bool(forKey: "cloudKitInitializationFailed")
+        let hasWarnedAboutNoAccount = UserDefaults.standard.bool(forKey: "hasWarnedAboutNoICloudAccount")
+
+        Task {
+            let container = CKContainer.default()
+            let accountStatus = try? await container.accountStatus()
+
+            // Keep the persistent "isUsingCloudKit" flag honest. If the OS says
+            // the account isn't available, sync can't possibly be working on
+            // this device even if the container init succeeded. This lets the
+            // Library banner and Settings CloudKit row reflect reality.
+            if accountStatus != .available {
+                UserDefaults.standard.set(false, forKey: "isUsingCloudKit")
+            }
+
+            // Decide whether to interrupt with an alert this launch.
+            var shouldAlert = false
+            switch accountStatus {
+            case .available:
+                if initFailed {
+                    cloudKitErrorMessage = "Your data couldn't sync to iCloud. Check your internet connection and try restarting the app. Your reading data will be stored locally until sync is restored."
+                    shouldAlert = true
                 }
-                
+            case .noAccount:
+                // Only nag once per install — the persistent Library banner
+                // handles the ongoing visibility.
+                if !hasWarnedAboutNoAccount {
+                    cloudKitErrorMessage = "Sign in to iCloud in Settings to sync your reading across your iPhone, iPad, and Mac. Without iCloud your data stays on this device only."
+                    shouldAlert = true
+                    UserDefaults.standard.set(true, forKey: "hasWarnedAboutNoICloudAccount")
+                }
+            case .restricted:
+                if initFailed {
+                    cloudKitErrorMessage = "iCloud access is restricted. Check parental controls or device management settings."
+                    shouldAlert = true
+                }
+            case .temporarilyUnavailable:
+                if initFailed {
+                    cloudKitErrorMessage = "iCloud is temporarily unavailable. Your data will sync once the service is restored."
+                    shouldAlert = true
+                }
+            default:
+                if initFailed {
+                    cloudKitErrorMessage = "iCloud sync is unavailable. Make sure you're signed into iCloud and have an internet connection."
+                    shouldAlert = true
+                }
+            }
+
+            if shouldAlert {
                 showingCloudKitAlert = true
-                
-                // Clear the flag so we don't show this every time
+            }
+
+            // If the user signed back into iCloud after seeing the no-account
+            // warning, reset the nag flag so future sign-outs warn again.
+            if accountStatus == .available {
+                UserDefaults.standard.set(false, forKey: "hasWarnedAboutNoICloudAccount")
+            }
+
+            // Always clear the init-failure flag after handling it.
+            if initFailed {
                 UserDefaults.standard.set(false, forKey: "cloudKitInitializationFailed")
             }
         }

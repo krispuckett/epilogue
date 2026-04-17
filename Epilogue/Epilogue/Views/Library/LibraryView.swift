@@ -12,6 +12,7 @@ struct LibraryView: View {
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @AppStorage("libraryReadFilter") private var readFilter: ReadFilter = .all
     @AppStorage("librarySortOption") private var sortOption: SortOption = .dateAdded
+    @AppStorage("isUsingCloudKit") private var isUsingCloudKit: Bool = false
     @Namespace private var viewModeAnimation
     @Namespace private var listTransition
     @State private var showingCoverPicker = false
@@ -726,8 +727,50 @@ struct LibraryView: View {
     }
     
     @ViewBuilder
+    @ViewBuilder
+    private var syncStatusBanner: some View {
+        // Only show the banner when sync is off AND the user has books.
+        // First-time users with an empty library don't need to be nagged.
+        if !isUsingCloudKit && !viewModel.books.isEmpty {
+            Button {
+                appState.showingSettings = true
+                SensoryFeedback.light()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.icloud")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    Text("Not syncing to iCloud — tap to fix")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.25), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
     private var mainContent: some View {
         VStack(spacing: 0) {
+            syncStatusBanner
+
             ScrollView {
                 VStack(spacing: 0) {
                     if viewModel.isLoading {

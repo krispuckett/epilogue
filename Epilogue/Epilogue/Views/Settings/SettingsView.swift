@@ -81,6 +81,11 @@ struct SettingsView: View {
                     .ignoresSafeArea(.all)
 
             Form {
+                // MARK: - iCloud Sync (surfaced at the top so cross-device
+                // sync status is immediately visible — Amy's iPad couldn't
+                // find its way here before.)
+                CloudKitStatusView()
+
                 // MARK: - Epilogue+ Upsell Card
                 if !SimplifiedStoreKitManager.shared.isPlus {
                     Section {
@@ -489,9 +494,6 @@ struct SettingsView: View {
                     newFeaturesLabSection
                 }
 
-                // MARK: - iCloud Sync
-                CloudKitStatusView()
-                
                 // MARK: - Data
                 Section {
                     Button {
