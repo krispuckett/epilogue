@@ -12,6 +12,7 @@ struct LibraryView: View {
     @AppStorage("libraryViewMode") private var viewMode: ViewMode = .grid
     @AppStorage("libraryReadFilter") private var readFilter: ReadFilter = .all
     @AppStorage("librarySortOption") private var sortOption: SortOption = .dateAdded
+    @AppStorage("isUsingCloudKit") private var isUsingCloudKit: Bool = false
     @Namespace private var viewModeAnimation
     @Namespace private var listTransition
     @State private var showingCoverPicker = false
@@ -726,8 +727,49 @@ struct LibraryView: View {
     }
     
     @ViewBuilder
+    private var syncStatusBanner: some View {
+        // Only show the banner when sync is off AND the user has books.
+        // First-time users with an empty library don't need to be nagged.
+        if !isUsingCloudKit && !viewModel.books.isEmpty {
+            Button {
+                appState.showingSettings = true
+                SensoryFeedback.light()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.icloud")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DesignSystem.Colors.primaryAccent)
+                    Text("Not syncing to iCloud — tap to fix")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(DesignSystem.Colors.primaryAccent.opacity(0.25), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
     private var mainContent: some View {
         VStack(spacing: 0) {
+            syncStatusBanner
+
             ScrollView {
                 VStack(spacing: 0) {
                     if viewModel.isLoading {
@@ -1824,19 +1866,22 @@ class LibraryViewModel {
     private let userDefaults = UserDefaults.standard
     private let bookOrderKey = "com.epilogue.bookOrder"
 
+    /// Explicit deletion queue. Book IDs in here are the ONLY BookModels
+    /// allowed to be flagged `isInLibrary = false` by the next persist.
+    /// This prevents a stale/empty in-memory `books` array from wiping
+    /// the SwiftData library via an incidental `saveBooks()` call.
+    @ObservationIgnored private var pendingDeletionBookIds: Set<String> = []
+
+    /// True once SwiftData has been read at least once via `configure(modelContext:)`.
+    /// Used to reject destructive persists that run before the real library loads.
+    @ObservationIgnored private var hasLoadedFromSwiftData: Bool = false
+
     init() {
-        loadBooks()
-        updateBookCoverURLsToHigherQuality()
-
-        // Generate context for all books in background
-        Task {
-            await BookContextCache.shared.generateContextForAllBooks(books)
-        }
-
-        // Index all books for Spotlight on app launch
-        Task { @MainActor in
-            SpotlightIndexingService.shared.indexBooks(books)
-        }
+        // Deliberately DO NOT call loadBooks() here. Before `configure(modelContext:)`
+        // runs there is no SwiftData context, and reading UserDefaults early created
+        // a race where a stale/empty array could then be persisted back to SwiftData
+        // and silently wipe the CloudKit-backed library.
+        // See incident: TestFlight user lost all books except one after an update.
 
         // Listen for library refresh notification
         NotificationCenter.default.addObserver(
@@ -1856,11 +1901,104 @@ class LibraryViewModel {
     /// Configure with SwiftData context — switches from UserDefaults to SwiftData as source of truth
     func configure(modelContext: ModelContext) {
         self.modelContext = modelContext
+
+        // One-time recovery: resurrect any BookModel that was flagged
+        // isInLibrary = false but still has user-generated content attached
+        // (notes, quotes, questions, reading sessions, ambient sessions,
+        // custom description, non-zero progress, or a user rating). These
+        // are books the old diff-based persist logic hid from the user
+        // without their intent. Safe to run before loadBooks because it
+        // only flips false → true.
+        resurrectHiddenBooksWithUserContent(context: modelContext)
+
+        // loadBooksFromSwiftData sets hasLoadedFromSwiftData = true on its
+        // success path. We deliberately don't set it here so that a failed
+        // SwiftData load (fallback to UserDefaults) doesn't unlock the
+        // destructive persist path below.
         loadBooks()
         updateBookCoverURLsToHigherQuality()
+
+        // Spin up background indexing only after we know the real library
+        Task {
+            await BookContextCache.shared.generateContextForAllBooks(books)
+        }
+        Task { @MainActor in
+            SpotlightIndexingService.shared.indexBooks(books)
+        }
+
         #if DEBUG
         print("✅ LibraryViewModel configured with SwiftData — \(books.count) books loaded")
         #endif
+    }
+
+    /// One-time pass that re-flags `isInLibrary = true` on any BookModel
+    /// whose isInLibrary bit is false but which still has user data
+    /// attached. Intended to recover libraries wiped by the previous
+    /// diff-based persist logic.
+    ///
+    /// Bump the `restoreVersionKey` value if you need to re-run the
+    /// recovery on all devices again in the future.
+    private func resurrectHiddenBooksWithUserContent(context: ModelContext) {
+        let restoreVersionKey = "com.epilogue.library.restoreVersion"
+        let currentRestoreVersion = 1
+        if userDefaults.integer(forKey: restoreVersionKey) >= currentRestoreVersion {
+            return
+        }
+
+        do {
+            let descriptor = FetchDescriptor<BookModel>(
+                predicate: #Predicate { $0.isInLibrary == false }
+            )
+            let hiddenBooks = try context.fetch(descriptor)
+
+            var resurrected = 0
+            for book in hiddenBooks {
+                let hasNotes = (book.notes?.isEmpty == false)
+                let hasQuotes = (book.quotes?.isEmpty == false)
+                let hasQuestions = (book.questions?.isEmpty == false)
+                let hasAmbientSessions = (book.sessions?.isEmpty == false)
+                let hasReadingSessions = (book.readingSessions?.isEmpty == false)
+                let hasProgress = book.currentPage > 0
+                let hasRating = book.userRating != nil
+                let hasUserNotes = (book.userNotes?.isEmpty == false)
+                let hasCustomDescription = (book.userDescription?.isEmpty == false)
+                let wasRead = book.readingStatus == ReadingStatus.read.rawValue
+
+                let hasAnyUserContent =
+                    hasNotes
+                    || hasQuotes
+                    || hasQuestions
+                    || hasAmbientSessions
+                    || hasReadingSessions
+                    || hasProgress
+                    || hasRating
+                    || hasUserNotes
+                    || hasCustomDescription
+                    || wasRead
+
+                if hasAnyUserContent {
+                    book.isInLibrary = true
+                    resurrected += 1
+                    #if DEBUG
+                    print("  🪄 Resurrected '\(book.title)' by \(book.author) — had user content")
+                    #endif
+                }
+            }
+
+            if resurrected > 0 {
+                try context.save()
+                #if DEBUG
+                print("✅ Resurrected \(resurrected) book\(resurrected == 1 ? "" : "s") from hidden state")
+                #endif
+            }
+
+            userDefaults.set(currentRestoreVersion, forKey: restoreVersionKey)
+        } catch {
+            #if DEBUG
+            print("⚠️ resurrectHiddenBooksWithUserContent failed: \(error)")
+            #endif
+            // Don't set the flag — we'll try again next launch.
+        }
     }
     
     private func loadBooks() {
@@ -1914,6 +2052,7 @@ class LibraryViewModel {
             }
 
             self.books = convertedBooks
+            hasLoadedFromSwiftData = true
             #if DEBUG
             print("  ✅ Loaded \(convertedBooks.count) books from SwiftData (deduped from \(bookModels.count))")
             #endif
@@ -2015,16 +2154,46 @@ class LibraryViewModel {
         }
     }
 
-    /// Sync in-memory books array to SwiftData
+    /// Sync in-memory books array to SwiftData.
+    ///
+    /// This function is **purely additive** for `isInLibrary`:
+    /// - it inserts new books,
+    /// - it updates existing books' mutable fields,
+    /// - it will only flag `isInLibrary = false` on BookModels whose IDs were
+    ///   explicitly enqueued via `pendingDeletionBookIds` (i.e., the user
+    ///   actually deleted that book).
+    ///
+    /// This prevents the previous wipe bug where a stale/empty `self.books`
+    /// array could cause every existing BookModel to be marked not-in-library
+    /// and disappear from the user's library.
     private func persistToSwiftData(_ context: ModelContext) {
         #if DEBUG
-        print("💾 Persisting \(books.count) books to SwiftData")
+        print("💾 Persisting \(books.count) books to SwiftData (pending deletions: \(pendingDeletionBookIds.count))")
         #endif
 
         do {
             // Fetch ALL BookModels (not just isInLibrary) to catch duplicates
             let descriptor = FetchDescriptor<BookModel>()
             let existingModels = try context.fetch(descriptor)
+
+            // Count of currently-in-library models before we touch anything —
+            // used to detect a suspicious wipe attempt.
+            let existingInLibrary = existingModels.filter { $0.isInLibrary }.count
+
+            // DATA LOSS GUARD: refuse to persist if our in-memory array is
+            // suspiciously smaller than the existing library AND there are
+            // no matching pending deletions to explain the shrinkage. This
+            // catches: empty arrays from failed loads, partial UserDefaults
+            // decodes, init-before-configure races, etc.
+            if hasLoadedFromSwiftData,
+               books.isEmpty && existingInLibrary > 0 && pendingDeletionBookIds.isEmpty {
+                #if DEBUG
+                print("  🛑 BLOCKED empty persist — would have wiped \(existingInLibrary) books. Re-reading SwiftData instead.")
+                #endif
+                // Recover: re-sync our in-memory array from the truth on disk.
+                loadBooksFromSwiftData(context)
+                return
+            }
 
             // Group by ID — safely handles duplicates (unlike uniqueKeysWithValues which crashes)
             let groupedById = Dictionary(grouping: existingModels) { $0.id }
@@ -2033,7 +2202,6 @@ class LibraryViewModel {
                 existingById[id] = models.first
             }
 
-            let currentBookIds = Set(books.map { $0.id })
             var processedIds = Set<String>()
 
             // Update or create BookModels for all current books
@@ -2054,14 +2222,23 @@ class LibraryViewModel {
                 }
             }
 
-            // Mark removed books as not in library (don't delete — preserve notes/quotes)
-            for model in existingModels where model.isInLibrary && !currentBookIds.contains(model.id) {
-                model.isInLibrary = false
+            // Honour only *explicit* deletions. The previous diff-based logic
+            // ("any model whose id isn't in the current books array must be
+            // removed from the library") is what wiped users after a bad
+            // load. We now require the deletion to have been explicitly
+            // enqueued via deleteBook / removeBook.
+            var appliedDeletions = 0
+            for id in pendingDeletionBookIds {
+                if let model = existingById[id], model.isInLibrary {
+                    model.isInLibrary = false
+                    appliedDeletions += 1
+                }
             }
+            pendingDeletionBookIds.removeAll()
 
             try context.save()
             #if DEBUG
-            print("  ✅ Persisted \(books.count) books to SwiftData")
+            print("  ✅ Persisted \(books.count) books to SwiftData (explicit deletions applied: \(appliedDeletions))")
             #endif
         } catch {
             #if DEBUG
@@ -2080,7 +2257,11 @@ class LibraryViewModel {
         model.desc = book.description
         model.pageCount = book.pageCount
         model.publishedYear = book.publishedYear
-        model.isInLibrary = book.isInLibrary
+        // Do NOT sync book.isInLibrary here. The caller (persistToSwiftData)
+        // controls isInLibrary explicitly via additive set-to-true on
+        // insert/update and explicit set-to-false on pending deletions.
+        // Letting a Book struct's (possibly-default-false) flag ride through
+        // here is exactly how we previously wiped users' libraries.
         model.readingStatus = book.readingStatus.rawValue
         model.currentPage = book.currentPage
         model.userRating = book.userRating
@@ -2289,11 +2470,13 @@ class LibraryViewModel {
         #if DEBUG
         print("  📊 Books before: \(countBefore), after: \(countAfter)")
         #endif
-        
+
         if countBefore != countAfter {
+            // Enqueue explicit deletion so persistToSwiftData actually
+            // flags the BookModel isInLibrary = false for this specific book.
+            pendingDeletionBookIds.insert(book.id)
             saveBooks()
-            // Force UI update
-    
+
             #if DEBUG
             print("  ✅ Book removed successfully")
             #endif
@@ -2320,10 +2503,11 @@ class LibraryViewModel {
                 #if DEBUG
                 print("  🔄 Found book by localId instead: \(book.localId)")
                 #endif
-                _ = books[index]
+                let fallbackBook = books[index]
+                pendingDeletionBookIds.insert(fallbackBook.id)
                 books.remove(at: index)
                 saveBooks()
-        
+
                 #if DEBUG
                 print("  ✅ Book removed successfully by localId")
                 #endif
@@ -2348,6 +2532,10 @@ class LibraryViewModel {
         Task {
             await SpotlightIndexingService.shared.deindexBook(book.id)
         }
+
+        // Enqueue explicit deletion BEFORE mutating the array, so the
+        // subsequent saveBooks() knows this is an intentional removal.
+        pendingDeletionBookIds.insert(book.id)
 
         // Remove the book
         books.remove(at: index)

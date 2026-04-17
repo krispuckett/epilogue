@@ -55,12 +55,21 @@ class BookWidgetUpdater {
         let coverFileName = "\(bookID)_cover.jpg"
         let coverFileURL = containerURL.appendingPathComponent(coverFileName)
 
-        // Check if already cached
+        // Check if already cached AND the file is a real image (not 0 bytes / truncated)
         if FileManager.default.fileExists(atPath: coverFileURL.path) {
-            #if DEBUG
-            print("✅ Widget cover already cached: \(coverFileURL.path)")
-            #endif
-            return coverFileURL.path
+            let attrs = try? FileManager.default.attributesOfItem(atPath: coverFileURL.path)
+            let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
+            if size > 1024 {
+                #if DEBUG
+                print("✅ Widget cover already cached: \(coverFileURL.path) (\(size) bytes)")
+                #endif
+                return coverFileURL.path
+            } else {
+                #if DEBUG
+                print("⚠️ Cached widget cover is too small (\(size) bytes) — re-downloading")
+                #endif
+                try? FileManager.default.removeItem(at: coverFileURL)
+            }
         }
 
         // Download and cache

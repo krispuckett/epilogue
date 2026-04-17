@@ -251,9 +251,18 @@ final class DeepLinkHandler {
                 await TrueAmbientProcessor.shared.toggleListening()
             }
         case "end-session":
-            // Route through AmbientModeView so it triggers save + session summary
-            ensureAmbientActive()
-            NotificationCenter.default.post(name: .ambientQuickAction, object: "end-session")
+            // End the session directly without opening the AI chat UI.
+            // If ambient mode is already on screen, route through it so the summary shows;
+            // otherwise just tear down the processor + Live Activity in place.
+            let coordinator = EpilogueAmbientCoordinator.shared
+            if coordinator.isActive {
+                NotificationCenter.default.post(name: .ambientQuickAction, object: "end-session")
+            } else {
+                Task {
+                    _ = await TrueAmbientProcessor.shared.endSession()
+                    await LiveActivityLifecycleManager.shared.endSession()
+                }
+            }
         case "voice-capture":
             // Open ambient mode and trigger voice capture
             ensureAmbientActive()

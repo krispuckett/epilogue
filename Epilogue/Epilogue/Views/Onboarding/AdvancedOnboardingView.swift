@@ -56,6 +56,15 @@ struct AdvancedOnboardingView: View {
             title: "Your Reading Sessions",
             subtitle: "Every conversation preserved",
             description: "Review your thoughts, explore AI insights, and see your reading journey unfold over time."
+        ),
+        OnboardingPage(
+            type: .staticIcon,
+            videoName: nil,
+            videoExtension: nil,
+            title: "iCloud Sync",
+            subtitle: "YOUR LIBRARY, EVERYWHERE",
+            description: "Sign in to the same iCloud account on your iPhone and iPad and your books, notes, quotes, and sessions sync automatically. You can check sync status anytime in Settings.",
+            iconName: "icloud.fill"
         )
     ]
 
@@ -209,6 +218,8 @@ struct AdvancedOnboardingView: View {
             shaderWelcomeScreen(page: page, index: index)
         case .video:
             videoScreen(page: page, index: index)
+        case .staticIcon:
+            staticIconScreen(page: page, index: index)
         }
     }
 
@@ -385,6 +396,106 @@ struct AdvancedOnboardingView: View {
             }
         }
 
+    // MARK: - Static Icon Screen
+    @ViewBuilder
+    private func staticIconScreen(page: OnboardingPage, index: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                if currentPage > 0 {
+                    Button {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.85, blendDuration: 0)) {
+                            currentPage -= 1
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(width: 44, height: 44)
+                            .glassEffect(.regular, in: Circle())
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                themeManager.currentTheme.primaryAccent.opacity(0.35),
+                                themeManager.currentTheme.primaryAccent.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 40,
+                            endRadius: 180
+                        )
+                    )
+                    .frame(width: 320, height: 320)
+                    .blur(radius: 24)
+                    .scaleEffect(currentPage == index ? 1.15 : 0.85)
+                    .opacity(currentPage == index ? 0.7 : 0)
+
+                Image(systemName: page.iconName ?? "icloud.fill")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .fontWeight(.light)
+                    .frame(width: 140, height: 140)
+                    .foregroundStyle(.white)
+                    .scaleEffect(currentPage == index ? 1 : 0.7)
+                    .opacity(currentPage == index ? 1 : 0.3)
+                    .rotation3DEffect(
+                        .degrees(Double(index - currentPage) * 15),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
+                    )
+            }
+            .animation(.spring(response: 0.8, dampingFraction: 0.75), value: currentPage)
+
+            VStack(spacing: 20) {
+                Text(page.title)
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .scaleEffect(currentPage == index ? 1 : 0.9)
+                    .opacity(currentPage == index ? 1 : 0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.85).delay(0.1), value: currentPage)
+
+                if !page.subtitle.isEmpty {
+                    Text(page.subtitle.uppercased())
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .tracking(1.5)
+                        .scaleEffect(currentPage == index ? 1 : 0.9)
+                        .opacity(currentPage == index ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.85).delay(0.15), value: currentPage)
+                }
+
+                Text(page.description)
+                    .font(.system(size: 17))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 30)
+                    .minimumScaleFactor(0.9)
+                    .lineLimit(5)
+                    .scaleEffect(currentPage == index ? 1 : 0.9)
+                    .opacity(currentPage == index ? 1 : 0)
+                    .animation(.spring(response: 0.6, dampingFraction: 0.85).delay(0.2), value: currentPage)
+            }
+            .padding(.top, 40)
+
+            Spacer()
+
+            Spacer()
+                .frame(height: 80)
+        }
+    }
+
     private func completeOnboarding() {
         // Add blur effect during fade out for smoother transition
         withAnimation(.easeOut(duration: 0.5)) {
@@ -404,6 +515,7 @@ struct OnboardingPage {
     enum PageType {
         case shaderScreen
         case video
+        case staticIcon
     }
 
     let type: PageType
@@ -412,6 +524,25 @@ struct OnboardingPage {
     let title: String
     let subtitle: String
     let description: String
+    let iconName: String?
+
+    init(
+        type: PageType,
+        videoName: String?,
+        videoExtension: String?,
+        title: String,
+        subtitle: String,
+        description: String,
+        iconName: String? = nil
+    ) {
+        self.type = type
+        self.videoName = videoName
+        self.videoExtension = videoExtension
+        self.title = title
+        self.subtitle = subtitle
+        self.description = description
+        self.iconName = iconName
+    }
 }
 
 // MARK: - Page Indicator

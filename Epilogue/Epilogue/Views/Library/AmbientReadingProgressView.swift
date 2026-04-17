@@ -368,7 +368,12 @@ struct AmbientReadingProgressView: View {
                                     // Update progress immediately without animation for instant feedback
                                     animatedProgress = newProgress
 
-                                    // Update the book's current page
+                                    // Update SwiftData model directly for reactive UI + persistence
+                                    if let bookModel = bookModel {
+                                        bookModel.currentPage = newPage
+                                    }
+
+                                    // Update the book's current page in the in-memory library
                                     viewModel.updateCurrentPage(for: book, to: newPage)
 
                                     // Subtle haptic on 5% intervals
@@ -384,6 +389,9 @@ struct AmbientReadingProgressView: View {
                                         isDragging = false
                                     }
                                     SensoryFeedback.impact(.light)
+
+                                    // Persist the final page to SwiftData so it survives navigation
+                                    try? modelContext.save()
 
                                     // Check if book was just completed
                                     checkForCompletion(newProgress: animatedProgress)
@@ -401,6 +409,10 @@ struct AmbientReadingProgressView: View {
 
                     // Update the book's current page
                     let newPage = Int(Double(totalPages) * tapProgress)
+                    if let bookModel = bookModel {
+                        bookModel.currentPage = newPage
+                        try? modelContext.save()
+                    }
                     viewModel.updateCurrentPage(for: book, to: newPage)
 
                     SensoryFeedback.impact(.medium)

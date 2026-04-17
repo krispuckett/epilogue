@@ -166,27 +166,41 @@ struct MinimalSessionsView: View {
     
     // MARK: - Sessions List
     private var sessionsList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
-                ForEach(groupedSessions, id: \.date) { group in
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Date header
-                        Text(formatDateHeader(group.date))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(DesignSystem.Colors.textTertiary)
-                            .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
-                        
-                        // Sessions for this day
-                        ForEach(group.sessions) { sessionType in
-                            MinimalSessionCard(sessionType: sessionType)
-                                .padding(.horizontal, DesignSystem.Spacing.listItemPadding)
+        List {
+            ForEach(groupedSessions, id: \.date) { group in
+                Section {
+                    ForEach(group.sessions) { sessionType in
+                        MinimalSessionCard(sessionType: sessionType) {
+                            deleteSession(sessionType)
                         }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(
+                            top: 4,
+                            leading: DesignSystem.Spacing.listItemPadding,
+                            bottom: 4,
+                            trailing: DesignSystem.Spacing.listItemPadding
+                        ))
                     }
+                } header: {
+                    Text(formatDateHeader(group.date))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(DesignSystem.Colors.textTertiary)
+                        .textCase(nil)
+                        .padding(.leading, DesignSystem.Spacing.listItemPadding - 16)
+                        .padding(.vertical, 2)
                 }
+                .listSectionSeparator(.hidden)
             }
-            .padding(.top, 12)
-            .padding(.bottom, 100)
+
+            // Bottom padding for FAB
+            Color.clear
+                .frame(height: 80)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
     }
     
@@ -230,6 +244,19 @@ struct MinimalSessionsView: View {
         #endif
     }
 
+    private func deleteSession(_ sessionType: SessionType) {
+        switch sessionType {
+        case .ambient(let session):
+            modelContext.delete(session)
+            ambientSessions.removeAll { $0.id == session.id }
+        case .quick(let session):
+            modelContext.delete(session)
+            quickSessions.removeAll { $0.id == session.id }
+        }
+        try? modelContext.save()
+        SensoryFeedback.success()
+    }
+
     private func formatDateHeader(_ date: Date) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) {
@@ -245,9 +272,25 @@ struct MinimalSessionsView: View {
 // MARK: - Minimal Session Card
 struct MinimalSessionCard: View {
     let sessionType: SessionType
+    var onDelete: (() -> Void)? = nil
     @State private var isPressed = false
     @State private var showingDetail = false
+    @State private var showingEmptySessionAlert = false
+    @State private var showingDeleteConfirm = false
+    @State private var showingSummary = false
     @Environment(LibraryViewModel.self) var libraryViewModel
+
+    private var hasContent: Bool {
+        switch sessionType {
+        case .ambient(let session):
+            let q = session.capturedQuestions?.count ?? 0
+            let qt = session.capturedQuotes?.count ?? 0
+            let n = session.capturedNotes?.count ?? 0
+            return (q + qt + n) > 0 || session.duration >= 60
+        case .quick(let session):
+            return session.pagesRead > 0 || session.currentDuration >= 60
+        }
+    }
 
     private var book: Book? {
         guard let bookModel = sessionType.bookModel else { return nil }
@@ -295,7 +338,17 @@ struct MinimalSessionCard: View {
     var body: some View {
         Button {
             SensoryFeedback.light()
-            showingDetail = true
+            if !hasContent {
+                showingEmptySessionAlert = true
+            } else {
+                // For ambient sessions with captured content, show the summary sheet
+                // instead of launching a new ambient session
+                if case .ambient = sessionType {
+                    showingSummary = true
+                } else {
+                    showingDetail = true
+                }
+            }
         } label: {
             HStack(spacing: 16) {
                 // Book cover (cached for offline)
@@ -361,19 +414,52 @@ struct MinimalSessionCard: View {
                 isPressed = pressing
             }
         }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if onDelete != nil {
+                Button(role: .destructive) {
+                    showingDeleteConfirm = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+        .contextMenu {
+            if onDelete != nil {
+                Button(role: .destructive) {
+                    showingDeleteConfirm = true
+                } label: {
+                    Label("Delete Session", systemImage: "trash")
+                }
+            }
+        }
+        .alert("Nothing captured yet", isPresented: $showingEmptySessionAlert) {
+            if onDelete != nil {
+                Button("Delete Session", role: .destructive) {
+                    onDelete?()
+                }
+            }
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("This session was started but didn't record any time or notes. You can delete it if it was a mistake.")
+        }
+        .alert("Delete Session?", isPresented: $showingDeleteConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                onDelete?()
+            }
+        } message: {
+            Text("This reading session will be removed. This action can't be undone.")
+        }
+        .sheet(isPresented: $showingSummary) {
+            if case .ambient(let session) = sessionType {
+                AmbientSessionSummaryView(session: session, colorPalette: nil)
+            }
+        }
         .onChange(of: showingDetail) { _, showing in
-            // Launch ambient mode via coordinator
+            // Launch ambient mode via coordinator for quick sessions with content
             if showing {
-                switch sessionType {
-                case .ambient:
-                    if let book = book {
-                        EpilogueAmbientCoordinator.shared.launchBookMode(book: book)
-                    }
-                case .quick:
-                    // For quick sessions, just launch generic mode
-                    if let book = book {
-                        EpilogueAmbientCoordinator.shared.launchBookMode(book: book)
-                    }
+                if let book = book {
+                    EpilogueAmbientCoordinator.shared.launchBookMode(book: book)
                 }
                 showingDetail = false
             }

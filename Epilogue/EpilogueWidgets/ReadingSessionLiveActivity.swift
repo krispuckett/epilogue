@@ -139,7 +139,7 @@ struct ReadingSessionLiveActivity: Widget {
                             }
                             Spacer()
                             Link(destination: URL(string: "epilogue://ambient/end-session")!) {
-                                actionPill(icon: "stop.fill", label: "End", color: .white.opacity(0.4))
+                                actionPill(icon: "stop.fill", label: "End", color: Color(red: 1.0, green: 0.35, blue: 0.3))
                             }
                         }
                         .padding(.horizontal, 2)
@@ -311,7 +311,7 @@ struct ReadingSessionLiveActivity: Widget {
                     lockScreenAction(icon: "ellipsis.bubble", label: "Ask", color: accent)
                 }
                 Link(destination: URL(string: "epilogue://ambient/end-session")!) {
-                    lockScreenAction(icon: "stop.fill", label: "End", color: .white.opacity(0.35))
+                    lockScreenAction(icon: "stop.fill", label: "End", color: Color(red: 1.0, green: 0.35, blue: 0.3))
                 }
             }
             .padding(.top, 12)
