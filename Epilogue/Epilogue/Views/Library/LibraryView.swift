@@ -727,7 +727,6 @@ struct LibraryView: View {
     }
     
     @ViewBuilder
-    @ViewBuilder
     private var syncStatusBanner: some View {
         // Only show the banner when sync is off AND the user has books.
         // First-time users with an empty library don't need to be nagged.

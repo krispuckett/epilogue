@@ -102,6 +102,12 @@ class OrbMetalRenderer: NSObject {
     private var startTime = CACurrentMediaTime()
     private var currentSize: CGSize = .zero
 
+    // The fragment shader casts `time` from float to half. Half precision
+    // maxes at ~65504 and loses meaningful precision past ~1024, so after
+    // roughly 17 min of uptime the orb animation stutters and eventually
+    // freezes. Wrap elapsed time into a safe range before uploading.
+    private static let timeWrapPeriod: Float = 600
+
     // Smooth press interpolation
     private var smoothedPress: Float = 0.0
 
@@ -210,7 +216,8 @@ class OrbMetalRenderer: NSObject {
 
         renderEncoder.setRenderPipelineState(pipelineState)
 
-        let currentTime = Float(CACurrentMediaTime() - startTime)
+        let elapsed = Float(CACurrentMediaTime() - startTime)
+        let currentTime = elapsed.truncatingRemainder(dividingBy: Self.timeWrapPeriod)
         let resolution = SIMD2<Float>(Float(view.drawableSize.width), Float(view.drawableSize.height))
         encodeUniforms(to: renderEncoder, time: currentTime, resolution: resolution)
 
@@ -296,7 +303,8 @@ class OrbMetalRenderer: NSObject {
 
         renderEncoder.setRenderPipelineState(pipelineState)
 
-        let currentTime = Float(CACurrentMediaTime() - startTime)
+        let elapsed = Float(CACurrentMediaTime() - startTime)
+        let currentTime = elapsed.truncatingRemainder(dividingBy: Self.timeWrapPeriod)
         let resolution = SIMD2<Float>(Float(size.width), Float(size.height))
         encodeUniforms(to: renderEncoder, time: currentTime, resolution: resolution)
 
