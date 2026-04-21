@@ -251,6 +251,14 @@ final class DeepLinkHandler {
                 await TrueAmbientProcessor.shared.toggleListening()
             }
         case "end-session":
+            // Close the SwiftData ReadingSession row too. Without this the
+            // in-memory processor and Live Activity end correctly but the
+            // ReadingSession stays open (endDate == nil) and its displayed
+            // duration keeps growing, surviving phone restarts. This is
+            // how a TestFlight user ended up with a timer they could not
+            // stop without offloading the app.
+            NotificationCenter.default.post(name: .endActiveReadingSession, object: nil)
+
             // End the session directly without opening the AI chat UI.
             // If ambient mode is already on screen, route through it so the summary shows;
             // otherwise just tear down the processor + Live Activity in place.

@@ -1896,6 +1896,20 @@ class LibraryViewModel {
             // CRITICAL: Also update URLs after import to remove zoom parameters
             self.updateBookCoverURLsToHigherQuality()
         }
+
+        // Live Activity End (and any other caller that needs to stop a
+        // runaway session timer) posts this. Closes every ReadingSession
+        // with endDate == nil. Previously the Live Activity End path only
+        // closed the in-memory ambient processor, leaving the SwiftData
+        // row open so the displayed duration grew forever and survived
+        // phone restarts.
+        NotificationCenter.default.addObserver(
+            forName: .endActiveReadingSession,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.endActiveReadingSessions()
+        }
     }
 
     /// Configure with SwiftData context — switches from UserDefaults to SwiftData as source of truth
@@ -1910,6 +1924,13 @@ class LibraryViewModel {
         // without their intent. Safe to run before loadBooks because it
         // only flips false → true.
         resurrectHiddenBooksWithUserContent(context: modelContext)
+
+        // Clean up any ReadingSession left open for more than 4 hours.
+        // These are zombies from the pre-fix Live Activity End path where
+        // only the in-memory ambient processor closed and the SwiftData
+        // row was never updated, so the displayed duration kept counting.
+        // Runs every launch, idempotent when there is nothing to reap.
+        reapStaleReadingSessions(context: modelContext)
 
         // loadBooksFromSwiftData sets hasLoadedFromSwiftData = true on its
         // success path. We deliberately don't set it here so that a failed
@@ -2000,7 +2021,66 @@ class LibraryViewModel {
             // Don't set the flag — we'll try again next launch.
         }
     }
-    
+
+    /// Delete ReadingSession rows that were left open (endDate == nil) for
+    /// more than 4 hours. Sessions that old are always zombies from the
+    /// broken Live Activity End path, not real in-flight reading. Deleting
+    /// them is correct: the stored duration is meaningless (startDate to
+    /// whenever) and there is no user content attached to a ReadingSession
+    /// itself, so nothing of value is lost.
+    private func reapStaleReadingSessions(context: ModelContext) {
+        do {
+            let descriptor = FetchDescriptor<ReadingSession>(
+                predicate: #Predicate { $0.endDate == nil }
+            )
+            let active = try context.fetch(descriptor)
+            let cutoff = Date().addingTimeInterval(-4 * 3600)
+            let stale = active.filter { $0.startDate < cutoff }
+            guard !stale.isEmpty else { return }
+
+            for session in stale {
+                context.delete(session)
+            }
+            try context.save()
+            #if DEBUG
+            print("🧹 Reaped \(stale.count) stale ReadingSession\(stale.count == 1 ? "" : "s")")
+            #endif
+        } catch {
+            #if DEBUG
+            print("⚠️ reapStaleReadingSessions failed: \(error)")
+            #endif
+        }
+    }
+
+    /// Close every in-flight ReadingSession (endDate == nil) by calling
+    /// ReadingSession.endSession(at:) which stamps endDate = now and
+    /// computes duration. Triggered by the `.endActiveReadingSession`
+    /// notification that DeepLinkHandler posts when the user taps End
+    /// on the Live Activity. Safe to call redundantly — the predicate
+    /// only matches sessions that are still open.
+    func endActiveReadingSessions() {
+        guard let context = modelContext else { return }
+        do {
+            let descriptor = FetchDescriptor<ReadingSession>(
+                predicate: #Predicate { $0.endDate == nil }
+            )
+            let active = try context.fetch(descriptor)
+            guard !active.isEmpty else { return }
+
+            for session in active {
+                session.endSession(at: session.endPage)
+            }
+            try context.save()
+            #if DEBUG
+            print("🛑 Closed \(active.count) active ReadingSession\(active.count == 1 ? "" : "s") via end-session signal")
+            #endif
+        } catch {
+            #if DEBUG
+            print("⚠️ endActiveReadingSessions failed: \(error)")
+            #endif
+        }
+    }
+
     private func loadBooks() {
         if let modelContext = modelContext {
             loadBooksFromSwiftData(modelContext)
