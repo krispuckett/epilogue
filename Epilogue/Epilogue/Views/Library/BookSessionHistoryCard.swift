@@ -65,16 +65,19 @@ struct SessionHistoryData: Identifiable {
 
 struct BookSessionHistoryCard: View {
     let book: Book
+    var bookModel: BookModel? = nil
+    var colorPalette: ColorPalette? = nil
     @Environment(\.modelContext) private var modelContext
     @Query private var allSessions: [AmbientSession]
     @State private var isExpanded = false
     @State private var selectedSession: AmbientSession?
     @State private var showingFullSession = false
-    
+    @State private var showingAddSessionSheet = false
+
     // Filter sessions for this book
     private var bookSessions: [AmbientSession] {
         allSessions.filter { session in
-            session.bookModel?.id == book.id || 
+            session.bookModel?.id == book.id ||
             session.bookModel?.isbn == book.isbn ||
             session.bookModel?.title == book.title
         }.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }
@@ -124,7 +127,7 @@ struct BookSessionHistoryCard: View {
                             showingFullSession = true
                         }
                     }
-                    
+
                     if bookSessions.count > 5 {
                         HStack {
                             Image(systemName: "ellipsis")
@@ -136,16 +139,23 @@ struct BookSessionHistoryCard: View {
                         }
                         .padding(.top, 4)
                     }
+
+                    logManuallyButton
+                        .padding(.top, 4)
                 }
                 .transition(.opacity)
             } else if isExpanded && bookSessions.isEmpty {
-                Text("No reading sessions yet")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .italic()
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
+                VStack(spacing: 12) {
+                    Text("No reading sessions yet")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .italic()
+
+                    logManuallyButton
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .transition(.opacity)
             }
         }
         .padding(16)
@@ -162,6 +172,37 @@ struct BookSessionHistoryCard: View {
                 AmbientSessionSummaryView(session: session, colorPalette: nil)
             }
         }
+        .sheet(isPresented: $showingAddSessionSheet) {
+            AddReadingSessionSheet(
+                book: book,
+                bookModel: bookModel,
+                colorPalette: colorPalette
+            )
+        }
+    }
+
+    private var logManuallyButton: some View {
+        Button {
+            showingAddSessionSheet = true
+            SensoryFeedback.light()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 13, weight: .medium))
+                Text("Log Past Session")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(Color(red: 1.0, green: 0.45, blue: 0.16))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule().fill(Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.12))
+            )
+            .overlay(
+                Capsule().strokeBorder(Color(red: 1.0, green: 0.45, blue: 0.16).opacity(0.25), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

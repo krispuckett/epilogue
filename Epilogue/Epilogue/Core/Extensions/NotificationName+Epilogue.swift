@@ -71,6 +71,7 @@ extension Notification.Name {
     static let visualFeedbackRequested = Notification.Name("VisualFeedbackRequested")
     static let transcriptionEvolved = Notification.Name("TranscriptionEvolved")
     static let ambientQuickAction = Notification.Name("AmbientQuickAction")
+    static let endActiveReadingSession = Notification.Name("EndActiveReadingSession")
 
     // MARK: - Voice
     static let voiceTranscriptUpdated = Notification.Name("voiceTranscriptUpdated")

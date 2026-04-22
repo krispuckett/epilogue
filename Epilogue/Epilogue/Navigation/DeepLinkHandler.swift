@@ -251,9 +251,26 @@ final class DeepLinkHandler {
                 await TrueAmbientProcessor.shared.toggleListening()
             }
         case "end-session":
-            // Route through AmbientModeView so it triggers save + session summary
-            ensureAmbientActive()
-            NotificationCenter.default.post(name: .ambientQuickAction, object: "end-session")
+            // Close the SwiftData ReadingSession row too. Without this the
+            // in-memory processor and Live Activity end correctly but the
+            // ReadingSession stays open (endDate == nil) and its displayed
+            // duration keeps growing, surviving phone restarts. This is
+            // how a TestFlight user ended up with a timer they could not
+            // stop without offloading the app.
+            NotificationCenter.default.post(name: .endActiveReadingSession, object: nil)
+
+            // End the session directly without opening the AI chat UI.
+            // If ambient mode is already on screen, route through it so the summary shows;
+            // otherwise just tear down the processor + Live Activity in place.
+            let coordinator = EpilogueAmbientCoordinator.shared
+            if coordinator.isActive {
+                NotificationCenter.default.post(name: .ambientQuickAction, object: "end-session")
+            } else {
+                Task {
+                    _ = await TrueAmbientProcessor.shared.endSession()
+                    await LiveActivityLifecycleManager.shared.endSession()
+                }
+            }
         case "voice-capture":
             // Open ambient mode and trigger voice capture
             ensureAmbientActive()
