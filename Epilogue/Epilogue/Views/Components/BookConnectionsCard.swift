@@ -87,8 +87,7 @@ struct BookConnectionsCard: View {
             }
         }
         .padding(16)
-        .glassEffect(.regular.tint(accentColor.opacity(0.08)))
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
+        .glassEffect(.regular.tint(accentColor.opacity(0.08)), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.large))
     }
 
     private var loadingState: some View {
@@ -235,8 +234,7 @@ struct ConnectionRow: View {
             }
         }
         .padding(10)
-        .glassEffect(.regular.tint(Color.white.opacity(0.05)))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .glassEffect(.regular.tint(Color.white.opacity(0.05)), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

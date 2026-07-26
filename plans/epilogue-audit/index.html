@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Epilogue repair audit</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f6f2ea;
+      --muted: #aaa49b;
+      --faint: #767169;
+      --canvas: #09090b;
+      --surface: #111114;
+      --surface-raised: #17171b;
+      --line: rgba(255, 255, 255, .10);
+      --line-strong: rgba(255, 255, 255, .17);
+      --amber: #ff9f52;
+      --amber-soft: rgba(255, 159, 82, .12);
+      --red: #ff716c;
+      --red-soft: rgba(255, 113, 108, .11);
+      --green: #72d89b;
+      --green-soft: rgba(114, 216, 155, .11);
+      --blue: #82adff;
+      --blue-soft: rgba(130, 173, 255, .11);
+      --purple: #c8a4ff;
+      --purple-soft: rgba(200, 164, 255, .11);
+      --radius: 18px;
+      --shadow: 0 20px 60px rgba(0, 0, 0, .30);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% -8%, rgba(255, 159, 82, .11), transparent 30rem),
+        radial-gradient(circle at 86% 12%, rgba(130, 173, 255, .07), transparent 34rem),
+        var(--canvas);
+      color: var(--ink);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    a { color: inherit; text-underline-offset: 3px; }
+    button, a, summary { touch-action: manipulation; }
+    :focus-visible { outline: 2px solid white; outline-offset: 3px; }
+    [id] { scroll-margin-top: 88px; }
+
+    .shell { width: min(1200px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar {
+      position: sticky;
+      z-index: 100;
+      top: 0;
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 9, 11, .86);
+      backdrop-filter: blur(18px) saturate(130%);
+    }
+    .topbar-inner {
+      display: flex;
+      min-height: 58px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+    .brand span { color: var(--muted); font-weight: 450; }
+    nav { display: flex; align-items: center; gap: 18px; }
+    nav a { color: var(--muted); font-size: 13px; text-decoration: none; }
+    nav a:hover { color: var(--ink); }
+
+    header { padding: 88px 0 48px; }
+    .eyebrow {
+      color: var(--amber);
+      font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { text-wrap: balance; }
+    h1 {
+      max-width: 930px;
+      margin: 18px 0 20px;
+      font-size: clamp(44px, 8vw, 92px);
+      line-height: .94;
+      letter-spacing: -.065em;
+    }
+    .lede { max-width: 790px; margin: 0; color: var(--muted); font-size: clamp(18px, 2vw, 22px); }
+    .meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 30px; }
+    .chip {
+      display: inline-flex;
+      min-height: 34px;
+      align-items: center;
+      padding: 6px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .025);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    main { padding-bottom: 96px; }
+    section { margin-top: 76px; }
+    h2 { margin: 0; font-size: clamp(29px, 4vw, 46px); line-height: 1.05; letter-spacing: -.045em; }
+    h3 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+    .section-note { max-width: 760px; margin: 10px 0 0; color: var(--muted); }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .stat {
+      min-height: 142px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+      box-shadow: var(--shadow);
+    }
+    .stat strong { display: block; font-size: 38px; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .stat span { display: block; margin-top: 12px; color: var(--muted); }
+
+    .callout {
+      padding: 22px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface-raised);
+    }
+    .callout + .callout { margin-top: 12px; }
+    .callout.danger { border-color: rgba(255, 113, 108, .34); background: var(--red-soft); }
+    .callout.safe { border-color: rgba(114, 216, 155, .30); background: var(--green-soft); }
+    .callout strong { color: var(--ink); }
+    .callout p { margin: 7px 0 0; color: var(--muted); }
+
+    .screenshot-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+    .screenshot-card {
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .screenshot-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #000;
+    }
+    .screenshot-card figcaption { padding: 15px 16px 17px; }
+    .screenshot-card strong { display: block; font-size: 14px; }
+    .screenshot-card span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .screenshot-grid + .callout { margin-top: 12px; }
+
+    .contract { display: grid; grid-template-columns: 1.1fr .9fr; gap: 12px; }
+    .contract-card { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .contract-card ul { margin: 16px 0 0; padding-left: 20px; color: var(--muted); }
+    .contract-card li + li { margin-top: 7px; }
+    .protected { border-color: rgba(255, 159, 82, .34); background: linear-gradient(145deg, var(--amber-soft), rgba(255,255,255,.015)); }
+
+    code {
+      padding: 2px 5px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #08080a;
+      color: #ded8cf;
+      font: .9em/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 16px; }
+    .filter {
+      min-height: 44px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+    }
+    .filter[aria-pressed="true"] { border-color: rgba(255,159,82,.6); background: var(--amber-soft); color: var(--ink); }
+    .finding-list { display: grid; gap: 10px; }
+    .finding { border: 1px solid var(--line); border-radius: 15px; background: var(--surface); overflow: clip; }
+    .finding[hidden] { display: none; }
+    .finding summary {
+      display: grid;
+      grid-template-columns: 105px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 72px;
+      padding: 14px 17px;
+      cursor: pointer;
+      list-style: none;
+    }
+    .finding summary::-webkit-details-marker { display: none; }
+    .finding summary::after { content: "+"; color: var(--faint); font-size: 22px; font-weight: 300; }
+    .finding[open] summary::after { content: "−"; }
+    .finding-title { font-weight: 630; letter-spacing: -.012em; }
+    .finding-meta { display: block; margin-top: 3px; color: var(--faint); font-size: 12px; }
+    .severity {
+      width: fit-content;
+      padding: 6px 8px;
+      border-radius: 999px;
+      font: 750 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .08em;
+    }
+    .p0 { background: var(--red-soft); color: #ffaaa6; }
+    .p1 { background: var(--amber-soft); color: #ffc18e; }
+    .p2 { background: var(--blue-soft); color: #b9d0ff; }
+    .review { background: var(--purple-soft); color: #dac5ff; }
+    .finding-body { padding: 0 17px 18px 138px; border-top: 1px solid var(--line); }
+    .finding-body dl { display: grid; grid-template-columns: 94px 1fr; gap: 10px 14px; margin: 17px 0 0; }
+    .finding-body dt { color: var(--faint); font-size: 13px; }
+    .finding-body dd { margin: 0; color: var(--muted); }
+    .finding-body .evidence { color: #d8d2ca; }
+
+    .plan-list { display: grid; gap: 12px; counter-reset: phase -1; }
+    .phase {
+      position: relative;
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr);
+      gap: 28px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      counter-increment: phase;
+    }
+    .phase-label { color: var(--amber); font: 700 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .10em; text-transform: uppercase; }
+    .phase-label::after { content: " " counter(phase); }
+    .phase p { margin: 8px 0 0; color: var(--muted); }
+    .phase ol { margin: 16px 0 0; padding-left: 20px; color: var(--muted); }
+    .phase li + li { margin-top: 8px; }
+    .gate { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); color: #d7d1c9; font-size: 14px; }
+    .scope-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 15px; }
+    .scope-pill { padding: 5px 8px; border-radius: 7px; background: rgba(255,255,255,.045); color: var(--muted); font-size: 12px; }
+
+    .matrix { width: 100%; border-collapse: collapse; border-spacing: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .matrix th, .matrix td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .matrix th { color: var(--faint); font-size: 12px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+    .matrix td { color: var(--muted); }
+    .matrix tr:last-child td { border-bottom: 0; }
+
+    .stop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .stop { padding: 20px; border: 1px solid rgba(255,113,108,.26); border-radius: var(--radius); background: var(--red-soft); }
+    .stop p { margin: 7px 0 0; color: var(--muted); }
+
+    footer { padding: 34px 0 58px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
+
+    @media (hover: hover) and (pointer: fine) {
+      .filter:hover { border-color: var(--line-strong); color: var(--ink); }
+      .finding:hover { border-color: var(--line-strong); }
+    }
+    @media (max-width: 900px) {
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .screenshot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .contract { grid-template-columns: 1fr; }
+      .phase { grid-template-columns: 1fr; gap: 10px; }
+      .finding-body { padding-left: 17px; }
+      nav a:nth-child(-n+2) { display: none; }
+    }
+    @media (max-width: 560px) {
+      .shell { width: min(100% - 22px, 1200px); }
+      header { padding-top: 60px; }
+      .summary-grid, .screenshot-grid, .stop-grid { grid-template-columns: 1fr; }
+      .finding summary { grid-template-columns: 88px minmax(0, 1fr) auto; gap: 10px; padding-inline: 12px; }
+      .finding-body { padding-inline: 12px; }
+      .finding-body dl { grid-template-columns: 1fr; gap: 3px; }
+      .finding-body dd + dt { margin-top: 8px; }
+      .section-head { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">Epilogue <span>/ repair audit</span></div>
+      <nav aria-label="Report sections">
+        <a href="#screenshots">Screenshots</a>
+        <a href="#contract">Visual contract</a>
+        <a href="#findings">Findings</a>
+        <a href="#plan">Plan</a>
+        <a href="#stops">Stop rules</a>
+      </nav>
+    </div>
+  </div>
+
+  <header class="shell">
+    <div class="eyebrow">Read-only audit · July 9, 2026</div>
+    <h1>Fix the app.<br>Keep its soul.</h1>
+    <p class="lede">A source-backed repair map for Epilogue. It covers build health, data safety, Book View behavior, security, performance, accessibility, and SDK 27 readiness. The background shaders, gradient system, glass language, type, spacing, and motion are protected invariants.</p>
+    <div class="meta">
+      <span class="chip">Commit aab97d6</span>
+      <span class="chip">Xcode 27.0 beta</span>
+      <span class="chip">iOS 26 deployment floor</span>
+      <span class="chip">51 vetted findings</span>
+      <span class="chip">0 app source files changed</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section id="outcome">
+      <div class="section-head">
+        <div>
+          <h2>What is actually wrong</h2>
+          <p class="section-note">The current checkout has a broken clean-build baseline, several high-risk persistence paths, and real Book View state bugs. Most of the highest-leverage work is nonvisual.</p>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="stat"><strong>51</strong><span>vetted findings and migration watch items</span></div>
+        <div class="stat"><strong>9</strong><span>P0 blockers or data and security risks</span></div>
+        <div class="stat"><strong>7</strong><span>pixel-affecting items requiring design approval</span></div>
+        <div class="stat"><strong>0</strong><span>shader or gradient changes authorized</span></div>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <h2>Verification state</h2>
+      <p class="section-note">The audit used the live source tree plus a clean Xcode 27 build in a disposable copy. Nothing from the disposable build was copied back into the repository.</p>
+      <div class="callout danger">
+        <strong>The live checkout does not clean-build.</strong>
+        <p>The first build stops because <code>Epilogue/Config.xcconfig</code> is referenced by the project but absent. A disposable copy supplied the checked-in template and reached the next hard error: <code>TrailMarkerViews.swift:167</code> uses <code>modelContext</code> without importing SwiftData.</p>
+      </div>
+      <div class="callout">
+        <strong>SDK 27 warnings are real, but they are not permission to rewrite the UI.</strong>
+        <p>The disposable build confirmed actor-isolation warnings, deprecated <code>UIScreen.main</code> usage, metadata decoding defects, and Swift 6 future errors. Compiler-confirmed sites should be fixed narrowly. Broad modifier rewrites are explicitly rejected.</p>
+      </div>
+      <div class="callout safe">
+        <strong>Fresh simulator evidence is included below.</strong>
+        <p>The already installed Epilogue 1.9 build was launched directly without rebuilding. These images document the restored visual system on iOS 27.0. They are not screenshots from the reverted redesign.</p>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <div class="section-head">
+        <div>
+          <h2>Current app screenshots</h2>
+          <p class="section-note">Captured July 9, 2026 from Epilogue 1.9 on an iPhone 17 Pro simulator running iOS 27.0 in portrait. The app was launched from its existing simulator installation because the checkout still has clean-build blockers.</p>
+        </div>
+      </div>
+      <div class="screenshot-grid">
+        <figure class="screenshot-card">
+          <img src="screenshots/library-home.png" alt="Epilogue Library showing Holly by Stephen King" width="402" height="874" loading="lazy">
+          <figcaption><strong>Library</strong><span>Current library atmosphere, navigation, glass, type, and cover treatment.</span></figcaption>
+        </figure>
+        <figure class="screenshot-card">
+          <img src="screenshots/book-view-idle.png" alt="Holly Book View before a reading session" width="402" height="874" loading="lazy">
+          <figcaption><strong>Book View</strong><span>Idle state with the current atmospheric gradient and summary composition.</span></figcaption>
+        </figure>
+        <figure class="screenshot-card">
+          <img src="screenshots/book-view-active-session.png" alt="Holly Book View with an active quick reading session" width="402" height="874" loading="lazy">
+          <figcaption><strong>Active session</strong><span>The session HUD rendered inside the existing Book View visual system.</span></figcaption>
+        </figure>
+        <figure class="screenshot-card">
+          <img src="screenshots/end-session-sheet.png" alt="Holly Book View with the End Session sheet covering the lower half of the screen" width="402" height="874" loading="lazy">
+          <figcaption><strong>End Session</strong><span>Confirmed layout bug: page inputs and Save Session continue below the visible half-height sheet.</span></figcaption>
+        </figure>
+      </div>
+      <div class="callout danger">
+        <strong>The End Session layout bug is reproduced, not inferred.</strong>
+        <p>The visible sheet ends after the duration area. The accessibility hierarchy places Current Page and Save Session below the visible sheet at approximately y 811, confirming that the composition exceeds the presented height.</p>
+      </div>
+    </section>
+
+    <section id="contract">
+      <h2>The visual-system contract</h2>
+      <p class="section-note">Every future executor must treat this section as a hard boundary, not a preference.</p>
+      <div class="contract">
+        <div class="contract-card protected">
+          <h3>Protected, no autonomous edits</h3>
+          <ul>
+            <li>All Metal files under <code>Core/Shaders</code> and <code>Core/Background/Shaders</code>.</li>
+            <li><code>BookAtmosphericGradientView</code>, <code>FluidAmbientGradientView</code>, <code>UnifiedAtmosphericGradient</code>, and their renderer/config inputs.</li>
+            <li><code>OKLABColorExtractor</code>, atmosphere extraction, palette conversion, enhancement values, and color-selection behavior.</li>
+            <li>Glass modifier order, shapes, tint values, masks, overlays, clips, and material layering.</li>
+            <li>Typography choices, spacing tokens, book-cover geometry, motion curves, animation durations, and shader-fed geometry.</li>
+            <li>The existing user change in <code>BookConnectionsCard.swift</code>.</li>
+          </ul>
+        </div>
+        <div class="contract-card">
+          <h3>What a safe fix is allowed to do</h3>
+          <ul>
+            <li>Correct state, identity, validation, persistence, routing, security, and error reporting.</li>
+            <li>Add tests and deterministic fixtures without changing production pixels.</li>
+            <li>Fix compiler-confirmed API incompatibilities in place, preserving modifier position and expression.</li>
+            <li>Touch layout only after baseline capture and explicit design approval.</li>
+            <li>Stop immediately if a nonvisual fix requires changing a protected path.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="findings">
+      <div class="section-head">
+        <div>
+          <h2>All vetted findings</h2>
+          <p class="section-note">Open any row for evidence, impact, and the safe fix direction. “Review” items can change pixels and are not approved for autonomous implementation.</p>
+        </div>
+      </div>
+      <div class="filters" role="group" aria-label="Filter findings">
+        <button class="filter" type="button" data-filter="all" aria-pressed="true">All</button>
+        <button class="filter" type="button" data-filter="build" aria-pressed="false">Build and SDK</button>
+        <button class="filter" type="button" data-filter="data" aria-pressed="false">Data safety</button>
+        <button class="filter" type="button" data-filter="book" aria-pressed="false">Book View</button>
+        <button class="filter" type="button" data-filter="security" aria-pressed="false">Security and privacy</button>
+        <button class="filter" type="button" data-filter="performance" aria-pressed="false">Performance</button>
+        <button class="filter" type="button" data-filter="visual" aria-pressed="false">Design review</button>
+        <button class="filter" type="button" data-filter="tooling" aria-pressed="false">Tooling</button>
+      </div>
+      <div id="finding-list" class="finding-list"></div>
+    </section>
+
+    <section id="plan">
+      <h2>Execution plan</h2>
+      <p class="section-note">Order matters. Each phase reduces the risk of the next one. No phase authorizes source changes by itself.</p>
+      <div class="plan-list">
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Freeze and fingerprint the visual system</h3>
+            <p>Record the exact working diff, preserve the existing <code>BookConnectionsCard.swift</code> edit, and fingerprint every protected path before implementation.</p>
+            <ol>
+              <li>Record <code>git status --short</code>, <code>git diff --stat</code>, and the current commit.</li>
+              <li>Hash the shader, background, color, and design-system files. Store hashes only in the implementation worktree or review artifact.</li>
+              <li>After the build baseline works, capture deterministic Book View, Ambient, completion, session, and gradient states on fixed simulator devices.</li>
+            </ol>
+            <div class="gate"><strong>Gate:</strong> No protected file is modified. No pre-existing user diff is overwritten.</div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Restore a trustworthy Xcode 27 baseline</h3>
+            <p>Fix only the configuration, target, import, version, and dependency issues required to build and test.</p>
+            <ol>
+              <li>Commit a nonsecret base xcconfig and keep secrets in an untracked override. Remove the xcconfig from the app Resources phase through Xcode.</li>
+              <li>Add the missing SwiftData import at <code>TrailMarkerViews.swift</code>.</li>
+              <li>Repair the unit-test host, module name, target membership, and shared schemes through Xcode. Never edit <code>project.pbxproj</code> by hand.</li>
+              <li>Align app and widget version/build numbers. Remove the unused WhisperKit CLI product and pin the library to a reviewed revision or release.</li>
+              <li>Run a clean SDK 27 build and tests from a deterministic simulator destination.</li>
+            </ol>
+            <div class="scope-row"><span class="scope-pill">No Book View layout</span><span class="scope-pill">No gradients</span><span class="scope-pill">No shaders</span><span class="scope-pill">No glass chains</span></div>
+            <div class="gate"><strong>Gate:</strong> Clean build exits 0. Test-host smoke test launches. Production UI source is unchanged except the single missing import.</div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Stop data loss before fixing polish</h3>
+            <p>Persistence recovery is the most dangerous part of the codebase. Fix it before state or UI work.</p>
+            <ol>
+              <li>Replace automatic SwiftData store deletion with quarantine, backup, diagnostic, retry, and explicit reset.</li>
+              <li>Prevent writes when only an emergency in-memory container is available. Present a recovery state with retry and export.</li>
+              <li>Use one canonical V10 schema and <code>EpilogueMigrationPlan</code>. Include the knowledge-graph models used at launch.</li>
+              <li>Create historical persistent-store fixtures. Test every schema hop, relationship, identifier, rollback, and failure path.</li>
+            </ol>
+            <div class="gate"><strong>Gate:</strong> Failure injection never deletes the source store. No editable app opens on an ephemeral store. Historical fixtures migrate with unchanged record counts and relationships.</div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Repair Book View state and session integrity</h3>
+            <p>Correct data flow without restructuring the view hierarchy.</p>
+            <ol>
+              <li>Create canonical identity helpers for books, sessions, notes, quotes, replacement, and Ambient persistence.</li>
+              <li>Make Book Detail read mutable state from one observable canonical model while retaining the exact view tree and modifier order.</li>
+              <li>Centralize page parsing and validation. Write the same accepted page to every record and define unknown-page-count behavior.</li>
+              <li>Cancel delayed completion work, preserve the stop timestamp, report save failures, restore or close unfinished sessions, and prevent duplicate archive records.</li>
+              <li>Wire the re-entry Ambient action and Add Page Count action. Persist or remove completion fields that currently discard input.</li>
+            </ol>
+            <div class="gate"><strong>Gate:</strong> Unit and integration tests cover every item. Protected-file hashes remain identical. Same-state screenshots show no unintended pixel drift.</div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Close security and privacy gaps</h3>
+            <p>Assume every shipped binary and tracked file is public.</p>
+            <ol>
+              <li>Rotate all committed credentials, remove them from the current tree and history, then add secret scanning.</li>
+              <li>Replace extractable shared proxy authentication with server-validated short-lived authorization.</li>
+              <li>Redact invitation tokens and deep-link query values. Enforce exact HTTPS host validation.</li>
+              <li>Make Keychain writes and deletes return typed failures. Update UI state only after success.</li>
+              <li>Centralize notification permission and request it in context. Remove unused photo-library permission strings through Xcode if production code does not need them.</li>
+            </ol>
+            <div class="gate"><strong>Gate:</strong> Secret scan is clean, rotated values are invalid, URL validation tests pass, and permission prompts occur only from explicit user flows.</div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Fix performance and SDK 27 diagnostics one seam at a time</h3>
+            <p>Do the nonvisual work first. Treat anything near color extraction or shader sizing as a separate design review.</p>
+            <ol>
+              <li>Keep slider updates in memory while dragging and persist once on completion. Do not fetch and rewrite the full library on every movement.</li>
+              <li>Move launch maintenance off the interactive main-actor window and remove the memory-resurfacing N+1 queries.</li>
+              <li>Remove or debug-gate unbounded cover-image retention. Preserve exact image and palette results.</li>
+              <li>Resolve actor-isolation warnings in isolated service batches with targeted tests. Keep Swift 5 mode until the warning gate is clean.</li>
+              <li>Fix only compiler-confirmed ContentBuilder ambiguities in place. Never reorder background, overlay, mask, clip, or glass modifiers.</li>
+            </ol>
+            <div class="gate"><strong>Gate:</strong> Build warnings trend to zero, slider persistence is bounded, launch interaction remains smooth, and visual baselines remain unchanged.</div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase-label">Phase</div>
+          <div>
+            <h3>Handle pixel-affecting Book View fixes with Kris in the loop</h3>
+            <p>This phase is never autonomous. Make one narrowly scoped change, run it, compare it, and stop for review.</p>
+            <ol>
+              <li>End Session compact width and input validation.</li>
+              <li>Active-session HUD compact behavior, live timer, and 44 by 44 point hit regions.</li>
+              <li>Progress-artwork containment at 320 points and iPad split widths without touching its gradient or motion.</li>
+              <li>Dynamic Type and collapsed-summary behavior while preserving the typographic character.</li>
+              <li>Known background-before-glass violations, only after confirming the active path and an equivalent hit-testing solution.</li>
+              <li>Toolbar constrained-width behavior using availability-gated SDK 27 APIs only if the current composition demonstrably fails.</li>
+            </ol>
+            <div class="gate"><strong>Gate:</strong> Each change has same-device before and after screenshots, accessibility-size screenshots, and explicit visual approval. Any shader, gradient, color, glass, type, spacing, or motion drift causes immediate rollback.</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="verification">
+      <h2>Verification matrix</h2>
+      <p class="section-note">No fix is complete because it “looks right.” These checks define done.</p>
+      <table class="matrix">
+        <thead><tr><th>Layer</th><th>Required proof</th><th>Failure meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Build</td><td>Clean Xcode 27 build, iOS 26 deployment, no hard errors.</td><td>Stop. Do not move to UI work.</td></tr>
+          <tr><td>Tests</td><td>Host smoke test, model fixtures, Book View state tests, session archive tests, URL and Keychain tests.</td><td>The fix is not verified.</td></tr>
+          <tr><td>Persistence</td><td>Historical store migration, failure injection, relaunch, CloudKit recovery, no source-store deletion.</td><td>Block release.</td></tr>
+          <tr><td>Visual</td><td>Fixed simulator, seeded data, same state, light/dark where relevant, 320pt width, iPad split width, AX text sizes.</td><td>Rollback or ask for design direction.</td></tr>
+          <tr><td>Protected stack</td><td>File hashes and diff confirm no changes to Metal, background, color extraction, palette, design tokens, or animation timing.</td><td>Reject the change as out of scope.</td></tr>
+          <tr><td>Runtime</td><td>Start, pause, cancel, resume, save, fail-save, completion rollback, re-entry, replacement, and relaunch flows.</td><td>Behavior remains unsafe.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="stops">
+      <h2>Nonnegotiable stop rules</h2>
+      <p class="section-note">These are designed to prevent a repeat of the previous failure.</p>
+      <div class="stop-grid">
+        <div class="stop"><h3>A protected file changes</h3><p>Stop and report the exact dependency. Do not “make it work” by editing a shader, gradient, palette, glass chain, design token, or animation.</p></div>
+        <div class="stop"><h3>The hierarchy must change</h3><p>Stop and request design approval. SwiftUI identity and geometry can alter shaders, glass, animation state, and composition even when the diff looks harmless.</p></div>
+        <div class="stop"><h3>A migration test loses or duplicates data</h3><p>Stop. Preserve the source store and diagnostics. Never invoke automatic deletion as recovery.</p></div>
+        <div class="stop"><h3>A screenshot drifts outside the target area</h3><p>Stop and roll back. There is no acceptable collateral visual change in this repair cycle.</p></div>
+        <div class="stop"><h3>The compiler suggests a broad modifier rewrite</h3><p>Fix only the diagnosed expression in place. If that cannot compile without moving modifiers, stop for review.</p></div>
+        <div class="stop"><h3>The live source no longer matches this audit</h3><p>Re-audit the affected path. Do not execute stale steps against changed state.</p></div>
+      </div>
+    </section>
+
+    <section id="rejected">
+      <h2>Considered and rejected</h2>
+      <div class="callout">
+        <strong>No shader rewrite, no gradient replacement, no “native cleanup.”</strong>
+        <p>The custom atmosphere, OKLAB extraction, enhanced palette behavior, and Metal rendering are product decisions, not generic technical debt.</p>
+      </div>
+      <div class="callout">
+        <strong>No BookDetailView decomposition during bug repair.</strong>
+        <p>The file is too large, but extracting view bodies now can change identity, layout proposals, environment propagation, and animation behavior. Extract pure validation and persistence seams first, behind tests.</p>
+      </div>
+      <div class="callout">
+        <strong>No broad Dynamic Type or toolbar restyle.</strong>
+        <p>Accessibility and constrained-width failures are real. Their solution must preserve Epilogue’s typographic and spatial language, not replace it with a generic system composition.</p>
+      </div>
+      <div class="callout">
+        <strong>No screenshots from the reverted build.</strong>
+        <p>Those images document an implementation that changed the design and remain invalid. The screenshots in this report were recaptured from the restored Epilogue 1.9 simulator installation.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell">Generated locally from commit <code>aab97d6</code>. The new workspace artifacts are this report and four simulator screenshots. The pre-existing <code>BookConnectionsCard.swift</code> change remains untouched.</div>
+  </footer>
+
+  <script>
+    const findings = [
+      { id: 'BUILD-01', priority: 'P0', tone: 'p0', category: 'build', title: 'Fresh checkout cannot build', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>Epilogue/Config.xcconfig.template:2</code>, <code>Epilogue.xcodeproj/project.pbxproj:62,378,591</code>', impact: 'The project requires an absent local xcconfig and also copies that configuration into app resources.', fix: 'Commit nonsecret defaults, support an untracked override, and remove the xcconfig from Resources through Xcode.' },
+      { id: 'BUILD-02', priority: 'P0', tone: 'p0', category: 'build', title: 'SDK 27 build stops at a missing SwiftData import', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>TrailMarkerViews.swift:1,167</code>', impact: 'Member import visibility prevents source compilation after the config blocker is bypassed.', fix: 'Import SwiftData in that file only, then rebuild to expose the next diagnostic.' },
+      { id: 'TEST-01', priority: 'P0', tone: 'p0', category: 'build tooling', title: 'Unit-test host points at the old app product', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>project.pbxproj:219,531,718,733</code>, <code>EpilogueTests.swift:9</code>', impact: 'The test bundle cannot be trusted to load the current ReadEpilogue host or module.', fix: 'Repair product/module/test-host settings in Xcode and add a one-assertion host smoke test.' },
+      { id: 'SDK27-01', priority: 'P1', tone: 'p1', category: 'build', title: 'Swift 6 concurrency errors are accumulating under Swift 5 mode', effort: 'L', risk: 'Medium', confidence: 'High', evidence: '<code>NotesSyncManager.swift:99-100,130,201,215</code>, <code>DocumentRecognitionService.swift:77-88</code>, <code>SharedCameraManager.swift:139-142</code>', impact: 'Confirmed warnings are future Swift 6 errors and include real actor-boundary violations.', fix: 'Create a diagnostics gate, fix one service boundary at a time, and keep timing-sensitive visual code out of the sweep.' },
+      { id: 'SDK27-02', priority: 'P1', tone: 'p1', category: 'build', title: 'SDK 27 State macro migration needs a targeted sweep', effort: 'M', risk: 'Medium', confidence: 'Medium', evidence: '<code>BookDetailView.swift:3186-3193</code> and 12 similar <code>State(initialValue:)</code> initializer sites', impact: 'SDK 27 changed State synthesis and can produce init errors or incorrect runtime initialization.', fix: 'Wait for compiler diagnostics, then apply the documented State-macro fix at each confirmed site. Do not reorder assignments as a guess.' },
+      { id: 'SDK27-03', priority: 'P2', tone: 'p2', category: 'build visual', title: 'ContentBuilder modifier ambiguities require surgical fixes only', effort: 'M', risk: 'High', confidence: 'Medium', evidence: '<code>BookDetailView.swift:555</code>, <code>AmbientModeView.swift:1459</code>, <code>BookConnectionsCard.swift:69</code>', impact: 'Direct ShapeStyle background and overlay expressions can become ambiguous in SDK 27.', fix: 'Change only compiler-confirmed expressions to the trailing-closure overload without moving any modifier.' },
+      { id: 'DATA-01', priority: 'P0', tone: 'p0', category: 'data', title: 'Automatic recovery can delete the entire SwiftData store', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>EpilogueApp.swift:153-155</code>, <code>DataRecovery.swift:24-68,96-117</code>', impact: 'Two initialization failures can remove the library, notes, sessions, WAL, and CloudKit metadata without backup or confirmation.', fix: 'Quarantine and preserve the store, provide diagnostics and retry, and require explicit confirmation for destructive reset.' },
+      { id: 'DATA-02', priority: 'P0', tone: 'p0', category: 'data', title: 'Emergency in-memory fallback still opens an editable app', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>EpilogueApp.swift:409-447</code>', impact: 'Books, notes, and sessions can appear saved and then disappear at process exit.', fix: 'Show a blocking read-only recovery surface instead of the normal app when persistence is ephemeral.' },
+      { id: 'DATA-03', priority: 'P0', tone: 'p0', category: 'data', title: 'Production bypasses the canonical schema and migration plan', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>EpilogueApp.swift:178-205</code>, <code>SchemaVersioning.swift:211-266</code>', impact: 'Knowledge-graph models used at launch are absent from the production model list, and ten declared migrations are skipped.', fix: 'Create one production container factory using the complete V10 schema and EpilogueMigrationPlan, verified against historical stores.' },
+      { id: 'DATA-04', priority: 'P1', tone: 'p1', category: 'data', title: 'Google Books metadata fields never decode', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>GoogleBooksAPI.swift:141-144</code>', impact: 'Publisher, language, average rating, and rating count remain nil even when the API returns them.', fix: 'Remove immutable default initializers or supply an explicit decoder, then add a representative fixture test.' },
+      { id: 'BOOK-01', priority: 'P1', tone: 'p1', category: 'book', title: 'Book Detail renders mutable state from an immutable snapshot', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookDetailView.swift:71-79,223-227,748-790</code>, <code>LibraryView.swift:2397-2401,2465-2479</code>', impact: 'Status, progress, stats, and later session starts can remain stale until the view is recreated.', fix: 'Resolve one observable canonical book and derive data from it while preserving the exact view hierarchy and modifiers.' },
+      { id: 'BOOK-02', priority: 'P1', tone: 'p1', category: 'book', title: 'Completion fires after progress is rolled back', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>AmbientReadingProgressView.swift:98-104,501-530</code>', impact: 'A reader can drag to 100 percent, move back, and still get marked read 2.5 seconds later.', fix: 'Store a cancellable task, cancel below 100 percent or on disappear, and revalidate state before mutation. Keep the celebration shader and timing.' },
+      { id: 'BOOK-03', priority: 'P1', tone: 'p1', category: 'book', title: 'Re-entry Start Ambient silently does nothing', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:272-281,375-383,924-927</code>', impact: 'The card dismisses, but the upgrade function returns when no quick session exists.', fix: 'Use a direct book-specific Ambient launch path or create the required session explicitly.' },
+      { id: 'BOOK-04', priority: 'P1', tone: 'p1', category: 'book data', title: 'Page values diverge across session and library records', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:3246-3348</code>, <code>LibraryView.swift:2465-2479</code>, <code>ReadingSession.swift:34-47</code>', impact: 'Negative or over-total pages can persist in sessions while the library stores a different clamped value. Unknown totals clamp to zero.', fix: 'Parse and validate once, define unknown-total behavior, and write the same accepted value everywhere.' },
+      { id: 'BOOK-05', priority: 'P1', tone: 'p1', category: 'book data', title: 'Session save failures still show success', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:253-269,3326-3357</code>', impact: 'The app can clear the active session, dismiss, haptically confirm, and show Saved even if SwiftData failed.', fix: 'Surface typed errors and emit success only after persistence succeeds.' },
+      { id: 'BOOK-06', priority: 'P1', tone: 'p1', category: 'book', title: 'Saving overwrites the actual stop time', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:605-609,3327-3328</code>, <code>ReadingSession.swift:44-50</code>', impact: 'Time spent filling the End Session sheet is added to reading duration after the timer was visibly paused.', fix: 'Preserve the recorded stop timestamp on save and clear it only when cancellation resumes the session.' },
+      { id: 'BOOK-07', priority: 'P1', tone: 'p1', category: 'book data', title: 'Unfinished quick sessions are neither restored nor closed', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookDetailView.swift:211-269,290-384,744-747</code>, <code>MinimalSessionsView.swift:213-226</code>', impact: 'Leaving Book View drops the HUD but leaves an open record, allowing overlaps and hidden unfinished-session buildup.', fix: 'On load, restore or close the canonical unfinished session according to a tested policy. Filter completed records before fetch limits.' },
+      { id: 'BOOK-08', priority: 'P1', tone: 'p1', category: 'book data', title: 'Quick sessions are saved into the archive twice', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookDetailView.swift:3326-3341</code>, <code>MinimalSessionsView.swift:73-77</code>', impact: 'One session creates both a ReadingSession and AmbientSession, then the archive appends both without deduplication.', fix: 'Choose one canonical record or explicitly link and deduplicate paired records across all consumers.' },
+      { id: 'BOOK-09', priority: 'P1', tone: 'p1', category: 'book data', title: 'Nil ISBN values can attach every session to the wrong book', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookSessionHistoryCard.swift:74-80</code>', impact: 'Two nil optionals compare equal, so unrelated books without ISBNs can share session history. Title fallback also merges editions.', fix: 'Compare only unwrapped, nonempty ISBNs and use canonical identity before any legacy fallback.' },
+      { id: 'BOOK-10', priority: 'P1', tone: 'p1', category: 'book data', title: 'Replacing book metadata drops progress and local identity', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>LibraryView.swift:2490-2510</code>, <code>GoogleBooksAPI.swift:168-196</code>', impact: 'Metadata replacement can reset current page and strand sessions or notes on a retired local ID.', fix: 'Treat replacement as metadata mutation of the canonical local book and preserve all relationships and progress.' },
+      { id: 'BOOK-11', priority: 'P1', tone: 'p1', category: 'book', title: 'Completion tags and favorite state are discarded', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>BookCompletionSheet.swift:9-15,333-469</code>', impact: 'Visible controls accept emotional tags and favorite state, but Save persists neither.', fix: 'Persist both fields with model support, or remove the controls until that contract exists. Do not restyle the sheet.' },
+      { id: 'BOOK-12', priority: 'P1', tone: 'p1', category: 'book', title: 'Add Page Count is a visible no-op', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:1390-1411</code>', impact: 'The app explains how to enable progress tracking, then the only action does nothing.', fix: 'Route the existing button to the existing edit flow with page-count focus.' },
+      { id: 'BOOK-13', priority: 'P2', tone: 'p2', category: 'book', title: 'Reading Stats labels elapsed time as days to finish', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:1906-1916</code>', impact: 'Days since dateAdded are presented as a completion forecast.', fix: 'Rename the label to match the data or derive true completion duration from session dates.' },
+      { id: 'BOOK-14', priority: 'P1', tone: 'p1', category: 'book data', title: 'Legacy notes and quotes collide on title alone', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookDetailView.swift:387-405</code>', impact: 'Same-title books can display each other’s legacy notes and quotes.', fix: 'Migrate to canonical local IDs using title plus author with explicit ambiguity handling.' },
+      { id: 'BOOK-15', priority: 'P1', tone: 'p1', category: 'book data', title: 'Ambient sessions construct a new BookModel instead of linking the existing one', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>AmbientModeView+Persistence.swift:750-765</code>', impact: 'Session start can duplicate a book or attach a relationship to an unmanaged model, fragmenting history and re-entry data.', fix: 'Fetch the canonical BookModel by local ID, with provider ID only as a migration fallback.' },
+      { id: 'BOOK-16', priority: 'P1', tone: 'p1', category: 'book', title: 'The active-session duration has no live clock', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:541-547</code>, <code>ReadingSession.swift:53-70</code>', impact: 'The displayed duration depends on Date but the active HUD has no TimelineView or timer-driven state, so it updates only incidentally.', fix: 'Drive only the duration label from a lightweight timeline. Keep the HUD geometry, typography, glass, and transitions identical.' },
+      { id: 'PERF-01', priority: 'P1', tone: 'p1', category: 'performance book', title: 'Dragging progress persists the whole library on every movement', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>AmbientReadingProgressView.swift:353-389</code>, <code>LibraryView.swift:2005-2062,2465-2480</code>', impact: 'Each drag event fetches all BookModels, syncs the full array, saves SwiftData, and posts a notification, causing jank and write amplification.', fix: 'Update in-memory progress during drag and persist once on end, with a final validated value.' },
+      { id: 'PERF-02', priority: 'P1', tone: 'p1', category: 'performance', title: 'Heavy launch maintenance runs in the interactive main-actor window', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>EpilogueApp.swift:37-74</code>, <code>BookDNAService.swift:24</code>, <code>MemoryResurfacingService.swift:35</code>', impact: 'Large libraries can hitch about one second after launch while the reader begins interacting.', fix: 'Move versioned, delta-based maintenance to dedicated contexts after first interaction or background processing.' },
+      { id: 'PERF-03', priority: 'P1', tone: 'p1', category: 'performance', title: 'Full-resolution covers remain in an unbounded debug dictionary', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>SharedBookCoverView.swift:4,249-250</code>', impact: 'Opening books can retain every full image in addition to the bounded production caches.', fix: 'Remove the unused store or compile it only in debug with a strict limit. Verify image and palette output are identical.' },
+      { id: 'PERF-04', priority: 'P1', tone: 'p1', category: 'performance book', title: 'Book Connections scans global themes and can hide valid connections', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookConnectionsCard.swift:25,117</code>, <code>KnowledgeGraphService.swift:385</code>', impact: 'A book with no globally top-20 theme can show no connections while each load scans and sorts every theme.', fix: 'Query themes scoped to the current book and rank there, preserving the card’s exact hierarchy and visual treatment.' },
+      { id: 'SEC-01', priority: 'P0', tone: 'p0', category: 'security', title: 'Committed credentials exist in source and tracked archives', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>.archive/session-notes/perplexity.md:1</code>, <code>API_KEY_SETUP.md:15,26</code>, <code>GoogleBooksAPI.swift:10</code>', impact: 'Repository readers can recover provider credentials. Deleting the current line does not invalidate history.', fix: 'Rotate first, purge current files and history, and add secret scanning. Never include credential values in reports or logs.' },
+      { id: 'SEC-02', priority: 'P0', tone: 'p0', category: 'security', title: 'Proxy authentication is extractable from every shipped binary', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>SecureAPIManager.swift:17-19,79</code>, <code>ClaudeService.swift:369-374</code>, <code>OptimizedPerplexityService.swift:784-789</code>', impact: 'A shared client secret can be recovered and replayed against the proxy.', fix: 'Rotate it and move to server-validated receipts, entitlements, or short-lived tokens. Treat clients as public.' },
+      { id: 'SEC-03', priority: 'P1', tone: 'p1', category: 'security', title: 'Invitation bearer tokens and deep-link queries are logged', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>DeepLinkHandler.swift:38</code>, <code>SocialCompanionService.swift:78,163</code>', impact: 'Console and diagnostic logs can expose live invitation credentials.', fix: 'Log route names and redacted request identifiers only.' },
+      { id: 'SEC-04', priority: 'P1', tone: 'p1', category: 'security', title: 'Book-cover validation accepts HTTP and substring host matches', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>URLValidator.swift:7,76-145</code>', impact: 'A lookalike host containing a trusted hostname can pass validation, and cover downloads need not use HTTPS.', fix: 'Require HTTPS and allow only exact hosts or dot-delimited subdomains. Test redirects and suffix tricks.' },
+      { id: 'SEC-05', priority: 'P1', tone: 'p1', category: 'security', title: 'Keychain write and delete failures are swallowed', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>KeychainManager.swift:195-204</code>', impact: 'The UI can claim a credential changed while the old value remains active.', fix: 'Return a typed result or throw, then update service state only after success.' },
+      { id: 'PRIV-01', priority: 'P2', tone: 'p2', category: 'security', title: 'Notification permission is requested at app appearance from multiple owners', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>EpilogueApp.swift:27-30,125-145</code>, <code>OnboardingCoordinator.swift:61-76</code>', impact: 'First launch can show an unexplained prompt before a reader chooses a notification feature.', fix: 'Centralize authorization and request it from onboarding context or a feature toggle.' },
+      { id: 'PRIV-02', priority: 'P2', tone: 'p2', category: 'security tooling', title: 'Production declares photo access for disabled diagnostic image saving', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>project.pbxproj:513-514,561-562</code>, <code>ImprovedColorExtraction.swift:399-403</code>', impact: 'The privacy surface and App Store disclosure imply a production capability that is currently commented out.', fix: 'Confirm no shipping path needs Photos, then remove the usage descriptions through Xcode.' },
+      { id: 'LAYOUT-01', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'End Session has an unsatisfiable 320-point composition', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift:3236-3316</code>', impact: 'Two fixed fields, gaps, icon, inner padding, and outer padding exceed compact available width.', fix: 'Change only the row’s adaptive behavior after baseline capture. Preserve controls, type, glass, spacing language, background, and motion.' },
+      { id: 'LAYOUT-02', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Active-session HUD cannot adapt and controls miss the default 44-point target', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift:541-627</code>', impact: 'Three metrics plus three controls share one row, and the icon controls have no explicit 44 by 44 point regions.', fix: 'Design a compact behavior with Kris. Do not touch the Ambient orb shader, glass, type, spacing tokens, or transition timing.' },
+      { id: 'LAYOUT-03', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Progress artwork is wider than Book View at 320 points', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>DesignSystem.swift:45-59</code>, <code>BookDetailView.swift:691-695</code>, <code>AmbientReadingProgressView.swift:149-168</code>', impact: 'A 280-point glow is proposed inside 272 points of content width, creating pressure or clipping.', fix: 'Contain the existing artwork without changing gradient stops, colors, blur, opacity, shader, or animation.' },
+      { id: 'A11Y-01', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Book Detail’s fixed type and summary crop do not scale reliably', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift:1036-1094,1236-1288</code> plus repeated fixed-size fonts', impact: 'Accessibility text can clip, lose hierarchy, or be cut by the fixed 100-point summary mask.', fix: 'Preserve the typeface and hierarchy while adding controlled scaling and adaptive crop behavior, reviewed at every AX size.' },
+      { id: 'GLASS-01', priority: 'REVIEW', tone: 'review', category: 'visual', title: 'Active surfaces contain background-before-glass chains', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>BookCompletionSheet.swift:317-320</code>, <code>CaptureReviewQueue.swift:98-102</code>, <code>AmbientSessionSummaryView.swift:698-702,1504-1508</code>', impact: 'Clear or nearly clear backgrounds before glass can break inherited Liquid Glass behavior, but some may be serving hit testing.', fix: 'Confirm each active path and replace the hit-testing mechanism without changing pixels. One surface at a time, with screenshots.' },
+      { id: 'TOOLBAR-01', priority: 'REVIEW', tone: 'review', category: 'visual build', title: 'Book View has no constrained-width toolbar policy', effort: 'M', risk: 'High', confidence: 'Medium', evidence: '<code>BookDetailView.swift:748-790</code>', impact: 'A variable-width status pill and export control rely on older placements and may compress or overflow.', fix: 'Only if runtime evidence proves a failure, availability-gate SDK 27 visibility priority or pinned placement with an iOS 26 fallback.' },
+      { id: 'LAYOUT-04', priority: 'REVIEW', tone: 'review', category: 'visual build', title: 'Global screen metrics are wrong for iPad multitasking and scenes', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>DynamicIslandToast.swift:23</code>, <code>RichTextEditor.swift:67</code>, <code>AmbientOrbButton.swift:27</code>', impact: 'UIScreen.main can provide the wrong width or scale for resized scenes and is deprecated in iOS 26.', fix: 'Migrate ordinary layout to container geometry first. Treat shader LOD and orb scale as separately approved visual work.' },
+      { id: 'REL-01', priority: 'P1', tone: 'p1', category: 'tooling build', title: 'App and widget versions do not match', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>project.pbxproj:440-481,502-576</code>', impact: 'The widget reports version 1.0 build 2 while the app reports 1.9 build 1, creating release-validation risk.', fix: 'Align containing app and extension version/build values through Xcode.' },
+      { id: 'DEP-01', priority: 'P1', tone: 'p1', category: 'tooling build', title: 'WhisperKit tracks main and the app links its CLI product', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>project.pbxproj:237-240,858-879</code>, <code>Package.resolved:50</code>', impact: 'Resolution can change the voice stack without intent, and the CLI expands the app build graph.', fix: 'Pin a verified release or exact revision and remove only the CLI product through Xcode, then test offline transcription.' },
+      { id: 'DX-01', priority: 'P1', tone: 'p1', category: 'tooling', title: 'TestFlight preflight can report readiness after build failure', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>testflight_preflight.sh:14,44-47,96</code>', impact: 'The script uses the wrong project path, does not fail closed, and can print a successful readiness message anyway.', fix: 'Use strict shell mode, resolve paths from the script, run build and tests explicitly, and exit nonzero on every required failure.' },
+      { id: 'DX-02', priority: 'P2', tone: 'p2', category: 'tooling', title: 'Legacy source trees outside the target look active', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>Epilogue/App</code>, top-level <code>Epilogue/Services</code> and <code>Epilogue/Views</code>, active target root at <code>Epilogue/Epilogue</code>', impact: 'Humans and agents can inspect or edit plausible Swift files that are not compiled, producing false fixes and contradictory audits.', fix: 'Inventory target membership and archive only files proven dead. Never move or rewrite active shader, gradient, or design-system files.' },
+      { id: 'TEST-02', priority: 'P0', tone: 'p0', category: 'tooling data', title: 'Migration tests do not migrate historical stores', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>CloudKitFallbackTests.swift:155,223,243</code>, <code>test_migration.sh:36</code>', impact: 'The most dangerous path appears covered while tests use unrelated in-memory containers or uninstall before creating old data.', fix: 'Add versioned persistent fixtures and run them through the production container factory with failure injection.' },
+      { id: 'TEST-03', priority: 'P1', tone: 'p1', category: 'tooling visual', title: 'Protected visuals have no regression gate', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>EpilogueUITests.swift:26</code>, <code>EpilogueUITestsLaunchTests.swift:28</code>', impact: 'Book View, gradients, Metal backgrounds, glass, type, spacing, and motion can regress without automated signal.', fix: 'Add deterministic seeded screenshot baselines and require zero unintended pixel drift for UI-affecting fixes.' },
+      { id: 'ARCH-01', priority: 'P2', tone: 'p2', category: 'tooling performance', title: 'Large view files make small fixes unusually dangerous', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift</code> 3,517 lines, <code>AmbientModeView.swift</code> 2,543 lines, <code>TrueAmbientProcessor.swift</code> 3,374 lines', impact: 'Data, persistence, state, and visual composition are interleaved, widening the blast radius of every edit.', fix: 'Do not decompose view bodies now. Extract pure validation, query, and persistence seams behind characterization tests first.' }
+    ];
+
+    const list = document.querySelector('#finding-list');
+    const escapeText = (value) => String(value).replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+
+    findings.forEach((finding) => {
+      const item = document.createElement('details');
+      item.className = 'finding';
+      item.dataset.category = finding.category;
+      item.innerHTML = `
+        <summary>
+          <span class="severity ${escapeText(finding.tone)}">${escapeText(finding.priority)} ${escapeText(finding.id)}</span>
+          <span><span class="finding-title">${escapeText(finding.title)}</span><span class="finding-meta">Effort ${escapeText(finding.effort)} · Fix risk ${escapeText(finding.risk)} · Confidence ${escapeText(finding.confidence)}</span></span>
+        </summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Evidence</dt><dd class="evidence">${finding.evidence}</dd>
+            <dt>Impact</dt><dd>${escapeText(finding.impact)}</dd>
+            <dt>Safe direction</dt><dd>${escapeText(finding.fix)}</dd>
+          </dl>
+        </div>`;
+      list.appendChild(item);
+    });
+
+    const filterButtons = Array.from(document.querySelectorAll('.filter'));
+    filterButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const selected = button.dataset.filter;
+        filterButtons.forEach((candidate) => candidate.setAttribute('aria-pressed', String(candidate === button)));
+        Array.from(document.querySelectorAll('.finding')).forEach((finding) => {
+          finding.hidden = selected !== 'all' && !finding.dataset.category.split(' ').includes(selected);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
