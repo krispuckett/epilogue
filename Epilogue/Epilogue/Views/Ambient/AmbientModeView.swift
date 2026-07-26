@@ -1564,7 +1564,7 @@ struct AmbientModeView: View {
                             if keyboardText.isEmpty {
                                 // FIXED: Don't wrap AmbientOrbButton in another Button (nested button problem)
                                 // AmbientOrbButton is already a Button internally - just pass action directly
-                                AmbientOrbButton(size: 48) {
+                                NovaGoldenOrbButton(size: 48) {
                                     // If voice mode is disabled, enable it first
                                     if !isVoiceModeEnabled {
                                         isVoiceModeEnabled = true

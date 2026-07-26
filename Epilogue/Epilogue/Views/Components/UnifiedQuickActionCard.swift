@@ -183,7 +183,7 @@ struct UnifiedQuickActionCard: View {
                                 Button {
                                     startAmbientMode()
                                 } label: {
-                                    AmbientOrbButton(size: 36) {
+                                    NovaGoldenOrbButton(size: 36) {
                                         // Action handled by parent
                                     }
                                     .allowsHitTesting(false)
