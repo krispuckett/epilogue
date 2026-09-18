@@ -91,6 +91,28 @@ Audit commands (`/audit-*`):
 
 ## Directory Structure
 
+> **IMPORTANT — two trees exist, only one compiles.**
+>
+> The Xcode project uses synchronized folder groups. Only these are in targets:
+>
+> - `Epilogue/Epilogue/` → app target **`ReadEpilogue`** (~470 files) ← **the real source**
+> - `Epilogue/EpilogueWidgets/` → widget extension
+> - `Epilogue/EpilogueTests/`, `Epilogue/EpilogueUITests/`
+>
+> These sit beside `Epilogue.xcodeproj` and are compiled by **nothing**
+> (35 files, ~9,282 lines): `Epilogue/App/`, `Epilogue/Core/`,
+> `Epilogue/Models/`, `Epilogue/Services/`, `Epilogue/Views/`,
+> `Epilogue/SwiftUIView.swift`.
+>
+> `Epilogue/App/EpilogueApp.swift` holds a **second** `@main struct EpilogueApp`
+> with an alternate TabView UI. It is inert only because it is outside the
+> target.
+>
+> Consequence: a grep for any symbol returns hits in both trees and half are
+> fiction. **Always scope searches to `Epilogue/Epilogue/`.** The paths in the
+> Architecture section above are relative to that inner folder.
+
+
 ```
 Epilogue/
 ├── App/              # App entry point, configuration

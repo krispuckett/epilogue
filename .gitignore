@@ -116,3 +116,8 @@ iOSInjectionProject/
 # API Keys and Configuration
 Config.xcconfig
 *.xcconfig
+
+# Build logs (never commit — 1MB+ and instantly stale)
+build_output.log
+*.build.log
+build/
