@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Trail Marker Card
 /// Displays a trail marker left by your reading companion.
