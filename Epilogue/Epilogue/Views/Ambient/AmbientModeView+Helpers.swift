@@ -671,7 +671,7 @@ extension AmbientModeView {
                 localId: UUID().uuidString
             )
             bookModel.isInLibrary = true
-            bookModel.readingStatus = "want_to_read"
+            bookModel.readingStatus = ReadingStatus.wantToRead.rawValue
             bookModel.dateAdded = Date()
 
             modelContext.insert(bookModel)

@@ -263,6 +263,7 @@ struct ContentView: View {
                 libraryViewModel: libraryViewModel,
                 modelContext: modelContext
             )
+            BookModelMigrationService.shared.normalizeLegacyReadingStatuses(modelContext: modelContext)
         }
 
         // Check for CloudKit migration

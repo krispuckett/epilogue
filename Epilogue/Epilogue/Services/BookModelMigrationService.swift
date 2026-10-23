@@ -10,6 +10,37 @@ class BookModelMigrationService {
 
     private let migrationCompletedKey = "bookModelMigrationCompleted_v1"
 
+    private let readingStatusNormalizedKey = "readingStatusNormalized_v1"
+
+    /// Ambient recommendations once saved "want_to_read", which matches no
+    /// ReadingStatus case, so those books fell out of status-filtered lists.
+    func normalizeLegacyReadingStatuses(modelContext: ModelContext) {
+        guard !UserDefaults.standard.bool(forKey: readingStatusNormalizedKey) else { return }
+
+        let legacyValue = "want_to_read"
+        let descriptor = FetchDescriptor<BookModel>(
+            predicate: #Predicate<BookModel> { $0.readingStatus == legacyValue }
+        )
+
+        do {
+            let legacyBooks = try modelContext.fetch(descriptor)
+            for book in legacyBooks {
+                book.readingStatus = ReadingStatus.wantToRead.rawValue
+            }
+            if !legacyBooks.isEmpty {
+                try modelContext.save()
+            }
+            UserDefaults.standard.set(true, forKey: readingStatusNormalizedKey)
+            #if DEBUG
+            print("✅ [MIGRATION] Normalized \(legacyBooks.count) legacy reading statuses")
+            #endif
+        } catch {
+            #if DEBUG
+            print("❌ [MIGRATION] Reading status normalization failed: \(error)")
+            #endif
+        }
+    }
+
     /// Migrate all UserDefaults books to SwiftData BookModels
     /// This ensures all existing library books have BookModels for enrichment
     func migrateIfNeeded(libraryViewModel: LibraryViewModel, modelContext: ModelContext) async {
