@@ -75,7 +75,7 @@ final class SocialCompanionService {
         context.insert(companionship)
         try context.save()
 
-        logger.info("Created companionship for '\(book.title)' with token: \(companionship.invitationToken ?? "none")")
+        logger.info("Created companionship for '\(book.title)'")
 
         return companionship
     }
@@ -160,7 +160,7 @@ final class SocialCompanionService {
         )
 
         guard let companionship = try context.fetch(descriptor).first else {
-            logger.error("No companionship found for token: \(token)")
+            logger.error("No companionship found for token")
             throw CompanionshipError.invitationNotFound
         }
 

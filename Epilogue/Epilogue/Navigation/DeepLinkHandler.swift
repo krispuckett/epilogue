@@ -35,7 +35,8 @@ final class DeepLinkHandler {
     }
 
     func handleURL(_ url: URL) {
-        logger.info("Handling URL: \(url.absoluteString)")
+        // Log the route only. Query values can carry invitation tokens.
+        logger.info("Handling URL: \(url.scheme ?? "", privacy: .public)://\(url.host ?? "", privacy: .public)")
 
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             logger.error("Failed to parse URL components")
