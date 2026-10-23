@@ -95,7 +95,15 @@ enum URLValidator {
             return nil
         }
         
-        guard let url = URL(string: sanitized) else {
+        guard var components = URLComponents(string: sanitized) else {
+            #if DEBUG
+            print("🔒 URLValidator: Failed to create URL from sanitized string: \(sanitized)")
+            #endif
+            return nil
+        }
+        // Cover downloads always go over HTTPS. Google Books often returns http.
+        components.scheme = "https"
+        guard let url = components.url else {
             #if DEBUG
             print("🔒 URLValidator: Failed to create URL from sanitized string: \(sanitized)")
             #endif
@@ -130,7 +138,9 @@ enum URLValidator {
                 "m.media-amazon.com"
             ]
             
-            if trustedImageHosts.contains(where: { host.contains($0) }) {
+            // Exact host or a dot-delimited subdomain. A substring match would
+            // let books.google.com.example.net through.
+            if trustedImageHosts.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
                 return url
             } else {
                 #if DEBUG
