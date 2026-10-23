@@ -42,7 +42,9 @@ final class ReadingSession {
     }
 
     func endSession(at endPage: Int) {
-        self.endDate = Date()
+        // Keep the stop time recorded when the timer paused, so time spent
+        // filling in the End Session sheet is not counted as reading.
+        self.endDate = self.endDate ?? Date()
         self.endPage = endPage
         self.pagesRead = max(0, endPage - startPage)
         if let endDate = endDate {
