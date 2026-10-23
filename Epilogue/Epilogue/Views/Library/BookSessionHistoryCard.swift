@@ -78,9 +78,15 @@ struct BookSessionHistoryCard: View {
     private var bookSessions: [AmbientSession] {
         allSessions.filter { session in
             session.bookModel?.id == book.id ||
-            session.bookModel?.isbn == book.isbn ||
+            Self.sameISBN(session.bookModel?.isbn, book.isbn) ||
             session.bookModel?.title == book.title
         }.sorted { ($0.startTime ?? Date()) > ($1.startTime ?? Date()) }
+    }
+
+    /// Two missing ISBNs are not a match. Compare only real values.
+    static func sameISBN(_ lhs: String?, _ rhs: String?) -> Bool {
+        guard let lhs, !lhs.isEmpty, let rhs, !rhs.isEmpty else { return false }
+        return lhs == rhs
     }
     
     var body: some View {
