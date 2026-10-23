@@ -26,6 +26,9 @@ struct CognitivePatternVisualizer: View {
             .onAppear {
                 particleSystem.startAnimation()
             }
+            .onDisappear {
+                particleSystem.stopAnimation()
+            }
         }
         .onChange(of: patterns) { _, newPatterns in
             updateAnimatedPatterns(newPatterns)
@@ -205,14 +208,19 @@ class ParticleSystem {
     @ObservationIgnored private var timer: Timer?
     
     func startAnimation() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
-            self.update()
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
+            self?.update()
         }
     }
     
     func stopAnimation() {
         timer?.invalidate()
         timer = nil
+    }
+
+    deinit {
+        timer?.invalidate()
     }
     
     func emitParticles(at position: CGPoint, color: Color, count: Int) {
