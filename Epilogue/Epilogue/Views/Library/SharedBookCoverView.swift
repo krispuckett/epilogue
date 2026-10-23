@@ -246,7 +246,10 @@ struct SharedBookCoverView: View {
                         // Call the captured callback
                         callback?(fullImage)
 
+                        // Diagnostic store with no size limit and no readers in shipping code
+                        #if DEBUG
                         DisplayedImageStore.shared.store(image: fullImage, for: expectedURL)
+                        #endif
                         // Store in quick cache
                         let cleanedURL = cleanURL(expectedURL)
                         Self.quickImageCache.setObject(fullImage, forKey: "\(cleanedURL)_full" as NSString)
