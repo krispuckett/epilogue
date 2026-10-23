@@ -21,6 +21,7 @@ struct AmbientReadingProgressView: View {
     @State private var hasTriggeredCompletion: Bool = false
     @State private var celebrationStartTime: Date?
     @State private var isCelebrating: Bool = false
+    @State private var completionTask: Task<Void, Never>?
 
     @Environment(LibraryViewModel.self) var viewModel
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -99,8 +100,14 @@ struct AmbientReadingProgressView: View {
             // Reset if dragging back below 100%
             if oldProgress >= 1.0 && newProgress < 1.0 {
                 hasTriggeredCompletion = false
+                completionTask?.cancel()
+                completionTask = nil
             }
             updateProgress(to: newProgress)
+        }
+        .onDisappear {
+            completionTask?.cancel()
+            completionTask = nil
         }
     }
     
@@ -528,8 +535,13 @@ struct AmbientReadingProgressView: View {
         // Trigger celebration animation
         triggerCelebrationPulses()
 
-        // After animation completes: change status and show sheet
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        // After animation completes: change status and show sheet.
+        // Cancelled if the reader drags back below 100% or leaves first.
+        completionTask?.cancel()
+        completionTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled, progress >= 1.0 else { return }
+
             // Now change status to read
             if let bookModel = bookModel {
                 bookModel.readingStatus = ReadingStatus.read.rawValue
