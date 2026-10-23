@@ -154,6 +154,7 @@ struct EditContentOverlay: View {
     let onSave: () -> Void
     @FocusState private var isFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    @State private var keyboardTokens: [NSObjectProtocol] = []
 
     var body: some View {
         GeometryReader { geometry in
@@ -238,7 +239,7 @@ struct EditContentOverlay: View {
             }
 
             // Subscribe to keyboard notifications
-            NotificationCenter.default.addObserver(
+            let showToken = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillShowNotification,
                 object: nil,
                 queue: .main
@@ -250,7 +251,7 @@ struct EditContentOverlay: View {
                 }
             }
 
-            NotificationCenter.default.addObserver(
+            let hideToken = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillHideNotification,
                 object: nil,
                 queue: .main
@@ -259,6 +260,11 @@ struct EditContentOverlay: View {
                     keyboardHeight = 0
                 }
             }
+            keyboardTokens = [showToken, hideToken]
+        }
+        .onDisappear {
+            keyboardTokens.forEach { NotificationCenter.default.removeObserver($0) }
+            keyboardTokens.removeAll()
         }
     }
 }

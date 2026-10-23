@@ -94,6 +94,8 @@ struct AmbientModeView: View {
     @Namespace private var morphingNamespace  // For smooth morphing animation
     @FocusState var isKeyboardFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    // Block-based observer tokens, removed on disappear so repeat visits don't stack callbacks
+    @State private var notificationTokens: [NSObjectProtocol] = []
     @State private var hasAppearedOnce = false  // Prevent keyboard auto-focus on initial load
     
     // Smooth gradient transitions - start visible
@@ -618,6 +620,9 @@ struct AmbientModeView: View {
             bookCoverTimer?.invalidate()
             transcriptionFadeTimer?.invalidate()
             breathingTimer?.invalidate()
+
+            notificationTokens.forEach { NotificationCenter.default.removeObserver($0) }
+            notificationTokens.removeAll()
             
             // Stop any active recording
             if isRecording {
@@ -829,7 +834,7 @@ struct AmbientModeView: View {
             loadExistingSessionIfAvailable()
 
             // Set up listener for queued questions being processed
-            NotificationCenter.default.addObserver(
+            let queuedQuestionToken = NotificationCenter.default.addObserver(
                 forName: .queuedQuestionProcessed,
                 object: nil,
                 queue: .main
@@ -847,9 +852,7 @@ struct AmbientModeView: View {
                     messages.append(answerMessage)
                 }
             }
-        }
-        .onDisappear {
-            NotificationCenter.default.removeObserver(self, name: .queuedQuestionProcessed, object: nil)
+            notificationTokens.append(queuedQuestionToken)
         }
         // Local toast for ambient mode (since fullScreenCover covers ContentView's toast)
         .overlay(alignment: .top) {
@@ -1770,7 +1773,7 @@ struct AmbientModeView: View {
     
     private func setupKeyboardObservers() {
         // Observe keyboard notifications
-        NotificationCenter.default.addObserver(
+        let showToken = NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardWillShowNotification,
             object: nil,
             queue: .main
@@ -1782,7 +1785,7 @@ struct AmbientModeView: View {
             }
         }
         
-        NotificationCenter.default.addObserver(
+        let hideToken = NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardWillHideNotification,
             object: nil,
             queue: .main
@@ -1791,6 +1794,7 @@ struct AmbientModeView: View {
                 keyboardHeight = 0
             }
         }
+        notificationTokens.append(contentsOf: [showToken, hideToken])
     }
     
     private func fadeOutOnboarding() {

@@ -16,6 +16,7 @@ struct LiquidCommandPalette: View {
     @State private var shouldShowSearchResults = false
     @FocusState private var isFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
+    @State private var keyboardTokens: [NSObjectProtocol] = []
     @State private var contentOffset: CGFloat = 0
     
     // Book search integration
@@ -229,7 +230,7 @@ struct LiquidCommandPalette: View {
             }
             
             // Subscribe to keyboard notifications
-            NotificationCenter.default.addObserver(
+            let showToken = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillShowNotification,
                 object: nil,
                 queue: .main
@@ -241,7 +242,7 @@ struct LiquidCommandPalette: View {
                 }
             }
             
-            NotificationCenter.default.addObserver(
+            let hideToken = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillHideNotification,
                 object: nil,
                 queue: .main
@@ -250,6 +251,7 @@ struct LiquidCommandPalette: View {
                     keyboardHeight = 0
                 }
             }
+            keyboardTokens = [showToken, hideToken]
         }
         .sheet(isPresented: $showBookSearch) {
             BookSearchSheet(
@@ -306,6 +308,8 @@ struct LiquidCommandPalette: View {
             }
         }
         .onDisappear {
+            keyboardTokens.forEach { NotificationCenter.default.removeObserver($0) }
+            keyboardTokens.removeAll()
             voiceManager.stopListening()
             // Handle interrupt if palette is being dismissed unexpectedly
             if transitionCoordinator.state != .hidden {
