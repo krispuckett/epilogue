@@ -193,12 +193,25 @@ final class EnhancedTrendingBooksService {
     }
     
     // MARK: - Private Methods
+
+    /// The search cache lives in its own local store. The default configuration
+    /// points at the library's default.store with CloudKit on, which rejects this
+    /// model and must never be opened with a partial schema.
+    private static let searchCacheContainer: ModelContainer? = {
+        let configuration = ModelConfiguration(
+            "SearchCache",
+            schema: Schema([CachedSearchResult.self]),
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
+        return try? ModelContainer(for: CachedSearchResult.self, configurations: configuration)
+    }()
     
     private func fetchTrendingCategory(_ type: TrendingCategory.CategoryType) async -> TrendingCategory? {
         logger.info("Fetching trending books for category: \(type.rawValue)")
         
         // Get model context for caching
-        guard let modelContext = try? ModelContainer(for: CachedSearchResult.self).mainContext else {
+        guard let modelContext = Self.searchCacheContainer?.mainContext else {
             logger.error("Failed to create model context for trending books")
             return nil
         }
