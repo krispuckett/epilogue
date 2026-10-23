@@ -58,8 +58,8 @@ enum ClaudeError: LocalizedError {
 // MARK: - Claude Model
 
 enum ClaudeModel: String {
-    case sonnet = "claude-sonnet-4-6"
-    case opus = "claude-opus-4-6"
+    case sonnet = "claude-sonnet-5-5"
+    case opus = "claude-opus-5-5"
 
     var displayName: String {
         switch self {
@@ -404,6 +404,16 @@ class ClaudeService: ObservableObject {
 
         if let systemPrompt = systemPrompt {
             body["system"] = systemPrompt
+        }
+
+        // Thinking tokens count toward max_tokens, and callers size max_tokens for
+        // the reply alone. Sonnet 5.5 keeps thinking off with between_tools (its
+        // lowest setting). Opus 5.5 cannot turn thinking off, so keep it short.
+        switch model {
+        case .sonnet:
+            body["thinking"] = ["type": "between_tools"]
+        case .opus:
+            body["output_config"] = ["effort": "low"]
         }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
