@@ -26,7 +26,11 @@ final class PerformanceMonitor {
     @ObservationIgnored private var performanceMetrics: [String: PerformanceMetric] = [:]
     
     private init() {
+        // The FPS display link fires every frame for the life of the process.
+        // Nothing in the shipping UI reads it, so it runs in debug builds only.
+        #if DEBUG
         setupDisplayLink()
+        #endif
     }
     
     // MARK: - Public Methods
