@@ -1134,7 +1134,7 @@ struct SettingsView: View {
                 UserDefaults.standard.removeObject(forKey: "perplexity_quota_last_reset")
 
                 // Clean SwiftData store files for fresh start
-                DataRecovery.cleanSwiftDataStore()
+                DataRecovery.deleteSwiftDataStoreForExplicitReset()
 
                 // Force synchronize
                 UserDefaults.standard.synchronize()

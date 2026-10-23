@@ -152,7 +152,7 @@ struct EpilogueApp: App {
 
         // Check if we should clean the database due to repeated failures
         if DataRecovery.shouldAttemptRecovery() {
-            DataRecovery.cleanSwiftDataStore()
+            DataRecovery.quarantineSwiftDataStore()
         }
 
         // CRITICAL: Always use CloudKit for data persistence and sync
@@ -406,8 +406,8 @@ struct EpilogueApp: App {
             print("❌ Fatal: Could not initialize ModelContainer: \(error)")
             #endif
 
-            // Clean the store
-            DataRecovery.cleanSwiftDataStore()
+            // Set the store aside in quarantine so the next launch can retry clean
+            DataRecovery.quarantineSwiftDataStore()
 
             // Create in-memory container as absolute emergency fallback
             // This prevents app crash and allows user to see error message
