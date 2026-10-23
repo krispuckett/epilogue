@@ -138,10 +138,10 @@ struct VolumeInfo: Codable {
     let pageCount: Int?
     let imageLinks: ImageLinks?
     let industryIdentifiers: [IndustryIdentifier]?
-    let publisher: String? = nil
-    let language: String? = nil
-    let averageRating: Double? = nil
-    let ratingsCount: Int? = nil
+    var publisher: String?
+    var language: String?
+    var averageRating: Double?
+    var ratingsCount: Int?
     
     var publishedYear: String? {
         guard let publishedDate = publishedDate else { return nil }
